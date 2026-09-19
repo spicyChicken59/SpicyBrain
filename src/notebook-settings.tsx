@@ -10,13 +10,17 @@ import {
 import { NoteEditor } from "./reader";
 import {
   emptyState,
-  exportText,
+  ImportChangedError,
+  STUDY_BUDGET_BYTES,
+  studyBytes,
+  JSON_FILE_BYTES,
   importPreview,
   nowISO,
-  parseImport,
+  parseImportFile,
+  parseLegacyFile,
   type StudyState,
 } from "./study";
-import { PageTitle, SaveStatus, download, useStudy } from "./ui";
+import { PageTitle, SaveStatus, StudyDownload, useStudy } from "./ui";
 
 export function Search() {
   const { data } = useStudy(),
@@ -273,12 +277,16 @@ export function Notebook({ id }: { id?: string }) {
 export function Settings() {
   const { data, store } = useStudy();
   const [incoming, setIncoming] = useState<StudyState | null>(null),
+    [basis, setBasis] = useState<StudyState | null>(null),
+    [legacyFile, setLegacyFile] = useState<File | null>(null),
     [mode, setMode] = useState<"merge" | "replace">("merge"),
     [confirm, setConfirm] = useState(false),
     [reset, setReset] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
-  const preview = incoming ? importPreview(data, incoming, knownIds) : null;
+  const preview =
+    incoming && basis ? importPreview(basis, incoming, knownIds) : null;
+  const oversized = studyBytes(data) > STUDY_BUDGET_BYTES;
   const pref = (patch: Partial<StudyState["settings"]>) => {
     const updatedAt = nowISO();
     void store.change((s) => ({
@@ -286,18 +294,38 @@ export function Settings() {
       settings: { ...s.settings, ...patch, updatedAt },
     }));
   };
-  const loadFile = async (file?: File) => {
+  const loadFile = async (file?: File, legacy = false) => {
     setIncoming(null);
+    setLegacyFile(null);
     setConfirm(false);
     if (!file) return;
+    setBusy(true);
     try {
-      if (file.size > 5_000_000) throw Error("Import exceeds the 5 MB limit.");
-      setIncoming(parseImport(await file.text()));
+      const prefix = await file.slice(0, 80).text();
+      if (
+        !legacy &&
+        file.size > JSON_FILE_BYTES &&
+        !prefix.startsWith('{"format":"SpicyBrain framed backup')
+      ) {
+        setLegacyFile(file);
+        setMessage(
+          "This older JSON file exceeds 20 MB. Nothing has been changed. Use the compatibility reader below only for a backup you intend to restore.",
+        );
+        return;
+      }
+      const parsed = legacy
+        ? await parseLegacyFile(file)
+        : await parseImportFile(file);
+      const current = await store.readLatest();
+      setBasis(current);
+      setIncoming(parsed);
       setMessage("Import validated. Review the preview before applying.");
     } catch {
       setMessage(
         "This file is invalid, too large, or from an unsupported future version. No data changed.",
       );
+    } finally {
+      setBusy(false);
     }
   };
   return (
@@ -374,17 +402,25 @@ export function Settings() {
             Export is a manual download; it is not cloud sync. Moving to another
             domain or browser requires export/import.
           </p>
-          <button
+          <p>
+            Active study data has a 16 MB UTF-8 budget. Notes and drafts allow
+            up to 100,000 characters each. A limit or storage failure keeps
+            unsaved text available in recovery downloads.
+          </p>
+          {oversized && (
+            <p className="sc-notice">
+              This preserved collection exceeds the active budget. It remains
+              readable and exportable; only edits that do not increase its size
+              can save. Back up before shortening text or replacing it with a
+              smaller collection.
+            </p>
+          )}
+          <StudyDownload
+            name="SpicyBrain-study-data.json"
             className="sc-btn sc-btn--primary"
-            onClick={() => {
-              download("SpicyBrain-study-data.json", exportText(data));
-              setMessage(
-                "Export download requested. Keep the file somewhere you can find it. Browser save status is separate.",
-              );
-            }}
           >
             Export all study data
-          </button>
+          </StudyDownload>
           <p className="sc-hint">
             The file contains personal study text. Share it only when you intend
             to.
@@ -398,17 +434,54 @@ export function Settings() {
           stays recoverable.
         </p>
         <label className="sc-field">
-          Study data file (.json, up to 5 MB)
+          Study data file (.json or .jsonl)
           <input
             className="sc-input"
             type="file"
-            accept=".json,application/json"
+            accept=".json,.jsonl,application/json,application/x-ndjson"
+            disabled={busy}
             onChange={(e) => void loadFile(e.target.files?.[0])}
           />
         </label>
+        <p className="sc-hint">
+          Plain JSON supports up to 20 MB. Larger recovery exports use a single
+          framed .jsonl file with bounded 1 MB frames. Older, larger collections
+          can be restored intact, but adding more data is paused above the
+          active budget. Large restores need enough browser memory and storage.
+        </p>
+        {legacyFile && (
+          <div className="sc-notice">
+            <p>
+              The compatibility reader opens older large JSON exports. It may
+              need substantial memory. The whole file is validated before the
+              import preview; no data is written by opening it.
+            </p>
+            <button
+              className="sc-btn sc-btn--secondary"
+              disabled={busy}
+              onClick={() => void loadFile(legacyFile, true)}
+            >
+              Open older large backup
+            </button>
+          </div>
+        )}
         {preview && incoming && (
           <div className="import-preview">
             <h3>Import preview</h3>
+            <p>
+              This preview includes saved work from other tabs. If study data
+              changes before you apply it, you will be asked to review a
+              refreshed preview. Merge keeps new saved work; replacement
+              explicitly removes the confirmed collection.
+            </p>
+            {studyBytes(incoming) > STUDY_BUDGET_BYTES && (
+              <p className="sc-notice">
+                This backup exceeds the 16 MB active budget. Restoration
+                preserves every record. Further growth cannot save until the
+                collection is reduced; export and non-growing edits remain
+                available.
+              </p>
+            )}
             <div className="sc-table-scroll">
               <table className="sc-table">
                 <thead>
@@ -425,7 +498,7 @@ export function Settings() {
                       <td>{n}</td>
                       <td>
                         {
-                          Object.keys(data[k as keyof StudyState] as object)
+                          Object.keys(basis![k as keyof StudyState] as object)
                             .length
                         }
                       </td>
@@ -481,14 +554,9 @@ export function Settings() {
                   uses this file instead. Export your current data first if you
                   want to retain it.
                 </p>
-                <button
-                  className="sc-btn sc-btn--secondary"
-                  onClick={() =>
-                    download("SpicyBrain-before-replace.json", exportText(data))
-                  }
-                >
+                <StudyDownload name="SpicyBrain-before-replace.json">
                   Export current data first
-                </button>
+                </StudyDownload>
                 <label className="sc-check">
                   <input
                     type="checkbox"
@@ -506,16 +574,28 @@ export function Settings() {
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    await store.import(incoming, mode);
+                    await store.import(incoming, mode, basis!);
                     setIncoming(null);
                     setConfirm(false);
                     setMessage(
                       "Import committed. All study records were saved in one transaction.",
                     );
-                  } catch {
-                    setMessage(
-                      "Import could not be committed, or immutable events conflict. Existing data was not changed. Export both copies before resolving conflicting events.",
-                    );
+                  } catch (error) {
+                    if (error instanceof ImportChangedError) {
+                      setConfirm(false);
+                      try {
+                        setBasis(await store.readLatest());
+                        setMessage(error.message);
+                      } catch {
+                        setIncoming(null);
+                        setMessage(
+                          "The preview could not be refreshed. Existing data was not replaced. Reopen the backup when storage is available.",
+                        );
+                      }
+                    } else
+                      setMessage(
+                        "Import could not be committed, or immutable events conflict. Existing data was not changed. Export both copies before resolving conflicting events.",
+                      );
                   } finally {
                     setBusy(false);
                   }
@@ -525,6 +605,7 @@ export function Settings() {
               </button>
               <button
                 className="sc-btn sc-btn--secondary"
+                disabled={busy}
                 onClick={() => {
                   setIncoming(null);
                   setMessage("Import cancelled. No data changed.");
@@ -543,14 +624,9 @@ export function Settings() {
           Reset removes all local notes, attempts, reviews, drafts, and
           preferences. Export before continuing if you want a backup.
         </p>
-        <button
-          className="sc-btn sc-btn--secondary"
-          onClick={() =>
-            download("SpicyBrain-before-reset.json", exportText(data))
-          }
-        >
+        <StudyDownload name="SpicyBrain-before-reset.json">
           Export before reset
-        </button>
+        </StudyDownload>
         <label className="sc-field">
           Type RESET to confirm
           <input

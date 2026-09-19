@@ -1,6 +1,6 @@
 # Acceptance evidence
 
-Builder acceptance work dated **2026-09-19**, on the locally served production build. Independent guidance review has not happened. No live site is published and no Databricks/cloud execution was performed.
+Builder acceptance work dated **2026-09-19**, on the locally served production build. Independent guidance review reproduced two preservation defects in the initial PR; corrections require independent re-review. No live site is published and no Databricks/cloud execution was performed.
 
 ## Production coverage
 
@@ -24,11 +24,11 @@ A separate capstone includes six required deliverable groups, six stakeholder di
 
 ## Deterministic and browser evidence
 
-`npm run check` passed: production/reference/negative content validation, TypeScript, ESLint, **36 unit/integration tests**, and the production build. Synthetic arithmetic verifies correction/quarantine output and cost/value sensitivity. It is not Databricks execution.
+`npm run check` passed: production/reference/negative content validation, TypeScript, ESLint, **44 unit/integration tests**, and the production build. Synthetic arithmetic verifies correction/quarantine output and cost/value sensitivity. It is not Databricks execution.
 
 Local runtime: Node 24.19.0, Playwright 1.63.0, actual Chromium 153.0.8010.0, Linux. Desktop 1440×1000; mobile viewport 390×844, plus a touch-enabled mobile context; 320×800 with all stylesheet text sizes doubled independently of viewport. Light/dark and reduced-motion preferences are exercised. Physical devices and assistive-technology hardware were not tested.
 
-The final Chromium suite has 12 journeys. An earlier complete 13-test run also executed the shared mobile-smoke file in Chromium; it is **not** WebKit evidence. The final config restricts that file to the WebKit project. Local WebKit 26.6 / Playwright build 2359 downloaded but could not launch because GTK4/GStreamer and related system libraries are missing; installing OS dependencies was denied by the environment (`setgroups/chown` package-manager errors). `SKIP_WEBKIT=1` is a local limitation, not a pass. CI attempts the real WebKit mobile emulation using its supported Ubuntu runner.
+The corrected Chromium suite has 15 journeys: the original 12 plus native concurrent-tab import, >5 MB export/recovery restoration, and oversized legacy/framed compatibility. The separate WebKit mobile emulation smoke runs only in the WebKit project. Local WebKit 26.6 / Playwright build 2359 lacks GTK4/GStreamer and related OS libraries; `SKIP_WEBKIT=1` is a limitation, not a pass. CI uses supported Ubuntu dependencies. The initial exact-head CI run passed WebKit, but that older result does not validate these corrections; the PR links the final correction-head run.
 
 | Gate | Observed assertions                                                                                                                                                                                                                                                                                         |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -48,8 +48,7 @@ The final Chromium suite has 12 journeys. An earlier complete 13-test run also e
 ## Reproduce
 
 ```sh
-npm ci
-npm run prepare:content
+npm ci --ignore-scripts
 npm run check
 APP_BASE=/SpicyBrain/ APP_OUT=dist-nested npm run build
 npx playwright install --with-deps chromium webkit
@@ -60,7 +59,7 @@ npm run report:sources
 
 In this constrained local environment, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to the available local Chromium executable and `SKIP_WEBKIT=1`. The preview/test server must be started by the same command environment as the browser; separate tool sessions have isolated loopback contexts. No tunnel or public hosting was used to obtain browser evidence.
 
-The CI workflow checks out the exact PR head, records it in `test-results/tested-head.txt` **after** the runner creates its results directory, and uploads only synthetic screenshots/traces/reports. Its URL, run ID, conclusion and actual head SHA belong in the PR handoff after the run exists; no older green run is attributed to newer code. Local screenshots were generated from the implementation working tree before the first feature commit; [build-inputs.json](evidence/build-inputs.json) identifies their matching code/content inputs. Exact-head reruns and CI evidence are linked in the PR.
+The CI workflow installs with lifecycle scripts disabled, asserts that catalog/search generated files are absent, and runs the now self-preparing `npm run check`. It checks out the exact PR head, records it in `test-results/tested-head.txt` **after** the runner creates its results directory, and uploads only synthetic screenshots/traces/reports. Its URL, run ID, conclusion and actual head SHA belong in the PR handoff after the run exists; no older green run is attributed to newer code. Local screenshots were generated from the implementation working tree before the first feature commit; [build-inputs.json](evidence/build-inputs.json) identifies their matching code/content inputs. Exact-head reruns and CI evidence are linked in the PR.
 
 ## Evidence files and limits
 
@@ -68,4 +67,8 @@ The CI workflow checks out the exact PR head, records it in `test-results/tested
 
 [Extension manifest](evidence/content-extension.json) includes the actual added/renamed content file diff and empty engine diff. [Source availability](evidence/source-availability.json) records 23/23 HTTP 200 probes separately from the [claim review](SOURCE-REVIEW.md). A reachable URL does not prove its lesson true. [Editorial matrix](EDITORIAL-REVIEW.md) covers the complete review scope and corrections.
 
-The build has a large-chunk advisory (about 305 KB gzip JavaScript) because the complete bounded course and search index ship together. No measured production-scale performance claim is made. Local storage can be lost or denied; unsaved memory can be lost on tab closure; there is no automatic sync. A recovery download is not a persisted browser save. WebKit local launch is unavailable; CI and physical-device status must be reported separately. No known failing Chromium acceptance assertion remains at the reported passing run. The UI disclosure/config-only final adjustments are verified again at the feature commit before handoff.
+The build has a large-chunk advisory (about 305 KB gzip JavaScript) because the complete bounded course and search index ship together. No measured production-scale performance claim is made. Local storage can be lost or denied; unsaved memory can be lost on tab closure; there is no automatic sync. A recovery download is not a persisted browser save. WebKit local launch is unavailable; CI and physical-device status must be reported separately. No known failing Chromium acceptance assertion remains at the reported passing run. The preservation corrections and final-head CI are reported separately in the PR handoff.
+
+## PR #1 preservation corrections
+
+The baseline `3bbd1576442a69dbb964f2a8498e7e206d11b291` reproduced the independent review exactly: another store's saved note disappeared on merge, an empty merge erased it, and the valid 51-note export was rejected at 5,118,056 bytes. See [correction evidence](CORRECTIONS.md) for the focused regressions and final-run links in the PR. These are new preservation tests, not claims about the earlier green suite.

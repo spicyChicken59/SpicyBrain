@@ -310,25 +310,147 @@ export function validateState(value: unknown): StudyState {
   }
   return s;
 }
+// Decimal UTF-8 bytes, measured on canonical state JSON (not JS string length).
+export const STUDY_BUDGET_BYTES = 16_000_000;
+export const JSON_FILE_BYTES = 20_000_000;
+export const BACKUP_FRAME_BYTES = 1_000_000;
+const FRAME_PAYLOAD_CHARS = 100_000; // Even fully escaped UTF-16 stays below the frame limit.
+const framedFormat = "SpicyBrain framed backup v1";
+export const utf8Bytes = (value: string) =>
+  new TextEncoder().encode(value).byteLength;
+export const studyBytes = (state: StudyState) =>
+  utf8Bytes(JSON.stringify(state));
+function checkGrowth(before: StudyState, after: StudyState) {
+  const bytes = studyBytes(after);
+  if (bytes > STUDY_BUDGET_BYTES && bytes > studyBytes(before))
+    throw Error(
+      "Study data exceeds the 16 MB active-data budget. This edit is unsaved, but remains in recovery downloads. Export a backup, then shorten text or restore a smaller collection before adding more work.",
+    );
+}
+const envelopeSchema = z
+  .object({
+    format: z.literal("SpicyBrain study data"),
+    exportedAt: iso,
+    state: z.unknown(),
+  })
+  .strict();
+const frameHeader = z
+  .object({
+    format: z.literal(framedFormat),
+    parts: z.number().int().positive().safe(),
+    bytes: z.number().int().positive().safe(),
+  })
+  .strict();
+const frameSchema = z
+  .object({
+    part: z.number().int().min(0).safe(),
+    data: z.string().max(FRAME_PAYLOAD_CHARS),
+  })
+  .strict();
 export function exportText(s: StudyState, at = nowISO()) {
-  return JSON.stringify(
+  // Oversized legacy states and unsaved recovery data are never truncated.
+  const raw = JSON.stringify(
     { format: "SpicyBrain study data", exportedAt: at, state: s },
     null,
     2,
   );
+  const bytes = utf8Bytes(raw);
+  if (bytes <= JSON_FILE_BYTES) return raw;
+  const parts = Math.ceil(raw.length / FRAME_PAYLOAD_CHARS);
+  const lines = [JSON.stringify({ format: framedFormat, parts, bytes })];
+  for (let part = 0; part < parts; part++)
+    lines.push(
+      JSON.stringify({
+        part,
+        data: raw.slice(
+          part * FRAME_PAYLOAD_CHARS,
+          (part + 1) * FRAME_PAYLOAD_CHARS,
+        ),
+      }),
+    );
+  return lines.join("\n");
+}
+function decodeFrames(lines: Iterable<string>): string {
+  const iterator = lines[Symbol.iterator]();
+  const headerLine = iterator.next().value as string | undefined;
+  if (!headerLine || utf8Bytes(headerLine) > BACKUP_FRAME_BYTES)
+    throw Error("Invalid backup header");
+  const header = frameHeader.parse(JSON.parse(headerLine));
+  const chunks: string[] = [];
+  let bytes = 0;
+  for (const line of { [Symbol.iterator]: () => iterator }) {
+    if (utf8Bytes(line) > BACKUP_FRAME_BYTES)
+      throw Error("Backup frame exceeds 1 MB. No data changed.");
+    const frame = frameSchema.parse(JSON.parse(line));
+    if (frame.part !== chunks.length || chunks.length >= header.parts)
+      throw Error("Missing, reordered, or extra backup frame");
+    chunks.push(frame.data);
+    // Bound expansion by the actual transport; never allocate from header declarations.
+    bytes += frame.data.length;
+    if (bytes > header.bytes) throw Error("Invalid backup length");
+  }
+  const raw = chunks.join("");
+  if (chunks.length !== header.parts || utf8Bytes(raw) !== header.bytes)
+    throw Error("Incomplete backup");
+  return raw;
+}
+function parseEnvelope(raw: string): StudyState {
+  return migrateState(envelopeSchema.parse(JSON.parse(raw)).state);
 }
 export function parseImport(raw: string): StudyState {
-  if (new TextEncoder().encode(raw).byteLength > 5_000_000)
-    throw Error("Import exceeds the 5 MB limit. No data changed.");
-  const envelope = z
-    .object({
-      format: z.literal("SpicyBrain study data"),
-      exportedAt: iso,
-      state: z.unknown(),
-    })
-    .strict()
-    .parse(JSON.parse(raw));
-  return migrateState(envelope.state);
+  if (raw.startsWith('{"format":"SpicyBrain framed backup'))
+    return parseEnvelope(decodeFrames(raw.split("\n")));
+  if (utf8Bytes(raw) > JSON_FILE_BYTES)
+    throw Error(
+      "Plain JSON exceeds 20 MB. Use a framed recovery backup. No data changed.",
+    );
+  return parseEnvelope(raw);
+}
+// File reads are bounded even when a preserved legacy collection is larger than
+// today's active budget. The collection itself must still fit browser memory/storage.
+export async function parseImportFile(file: Blob): Promise<StudyState> {
+  const prefix = await file.slice(0, 80).text();
+  if (!prefix.startsWith('{"format":"SpicyBrain framed backup')) {
+    if (file.size > JSON_FILE_BYTES)
+      throw Error("Plain JSON exceeds 20 MB. No data changed.");
+    return parseImport(await file.text());
+  }
+  const lines: string[] = [];
+  let pending = "";
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  for (let offset = 0; offset < file.size; offset += 65536) {
+    pending += decoder.decode(
+      await file.slice(offset, offset + 65536).arrayBuffer(),
+      { stream: true },
+    );
+    let newline: number;
+    while ((newline = pending.indexOf("\n")) >= 0) {
+      const line = pending.slice(0, newline);
+      if (utf8Bytes(line) > BACKUP_FRAME_BYTES)
+        throw Error("Backup frame exceeds 1 MB. No data changed.");
+      lines.push(line);
+      pending = pending.slice(newline + 1);
+    }
+    if (utf8Bytes(pending) > BACKUP_FRAME_BYTES)
+      throw Error("Backup frame exceeds 1 MB. No data changed.");
+  }
+  pending += decoder.decode();
+  if (pending) lines.push(pending);
+  return parseEnvelope(decodeFrames(lines));
+}
+// Explicit compatibility path for monolithic exports made before framing existed.
+// Read in bounded slices; never rewrite or trim legacy data to fit today's budget.
+export async function parseLegacyFile(file: Blob): Promise<StudyState> {
+  const chunks: string[] = [],
+    decoder = new TextDecoder("utf-8", { fatal: true });
+  for (let offset = 0; offset < file.size; offset += 65536)
+    chunks.push(
+      decoder.decode(await file.slice(offset, offset + 65536).arrayBuffer(), {
+        stream: true,
+      }),
+    );
+  chunks.push(decoder.decode());
+  return parseEnvelope(chunks.join(""));
 }
 function stableHash(value: string) {
   let h = 2166136261;
@@ -487,11 +609,41 @@ export type StoreSnapshot = {
   status: "loading" | "saving" | "saved" | "unsaved";
   error: string | null;
 };
+export class ImportChangedError extends Error {
+  constructor() {
+    super(
+      "Study data changed since this preview. Review the updated preview and confirm again.",
+    );
+  }
+}
 export class StudyStore {
   private db: IDBPDatabase | undefined;
   private listeners = new Set<() => void>();
   private queue = Promise.resolve();
-  private pending: ((s: StudyState) => StudyState)[] = [];
+  private pending: {
+    sequence: number;
+    apply: (s: StudyState) => StudyState;
+  }[] = [];
+  private sequence = 0;
+  private replay(data: StudyState, pending = this.pending) {
+    return pending.reduce((s, op) => op.apply(s), data);
+  }
+  private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(task);
+    this.queue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+  private committed(data: StudyState, through: number) {
+    this.pending = this.pending.filter((p) => p.sequence > through);
+    this.emit({
+      data: this.replay(data),
+      status: this.pending.length ? "saving" : "saved",
+      error: null,
+    });
+  }
   private snap: StoreSnapshot = {
     data: emptyState(),
     status: "loading",
@@ -551,7 +703,7 @@ export class StudyStore {
       await tx.done;
       // A blocked upgrade may have allowed edits in memory. Replay, never erase them.
       this.emit({
-        data: this.pending.reduce((s, op) => op(s), data),
+        data: this.replay(data),
         status: this.pending.length ? "saving" : "saved",
         error: null,
       });
@@ -566,69 +718,100 @@ export class StudyStore {
     }
   }
   change(fn: (s: StudyState) => StudyState) {
-    const data = fn(this.snap.data);
-    this.pending.push(fn);
-    this.emit({ data, status: "saving", error: null });
-    this.queue = this.queue.then(async () => {
-      if (!this.pending.length) return;
-      const batch = [...this.pending];
+    const data = fn(this.snap.data),
+      through = ++this.sequence;
+    this.pending.push({ sequence: through, apply: fn });
+    // Keep an existing recovery notice stable until a write actually succeeds.
+    this.emit({ data, status: "saving", error: this.snap.error });
+    return this.enqueue(async () => {
+      const batch = this.pending.filter((p) => p.sequence <= through);
+      if (!batch.length) return;
+      let tx;
       try {
         if (!this.db) throw Error("Storage unavailable");
-        this.fault?.();
-        const tx = this.db.transaction("study", "readwrite");
+        tx = this.db.transaction("study", "readwrite");
         const stored = await tx.store.get("root");
-        const combined = validateState(
-          batch.reduce(
-            (s, op) => op(s),
-            stored ? migrateState(stored) : emptyState(),
-          ),
-        );
+        const before = stored ? migrateState(stored) : emptyState();
+        const combined = validateState(this.replay(before, batch));
+        checkGrowth(before, combined);
         await tx.store.put(combined, "root");
+        this.fault?.();
         await tx.done;
-        this.pending.splice(0, batch.length);
-        this.emit({
-          data: this.pending.reduce((s, op) => op(s), combined),
-          status: this.pending.length ? "saving" : "saved",
-          error: null,
-        });
-      } catch {
+        this.committed(combined, through);
+      } catch (error) {
+        if (tx) {
+          try {
+            tx.abort();
+          } catch {
+            /* Already complete. */
+          }
+          await tx.done.catch(() => {});
+        }
         this.emit({
           ...this.snap,
           status: "unsaved",
           error:
-            "Not saved in this browser. Your draft is still here. Download recovery data, or retry saving.",
+            error instanceof Error &&
+            error.message.startsWith("Study data exceeds")
+              ? error.message
+              : "Not saved in this browser. Your draft is still here. Download recovery data, or retry saving.",
         });
       }
     });
-    return this.queue;
   }
-  async replace(next: StudyState) {
-    validateState(next);
-    await this.queue;
-    if (!this.db)
-      throw Error("Storage unavailable. Existing data was not replaced.");
-    const tx = this.db.transaction("study", "readwrite");
-    try {
-      await tx.store.put(next, "root");
-      this.fault?.();
-      await tx.done;
-      this.pending = [];
-      this.emit({ data: next, status: "saved", error: null });
-    } catch (e) {
-      try {
-        tx.abort();
-      } catch {
-        /* Already aborted. */
+  // Used for preview/export: include other tabs' committed work and this tab's
+  // unsaved operations. This is a queue barrier, not a background-sync promise.
+  readLatest() {
+    return this.enqueue(async () => {
+      let data = this.snap.data;
+      if (this.db) {
+        const saved = await this.db.get("study", "root");
+        data = this.replay(saved ? migrateState(saved) : emptyState());
+        this.emit({ ...this.snap, data });
       }
-      await tx.done.catch(() => {});
-      throw e;
-    }
+      return data;
+    });
   }
-  async import(next: StudyState, mode: "merge" | "replace") {
-    await this.queue;
-    await this.replace(
-      mode === "merge" ? mergeStates(this.snap.data, next) : next,
-    );
+  replace(next: StudyState) {
+    return this.import(next, "replace");
+  }
+  import(next: StudyState, mode: "merge" | "replace", expected?: StudyState) {
+    // Validate/copy before queuing so callers cannot change the pending import.
+    const incoming = validateState(next),
+      through = this.sequence;
+    const basis = expected
+      ? JSON.stringify(validateState(expected))
+      : undefined;
+    return this.enqueue(async () => {
+      if (!this.db)
+        throw Error("Storage unavailable. Existing data was not changed.");
+      const tx = this.db.transaction("study", "readwrite");
+      try {
+        const saved = await tx.store.get("root");
+        const batch = this.pending.filter((p) => p.sequence <= through);
+        const latest = validateState(
+          this.replay(saved ? migrateState(saved) : emptyState(), batch),
+        );
+        if (basis !== undefined && basis !== JSON.stringify(latest))
+          throw new ImportChangedError();
+        const combined =
+          mode === "merge" ? mergeStates(latest, incoming) : incoming;
+        // Restores may contain data accepted by an older build. Preserve it in
+        // full; normal subsequent edits must obey the non-growing legacy policy.
+        await tx.store.put(combined, "root");
+        this.fault?.();
+        await tx.done;
+        this.committed(combined, through);
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {
+          /* Already aborted. */
+        }
+        await tx.done.catch(() => {});
+        throw error;
+      }
+    });
   }
   flush = () => this.queue;
   close() {

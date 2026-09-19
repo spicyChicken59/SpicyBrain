@@ -21,9 +21,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           package-manager-cache: false
-      - run: npm ci
-      - run: npm run prepare:content
-      - run: npm run check
+      - name: Clean install without lifecycle-generated files
+        run: npm ci --ignore-scripts
+      - name: Fresh-checkout acceptance (check generates its own content)
+        run: |
+          test ! -e src/generated/catalog.json
+          test ! -e src/generated/search.json
+          npm run check
       - name: Build nested-path artifact
         run: npm run build
         env:

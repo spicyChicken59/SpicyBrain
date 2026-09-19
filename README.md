@@ -16,9 +16,10 @@ npm run prepare:content
 npm run dev
 ```
 
-For production acceptance:
+For production acceptance from a fresh checkout (no generated files are required beforehand):
 
 ```sh
+npm ci --ignore-scripts
 npm run check
 APP_BASE=/SpicyBrain/ APP_OUT=dist-nested npm run build
 npx playwright install --with-deps chromium webkit
@@ -26,6 +27,8 @@ npm run test:e2e
 npm run test:content-extension
 npm run report:sources
 ```
+
+`npm run check` validates and generates the content catalog/search before typechecking. It does not depend on install scripts or a previous build.
 
 `npm run preview` serves the root production build on loopback port 4173. Browser acceptance launches its own loopback-only static server on 4183. Root output is `dist/`; the optional nested output is `dist-nested/`. Hash routes need no host rewrite. `report:sources` writes a dated availability report independently from the build gate.
 

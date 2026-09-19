@@ -31,6 +31,52 @@ export function download(name: string, text: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+export function StudyDownload({
+  name,
+  children,
+  className = "sc-btn sc-btn--secondary",
+}: {
+  name: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const { store } = useStudy();
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  return (
+    <>
+      <button
+        className={className}
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError("");
+          try {
+            const data = await store
+              .readLatest()
+              .catch(() => store.getSnapshot().data);
+            const raw = exportText(data);
+            download(
+              raw.startsWith('{"format":"SpicyBrain framed backup')
+                ? name.replace(/\.json$/, ".jsonl")
+                : name,
+              raw,
+            );
+          } catch {
+            setError(
+              "The download could not be prepared. Keep this tab open and try again.",
+            );
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {children}
+      </button>
+      {error && <p role="alert">{error}</p>}
+    </>
+  );
+}
 export function MD({ children }: { children: string }) {
   return (
     <Markdown
@@ -133,14 +179,9 @@ export function StorageNotice() {
         <aside className="sc-notice" role="alert">
           <p>{error}</p>
           <div className="actions">
-            <button
-              className="sc-btn sc-btn--secondary"
-              onClick={() =>
-                download("SpicyBrain-recovery.json", exportText(data))
-              }
-            >
+            <StudyDownload name="SpicyBrain-recovery.json">
               Download recovery data
-            </button>
+            </StudyDownload>
             <button
               className="sc-btn sc-btn--ghost"
               onClick={() => void store.change((s) => s)}
