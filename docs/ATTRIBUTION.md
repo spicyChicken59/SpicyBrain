@@ -1,0 +1,9 @@
+# Design, fonts and original teaching material
+
+The read-only SpicyChicken design source is `spicyChicken59/design-system` at commit `14a752dd0269bd6ebbb7080eb0d9e1922cd1ef2c`, version v2.13.0. README, DESIGN_SYSTEM.md, VISUAL-RECIPES.md, vendor script and LICENSE were inspected. This is the committed snapshot; no unpublished standalone release tag or CDN version was assumed.
+
+`public/design-system/provenance.json` records every vendored file's SHA-256. `verifyDesign()` rejects changes to those bytes. The original LICENSE preserves MIT terms for eligible design code and the separate brand exception: the chick/brand remain all rights reserved. The original mark is reused only for the owner's SpicyChicken-family app, with the name SpicyBrain in type and a restrained footer watermark. No mascot was invented or upstream/sibling modified.
+
+Only the CSS and original chick SVGs are loaded at runtime. `src/generated/design.css` derives from `sc.css` solely by removing its remote Google Fonts import. The source snapshot itself is unchanged. The line-based removal was verified by real network capture after a first regex missed semicolons inside the font URL. Fonts now come from pinned local Fontsource packages. Notices are shipped at `public/licenses/`: Bricolage Grotesque, Instrument Sans, and IBM Plex Mono, each under its included SIL Open Font License. Package/source copyright text is preserved verbatim in those notice files.
+
+All course prose, Cinderline fiction, datasets and teaching SVGs are original authored educational material. No third-party product screenshot, proprietary training, customer data, or copied course passage was imported. Source links support factual claims; they do not license the course as official material. Original course/brand assets have no blanket MIT grant. The repository has no catch-all open-source license.
