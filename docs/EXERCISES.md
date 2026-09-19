@@ -20,13 +20,19 @@ schemas and captured formatted Spark plan in
 CI produces its own exact-head artifact; do not relabel the Windows local run
 as Linux CI, physical-device browser evidence or a Databricks execution.
 
-The completed local suite passed **30 tests, zero failures/errors/skips** in
+The initial milestone's local suite passed **30 tests, zero failures/errors/skips** in
 102.154 seconds with Python 3.12.14, Temurin Java 17.0.20.1+1 and Spark 4.0.4.
-Seven exact displayed Python/SQL examples are copied with a SHA manifest and
-executed, including separately asserted changed-input tasks. The final archive
-also passed CRC/path checks and an extracted standalone 21-test Python smoke
+At that initial milestone, seven exact displayed Python/SQL examples were copied
+with a SHA manifest and executed, including separately asserted changed-input
+tasks. That initial archive also passed CRC/path checks and an extracted standalone 21-test Python smoke
 run; [bundle-check evidence](evidence/reliable-data-bundle-check.json) keeps that
 limited packaging check separate from the full Spark execution.
+
+These initial counts are historical and did not cover the subsequently found
+unkeyed conflict. [Correction acceptance](PUBLICATION-GATE-CORRECTION.md)
+separates the unchanged-source reproductions from corrected source-tree and
+extracted-bundle runs. The current linked execution and bundle evidence files
+are regenerated from those actual correction runs.
 
 The initial Spark 4.0.1 attempt failed in Windows Python workers. Apache's
 [SPARK-53759](https://issues.apache.org/jira/browse/SPARK-53759) documents the
@@ -70,12 +76,19 @@ composite order-line keys, integer cents and retained explicit cancellations.
 | Valid A3 correction and replay | A3 14/1; C1 8/0; total 22/1 | New snapshot once; correction replay does not add it twice |
 | Conflicting A event or A2 payload | A unresolved; prepared accepted C1 only | New report blocked; last verified 20/1 explicitly stale/previous |
 | Invalid latest A3 or missing A ordering | A unresolved; no resurrection of A2 | Same publication block |
+| Same nonempty event ID, conflicting quantities, no usable inspection key | Both payloads retained/quarantined; conflict exists even with no unresolved key | First run: no snapshot/effect. With a prior report: retain it as stale; do not publish a diagnostic 22/1 correction candidate |
 | Failure after retained raw/resolution | Correction retained; previous report stays 20/1 and stale | Recovery publishes independently expected 22/1 |
 | Failure after publication | 22/1 published; local effect not yet recorded | Recovery records one idempotency-keyed local effect |
 | Order-line transfer | O7=900 cents; O8=400; total 1300 | Cancellation tombstone retained; ambiguous current line refuses report |
 
 The Python reference is intentionally stricter for unresolved historical
-identity conflicts: it blocks associated keys pending manual adjudication.
+identity conflicts: it blocks publication pending manual adjudication, whether
+or not usable inspection keys can be attributed to the conflict. Its conflict
+evidence remains distinct from the unresolved-key list. SQL and PySpark expose
+the same gate in a one-row `publication` relation, including event-conflict,
+revision-conflict and unresolved-key counts; they do not themselves simulate
+publishing a report or recording an effect. Empty unresolved keys alone cannot
+authorize a report.
 There is no arbitrary tie-break or automatic conflict repair. Baseline B's
 never-valid exclusion policy is distinct from invalid latest A's unresolved
 current state. Neither policy claims complete source coverage.
@@ -93,6 +106,10 @@ illustrative/unexecuted with a separately named runtime context.
 ## Updating the downloadable artifact
 
 Keep code/data/text in `content/exercises/reliable-data/`, outside app logic.
+Synchronize the embedded code and regenerate snippets with
+`python content/exercises/reliable-data/sync_lesson_examples.py --embed-source`.
+The [authoring commands](AUTHORING.md#downloadable-exercises) cover the exact
+execution, packaging, checksum and extracted-bundle validation sequence.
 Run the complete tests, then package only authored files and sanitized execution
 JSON using `package_bundle.py`; it rejects cache files and writes deterministic
 ZIP entries. Update the course download SHA-256 after packaging. The content

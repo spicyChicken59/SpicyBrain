@@ -2,6 +2,8 @@
 
 Builder verification for the approved [study-hub milestone](STUDY-HUB-MILESTONE.md). Starting base: `a3e858937ef72b0f7a6a474650def0b7b9e8ab23`; branch: `feat/study-hub-reliable-data-foundations`. The PR records the final head, exact-head workflow, job and artifact links. This document records local observations; it is not independent learner validation or deployment acceptance.
 
+The initial results below describe the milestone at `88e81ebb456d631f0fc30de875ea5c85439dfefa`. They did not cover the subsequently reproduced unkeyed provenance conflict. The bounded same-PR correction, original failures, corrected execution and affected-reader evidence are recorded in [PUBLICATION-GATE-CORRECTION.md](PUBLICATION-GATE-CORRECTION.md). The original green workflow is not acceptance for the correction head.
+
 ## Before and after
 
 The prior entry started a role-oriented course. The new Today offers the content-defined Reliable Data Foundations path, while a returning learner retains the actual saved topic/section. Learn provides roadmaps, direct topics and task references into the same canonical content. Practice, scenarios and the capstone remain accessible. Explicit path context governs previous/next; a direct topic visibly falls back to its own course. Search/playbook detours preserve the original resume, including a detour to another section of the same topic. Revised and removed content states are explained rather than silently completed or reset.

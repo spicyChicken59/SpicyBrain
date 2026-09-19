@@ -54,6 +54,18 @@ Put a local `.zip` bundle under `content/downloads/`, then declare course `downl
 
 Archives may contain `.md`, `.txt`, `.json`, `.csv`, `.py`, `.sql` and `.toml` files. Limits are 20 MB compressed, 50 MB total declared expanded size and 200 entries. Traversal, absolute or reserved paths, symlinks, encryption, duplicate/case-colliding names and unsupported compression are rejected. The exact bytes must match the manifest checksum. Explain setup, dependencies, expected outputs and known limits in the bundle. Preserve an attempt/solution distinction; do not describe illustrative code as executed cloud evidence. Regenerate the archive and checksum after any bundled-file change.
 
+For Reliable Data Foundations, keep `solutions/` as the source of the complete embedded resolution/Spark/recovery code. From the repository root with the documented Python 3.12/Java 17 environment:
+
+```sh
+python content/exercises/reliable-data/sync_lesson_examples.py --embed-source
+python content/exercises/reliable-data/run_tests.py --spark --evidence docs/evidence/reliable-data-execution.json
+python content/exercises/reliable-data/package_bundle.py --output content/downloads/reliable-data-exercises.zip --execution docs/evidence/reliable-data-execution.json
+```
+
+The helper updates four stable source sections and regenerates the 11-entry displayed-example manifest. Without `--embed-source` it validates those source sections while regenerating the manifest; stale embedded code fails. Tests compare snippet hashes and full/source-fragment content, as well as the relevant actual Python/SQL/PySpark behavior. Packaging requires a successful complete pinned Spark run with no skips and matching tested source hashes. After packaging, set the course download's SHA-256 to the newly reported digest, run content validation, extract that exact ZIP into a separate directory, and run `python run_tests.py --spark --evidence extracted-execution.json` there. Verify the extracted files against source and the bundle's execution evidence. The app never runs the helper or downloaded code.
+
+After a material correction, increment the affected lesson version and only the cards/questions whose assessed meaning changed. Inspect the rendered explanation, full source expansion, revealed solution and actual download on desktop/mobile production builds. Seed earlier-version study records and confirm revision notices without modifying their saved evidence. These checks supplement the ordinary milestone gates; they do not turn a local test into a Databricks execution.
+
 ## Launch preservation
 
 `content/preservation/dbxfe-launch.json` records the original module, lesson, section, card, question, option, scenario, asset and capstone IDs from the pinned launch commit. The build validates every listed identity against the current content, while allowing new lessons and different navigation grouping. This gate replaces the old exact 12-by-3 ceiling. It protects identities and coverage, not prose quality; editorial review still evaluates whether retained and new material teaches something useful.

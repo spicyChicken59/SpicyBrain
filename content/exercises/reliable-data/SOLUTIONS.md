@@ -87,8 +87,9 @@ with equal payloads are deliveries of one event. Distinct event IDs with the
 same key/revision/quantities agree; equal revisions with different quantities
 conflict. Neither row order nor an arbitrary `row_number` is authority.
 
-This conservative authored policy blocks every affected key with an unresolved
-identity conflict, including a conflict discovered in older retained history.
+This conservative authored policy blocks publication for every unresolved
+identity conflict, including one discovered in older retained history or with
+no attributable inspection key. Known affected keys are separately unresolved.
 There is no automatic adjudication in this exercise. An invalid latest revision
 for a key with earlier valid evidence blocks that key rather than reviving its
 old value. An unordered observation for a known valid key also blocks: latest
@@ -102,6 +103,30 @@ publishable new current report**. Publication is blocked. If a verified 20/1
 snapshot exists it remains `stale_previous`; on a first blocked run there is
 `blocked_no_snapshot`. The current accepted preparation, rejected evidence,
 and previous published report are deliberately separate.
+
+An empty unresolved-key list proves only that no usable affected key was
+identified. The two `unkeyed` rows have null inspection IDs, quantities 2 and 3,
+and the same event ID. Both remain quarantined; their event payloads conflict.
+On a first run there are no accepted candidates, publication is false, status
+is `blocked_no_snapshot`, and no snapshot/effect exists. After a verified
+baseline, receiving this conflict alongside A v3 leaves a diagnostic 22/1
+candidate but preserves the published 20/1 snapshot as `stale_previous`, with
+no second effect. Reverse order and replay cannot restore trustworthy provenance.
+Missing, empty, whitespace-only and null keys do not become invented identities.
+
+The gate therefore checks both `not conflicts` and `not blocked`. This does
+not block all quarantine: isolated invalid B and two unrelated unkeyed events
+still follow the stated accepted-only coverage policy when no identity conflict
+exists. A blank event ID itself provides no immutable identity to compare.
+
+SQL and PySpark expose `event_conflicts`, `revision_conflicts`, `unresolved`
+and a one-row `publication` decision relation. Its three counts describe
+event conflicts, revision conflicts and unresolved usable keys; all must be
+zero for `publication_allowed`. Read that decision instead of inferring safety
+from accepted rows or an empty unresolved relation. Spark produces diagnostic
+relations only; `LocalPipeline` alone simulates snapshots and local effects.
+For empty candidate input SQL SUM returns null totals while Python sum gives
+zero totals; neither representation is a publishable report in this blocked case.
 
 ## Failure and recovery
 

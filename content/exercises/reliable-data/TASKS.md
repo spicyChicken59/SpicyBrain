@@ -50,6 +50,15 @@ Keep the raw records. Compare the independent literal expected files.
 Explain why discarding an invalid latest revision then choosing a lower valid
 revision lies about current state. Do not use arrival order as revision order.
 
+Now use `fixtures/unkeyed-conflict.json`: one nonempty event ID carries two
+different quantities but neither row has a usable inspection ID. Predict the
+conflict evidence, unresolved-key list and publication decision separately.
+Test it on a first run. Then publish the baseline, ingest the first bad row,
+and ingest the second with the valid A v3 correction. Does an empty unresolved
+key list make the diagnostic 22/1 candidate trustworthy enough to publish?
+Repeat with missing/blank keys, reversed arrival and replay. Distinguish those
+conflicts from B's ordinary disclosed quarantine and unrelated unkeyed events.
+
 ## 6. Name and recover the failed boundary
 
 Publish the baseline. Inject failure after `retained_raw` while ingesting A v3.

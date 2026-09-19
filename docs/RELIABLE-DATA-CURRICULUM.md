@@ -54,3 +54,23 @@ New/deepened mechanisms were checked against current primary pages on 19 Septemb
 | `dbxfe-fact-jobs`, `dbxfe-fact-pipelines`, `dbxfe-fact-expectations` · 08/10 | Jobs coordinates tasks; declarative pipelines and Databricks-managed context are distinguished; row-quality actions do not prove source reconciliation or external-effect idempotency. |
 
 Exact publishers, URLs, dates, context and caveats live in `course.json`; claim IDs connect them to sections, checks, cards and assets. Unchanged introductory material retains the baseline review record rather than being presented as newly independently reviewed. Re-review after material documentation changes; no source-availability result is a truth certification.
+
+## Bounded publication-gate correction — 19 September 2026
+
+The initial milestone review and 30-test evidence above remain historical. They did not cover the independently reproduced conflict whose event ID was nonempty but whose inspection IDs were unusable. Guidance's two failing cases came from isolated execution of the reviewed source on Python 3.13.5/Linux; they were not independent browser, Spark or Databricks acceptance. The correction is part of the same PR #2 and implements the already stated original exercise policy, without changing a Databricks factual claim or the 43-lesson inventory.
+
+The affected `dbxfe-record-resolution` explanation, worked example, attempt and revealed solution now distinguish three things: row quarantine, global provenance conflict evidence and the list of attributable unresolved inspection keys. Missing/null/empty/whitespace-only inspection IDs do not supply an artificial business key. A contradictory nonempty event ID still blocks a new report. The first-publication example therefore requires `blocked_no_snapshot`, no published snapshot and no simulated effect. The cross-batch example may prepare A v3 plus C at 22/1 diagnostically, but must retain the exact previous 20/1 snapshot as `stale_previous` with its effects unchanged. Baseline B's disclosed, nonconflicting exclusion remains permitted.
+
+The embedded complete Python and SQL/PySpark sources are synchronized from the corrected authored files through the supported `sync_lesson_examples.py` workflow before final execution and packaging. The Spark teaching explicitly requires consuming the global publication decision and conflict counts; zero unresolved-key rows alone are insufficient. Spark exposes transformations/diagnostics, while the separate Python simulation controls the modeled published snapshot and local outbox. No website deployment or real notification is involved.
+
+Material version decisions preserve identity and prior evidence:
+
+| Item | Change | Reason |
+|---|---|---|
+| `dbxfe-record-resolution` | 1.0.0 → 1.1.0 | Adds the missing-key provenance example and repairs the complete source implementation taught by this package. |
+| `dbxfe-record-resolution-foundation-q2` | Revision 1 → 2 | The diagnostic-versus-published question now assesses the unkeyed conflict and valid correction together. Option IDs and the correct-option ID stay stable; previous prompts/options/selected answers remain historical records. |
+| `dbxfe-record-resolution-foundation-card1` | Revision 1 → 2 | Extends the quarantine/current-state distinction to global conflict evidence without an attributable key. Existing review events remain revision-1 history; normal revised-material behavior applies. |
+| Remaining cards/questions | No revision change | Their meaning and answers are unchanged. A content correction does not justify manufacturing revisions for unrelated assessments. |
+| Course | 2.0.0 → 2.0.1 | Records this bounded material correction in course change notes. |
+
+Other actual consumers were inspected: the identity/ordering topic already blocks unresolved identity conflicts without a keyed-only exception; guarded updates already require the resolver's `publication_allowed` gate; LocalPipeline and its recovery lesson already obey that gate. Their independent displayed examples and assessment meanings need no change. Final corrected run counts, source/snippet/archive hashes and production-reader revision-preservation evidence are recorded in the correction acceptance evidence, rather than attributed to the initial green run above. This remains builder editorial review, not independent learner validation.

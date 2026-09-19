@@ -28,11 +28,33 @@ def load(relative):
 BASE = load("fixtures/baseline.json")
 BATCHES = load("fixtures/batches.json")
 EXPECTED = load("expected/business.json")  # Authored literals; never built by resolve().
+UNKEYED = load("fixtures/unkeyed-conflict.json")
+PROVENANCE = load("expected/provenance.json")
 OUTPUTS = {}
 
 
 def business(result):
     return {key: result[key] for key in ("accepted", "totals", "excluded_keys", "unresolved", "publication_allowed")}
+
+
+def unkeyed_variants():
+    for name, value in (("missing", None), ("null", None), ("empty", ""),
+                        ("spaces", "   "), ("tabs", "\t\r\n"), ("unicode_space", "\u00a0\u2003")):
+        rows = deepcopy(UNKEYED)
+        for row in rows:
+            if name == "missing":
+                del row["inspection_id"]
+            else:
+                row["inspection_id"] = value
+        yield name, rows
+
+
+def pipeline_observation(pipe):
+    return {"accepted_candidate": pipe.resolved["accepted"], "candidate_totals": pipe.resolved["totals"],
+            "conflicts": pipe.resolved["conflicts"], "unresolved": pipe.resolved["unresolved"],
+            "quarantined_rows": len(pipe.resolved["quarantine"]), "raw_count": len(pipe.raw),
+            "publication_allowed": pipe.resolved["publication_allowed"], "status": pipe.status,
+            "published": pipe.published, "local_effect_count": len(pipe.outbox)}
 
 
 class ReferenceTests(unittest.TestCase):
@@ -45,10 +67,15 @@ class ReferenceTests(unittest.TestCase):
             self.assertEqual(sha256(path.read_bytes()).hexdigest(), entry["sha256"])
             if course.is_dir():
                 body = (course / (entry["lesson_id"] + ".md")).read_text(encoding="utf-8")
+                if entry.get("section_id"):
+                    body = body.split("<!-- section:" + entry["section_id"] + " -->", 1)[1].split("<!-- section:", 1)[0]
                 language = entry["language"]
                 displayed = re.findall(r"~~~" + language + r"\n(.*?)\n~~~", body, re.DOTALL)[0] + "\n"
                 self.assertEqual(snippet, displayed, "Displayed example changed; sync and rerun")
-            if entry["lesson_id"] in ("dbxfe-python-bridge", "dbxfe-versioned-updates", "dbxfe-m04-l03"):
+            if entry.get("source_file"):
+                from sync_lesson_examples import source_fragment
+                self.assertEqual(snippet, source_fragment(entry["source_file"], entry["source_fragment"]))
+            elif entry["lesson_id"] in ("dbxfe-python-bridge", "dbxfe-versioned-updates", "dbxfe-m04-l03"):
                 previous = Path.cwd()
                 try:
                     os.chdir(ROOT)
@@ -56,6 +83,109 @@ class ReferenceTests(unittest.TestCase):
                 finally:
                     os.chdir(previous)
         OUTPUTS["displayed_example_manifest"] = manifest
+
+    def test_unkeyed_conflict_first_run_blocks_publication_and_effect(self):
+        pipe = LocalPipeline()
+        pipe.ingest(UNKEYED)
+        self.assertEqual(pipe.raw, UNKEYED)
+        self.assertEqual(pipe.resolved["conflicts"], [{"kind": "event_id", "identity": "unkeyed", "raw_indices": [0, 1]}])
+        self.assertEqual(len(pipe.resolved["quarantine"]), 2)
+        actual = {"accepted": pipe.resolved["accepted"], "unresolved": pipe.resolved["unresolved"],
+                  "publication_allowed": pipe.resolved["publication_allowed"], "status": pipe.status,
+                  "published": pipe.published, "local_effect_count": len(pipe.outbox)}
+        self.assertEqual(actual, PROVENANCE["first_run"])
+        self.assertEqual(pipe.outbox, {})
+        OUTPUTS["provenance_first_run"] = pipeline_observation(pipe)
+
+    def test_unkeyed_cross_batch_correction_keeps_verified_snapshot(self):
+        pipe = LocalPipeline()
+        pipe.ingest(BASE)
+        previous, effects = deepcopy(pipe.published), deepcopy(pipe.outbox)
+        pipe.ingest([UNKEYED[0]])
+        self.assertTrue(pipe.resolved["publication_allowed"])  # One invalid row is not an identity conflict.
+        pipe.ingest([UNKEYED[1]] + BATCHES["correction"])
+        self.assertEqual(pipe.resolved["accepted"], PROVENANCE["cross_batch"]["accepted_candidate"])
+        self.assertEqual(pipe.resolved["totals"], PROVENANCE["cross_batch"]["candidate_totals"])
+        self.assertFalse(pipe.resolved["publication_allowed"])
+        self.assertEqual(pipe.resolved["unresolved"], [])
+        self.assertEqual(pipe.status, "stale_previous")
+        self.assertEqual(pipe.published, previous)
+        self.assertEqual(pipe.published["totals"], PROVENANCE["cross_batch"]["previous_published_totals"])
+        self.assertEqual(pipe.outbox, effects)
+        self.assertEqual(len(pipe.resolved["quarantine"]), 3)
+        self.assertEqual(pipe.resolved["conflicts"], [{"kind": "event_id", "identity": "unkeyed", "raw_indices": [5, 6]}])
+        OUTPUTS["provenance_cross_batch"] = pipeline_observation(pipe)
+
+    def test_unkeyed_missing_blank_reversal_replay_and_cross_batch(self):
+        outcomes = []
+        for variant, original in unkeyed_variants():
+            for order, pair in (("forward", original), ("reversed", list(reversed(original)))):
+                with self.subTest(variant=variant, order=order):
+                    first = LocalPipeline()
+                    first.ingest(pair)
+                    first.ingest(pair)
+                    first.recover()
+                    self.assertEqual(len(first.raw), 4)
+                    self.assertEqual(len(first.resolved["quarantine"]), 4)
+                    self.assertEqual(first.resolved["unresolved"], [])
+                    self.assertEqual(len(first.resolved["conflicts"]), 1)
+                    self.assertFalse(first.resolved["publication_allowed"])
+                    self.assertEqual(first.status, "blocked_no_snapshot")
+                    self.assertIsNone(first.published)
+                    self.assertEqual(first.outbox, {})
+                    pipe = LocalPipeline()
+                    pipe.ingest(BASE)
+                    previous, effects = deepcopy(pipe.published), deepcopy(pipe.outbox)
+                    pipe.ingest([pair[0]])
+                    pipe.ingest([pair[1]] + BATCHES["correction"])
+                    pipe.ingest(pair + BATCHES["correction"])
+                    pipe.recover()
+                    self.assertFalse(pipe.resolved["publication_allowed"])
+                    self.assertEqual(pipe.status, "stale_previous")
+                    self.assertEqual(pipe.published, previous)
+                    self.assertEqual(pipe.outbox, effects)
+                    self.assertEqual(pipe.resolved["accepted"], PROVENANCE["cross_batch"]["accepted_candidate"])
+                    self.assertEqual(pipe.resolved["unresolved"], [])
+                    outcomes.append({"variant": variant, "order": order, "first_after_replay": pipeline_observation(first),
+                                     "cross_batch_after_replay": pipeline_observation(pipe)})
+        OUTPUTS["provenance_variant_regressions"] = outcomes
+
+    def test_quarantine_alone_does_not_manufacture_provenance_conflict(self):
+        outcomes = []
+        for variant, pair in unkeyed_variants():
+            unrelated = deepcopy(pair)
+            unrelated[1]["event_id"] = "different-delivery"
+            result = resolve(BASE + unrelated)
+            self.assertEqual(business(result), EXPECTED["baseline"])
+            self.assertEqual(result["conflicts"], [])
+            self.assertEqual(len(result["quarantine"]), 3)
+            # A blank event ID supplies no immutable identity to compare.
+            for event in (None, "", " \t\n", "\u00a0"):
+                no_identity = [{**row, "event_id": event} for row in pair]
+                result = resolve(BASE + no_identity)
+                self.assertEqual(business(result), EXPECTED["baseline"])
+                self.assertEqual(result["conflicts"], [])
+            outcomes.append({"variant": variant, "publication_allowed": True, "excluded_keys": ["B"]})
+        OUTPUTS["provenance_quarantine_controls"] = outcomes
+
+    def test_exact_embedded_resolver_runs_new_gate(self):
+        namespace = {}
+        source = (ROOT / "lesson_examples/dbxfe-record-resolution-reference.py").read_text(encoding="utf-8")
+        exec(compile(source, "dbxfe-record-resolution-reference.py", "exec"), namespace)
+        first = namespace["LocalPipeline"]()
+        first.ingest(UNKEYED)
+        self.assertFalse(first.resolved["publication_allowed"])
+        self.assertEqual(first.status, "blocked_no_snapshot")
+        self.assertIsNone(first.published)
+        pipe = namespace["LocalPipeline"]()
+        pipe.ingest(BASE)
+        previous = deepcopy(pipe.published)
+        pipe.ingest([UNKEYED[0]])
+        pipe.ingest([UNKEYED[1]] + BATCHES["correction"])
+        self.assertFalse(pipe.resolved["publication_allowed"])
+        self.assertEqual(pipe.published, previous)
+        self.assertEqual(len(pipe.outbox), 1)
+        OUTPUTS["embedded_provenance"] = pipeline_observation(pipe)
 
     def test_baseline_exact_rows_and_coverage(self):
         result = resolve(BASE)
@@ -254,6 +384,7 @@ class SparkTests(unittest.TestCase):
                 self.assertEqual(actual_totals, EXPECTED[name]["totals"])
                 self.assertEqual([list(item) for item in stages["accepted"].dtypes], EXPECTED["types"])
                 self.assertEqual([list(item) for item in stages["totals"].dtypes], EXPECTED["totals_types"])
+                self.assertEqual(stages["publication"].first().asDict(), PROVENANCE["quarantine_without_conflict"])
                 OUTPUTS[f"{language}_{name}"] = {"rows": actual_rows, "totals": actual_totals,
                                                    "types": stages["accepted"].dtypes,
                                                    "totals_types": stages["totals"].dtypes}
@@ -285,10 +416,81 @@ class SparkTests(unittest.TestCase):
             self.assertEqual(actual, EXPECTED[expected]["accepted"])
             self.assertEqual([row["inspection_id"] for row in stages["unresolved"].orderBy("inspection_id").collect()],
                              EXPECTED[expected]["unresolved"])
-            sql_rows = self.rows(sql_transform(raw, self.spark)["accepted"])
+            sql_stages = sql_transform(raw, self.spark)
+            sql_rows = self.rows(sql_stages["accepted"])
             self.assertEqual(sql_rows, EXPECTED[expected]["accepted"])
+            decision_key = {"event_conflict": "known_event_conflict", "version_conflict": "known_revision_conflict",
+                            "invalid_latest": "invalid_latest", "missing_order": "invalid_latest"}.get(name, "quarantine_without_conflict")
+            py_decision = stages["publication"].first().asDict()
+            sql_decision = sql_stages["publication"].first().asDict()
+            self.assertEqual(py_decision, PROVENANCE[decision_key])
+            self.assertEqual(sql_decision, PROVENANCE[decision_key])
+            OUTPUTS["spark_decision_" + name] = {"pyspark": py_decision, "sql": sql_decision}
             OUTPUTS["spark_" + name] = actual
             self.spark.catalog.clearCache()
+
+    def test_spark_unkeyed_first_run_exposes_global_decision(self):
+        from solutions.spark_transform import pyspark_transform, sql_transform
+        raw = self.frame(UNKEYED)
+        for language, stages in (("pyspark", pyspark_transform(raw)), ("sql", sql_transform(raw, self.spark))):
+            self.assertEqual(stages["publication"].first().asDict(), PROVENANCE["blocked_unattributed"])
+            self.assertEqual([row.asDict() for row in stages["event_conflicts"].collect()], [{"event_id": "unkeyed", "payloads": 2}])
+            self.assertEqual(stages["revision_conflicts"].collect(), [])
+            self.assertEqual(stages["unresolved"].collect(), [])
+            self.assertEqual(stages["accepted"].collect(), [])
+            totals = stages["totals"].first().asDict()
+            # SQL SUM(empty) is NULL; Python's sum(empty) is 0. Neither is a report.
+            self.assertEqual(totals, {"inspected_units": None, "defective_units": None, "defect_rate": None})
+            OUTPUTS["spark_unkeyed_first_" + language] = {"publication": PROVENANCE["blocked_unattributed"],
+                                                           "accepted_candidate": [], "candidate_totals": totals}
+        self.spark.catalog.clearCache()
+
+    def test_spark_unkeyed_cross_batch_reversal_replay_variants(self):
+        from solutions.spark_transform import pyspark_transform, sql_transform
+        outcomes = []
+        for variant, pair in unkeyed_variants():
+            # Recompute retained history after separate arrivals, their reversal,
+            # and repeated deliveries. Spark exposes the gate; it does not simulate publication.
+            history = BASE + [pair[1]] + [pair[0]] + BATCHES["correction"] + pair + BATCHES["correction"]
+            raw = self.frame(history)
+            for language, stages in (("pyspark", pyspark_transform(raw)), ("sql", sql_transform(raw, self.spark))):
+                with self.subTest(variant=variant, language=language):
+                    decision = stages["publication"].first().asDict()
+                    self.assertEqual(decision, PROVENANCE["blocked_unattributed"])
+                    accepted = self.rows(stages["accepted"])
+                    self.assertEqual(accepted, PROVENANCE["cross_batch"]["accepted_candidate"])
+                    outcomes.append({"variant": variant, "language": language, "publication": decision,
+                                     "accepted_candidate": accepted})
+            self.spark.catalog.clearCache()
+        OUTPUTS["spark_unkeyed_cross_batch_variants"] = outcomes
+
+    def test_spark_quarantine_without_identity_conflict_remains_allowed(self):
+        from solutions.spark_transform import pyspark_transform, sql_transform
+        unrelated, no_identity = [], []
+        for variant, pair in unkeyed_variants():
+            unrelated.extend([{**row, "event_id": variant + str(index)} for index, row in enumerate(pair)])
+            no_identity.extend([{**row, "event_id": " \t\n\u00a0\u2003"} for row in pair])
+        for case, rows in (("different_event_ids", unrelated), ("blank_event_ids", no_identity)):
+            raw = self.frame(BASE + rows)
+            for language, stages in (("pyspark", pyspark_transform(raw)), ("sql", sql_transform(raw, self.spark))):
+                decision = stages["publication"].first().asDict()
+                self.assertEqual(decision, PROVENANCE["quarantine_without_conflict"])
+                self.assertEqual(self.rows(stages["accepted"]), EXPECTED["baseline"]["accepted"])
+                OUTPUTS["spark_quarantine_control_" + case + "_" + language] = decision
+            self.spark.catalog.clearCache()
+
+    def test_exact_embedded_spark_code_exposes_corrected_gate(self):
+        namespace = {}
+        source = (ROOT / "lesson_examples/dbxfe-record-resolution-spark.py").read_text(encoding="utf-8")
+        exec(compile(source, "dbxfe-record-resolution-spark.py", "exec"), namespace)
+        raw = self.frame(BASE + UNKEYED + BATCHES["correction"])
+        for language, stages in (("pyspark", namespace["pyspark_transform"](raw)),
+                                  ("sql", namespace["sql_transform"](raw, self.spark))):
+            decision = stages["publication"].first().asDict()
+            self.assertEqual(decision, PROVENANCE["blocked_unattributed"])
+            self.assertEqual(self.rows(stages["accepted"]), PROVENANCE["cross_batch"]["accepted_candidate"])
+            OUTPUTS["embedded_spark_decision_" + language] = decision
+        self.spark.catalog.clearCache()
 
     def test_join_grain_and_actual_plan(self):
         from solutions.spark_transform import join_experiment, pyspark_transform
@@ -411,7 +613,8 @@ def main():
     parser.add_argument("--spark", action="store_true")
     parser.add_argument("--evidence", type=Path)
     args = parser.parse_args()
-    program_hashes = {name: sha256((ROOT / name).read_bytes()).hexdigest() for name in ("run_tests.py", "requirements.txt")}
+    program_hashes = {name: sha256((ROOT / name).read_bytes()).hexdigest() for name in
+                      ("run_tests.py", "requirements.txt", "sync_lesson_examples.py", "package_bundle.py")}
     input_hashes = {str(path.relative_to(ROOT)).replace("\\", "/"): sha256(path.read_bytes()).hexdigest()
                    for directory in ("fixtures", "expected", "solutions", "lesson_examples")
                    for path in sorted((ROOT / directory).rglob("*"))
