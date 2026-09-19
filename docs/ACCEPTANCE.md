@@ -1,5 +1,7 @@
 # Acceptance evidence
 
+Historical PR #1 evidence follows. Current study-hub work is recorded separately in [STUDY-HUB-ACCEPTANCE.md](STUDY-HUB-ACCEPTANCE.md); the later attributed hosting checkpoint is in [DEPLOYMENT.md](DEPLOYMENT.md). Statements below about publication and PR state describe their original checkpoint.
+
 Builder acceptance work dated **2026-09-19**, on the locally served production build. Independent guidance review reproduced two preservation defects in the initial PR; corrections require independent re-review. No live site is published and no Databricks/cloud execution was performed.
 
 ## Production coverage

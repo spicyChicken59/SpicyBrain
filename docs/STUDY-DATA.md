@@ -1,5 +1,13 @@
 # Study data and review
 
+## Study-hub schema 3 — 19 September 2026
+
+The study-hub build keeps the existing `spicybrain-study-v2` database name and native database version 2. Its root **record schema is now 3**. Positions and resume can carry an optional stable `pathId`; it is exported, validated, merged with the whole position by the existing timestamp/tie-break rule, and included in import unknown-reference reporting. Nothing is stored in a hidden local-storage preference. Route query parameters identify explicit path context and a temporary return link; they contain no note/search text.
+
+Strict schema-1 and actual baseline schema-2 inputs are validated against their original position shape, then migrated transactionally without changing any record or timestamp. Missing path context stays missing: a direct topic uses its own course as a visibly explained continuation fallback. Removed path IDs remain recoverable; they do not delete study records. Native schema-2/backup migration and path-context round trips are covered by the study-hub tests. The earlier schema-2 description below remains historical reference for the unchanged record families and safety policies.
+
+Lesson and section completion from a different content version is labeled as earlier-version evidence. It does not automatically complete the revised material. Page visits, solution reveals, downloads, and bridge skips do not create completion.
+
 `spicybrain-study-v2`, IndexedDB database version 2, contains one transactional `study/root` snapshot with schemaVersion 2. Separate maps retain notes, practice drafts, bookmarks, explicit completion, immutable objective attempts, immutable scheduled reviews, derived schedules, extra-practice events, rubric self-assessments and stable section positions. Resume, settings and local-storage disclosure are included. UTC timestamps and stable IDs, rather than lesson order or titles, link evidence.
 
 An explicit completion records a learner choice. Scrolling, answer reveal, a note or a self-rating does not establish mastery. Objective attempts record question revision, lesson contentVersion, selected/correct option IDs, correctness, concept IDs and the complete prompt/options/rationales at submission. Later content edits do not rewrite old scores. Self-assessments are explicitly learner-chosen, not automated grading.

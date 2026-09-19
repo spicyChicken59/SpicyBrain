@@ -69,3 +69,8 @@ All 12 scenarios have distinct contexts/tasks, requirements, complete model reas
 ## Corrections discovered in platform acceptance
 
 Fixed blocked-upgrade text replay, ambiguous quiz wording/distractors, actual-vs-next review dates, remote font-import stripping, revised-question notice, and narrow large-text intrinsic sizing. Browser test selectors were corrected where a wrapping label included its form value; those were test errors, not evidence of lost drafts. The extension browser now reloads the bundle after rebuilding, rather than treating a hash-only navigation as a new build. See acceptance logs for final results.
+
+
+## Approved study-hub milestone editorial review — 2026-09-19
+
+The 36-lesson review above remains historical. The current authored scope adds seven lessons and deepens five canonical lessons while preserving all original material. See [the ten-core/two-bridge review and correction matrix](RELIABLE-DATA-CURRICULUM.md), [pre-edit disposition](CURRICULUM-DISPOSITION.md), [coverage evidence](evidence/reliable-data-coverage.json), and [six-diagram contact sheet](evidence/reliable-data-diagrams.png). This is builder editorial review, not independent learner validation. New tasks and solutions are separately presented; no reveal, visit or bridge skip proves completion.

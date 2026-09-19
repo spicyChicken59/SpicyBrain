@@ -25,12 +25,15 @@ for (const base of ["/", "/SpicyBrain/"])
     await shot(page, base === "/" ? "01-start-desktop" : "01-start-nested");
     await page
       .getByRole("navigation", { name: "Main navigation" })
-      .getByRole("link", { name: "Courses", exact: true })
+      .getByRole("link", { name: "Learn", exact: true })
       .click();
-    await expect(page.getByText("12 modules · 36 lessons")).toBeVisible();
+    await page
+      .getByRole("link", { name: "Course library", exact: true })
+      .click();
+    await expect(page.getByText("12 modules · 43 lessons")).toBeVisible();
     await page.getByRole("link", { name: /12 modules/ }).click();
     await expect(page.locator(".module-block")).toHaveCount(12);
-    await expect(page.locator(".module-block ol li")).toHaveCount(36);
+    await expect(page.locator(".module-block ol li")).toHaveCount(43);
     await shot(page, "02-course-map");
     await nav(page, `#/lesson/${lesson}/${section}`);
     await expect(page.locator(`#${section}`)).toBeVisible();
@@ -311,13 +314,11 @@ test("G export clean-context import, duplicate/conflict/unknown previews, replac
     other = await context.newPage();
   await ready(other, "http://127.0.0.1:4183/#/settings");
   const upload = async (text: string) =>
-    other
-      .getByLabel("Study data file")
-      .setInputFiles({
-        name: "synthetic.json",
-        mimeType: "application/json",
-        buffer: Buffer.from(text),
-      });
+    other.getByLabel("Study data file").setInputFiles({
+      name: "synthetic.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(text),
+    });
   await upload(raw);
   await expect(
     other.getByRole("heading", { name: "Import preview" }),
@@ -642,13 +643,11 @@ test("H native transaction abort during replacement retains the old snapshot", a
   await ready(page, "/#/settings");
   await page.getByLabel("Theme").selectOption("dark");
   const before = await stored(page);
-  await page
-    .getByLabel("Study data file")
-    .setInputFiles({
-      name: "synthetic-replace.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(exportText(emptyState())),
-    });
+  await page.getByLabel("Study data file").setInputFiles({
+    name: "synthetic-replace.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(exportText(emptyState())),
+  });
   await page.getByLabel("Import method").selectOption("replace");
   await page
     .getByLabel("I understand that replacement removes my current study data.")

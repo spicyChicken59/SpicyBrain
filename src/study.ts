@@ -117,11 +117,12 @@ const position = z
     sectionId: idSchema,
     offset: z.number().min(-5000).max(100000),
     updatedAt: iso,
+    pathId: idSchema.optional(),
   })
   .strict();
 export const stateSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     notes: record(note),
     drafts: record(draft),
     bookmarks: record(bookmark),
@@ -141,7 +142,7 @@ export type StudyState = z.infer<typeof stateSchema>;
 export type Note = z.infer<typeof note>;
 export function emptyState(at = "1970-01-01T00:00:00.000Z"): StudyState {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     notes: {},
     drafts: {},
     bookmarks: {},
@@ -254,15 +255,30 @@ export function migrateState(value: unknown): StudyState {
     value &&
     typeof value === "object" &&
     "schemaVersion" in value &&
-    value.schemaVersion === 1
+    (value.schemaVersion === 1 || value.schemaVersion === 2)
   ) {
     // Synthetic predecessor: v1 had all records except extra practice, which was not recorded.
-    const old = stateSchema
-      .omit({ schemaVersion: true, extraPractice: true })
-      .extend({ schemaVersion: z.literal(1) })
-      .strict()
-      .parse(value);
-    return validateState({ ...old, schemaVersion: 2, extraPractice: {} });
+    const legacyPosition = position.omit({ pathId: true }).strict();
+    const legacy = stateSchema
+      .extend({
+        schemaVersion: z.literal(2),
+        positions: record(legacyPosition),
+        resume: legacyPosition.nullable(),
+      })
+      .strict();
+    const old =
+      value.schemaVersion === 1
+        ? legacy
+            .omit({ extraPractice: true })
+            .extend({ schemaVersion: z.literal(1) })
+            .strict()
+            .parse(value)
+        : legacy.parse(value);
+    return validateState({
+      ...old,
+      schemaVersion: 3,
+      extraPractice: "extraPractice" in old ? old.extraPractice : {},
+    });
   }
   return validateState(value);
 }
@@ -587,6 +603,7 @@ export function importPreview(
     incoming.reviews,
     incoming.assessments,
     incoming.positions,
+    ...(incoming.resume ? [[incoming.resume]] : []),
   ])
     for (const value of Object.values(group)) {
       for (const key of [
@@ -596,10 +613,11 @@ export function importPreview(
         "targetId",
         "cardId",
         "questionId",
+        "pathId",
       ] as const)
         if (key in value) {
           const id = (value as Record<string, unknown>)[key] as string;
-          if (!known.has(id)) unknown.add(id);
+          if (typeof id === "string" && !known.has(id)) unknown.add(id);
         }
     }
   return { counts, conflicts, unknown: [...unknown].sort() };
@@ -699,7 +717,7 @@ export class StudyStore {
       const tx = this.db.transaction("study", "readwrite");
       const saved = await tx.store.get("root");
       const data = saved ? migrateState(saved) : emptyState();
-      if (saved?.schemaVersion === 1) await tx.store.put(data, "root");
+      if (saved && saved.schemaVersion !== 3) await tx.store.put(data, "root");
       await tx.done;
       // A blocked upgrade may have allowed edits in memory. Replay, never erase them.
       this.emit({

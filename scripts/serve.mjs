@@ -3,7 +3,7 @@ import { URL } from "node:url";
 // Loopback-only production static server. No SPA rewrite or deployment.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { resolve, extname } from "node:path";
+import { resolve, extname, sep } from "node:path";
 const mime = {
   ".html": "text/html",
   ".js": "application/javascript",
@@ -23,7 +23,7 @@ createServer(async (req, res) => {
           (nested ? path.slice("/SpicyBrain".length) : path) +
           (path.endsWith("/") ? "index.html" : ""),
       );
-    if (!file.startsWith(root + "/")) throw Error("Outside root");
+    if (!file.startsWith(root + sep)) throw Error("Outside root");
     res.setHeader(
       "Content-Type",
       mime[extname(file)] || "application/octet-stream",

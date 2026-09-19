@@ -1,110 +1,11 @@
 import { useEffect, useState } from "react";
-import { courses, findLesson, lessonHref, cards } from "./catalog";
+import { courses, findLesson, lessonHref } from "./catalog";
+import { Today, Learn, Roadmap, completionLabel } from "./hub";
 import { Notebook, Search, Settings } from "./notebook-settings";
 import { Practice, Review } from "./practice-review";
 import { Reader } from "./reader";
-import { reviewQueue } from "./study";
 import { MD, PageTitle, StorageNotice, baseAsset, useStudy } from "./ui";
 
-function Start() {
-  const { data } = useStudy();
-  const first = courses[0]?.modules[0]?.lessons[0],
-    resume = data.resume,
-    entry = resume ? findLesson(resume.lessonId) : null,
-    due = reviewQueue(cards, data, new Date().toISOString(), 100000);
-  return (
-    <>
-      <div className="start-hero">
-        <p className="sc-eyebrow">your space to make things click</p>
-        <h1>
-          {entry
-            ? "Pick up the thread."
-            : "Learn it. See it.\nUse it. Remember it."}
-        </h1>
-        <p className="hero-dek">
-          {entry
-            ? "One idea at a time. Your place is right here."
-            : "Clear explanations. Useful practice. Ideas that stay with you."}
-        </p>
-        <div className="continue-panel">
-          <p className="sc-eyebrow">
-            {entry ? "where you left off" : "start here"}
-          </p>
-          <h2>{entry?.lesson.title ?? courses[0]?.title}</h2>
-          <p>
-            {entry
-              ? `${entry.module.title} · ${entry.lesson.sections.find((s) => s.id === resume?.sectionId)?.title ?? "Lesson beginning"}`
-              : courses[0]?.subtitle}
-          </p>
-          {first && (
-            <a
-              className="sc-btn sc-btn--primary"
-              href={
-                entry
-                  ? lessonHref(entry.lesson.id, resume?.sectionId)
-                  : lessonHref(first.id)
-              }
-            >
-              {entry ? "Resume learning" : "Start learning"}{" "}
-              <span aria-hidden="true">→</span>
-            </a>
-          )}
-          {!entry && (
-            <p className="sc-hint">
-              No study activity yet. Start anywhere; nothing is locked.
-            </p>
-          )}
-          {resume && !entry && (
-            <p>
-              Your previous lesson was removed. Your notes and history remain in
-              Notebook.
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="start-secondary">
-        <a href="#/courses">
-          <span className="sc-eyebrow">choose your path</span>
-          <h2>Explore the course</h2>
-          <p>See the map. Skip what you know.</p>
-          <span aria-hidden="true">→</span>
-        </a>
-        <a href="#/review">
-          <span className="sc-eyebrow">a small review</span>
-          <h2>
-            {due.length
-              ? `${due.length} cards to revisit`
-              : "Bring an idea back"}
-          </h2>
-          <p>
-            {due.length
-              ? "A manageable session, on your terms."
-              : "Introduce a few cards after a lesson."}
-          </p>
-          <span aria-hidden="true">→</span>
-        </a>
-        <a href="#/practice">
-          <span className="sc-eyebrow">try the work</span>
-          <h2>Make one decision</h2>
-          <p>A fictional customer. A practical task.</p>
-          <span aria-hidden="true">→</span>
-        </a>
-      </div>
-      <div className="start-footnote">
-        <p className="sc-eyebrow">a practical role ramp</p>
-        <p>
-          Independent learning material for someone new to Databricks pre-sales
-          field engineering. Learn the platform, ask better questions, and build
-          useful customer-facing judgment.
-        </p>
-        <p className="sc-muted">
-          Not official Databricks onboarding, a credential, or an employer
-          assessment.
-        </p>
-      </div>
-    </>
-  );
-}
 function Courses({ id }: { id?: string }) {
   const { data } = useStudy(),
     course = courses.find((c) => c.id === id);
@@ -216,9 +117,7 @@ function Courses({ id }: { id?: string }) {
                       <span>{l.summary}</span>
                     </span>
                     <span className="lesson-state">
-                      {data.completions[`complete-${l.id}`]?.completed
-                        ? "Complete"
-                        : `~${l.estimatedMinutes} min`}{" "}
+                      {completionLabel(l, data)}{" "}
                       <span aria-hidden="true">→</span>
                     </span>
                   </a>
@@ -253,7 +152,18 @@ function Courses({ id }: { id?: string }) {
 export default function App() {
   const [hash, setHash] = useState(location.hash || "#/"),
     { data, status } = useStudy();
-  const parts = hash.slice(2).split("/"),
+  const [route, query] = hash.split("?"),
+    params = new URLSearchParams(query),
+    pathId = params.get("path") ?? undefined,
+    fromValue = params.get("from"),
+    from =
+      fromValue &&
+      /^#\/lesson\/[a-z0-9-]+(?:\/[a-z0-9-]+)?(?:\?path=[a-z0-9-]+)?$/.test(
+        fromValue,
+      )
+        ? fromValue
+        : undefined,
+    parts = route.slice(2).split("/"),
     page = parts[0] || "start",
     id = parts[1],
     section = parts[2];
@@ -275,11 +185,9 @@ export default function App() {
     document.title = `${page === "lesson" ? (findLesson(id)?.lesson.title ?? "Lesson") : page[0].toUpperCase() + page.slice(1)} · SpicyBrain`;
   }, [page, id]);
   const nav = [
-    ["start", "Start"],
-    ["courses", "Courses"],
-    ["practice", "Practice"],
+    ["start", "Today"],
+    ["learn", "Learn"],
     ["review", "Review"],
-    ["search", "Search"],
     ["notebook", "Notebook"],
   ];
   return (
@@ -311,7 +219,14 @@ export default function App() {
                 href={p === "start" ? "#/" : `#/${p}`}
                 aria-current={
                   page === p ||
-                  (p === "courses" && (page === "course" || page === "lesson"))
+                  (p === "learn" &&
+                    [
+                      "courses",
+                      "course",
+                      "lesson",
+                      "path",
+                      "practice",
+                    ].includes(page))
                     ? "page"
                     : undefined
                 }
@@ -320,6 +235,13 @@ export default function App() {
               </a>
             ))}
           </nav>
+          <a
+            className="settings-link"
+            href={`#/search${from ? `?from=${encodeURIComponent(from)}` : page === "lesson" ? `?from=${encodeURIComponent(lessonHref(id, data.positions[id]?.sectionId ?? section, pathId))}` : ""}`}
+            aria-current={page === "search" ? "page" : undefined}
+          >
+            Search
+          </a>
           <a
             className="settings-link"
             href="#/settings"
@@ -335,20 +257,39 @@ export default function App() {
         tabIndex={-1}
       >
         <StorageNotice />
+        {from && (
+          <p className="detour-return">
+            <a href={from}>← Return to your learning path and saved topic</a>
+          </p>
+        )}
         {status === "loading" ? (
           <p role="status">Opening your learning space…</p>
         ) : page === "start" ? (
-          <Start />
+          <Today />
+        ) : page === "learn" ? (
+          <Learn
+            view={id}
+            from={from}
+            playbook={params.get("playbook") ?? undefined}
+          />
+        ) : page === "path" ? (
+          <Roadmap id={id} />
         ) : page === "courses" || page === "course" ? (
           <Courses id={id} />
         ) : page === "lesson" ? (
-          <Reader id={id} sectionId={section} />
+          <Reader
+            key={`${id}-${pathId ?? "direct"}`}
+            id={id}
+            sectionId={section}
+            pathId={pathId}
+            from={from}
+          />
         ) : page === "practice" ? (
           <Practice key={id ?? "all"} id={id} />
         ) : page === "review" ? (
           <Review key={id ?? "all"} lessonId={id} />
         ) : page === "search" ? (
-          <Search />
+          <Search from={from} />
         ) : page === "notebook" ? (
           <Notebook id={id} />
         ) : page === "settings" ? (
@@ -360,7 +301,7 @@ export default function App() {
               title="Let’s find your way back."
             />
             <p>
-              Your study data is safe. <a href="#/">Return to Start</a> or{" "}
+              Your study data is safe. <a href="#/">Return to Today</a> or{" "}
               <a href="#/notebook">open Notebook</a>.
             </p>
           </>

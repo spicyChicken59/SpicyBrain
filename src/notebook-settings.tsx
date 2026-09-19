@@ -22,7 +22,7 @@ import {
 } from "./study";
 import { PageTitle, SaveStatus, StudyDownload, useStudy } from "./ui";
 
-export function Search() {
+export function Search({ from }: { from?: string }) {
   const { data } = useStudy(),
     [query, setQuery] = useState("");
   const q = query.trim().toLocaleLowerCase();
@@ -75,7 +75,11 @@ export function Search() {
             {results.map((r) => (
               <a
                 key={`${r.type}-${r.id}`}
-                href={r.href}
+                href={
+                  from && r.href.startsWith("#/")
+                    ? `${r.href}${r.href.includes("?") ? "&" : "?"}from=${encodeURIComponent(from)}`
+                    : r.href
+                }
                 className="search-result"
               >
                 <span className="sc-eyebrow">

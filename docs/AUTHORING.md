@@ -2,8 +2,8 @@
 
 1. Add `content/courses/<directory>/course.json`. Use `tests/fixtures/photography/content/courses/photo/` as a small complete worked package, or `content/courses/dbxfe/` for the full course. Do not add an app registry entry, route, component or feature flag.
 2. Supply globally unique, course-prefixed IDs for course/module/lesson/section/concept/claim/source/asset/question/option/card/scenario/rubric. Keep them immutable through title/file/order changes. IDs start with a lower-case letter and contain lower-case letters, digits or hyphens; see the schema for limits.
-3. The course declares schema/content versions, title/subtitle/summary, objectives, prerequisite IDs, tags, review date, change notes, refreshers, modules, source/claim register, glossary/aliases, assets and scenarios. Each module declares ordered `lessonFiles`, objectives, summary, prerequisites and a distinct `scenarioId`. Optional `capstoneId` must address a separate capstone scenario. An optional package-specific `contract` enforces distribution.
-4. Each lesson JSON names its safe relative `bodyFile`; seven Markdown markers provide `why`, `understand`, `see`, `deeper`, `customer`, `try`, `revisit`. Every section carries stable ID, title, concept/claim/asset references. Write substantive explanations, a worked example, misconception/limit, an audience explanation, an actionable exercise and reasoned answer. At least two checks and three cards are required per lesson. Estimates are reading-time estimates, not timers.
+3. The course declares schema/content versions, title/subtitle/summary, objectives, prerequisite IDs, tags, review date, change notes, refreshers, modules, source/claim register, glossary/aliases, assets and scenarios. Each module declares ordered `lessonFiles`, objectives, summary, prerequisites and a distinct `scenarioId`. Optional `capstoneId` must address a separate capstone scenario. An optional package-specific `contract` enforces minimum distribution; extra topics do not violate it. The independent preservation manifest also protects every original launch ID.
+4. Each lesson JSON names its safe relative `.md` `bodyFile`. Legacy lessons retain exactly seven kinds: `why`, `understand`, `see`, `deeper`, `customer`, `try`, `revisit`. New or deepened lessons declare `teachingFormat: "flexible"` and choose their sequence; `customer` is not required. Every section carries a stable ID, kind, title and concept/claim/asset references. Prefer `<!-- section:your-stable-section-id -->` Markdown markers, which allow repeated kinds. Legacy unique kind markers remain valid. Unmatched, duplicated or unassigned blocks fail the build. Use kind `solution` for an initially collapsed answer and `exercise` for the independently visible task. Author outcome, prerequisites, mechanism, worked example, complete explained solution, common mistakes/limits, sources and related-topic links. At least two checks and three distinct cards remain required. Estimates are reading-time estimates, not timers.
 5. Questions have stable option IDs, one correct option ID, a rationale for every choice and concept/claim mappings. Cards identify their lesson/section and concept/claims. Use plausible misconception distractors; avoid two defensible correct answers. Practice requires context, task, requirements, a full model and reasoning, optional authored disclosures, and at least three anchored weak/partial/strong rubric dimensions. The app labels free-response evaluation as self-assessment.
 6. Put original SVGs in `content/assets/` and declare caption, alt, complete text equivalent, provenance/rights and claim mappings. SVGs need `<title>` and `<desc>`; scripts, event handlers, foreign objects and external resources are rejected. Do not put images or executables in Markdown. Supported prose elements are paragraphs, headings h3/h4, lists, emphasis, blockquotes, code, tables and safe links. Diagrams use explicit asset references. No raw HTML, MDX, arbitrary scripts or code evaluation.
 7. Read current primary documentation for material product assertions. Record source URL/title/publisher/type/context/access and review dates/caveats; connect documented claims to specific supporting sources, then reference claims on sections/cards/questions/scenarios/assets. Guidance and fiction are separate claim kinds. Availability checks do not prove facts. Avoid real customer information and copied proprietary training.
@@ -15,8 +15,51 @@ A cosmetic title/spelling/reordering change preserves the card/question `revisio
 
 Never reuse a removed ID for a different concept. Removed notes/drafts and history remain recoverable; obsolete source links land on an explained fallback. Breaking prerequisites or leaving unresolved required assets is a validation error, not an acceptable way to remove a lesson.
 
+## Paths and playbooks
+
+Add a JSON file under `content/paths/`. Discovery is automatic. A path is an ordered view of existing canonical lessons, including lessons from more than one course. It does not create another note, completion, card or question identity. The unrelated photography example is `tests/fixtures/photography/content/paths/photography.json`.
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "sample-path",
+  "title": "An intentional sequence",
+  "summary": "A concrete learning outcome in a useful order.",
+  "outcomes": ["Explain and apply the concept."],
+  "startingAssumptions": ["State what the learner is expected to know."],
+  "defaultStart": false,
+  "groups": [
+    {
+      "id": "sample-group",
+      "title": "Build the model",
+      "purpose": "Explain why these topics belong together.",
+      "lessonIds": ["existing-lesson-id"]
+    }
+  ],
+  "prerequisites": [],
+  "optionalBridges": [],
+  "playbooks": []
+}
+```
+
+The IDs in this illustrative snippet must be replaced with valid catalog targets before publication. Only one path may declare `defaultStart: true`; the Today page reads that content metadata. Each prerequisite is `{lessonId, requiredLessonId, explanation}`. Each optional bridge is `{lessonId, beforeLessonIds, explanation}`. Nothing is locked. Bridge lessons are separate from core groups; opening a bridge does not complete it. Prerequisites and bridge dependencies are checked for missing targets and cycles alongside canonical lesson prerequisites.
+
+Each playbook is `{id, title, summary, targets}`. A target requires `courseId` and a human-readable `label`, plus either `lessonId` with optional `sectionId`, `scenarioId`, or neither to link to the course. Refer to an existing action section instead of duplicating the lesson body. Targets are validated against their owning course in the full catalog.
+
+Use `#/lesson/<lesson-id>/<section-id>?path=<path-id>` to enter an explicit sequence. Legacy links without path context still work and use a disclosed course fallback. Path IDs are navigation preferences only; titles, files and display order never own learning evidence. Keep a bridge useful even when entered directly. Path JSON also supplies searchable roadmap and playbook titles.
+
+## Downloadable exercises
+
+Put a local `.zip` bundle under `content/downloads/`, then declare course `downloads` entries containing `id`, `title`, `description`, safe relative `path`, `mediaType: "application/zip"`, and the lowercase SHA-256 hash. Add its ID to each relevant lesson's `downloadIds`. The path is relative to `content/downloads/`, for example `reliable-data-exercises.zip`. The build copies only validated, referenced bundles into generated `public/content-downloads/`; it never runs their contents.
+
+Archives may contain `.md`, `.txt`, `.json`, `.csv`, `.py`, `.sql` and `.toml` files. Limits are 20 MB compressed, 50 MB total declared expanded size and 200 entries. Traversal, absolute or reserved paths, symlinks, encryption, duplicate/case-colliding names and unsupported compression are rejected. The exact bytes must match the manifest checksum. Explain setup, dependencies, expected outputs and known limits in the bundle. Preserve an attempt/solution distinction; do not describe illustrative code as executed cloud evidence. Regenerate the archive and checksum after any bundled-file change.
+
+## Launch preservation
+
+`content/preservation/dbxfe-launch.json` records the original module, lesson, section, card, question, option, scenario, asset and capstone IDs from the pinned launch commit. The build validates every listed identity against the current content, while allowing new lessons and different navigation grouping. This gate replaces the old exact 12-by-3 ceiling. It protects identities and coverage, not prose quality; editorial review still evaluates whether retained and new material teaches something useful.
+
 ## Reproduced extension proof
 
-`npm run test:content-extension` adds the original photography fixture (2 modules, 4 lessons, 12 cards, 8 checks, 2 diagrams, 2 scenarios) using only `content/courses/photo/**` and `content/assets/photo-*.svg`. It verifies discovery, all lesson/scenario rendering, asset loading, checks, search, notes, bookmarks, completion and review. It renames module/lesson titles, reverses ordering and question options, and changes JSON/Markdown filenames while retaining IDs. Actual stored notes, completions, attempts and immutable card history are compared. A material revision is then reviewed. Cleanup removes the fixture and verifies production again contains only `dbxfe`, with orphan notes still recoverable.
+`npm run test:content-extension` adds the original photography fixture (2 modules, 4 lessons, 12 cards, 8 checks, 2 diagrams, 2 scenarios), its roadmap and task playbook using only `content/courses/photo/**`, `content/assets/photo-*.svg` and `content/paths/photography.json`. It verifies roadmap discovery, a path order deliberately different from course order, canonical playbook links, all lesson/scenario rendering, asset loading, checks, search, notes, bookmarks, completion and review. It renames module/lesson titles, reverses ordering and question options, and changes JSON/Markdown filenames while retaining IDs. Actual stored notes, completions, attempts and immutable card history are compared. A material revision is then reviewed. Cleanup removes the course and path fixture and verifies production again contains only `dbxfe`, with orphan notes still recoverable.
 
 The exact added/changed/deleted paths and before/after hashes are in [content-extension.json](evidence/content-extension.json). `runtimeSourceChanges: []` is asserted, not inferred. The fixture is committed only under tests and never appears in the production build.
