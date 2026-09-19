@@ -1,23 +1,141 @@
 {
   "id": "dbxfe-m03-l02",
-  "title": "Separate storage, compute, tables, and governance",
-  "summary": "Explain what each platform layer does and what it cannot guarantee.",
-  "contentVersion": "1.0.0",
-  "estimatedMinutes": 4,
+  "title": "Delta tables: files, log, and snapshots",
+  "summary": "Predict committed table rows from a schematic file/log timeline and separate storage correctness from business correctness.",
+  "contentVersion": "2.0.0",
+  "estimatedMinutes": 12,
   "objectives": [
-    "Explain what each platform layer does and what it cannot guarantee.",
-    "Apply platform responsibilities to the worked customer example and explain its limits."
+    "Predict committed table rows from a schematic file/log timeline and separate storage correctness from business correctness.",
+    "Apply the reasoning to a changed case and explain the limits of the evidence."
   ],
-  "prerequisiteIds": [],
+  "prerequisiteIds": [
+    "dbxfe-workspace-compute"
+  ],
   "tags": [
     "Platform responsibilities",
     "object storage",
     "Delta Lake",
     "ACID",
-    "compute"
+    "compute",
+    "Reliable Data Foundations",
+    "Substantive technical topic"
   ],
   "bodyFile": "lessons/dbxfe-m03-l02.md",
   "sections": [
+    {
+      "id": "dbxfe-m03-l02-foundation-start",
+      "kind": "prerequisites",
+      "title": "Before the snapshot",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-mechanism",
+      "kind": "mechanism",
+      "title": "Files are physical; a snapshot is logical",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-example",
+      "kind": "example",
+      "title": "Work a two-version timeline",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ],
+      "assetIds": [
+        "dbxfe-foundation-snapshot"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-task",
+      "kind": "exercise",
+      "title": "Predict a changed commit",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-solution",
+      "kind": "solution",
+      "title": "Explain both outcomes",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-limits",
+      "kind": "mistakes",
+      "title": "Compatibility and evidence boundaries",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-links",
+      "kind": "related",
+      "title": "Carry the snapshot idea forward",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-sources",
+      "kind": "sources",
+      "title": "Sources and execution scope",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
     {
       "id": "dbxfe-m03-l02-why",
       "kind": "why",
@@ -141,7 +259,7 @@
       "options": [
         {
           "id": "dbxfe-m03-l02-q1-a",
-          "text": "That the source\u2019s business meaning and values are correct.",
+          "text": "That the source’s business meaning and values are correct.",
           "rationale": "Atomic table behavior does not validate every business rule."
         },
         {
@@ -198,6 +316,68 @@
         "dbxfe-fact-delta",
         "dbxfe-fact-delta-protocol",
         "dbxfe-fact-spark-sql"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-q1",
+      "revision": "1",
+      "prompt": "File f0 remains physically present after version 1 retired it. What belongs in a version 1 table read?",
+      "options": [
+        {
+          "id": "dbxfe-m03-l02-foundation-q1-a",
+          "text": "Only rows active in the committed version 1 snapshot.",
+          "rationale": "Physical presence does not make a file logically current."
+        },
+        {
+          "id": "dbxfe-m03-l02-foundation-q1-b",
+          "text": "Every row in f0, f1 and f2.",
+          "rationale": "That bypasses the table log and double-counts A."
+        },
+        {
+          "id": "dbxfe-m03-l02-foundation-q1-c",
+          "text": "Whichever file has the latest filesystem modification time.",
+          "rationale": "Filesystem arrival time does not define the committed table snapshot."
+        }
+      ],
+      "correctOptionId": "dbxfe-m03-l02-foundation-q1-a",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-q2",
+      "revision": "1",
+      "prompt": "What happens if a replacement data file is written but its transaction never commits?",
+      "options": [
+        {
+          "id": "dbxfe-m03-l02-foundation-q2-c",
+          "text": "The old data is automatically proven invalid.",
+          "rationale": "Failure to commit a new change says nothing about the business truth of the prior state."
+        },
+        {
+          "id": "dbxfe-m03-l02-foundation-q2-a",
+          "text": "That file alone does not establish a new committed table snapshot.",
+          "rationale": "The transaction boundary determines the visible change."
+        },
+        {
+          "id": "dbxfe-m03-l02-foundation-q2-b",
+          "text": "The new row automatically becomes current because the bytes exist.",
+          "rationale": "Physical writing is not the same as committing table metadata."
+        }
+      ],
+      "correctOptionId": "dbxfe-m03-l02-foundation-q2-a",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
       ]
     }
   ],
@@ -258,6 +438,61 @@
         "dbxfe-fact-delta-protocol",
         "dbxfe-fact-spark-sql"
       ]
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-card1",
+      "revision": "1",
+      "prompt": "Why does scanning every physical file differ from reading a Delta table?",
+      "answer": "The table snapshot includes only logically active data for its committed version.",
+      "explanation": "Old or uncommitted physical files are not automatically current rows.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-mechanism",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-card2",
+      "revision": "1",
+      "prompt": "How do table version and source revision differ?",
+      "answer": "A table version identifies a commit; a source revision orders a business record’s changes.",
+      "explanation": "One table commit can contain many business revisions.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-mechanism",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-l02-foundation-card3",
+      "revision": "1",
+      "prompt": "A replacement file exists but its transaction never committed. What can a current reader infer?",
+      "answer": "Physical file creation alone does not establish a new committed table snapshot.",
+      "explanation": "The last committed snapshot remains the reading basis; investigate failed writes through supported APIs.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-mechanism",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ]
     }
+  ],
+  "teachingFormat": "flexible",
+  "downloadIds": [
+    "dbxfe-reliable-data-exercises"
   ]
 }

@@ -9,6 +9,8 @@ import {
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Asset, Course } from "./content-schema";
+import { lessonHref, paths } from "./catalog";
+import { pathForLesson } from "./paths";
 import { StudyStore, exportText } from "./study";
 export const store = new StudyStore();
 const StoreContext = createContext(store);
@@ -77,7 +79,31 @@ export function StudyDownload({
     </>
   );
 }
-export function MD({ children }: { children: string }) {
+export function MD({
+  children,
+  pathId,
+  from,
+}: {
+  children: string;
+  pathId?: string;
+  from?: string;
+}) {
+  const contextualHref = (href: string | undefined) => {
+    const target = /^#\/lesson\/([a-z0-9-]+)(?:\/([a-z0-9-]+))?$/.exec(
+      href ?? "",
+    );
+    if (!target) return href;
+    if (pathForLesson(paths, target[1], pathId))
+      return lessonHref(target[1], target[2], pathId);
+    if (
+      from &&
+      /^#\/lesson\/[a-z0-9-]+(?:\/[a-z0-9-]+)?(?:\?path=[a-z0-9-]+)?$/.test(
+        from,
+      )
+    )
+      return `${href}?from=${encodeURIComponent(from)}`;
+    return href;
+  };
   return (
     <Markdown
       remarkPlugins={[remarkGfm]}
@@ -108,7 +134,7 @@ export function MD({ children }: { children: string }) {
       components={{
         a: ({ href, children }) => (
           <a
-            href={href}
+            href={contextualHref(href)}
             {...(href?.startsWith("https://")
               ? { target: "_blank", rel: "noopener noreferrer" }
               : {})}

@@ -4,7 +4,7 @@ export const idSchema = z.string().regex(/^[a-z][a-z0-9-]{2,100}$/);
 const text = z.string().trim().min(1).max(100000);
 const ids = z.array(idSchema);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-export const sectionKinds = [
+export const legacySectionKinds = [
   "why",
   "understand",
   "see",
@@ -12,6 +12,19 @@ export const sectionKinds = [
   "customer",
   "try",
   "revisit",
+] as const;
+export const sectionKinds = [
+  ...legacySectionKinds,
+  "outcome",
+  "prerequisites",
+  "mechanism",
+  "example",
+  "exercise",
+  "solution",
+  "mistakes",
+  "sources",
+  "related",
+  "reference",
 ] as const;
 export const sourceSchema = z
   .object({
@@ -83,7 +96,9 @@ export const lessonSchema = z
     objectives: z.array(text).min(1),
     prerequisiteIds: ids,
     tags: z.array(text),
-    sections: z.array(sectionSchema).length(7),
+    teachingFormat: z.literal("flexible").optional(),
+    downloadIds: ids.optional(),
+    sections: z.array(sectionSchema).min(1),
     questions: z.array(questionSchema).min(2),
     cards: z.array(cardSchema).min(3),
   })
@@ -165,6 +180,20 @@ export const courseSchema = z
         .strict(),
     ),
     assets: z.array(assetSchema),
+    downloads: z
+      .array(
+        z
+          .object({
+            id: idSchema,
+            title: text,
+            description: text,
+            path: text,
+            mediaType: z.literal("application/zip"),
+            sha256: z.string().regex(/^[a-f0-9]{64}$/),
+          })
+          .strict(),
+      )
+      .optional(),
     scenarios: z.array(scenarioSchema),
     capstoneId: idSchema.optional(),
     contract: z
@@ -186,12 +215,21 @@ export type Card = z.infer<typeof cardSchema>;
 export type Question = z.infer<typeof questionSchema>;
 export type Scenario = z.infer<typeof scenarioSchema>;
 export type Asset = z.infer<typeof assetSchema>;
+export type Download = NonNullable<Course["downloads"]>[number];
 
 export function safePath(path: string) {
   return (
     /^[a-zA-Z0-9][a-zA-Z0-9/_ .-]*$/.test(path) &&
     !path.split("/").some((p) => p === ".." || p === ".") &&
-    !path.includes("\\")
+    !path.includes("\\") &&
+    !path
+      .split("/")
+      .some(
+        (p) =>
+          !p ||
+          /[ .]$/.test(p) ||
+          /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p),
+      )
   );
 }
 export function validateCourses(input: unknown[]): Course[] {
@@ -199,6 +237,10 @@ export function validateCourses(input: unknown[]): Course[] {
   const allIds = new Set<string>();
   const navigation = new Set<string>();
   const prereqs = new Map<string, string[]>();
+  const catalogLessons = courses.flatMap((c) =>
+    c.modules.flatMap((m) => m.lessons),
+  );
+  const catalogScenarios = courses.flatMap((c) => c.scenarios);
   const fail = (message: string): never => {
     throw new Error(message);
   };
@@ -231,6 +273,7 @@ export function validateCourses(input: unknown[]): Course[] {
       ...c.sources,
       ...c.claims,
       ...c.assets,
+      ...(c.downloads ?? []),
     ];
     for (const item of items) {
       if (allIds.has(item.id)) fail(`Duplicate ID: ${item.id}`);
@@ -262,11 +305,31 @@ export function validateCourses(input: unknown[]): Course[] {
         fail(`Unsafe asset path: ${a.path}`);
       refs(a.claimIds, claims, "asset claim");
     }
+    for (const d of c.downloads ?? [])
+      if (!safePath(d.path) || !d.path.endsWith(".zip"))
+        fail(`Unsafe download path: ${d.path}`);
     for (const g of c.concepts) link(g.lessonId, g.sectionId);
     for (const l of lessons) {
       const kinds = new Set(l.sections.map((s) => s.kind));
-      if (sectionKinds.some((k) => !kinds.has(k)))
+      if (
+        !l.teachingFormat &&
+        (l.sections.length !== 7 ||
+          legacySectionKinds.some((k) => !kinds.has(k)))
+      )
         fail(`Missing required teaching section: ${l.id}`);
+      if (
+        l.teachingFormat === "flexible" &&
+        (!kinds.has("solution") ||
+          (!kinds.has("exercise") && !kinds.has("try")))
+      )
+        fail(
+          `Flexible lesson requires a separate exercise and solution: ${l.id}`,
+        );
+      refs(
+        l.downloadIds ?? [],
+        new Set((c.downloads ?? []).map((d) => d.id)),
+        "download",
+      );
       for (const s of l.sections) {
         refs(s.conceptIds, concepts, "concept");
         refs(s.claimIds, claims, "claim");
@@ -305,10 +368,10 @@ export function validateCourses(input: unknown[]): Course[] {
       fail("Missing capstone");
     if (c.contract) {
       const d = c.contract;
-      if (c.modules.length !== d.modules) fail("Incorrect module count");
+      if (c.modules.length < d.modules) fail("Insufficient module count");
       for (const m of c.modules) {
-        if (m.lessons.length !== d.lessonsPerModule)
-          fail(`Incorrect lesson count: ${m.id}`);
+        if (m.lessons.length < d.lessonsPerModule)
+          fail(`Insufficient lesson count: ${m.id}`);
         if (
           new Set(
             m.lessons.flatMap((l) => l.sections.flatMap((s) => s.assetIds)),
@@ -347,24 +410,297 @@ export function validateCourses(input: unknown[]): Course[] {
         if (url.startsWith("#/")) {
           const parts = url.split("/"),
             id = parts[2];
-          if (parts[1] === "lesson" && parts[3]) link(id, parts[3]);
-          if (
-            !allIds.has(id) &&
-            !navigation.has(id) &&
-            !c.scenarios.some((x) => x.id === id)
-          )
+          if (parts.length > (parts[1] === "lesson" ? 4 : 3))
             fail(`Broken internal link: ${url}`);
+          if (
+            parts[1] === "lesson" &&
+            !catalogLessons.some(
+              (l) =>
+                l.id === id &&
+                (!parts[3] || l.sections.some((s) => s.id === parts[3])),
+            )
+          )
+            fail(`Broken lesson/section reference: ${url}`);
+          if (
+            parts[1] === "course" &&
+            !courses.some((course) => course.id === id)
+          )
+            fail(`Broken course link: ${url}`);
+          if (
+            parts[1] === "practice" &&
+            !catalogScenarios.some((scenario) => scenario.id === id)
+          )
+            fail(`Broken practice link: ${url}`);
         }
       }
   }
+  const complete = new Set<string>();
   const visit = (id: string, chain = new Set<string>()) => {
     if (chain.has(id)) fail(`Cyclic prerequisite: ${id}`);
+    if (complete.has(id)) return;
     const next = new Set(chain).add(id);
     for (const p of prereqs.get(id) ?? []) {
       if (!navigation.has(p)) fail(`Invalid prerequisite: ${p}`);
       visit(p, next);
     }
+    complete.add(id);
   };
   for (const id of navigation) visit(id);
   return courses;
+}
+
+export const referenceSchema = z
+  .object({
+    courseId: idSchema,
+    lessonId: idSchema.optional(),
+    sectionId: idSchema.optional(),
+    scenarioId: idSchema.optional(),
+    label: text,
+  })
+  .strict();
+export const pathSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    id: idSchema,
+    title: text,
+    summary: text,
+    outcomes: z.array(text).min(1),
+    startingAssumptions: z.array(text).min(1),
+    defaultStart: z.boolean().optional(),
+    groups: z
+      .array(
+        z
+          .object({
+            id: idSchema,
+            title: text,
+            purpose: text,
+            lessonIds: ids.min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    prerequisites: z.array(
+      z
+        .object({
+          lessonId: idSchema,
+          requiredLessonId: idSchema,
+          explanation: text,
+        })
+        .strict(),
+    ),
+    optionalBridges: z.array(
+      z
+        .object({
+          lessonId: idSchema,
+          beforeLessonIds: ids.min(1),
+          explanation: text,
+        })
+        .strict(),
+    ),
+    playbooks: z.array(
+      z
+        .object({
+          id: idSchema,
+          title: text,
+          summary: text,
+          targets: z.array(referenceSchema).min(1),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type LearningPath = z.infer<typeof pathSchema>;
+export type ContentReference = z.infer<typeof referenceSchema>;
+export type Playbook = LearningPath["playbooks"][number];
+
+export function validatePaths(
+  input: unknown[],
+  courses: Course[],
+): LearningPath[] {
+  const paths = input.map((value) => pathSchema.parse(value));
+  const allIds = new Set<string>();
+  const collect = (value: unknown) => {
+    if (Array.isArray(value)) for (const item of value) collect(item);
+    else if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      if (typeof record.id === "string") allIds.add(record.id);
+      for (const [key, item] of Object.entries(record))
+        if (key !== "id") collect(item);
+    }
+  };
+  collect(courses);
+  const lessons = new Map(
+    courses.flatMap((c) =>
+      c.modules.flatMap((m) => m.lessons.map((l) => [l.id, l] as const)),
+    ),
+  );
+  const graph = new Map<string, Set<string>>(
+    courses
+      .flatMap((course) => [
+        course,
+        ...course.modules,
+        ...course.modules.flatMap((module) => module.lessons),
+      ])
+      .map((item) => [item.id, new Set(item.prerequisiteIds)]),
+  );
+  const fail = (message: string): never => {
+    throw new Error(message);
+  };
+  const requireLesson = (id: string) => {
+    if (!lessons.has(id)) fail(`Missing path lesson: ${id}`);
+  };
+  if (paths.filter((path) => path.defaultStart).length > 1)
+    fail("Multiple default-start paths");
+  for (const path of paths) {
+    for (const item of [path, ...path.groups, ...path.playbooks]) {
+      if (allIds.has(item.id)) fail(`Duplicate ID: ${item.id}`);
+      allIds.add(item.id);
+    }
+    const ordered = path.groups.flatMap((group) => group.lessonIds);
+    if (new Set(ordered).size !== ordered.length)
+      fail(`Duplicate lesson within path: ${path.id}`);
+    for (const id of ordered) requireLesson(id);
+    const bridges = path.optionalBridges.map((bridge) => bridge.lessonId);
+    if (new Set(bridges).size !== bridges.length)
+      fail(`Duplicate optional bridge: ${path.id}`);
+    if (bridges.some((id) => ordered.includes(id)))
+      fail(`Optional bridge is also a required topic: ${path.id}`);
+    for (const bridge of path.optionalBridges) {
+      requireLesson(bridge.lessonId);
+      for (const id of bridge.beforeLessonIds) {
+        if (!ordered.includes(id)) fail(`Bridge target outside path: ${id}`);
+        graph.get(id)!.add(bridge.lessonId);
+      }
+    }
+    const dependencyKeys = new Set<string>();
+    for (const dependency of path.prerequisites) {
+      if (
+        !ordered.includes(dependency.lessonId) &&
+        !bridges.includes(dependency.lessonId)
+      )
+        fail(`Prerequisite target outside path: ${dependency.lessonId}`);
+      requireLesson(dependency.requiredLessonId);
+      const key = `${dependency.lessonId}/${dependency.requiredLessonId}`;
+      if (dependencyKeys.has(key)) fail(`Duplicate path prerequisite: ${key}`);
+      dependencyKeys.add(key);
+      graph.get(dependency.lessonId)!.add(dependency.requiredLessonId);
+    }
+    for (const playbook of path.playbooks)
+      for (const target of playbook.targets) {
+        const course = courses.find((course) => course.id === target.courseId);
+        if (!course)
+          throw new Error(`Missing playbook course: ${target.courseId}`);
+        if (target.scenarioId && (target.lessonId || target.sectionId))
+          fail(`Ambiguous playbook target: ${playbook.id}`);
+        if (target.sectionId && !target.lessonId)
+          fail(`Section requires playbook lesson: ${playbook.id}`);
+        if (
+          target.scenarioId &&
+          !course.scenarios.some(
+            (scenario) => scenario.id === target.scenarioId,
+          )
+        )
+          fail(`Missing playbook scenario: ${target.scenarioId}`);
+        if (target.lessonId) {
+          const lesson = course.modules
+            .flatMap((module) => module.lessons)
+            .find((lesson) => lesson.id === target.lessonId);
+          if (
+            !lesson ||
+            (target.sectionId &&
+              !lesson.sections.some(
+                (section) => section.id === target.sectionId,
+              ))
+          )
+            fail(
+              `Missing playbook lesson/section: ${target.lessonId}/${target.sectionId ?? ""}`,
+            );
+        }
+      }
+  }
+  const complete = new Set<string>();
+  const visit = (id: string, chain = new Set<string>()) => {
+    if (chain.has(id)) fail(`Cyclic path prerequisite: ${id}`);
+    if (complete.has(id)) return;
+    const next = new Set(chain).add(id);
+    for (const required of graph.get(id) ?? []) visit(required, next);
+    complete.add(id);
+  };
+  for (const id of graph.keys()) visit(id);
+  return paths;
+}
+
+export const preservationSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    courseId: idSchema,
+    baselineCommit: z.string().regex(/^[a-f0-9]{40}$/),
+    moduleIds: ids.min(1),
+    lessons: z
+      .array(
+        z
+          .object({
+            id: idSchema,
+            sectionIds: ids.min(1),
+            cardIds: ids.min(3),
+            questions: z
+              .array(z.object({ id: idSchema, optionIds: ids.min(2) }).strict())
+              .min(2),
+          })
+          .strict(),
+      )
+      .min(1),
+    scenarioIds: ids.min(1),
+    assetIds: ids.min(1),
+    capstoneId: idSchema,
+  })
+  .strict();
+export function validatePreservation(input: unknown, courses: Course[]) {
+  const baseline = preservationSchema.parse(input);
+  const course = courses.find((course) => course.id === baseline.courseId);
+  if (!course) throw Error(`Missing preserved course: ${baseline.courseId}`);
+  const check = (expected: string[], actual: string[]) => {
+    const present = new Set(actual);
+    for (const id of expected)
+      if (!present.has(id)) throw Error(`Missing preserved ID: ${id}`);
+  };
+  check(
+    baseline.moduleIds,
+    course.modules.map((module) => module.id),
+  );
+  check(
+    baseline.scenarioIds,
+    course.scenarios.map((scenario) => scenario.id),
+  );
+  check(
+    baseline.assetIds,
+    course.assets.map((asset) => asset.id),
+  );
+  if (course.capstoneId !== baseline.capstoneId)
+    throw Error("Preserved capstone identity changed");
+  const lessons = course.modules.flatMap((module) => module.lessons);
+  for (const original of baseline.lessons) {
+    const lesson = lessons.find((lesson) => lesson.id === original.id);
+    if (!lesson) throw Error(`Missing preserved lesson: ${original.id}`);
+    check(
+      original.sectionIds,
+      lesson.sections.map((section) => section.id),
+    );
+    check(
+      original.cardIds,
+      lesson.cards.map((card) => card.id),
+    );
+    check(
+      original.questions.map((question) => question.id),
+      lesson.questions.map((question) => question.id),
+    );
+    for (const question of original.questions)
+      check(
+        question.optionIds,
+        lesson.questions
+          .find((item) => item.id === question.id)!
+          .options.map((option) => option.id),
+      );
+  }
+  return baseline;
 }

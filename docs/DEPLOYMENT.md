@@ -1,5 +1,15 @@
 # Deployment preparation — not authorization
 
+## Current checkpoint — 19 September 2026
+
+The approved study-hub assignment supplies this existing public hosting checkpoint: [SpicyBrain](https://spicybrain.motahir-official.chatgpt.site), Sites project `appgprj_6aaeb1f97b9c8191b7ec8bf746c483c7`, recorded hosting source `8a80f1df37358797c9cec04f66d852294d395c60`. The handoff describes that source as the merged application plus the Sites manifest. This is attributed handoff evidence, not a new verification of the deployed version. GitHub remains the application repository; merging a PR does not publish it to Sites.
+
+This milestone authorizes one implementation PR, with no merge or deployment. Do not create another Site, change repository/hosting settings, enable Pages, change origin, or deploy this PR. Later authorized publication must reverify this same Site identity, source/build hashes, access model, and live learner-state continuity. Local native-storage tests are not a production-origin migration test.
+
+The initial record below is historical and describes the pre-publication state; it does not imply that the recorded Site is now absent.
+
+## Historical initial preparation
+
 No site was published, Pages enabled, tunnel created, deployment secret added, or cloud resource provisioned. Hosting and access model remain unselected. Public source in this user-created repository is authorized; that does not authorize website publication.
 
 Build with Node 24.19.0:

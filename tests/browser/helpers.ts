@@ -57,7 +57,7 @@ export async function shot(page: Page, name: string) {
   });
 }
 export async function saved(page: Page) {
-  await expect.poll(async () => (await stored(page))?.schemaVersion).toBe(2);
+  await expect.poll(async () => (await stored(page))?.schemaVersion).toBe(3);
   await expect(
     page.getByText("Unsaved · keep this tab open", { exact: true }),
   ).toHaveCount(0);

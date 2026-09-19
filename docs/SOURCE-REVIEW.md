@@ -37,3 +37,8 @@ The old GenAI guide is represented by the current agent documentation. Pipeline 
 Every lesson’s source disclosure distinguishes documented facts, original professional guidance and fiction. A general professional recommendation is not Databricks internal policy. Fictional stakeholders, budgets and targets are labeled. The only executed instructional exercises are deterministic local synthetic-data and value-arithmetic checks. SQL/PySpark snippets and proposed cloud labs remain illustrative/unexecuted.
 
 `npm run report:sources` independently writes [source-availability.json](evidence/source-availability.json), including checked timestamp, final URL, status, editorial dates and associated claims. Network failure is reported without preventing rendering. Re-read claim-supporting passages during a factual update; HTTP 200 alone is insufficient.
+
+
+## Approved study-hub milestone source review — 2026-09-19
+
+The original review above is retained as baseline history. New/deepened Reliable Data Foundations claims were re-read against primary documentation and pinned Python 3.12 / Spark 4.0.4 references. See [the package-by-package source scope](RELIABLE-DATA-CURRICULUM.md#source-review-scope). The original broad statement that only arithmetic was executed describes the baseline, not the current milestone; new local language/engine execution is recorded in the exercise evidence. No Databricks, Delta, workspace permission, cloud network or Jobs run is claimed.

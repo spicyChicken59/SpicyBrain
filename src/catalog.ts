@@ -1,7 +1,13 @@
 import raw from "./generated/catalog.json";
 import search from "./generated/search.json";
-import type { Course } from "./content-schema";
+import rawPaths from "./generated/paths.json";
+import type { Course, LearningPath } from "./content-schema";
 export const courses = raw as Course[];
+export const paths = rawPaths as LearningPath[];
+export const defaultPath = paths.find((path) => path.defaultStart);
+export const playbooks = paths.flatMap((path) =>
+  path.playbooks.map((playbook) => ({ ...playbook, path })),
+);
 export const publicIndex = search as {
   id: string;
   type: string;
@@ -20,8 +26,9 @@ export const cards = lessons.flatMap((l) => l.cards);
 export const scenarios = courses.flatMap((course) =>
   course.scenarios.map((scenario) => ({ course, scenario })),
 );
-export const knownIds = new Set(
-  courses.flatMap((c) => [
+export const knownIds = new Set([
+  ...paths.map((path) => path.id),
+  ...courses.flatMap((c) => [
     c.id,
     ...c.modules.flatMap((m) => [
       m.id,
@@ -34,8 +41,8 @@ export const knownIds = new Set(
     ]),
     ...c.scenarios.map((s) => s.id),
   ]),
-);
-export const lessonHref = (id: string, section?: string) =>
-  `#/lesson/${id}${section ? `/${section}` : ""}`;
+]);
+export const lessonHref = (id: string, section?: string, pathId?: string) =>
+  `#/lesson/${id}${section ? `/${section}` : ""}${pathId ? `?path=${encodeURIComponent(pathId)}` : ""}`;
 export const findLesson = (id: string) =>
   lessonEntries.find((e) => e.lesson.id === id);

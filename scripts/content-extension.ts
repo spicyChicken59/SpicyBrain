@@ -8,13 +8,13 @@ import {
   symlink,
   rename,
 } from "node:fs/promises";
-import { join, resolve, extname } from "node:path";
+import { join, resolve, extname, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { chromium, expect } from "@playwright/test";
-import { buildContent, root } from "./content.ts";
+import { buildContent, loadPaths, root } from "./content.ts";
 import { stored } from "../tests/browser/helpers.ts";
 import type { Course, Lesson } from "../src/content-schema.ts";
 type RawCourse = Omit<Course, "modules"> & {
@@ -87,7 +87,7 @@ const server = createServer(async (req, res) => {
         base,
         "." + path + (path.endsWith("/") ? "index.html" : ""),
       );
-    if (!file.startsWith(base + "/")) throw Error();
+    if (!file.startsWith(base + sep)) throw Error();
     res.setHeader(
       "Content-Type",
       mime[extname(file)] || "application/octet-stream",
@@ -111,7 +111,11 @@ try {
     "tsconfig.json",
   ])
     await cp(join(root, path), join(temp, path), { recursive: true });
-  await symlink(join(root, "node_modules"), join(temp, "node_modules"), "dir");
+  await symlink(
+    join(root, "node_modules"),
+    join(temp, "node_modules"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
   const before = await manifest(temp);
   await cp(
     join(root, "tests/fixtures/photography/content"),
@@ -124,6 +128,8 @@ try {
   let catalog = await build();
   expect(catalog.map((c) => c.id)).toEqual(["dbxfe", "photo"]);
   expect(catalog[1].modules).toHaveLength(2);
+  const extensionPaths = await loadPaths(catalog, join(temp, "content"));
+  expect(extensionPaths.some((path) => path.id === "photo-path")).toBe(true);
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const address = server.address();
   if (!address || typeof address === "string") throw Error("No port");
@@ -145,6 +151,34 @@ try {
       name: "Exposure and composition in photography",
     }),
   ).toBeVisible();
+  await go("#/learn/roadmaps");
+  await page
+    .getByRole("link")
+    .filter({ hasText: "Intentional photographs" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Intentional photographs", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Open next topic", exact: false })
+    .click();
+  await expect(page).toHaveURL(/#\/lesson\/photo-m01-l02\?path=photo-path$/);
+  await go("#/learn/playbooks");
+  await expect(
+    page.getByRole("heading", {
+      name: "A moving subject looks blurred",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", {
+      name: "Reason through motion and shutter duration",
+      exact: true,
+    })
+    .click();
+  await expect(page).toHaveURL(
+    /#\/lesson\/photo-m01-l01\/photo-m01-l01-understand/,
+  );
   // Every fixture lesson, asset, check and scenario renders through existing components.
   for (const m of catalog[1].modules) {
     for (const l of m.lessons) {
@@ -322,6 +356,7 @@ try {
   ]);
   expect(current.schedules["photo-m01-l01-card1"].revision).toBe("2");
   await rm(join(temp, "content/courses/photo"), { recursive: true });
+  await rm(join(temp, "content/paths/photography.json"));
   for (const n of ["photo-m01-diagram.svg", "photo-m02-diagram.svg"])
     await rm(join(temp, "content/assets", n));
   const release = await build();
@@ -345,6 +380,7 @@ try {
       (f) =>
         !f.path.startsWith("src/generated/") &&
         !f.path.startsWith("public/content-assets/") &&
+        !f.path.startsWith("public/content-downloads/") &&
         !f.path.startsWith("docs/evidence/"),
     );
   expect(runtimeChanges).toEqual([]);
@@ -369,6 +405,7 @@ try {
         runtimeSourceChanges: runtimeChanges,
         assertions: [
           "Catalog discovery",
+          "Content-only unrelated roadmap and playbook discovery; canonical topic targets and explicit path context",
           "Every lesson, asset, check and scenario rendered",
           "Public and local note search",
           "Notes/bookmarks/completion/attempt/review persisted",

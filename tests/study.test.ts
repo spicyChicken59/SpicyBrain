@@ -122,6 +122,58 @@ function completeState() {
   s.disclosureAccepted = true;
   return validateState(s);
 }
+test("baseline schema 2 migrates every record unchanged, persists schema 3, and round-trips path context", async () => {
+  const current = completeState();
+  const old = { ...current, schemaVersion: 2 };
+  const migrated = migrateState(old);
+  assert.deepEqual(migrated, current);
+  const name = `baseline-v2-${crypto.randomUUID()}`;
+  const db = await openDB(name, 2, {
+    upgrade(db) {
+      db.createObjectStore("study");
+    },
+  });
+  await db.put("study", old, "root");
+  db.close();
+  const store = new StudyStore(name);
+  await store.init();
+  assert.deepEqual(store.getSnapshot().data, current);
+  await store.change((s) => ({
+    ...s,
+    resume: {
+      ...s.resume!,
+      pathId: "synthetic-path",
+      updatedAt: "2026-03-09T06:59:59.000Z",
+    },
+    positions: {
+      ...s.positions,
+      "test-lesson": {
+        ...s.positions["test-lesson"],
+        pathId: "synthetic-path",
+        updatedAt: "2026-03-09T06:59:59.000Z",
+      },
+    },
+  }));
+  const withPath = store.getSnapshot().data;
+  assert.deepEqual(parseImport(exportText(withPath)), withPath);
+  assert(
+    importPreview(emptyState(), withPath, new Set()).unknown.includes(
+      "synthetic-path",
+    ),
+  );
+  assert.deepEqual(mergeStates(withPath, migrated).resume, withPath.resume);
+  store.close();
+  const reopened = new StudyStore(name);
+  await reopened.init();
+  assert.deepEqual(reopened.getSnapshot().data, withPath);
+  reopened.close();
+  await deleteDB(name);
+  const illegalLegacy = {
+    ...old,
+    resume: { ...old.resume!, pathId: "not-a-v2-field" },
+  };
+  assert.throws(() => migrateState(illegalLegacy));
+});
 test("all schedule ratings, rounding, ceiling and exact 24-hour DST boundaries", () => {
   for (const [rating, first, next] of [
     ["Again", 0, 0],
@@ -256,7 +308,7 @@ test("invalid/future/oversize/schedule corruption rejected without mutating stat
   const bad = structuredClone(s);
   bad.schedules[card.id].intervalDays = 100;
   assert.throws(() => validateState(bad));
-  assert.equal(s.schemaVersion, 2);
+  assert.equal(s.schemaVersion, 3);
 });
 test("synthetic v1 fixture migrates both export and actual IndexedDB version and survives reopen", async () => {
   const old = JSON.parse(
@@ -289,7 +341,7 @@ test("synthetic v1 fixture migrates both export and actual IndexedDB version and
   );
   store.close();
   const check = await openDB(name, 2);
-  assert.equal((await check.get("study", "root")).schemaVersion, 2);
+  assert.equal((await check.get("study", "root")).schemaVersion, 3);
   assert.equal(
     (await check.get("study", "root")).notes["synthetic-note"].text,
     old.notes["synthetic-note"].text,

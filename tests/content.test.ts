@@ -4,30 +4,117 @@ import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadCourses, verifyDesign } from "../scripts/content.ts";
-import { validateCourses, type Course } from "../src/content-schema.ts";
+import {
+  validateCourses,
+  validatePreservation,
+  type Course,
+} from "../src/content-schema.ts";
 const original = await loadCourses();
-test("complete distribution and pinned immutable design snapshot", async () => {
+const preservation = JSON.parse(
+  await readFile("content/preservation/dbxfe-launch.json", "utf8"),
+);
+test("launch inventory and stable IDs are preserved while additional lessons are allowed", async () => {
   await verifyDesign();
-  const c = original[0];
-  assert.equal(c.modules.length, 12);
-  assert.equal(c.scenarios.length, 13);
-  assert.equal(c.assets.length, 12);
+  const baseline = validatePreservation(preservation, original);
+  assert.equal(baseline.moduleIds.length, 12);
+  assert.equal(baseline.lessons.length, 36);
+  assert.equal(
+    baseline.lessons.flatMap((lesson) => lesson.cardIds).length,
+    108,
+  );
+  assert.equal(
+    baseline.lessons.flatMap((lesson) => lesson.questions).length,
+    72,
+  );
+  assert.equal(baseline.scenarioIds.length, 13);
+  assert.equal(baseline.assetIds.length, 12);
+  const c = original.find((course) => course.id === baseline.courseId)!;
   assert.equal(c.scenarios.filter((s) => s.isCapstone).length, 1);
   for (const m of c.modules) {
-    assert.equal(m.lessons.length, 3);
     assert.equal(
       new Set(m.lessons.flatMap((l) => l.sections.flatMap((s) => s.assetIds)))
-        .size,
-      1,
+        .size >= 1,
+      true,
     );
     for (const l of m.lessons) {
-      assert.equal(l.cards.length, 3);
-      assert.equal(l.questions.length, 2);
+      assert.ok(l.cards.length >= 3);
+      assert.ok(l.questions.length >= 2);
       assert.ok(
         l.sections.reduce((n, s) => n + s.markdown.split(/\s+/).length, 0) >
           300,
       );
     }
+  }
+});
+test("preservation rejects an original lesson, section or assessment disappearing even if counts are replaced", () => {
+  for (const kind of [
+    "lesson",
+    "section",
+    "card",
+    "question",
+    "option",
+    "asset",
+    "scenario",
+    "module",
+  ] as const) {
+    const changed = structuredClone(original);
+    const course = changed[0],
+      lesson = course.modules[0].lessons[0];
+    const item =
+      kind === "lesson"
+        ? lesson
+        : kind === "section"
+          ? lesson.sections[0]
+          : kind === "card"
+            ? lesson.cards[0]
+            : kind === "question"
+              ? lesson.questions[0]
+              : kind === "option"
+                ? lesson.questions[0].options[0]
+                : kind === "asset"
+                  ? course.assets[0]
+                  : kind === "scenario"
+                    ? course.scenarios[0]
+                    : course.modules[0];
+    item.id = "replacement-new-id";
+    assert.throws(
+      () => validatePreservation(preservation, changed),
+      /preserved/i,
+    );
+  }
+});
+test("flexible teaching order accepts distinct stable section IDs without a customer section", () => {
+  const changed = structuredClone(original),
+    lesson = changed[0].modules[0].lessons[0];
+  lesson.teachingFormat = "flexible";
+  lesson.sections[0].kind = "exercise";
+  lesson.sections[1].kind = "solution";
+  lesson.sections.find((section) => section.kind === "customer")!.kind =
+    "reference";
+  lesson.sections.reverse();
+  assert.equal(validateCourses(changed).length, original.length);
+});
+test("flexible teaching separates an attempted exercise from a revealed solution", () => {
+  const courses = structuredClone(original);
+  const lesson = courses[0].modules
+    .flatMap((module) => module.lessons)
+    .find((lesson) => lesson.teachingFormat === "flexible")!;
+  assert.ok(lesson, "The authored technical packages use flexible teaching");
+  for (const kind of ["solution", "exercise"] as const) {
+    const changed = structuredClone(courses);
+    const target = changed[0].modules
+      .flatMap((module) => module.lessons)
+      .find((item) => item.id === lesson.id)!;
+    for (const section of target.sections)
+      if (
+        section.kind === kind ||
+        (kind === "exercise" && section.kind === "try")
+      )
+        section.kind = "reference";
+    assert.throws(
+      () => validateCourses(changed),
+      /separate exercise and solution/,
+    );
   }
 });
 // Explicit negative fixtures are named transformations of valid authored content. Each must fail.

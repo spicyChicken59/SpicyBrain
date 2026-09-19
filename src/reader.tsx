@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { cards, findLesson, lessonEntries, lessonHref } from "./catalog";
+import {
+  cards,
+  courses,
+  findLesson,
+  lessonEntries,
+  lessonHref,
+  paths,
+} from "./catalog";
+import { pathForLesson, pathNeighbors } from "./paths";
 import type { Course, Lesson, Question, Section } from "./content-schema";
 import { nowISO } from "./study";
 import {
@@ -10,6 +18,7 @@ import {
   Sources,
   useStudy,
   uuid,
+  baseAsset,
 } from "./ui";
 
 export function NoteEditor({
@@ -239,6 +248,9 @@ function SectionTools({
   const { data, store } = useStudy();
   const b = `bookmark-${section.id}`,
     completion = `complete-${section.id}`;
+  const record = data.completions[completion];
+  const completeCurrent =
+    !!record?.completed && record.contentVersion === lesson.contentVersion;
   return (
     <div className="section-tools">
       <div className="actions">
@@ -267,7 +279,7 @@ function SectionTools({
         </button>
         <button
           className="sc-btn sc-btn--ghost"
-          aria-pressed={data.completions[completion]?.completed ?? false}
+          aria-pressed={completeCurrent}
           onClick={() => {
             const updatedAt = nowISO();
             void store.change((s) => ({
@@ -279,7 +291,7 @@ function SectionTools({
                   courseId: course.id,
                   lessonId: lesson.id,
                   sectionId: section.id,
-                  completed: !s.completions[completion]?.completed,
+                  completed: !completeCurrent,
                   contentVersion: lesson.contentVersion,
                   updatedAt,
                 },
@@ -287,9 +299,11 @@ function SectionTools({
             }));
           }}
         >
-          {data.completions[completion]?.completed
+          {completeCurrent
             ? "Section complete"
-            : "Mark section complete"}
+            : record?.completed
+              ? "Mark revised section complete"
+              : "Mark section complete"}
         </button>
       </div>
       <details
@@ -306,9 +320,20 @@ function SectionTools({
     </div>
   );
 }
-export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
+export function Reader({
+  id,
+  sectionId,
+  pathId,
+  from,
+}: {
+  id: string;
+  sectionId?: string;
+  pathId?: string;
+  from?: string;
+}) {
   const entry = findLesson(id),
     { data, store } = useStudy();
+  const originDetour = /^#\/lesson\/([^/?]+)/.exec(from ?? "")?.[1] === id;
   const entryRef = useRef(entry);
   entryRef.current = entry;
   useEffect(() => {
@@ -323,7 +348,8 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
         const node =
           document.getElementById(target) ??
           document.getElementById(lesson.sections[0].id);
-        if (node) {
+        if (!sectionId && !saved) window.scrollTo(0, 0);
+        else if (node) {
           node.scrollIntoView();
           if (saved?.sectionId === target)
             window.scrollBy(0, Math.max(0, saved.offset));
@@ -347,11 +373,12 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
         sectionId: selected.s.id,
         offset: Math.max(0, -selected.node!.getBoundingClientRect().top),
         updatedAt: nowISO(),
+        ...(pathId ? { pathId } : {}),
       };
       void store.change((s) => ({
         ...s,
-        resume: position,
-        positions: { ...s.positions, [id]: position },
+        resume: from ? s.resume : position,
+        positions: originDetour ? s.positions : { ...s.positions, [id]: position },
       }));
     };
     const scroll = () => {
@@ -369,7 +396,7 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
       window.removeEventListener("scroll", scroll);
       window.removeEventListener("pagehide", capture);
     };
-  }, [id, sectionId, store]);
+  }, [id, sectionId, pathId, from, originDetour, store]);
   if (!entry)
     return (
       <>
@@ -385,11 +412,59 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
       </>
     );
   const { course, module, lesson } = entry;
-  const index = lessonEntries.findIndex((e) => e.lesson.id === id),
-    previous = lessonEntries[index - 1],
-    next = lessonEntries[index + 1];
-  const completed =
-    data.completions[`complete-${lesson.id}`]?.completed ?? false;
+  const href = (lessonId: string, section?: string, context?: string) => {
+    const target = lessonHref(lessonId, section, context);
+    return from
+      ? `${target}${target.includes("?") ? "&" : "?"}from=${encodeURIComponent(from)}`
+      : target;
+  };
+  const path = pathForLesson(paths, id, pathId);
+  const prerequisites = [
+    ...new Set([
+      ...lesson.prerequisiteIds,
+      ...(path?.prerequisites
+        .filter((p) => p.lessonId === id)
+        .map((p) => p.requiredLessonId) ?? []),
+    ]),
+  ];
+  const bridges =
+    path?.optionalBridges.filter((b) => b.beforeLessonIds.includes(id)) ?? [];
+  const checkSection = lesson.sections.find((s) => s.kind === "revisit");
+  const checks = (
+    <>
+      <h3>Check your understanding</h3>
+      {lesson.questions.map((q) => (
+        <KnowledgeCheck
+          key={q.id}
+          question={q}
+          course={course}
+          lesson={lesson}
+        />
+      ))}
+      <p>
+        {cards.filter((c) => c.lessonId === id).length} flashcards connect this
+        lesson to later review.
+      </p>
+      <a href={`#/review/${id}`}>Review this lesson’s cards →</a>
+    </>
+  );
+  const courseEntries = lessonEntries.filter((e) => e.course.id === course.id);
+  const index = courseEntries.findIndex((e) => e.lesson.id === id);
+  const neighbors = path ? pathNeighbors(path, id) : undefined;
+  const previous = neighbors
+    ? neighbors.previous
+      ? findLesson(neighbors.previous)
+      : undefined
+    : courseEntries[index - 1];
+  const next = neighbors
+    ? neighbors.next
+      ? findLesson(neighbors.next)
+      : undefined
+    : courseEntries[index + 1];
+  const history = data.completions[`complete-${lesson.id}`];
+  const revised =
+    history?.completed && history.contentVersion !== lesson.contentVersion;
+  const completed = !!history?.completed && !revised;
   const changeFocus = () => {
     const updatedAt = nowISO();
     void store.change((s) => ({
@@ -400,8 +475,11 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
   return (
     <div className={`reader ${data.settings.focus ? "focus-mode" : ""}`}>
       <div className="reader-top">
-        <a className="sc-link--quiet" href={`#/course/${course.id}`}>
-          ← Course map
+        <a
+          className="sc-link--quiet"
+          href={path ? `#/path/${path.id}` : `#/course/${course.id}`}
+        >
+          {path ? `← ${path.title}` : "← Course map"}
         </a>
         <button className="sc-btn sc-btn--secondary" onClick={changeFocus}>
           {data.settings.focus ? "Exit focus mode" : "Focus mode"}
@@ -417,6 +495,40 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
           at your own pace
         </p>
       </PageTitle>
+      <p className="reader-context">
+        {path ? (
+          <>
+            Following <a href={`#/path/${path.id}`}>{path.title}</a>. Previous
+            and next stay in this roadmap.
+          </>
+        ) : pathId ? (
+          <>
+            The requested roadmap is unavailable or does not contain this topic.
+            Previous and next use{" "}
+            <a href={`#/course/${course.id}`}>{course.title}</a>.
+          </>
+        ) : (
+          <>
+            Direct topic visit. Previous and next use{" "}
+            <a href={`#/course/${course.id}`}>{course.title}</a>.
+          </>
+        )}
+      </p>
+      <p className="reader-utilities">
+        <a
+          href={`#/learn/playbooks?from=${encodeURIComponent(from ?? lessonHref(id, data.positions[id]?.sectionId ?? sectionId, pathId))}`}
+        >
+          Related task references
+        </a>{" "}
+        · <a href={`#/notebook`}>Notebook</a>
+      </p>
+      {revised && (
+        <p className="sc-notice">
+          You completed version {history.contentVersion}. This is version{" "}
+          {lesson.contentVersion}; your earlier completion is preserved, and
+          does not mean you studied this revision.
+        </p>
+      )}
       <div className="sc-reading">
         <nav
           className="sc-chapter-nav sc-chapter-nav--rail"
@@ -425,13 +537,14 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
           {lesson.sections.map((s, i) => (
             <a
               key={s.id}
-              href={lessonHref(id, s.id)}
+              href={href(id, s.id, pathId)}
               aria-current={
                 data.resume?.lessonId === id && data.resume.sectionId === s.id
                   ? "location"
                   : undefined
               }
               onClick={() => {
+                if (originDetour) return;
                 const updatedAt = nowISO();
                 void store.change((state) => ({
                   ...state,
@@ -443,12 +556,15 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
                       sectionId: s.id,
                       offset: 0,
                       updatedAt,
+                      ...(pathId ? { pathId } : {}),
                     },
                   },
                 }));
               }}
             >
-              <span className="chapter-number">0{i + 1}</span>
+              <span className="chapter-number">
+                {String(i + 1).padStart(2, "0")}
+              </span>
               {s.title}
             </a>
           ))}
@@ -461,6 +577,66 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
                 <li key={o}>{o}</li>
               ))}
             </ul>
+            <p className="sc-eyebrow">Helpful first</p>
+            {prerequisites.length ? (
+              <ul>
+                {prerequisites.map((prerequisite) => (
+                  <li key={prerequisite}>
+                    <a
+                      href={
+                        findLesson(prerequisite)
+                          ? lessonHref(
+                              prerequisite,
+                              undefined,
+                              path &&
+                                pathForLesson(paths, prerequisite, path.id)
+                                ? path.id
+                                : undefined,
+                            )
+                          : `#/course/${courses.find((c) => c.id === prerequisite || c.modules.some((m) => m.id === prerequisite))?.id ?? prerequisite}`
+                      }
+                    >
+                      {findLesson(prerequisite)?.lesson.title ??
+                        courses.find((c) => c.id === prerequisite)?.title ??
+                        courses
+                          .flatMap((c) => c.modules)
+                          .find((m) => m.id === prerequisite)?.title ??
+                        prerequisite}
+                    </a>
+                    {path?.prerequisites.find(
+                      (p) =>
+                        p.lessonId === id &&
+                        p.requiredLessonId === prerequisite,
+                    )?.explanation
+                      ? ` — ${path.prerequisites.find((p) => p.lessonId === id && p.requiredLessonId === prerequisite)!.explanation}`
+                      : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>
+                No required earlier topic. Use the optional foundations when
+                helpful.
+              </p>
+            )}
+            {bridges.length > 0 && (
+              <div>
+                <p>Optional foundations for this topic:</p>
+                <ul>
+                  {bridges.map((b) => (
+                    <li key={b.lessonId}>
+                      <a href={href(b.lessonId, undefined, path?.id)}>
+                        {findLesson(b.lessonId)?.lesson.title}
+                      </a>{" "}
+                      — {b.explanation}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <p className="sc-hint">
+              Prerequisites are guidance; every topic is open.
+            </p>
           </div>
           {sectionId && !lesson.sections.some((s) => s.id === sectionId) && (
             <p className="sc-notice">
@@ -476,46 +652,77 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
               tabIndex={-1}
             >
               <p className="sc-eyebrow">
-                0{i + 1} / {s.kind === "customer" ? "explain it" : s.kind}
+                {String(i + 1).padStart(2, "0")} /{" "}
+                {s.kind === "customer" ? "explain it" : s.kind}
               </p>
               <h2>{s.title}</h2>
-              {s.kind === "deeper" ? (
+              {s.kind === "deeper" || s.kind === "solution" ? (
                 <details className="sc-details depth">
-                  <summary>Expand technical detail</summary>
-                  <MD>{s.markdown}</MD>
+                  <summary>
+                    {s.kind === "solution"
+                      ? "Reveal explained solution"
+                      : "Expand technical detail"}
+                  </summary>
+                  <MD
+                    pathId={path?.id}
+                    from={from ?? lessonHref(id, data.positions[id]?.sectionId ?? sectionId, path?.id)}
+                  >
+                    {s.markdown}
+                  </MD>
                 </details>
               ) : (
-                <MD>{s.markdown}</MD>
+                <MD
+                  pathId={path?.id}
+                  from={from ?? lessonHref(id, data.positions[id]?.sectionId ?? sectionId, path?.id)}
+                >
+                  {s.markdown}
+                </MD>
               )}
               {s.assetIds.map((a) => {
                 const asset = course.assets.find((v) => v.id === a);
                 return asset ? <Diagram key={a} asset={asset} /> : null;
               })}
-              {s.kind === "try" && (
+              {(s.kind === "try" || s.kind === "exercise") && (
                 <TryDraft course={course} lesson={lesson} section={s} />
               )}{" "}
-              {s.kind === "revisit" && (
-                <>
-                  <h3>Check your understanding</h3>
-                  {lesson.questions.map((q) => (
-                    <KnowledgeCheck
-                      key={q.id}
-                      question={q}
-                      course={course}
-                      lesson={lesson}
-                    />
-                  ))}
-                  <p>
-                    {cards.filter((c) => c.lessonId === id).length} flashcards
-                    connect this lesson to later review.
-                  </p>
-                  <a href={`#/review/${id}`}>Review this lesson’s cards →</a>
-                </>
-              )}
+              {s.id === checkSection?.id && checks}
               <Sources course={course} claimIds={s.claimIds} />
               <SectionTools course={course} lesson={lesson} section={s} />
             </section>
           ))}
+          {!checkSection && (
+            <section className="lesson-checks">{checks}</section>
+          )}
+          {!!lesson.downloadIds?.length && (
+            <section className="lesson-downloads">
+              <h2>Optional local exercises</h2>
+              <p>
+                Read and solve the tasks here, or download the authored files to
+                run locally. Downloading does not execute code or record
+                completion.
+              </p>
+              <ul>
+                {lesson.downloadIds.map((downloadId) => {
+                  const file = course.downloads?.find(
+                    (d) => d.id === downloadId,
+                  );
+                  return file ? (
+                    <li key={file.id}>
+                      <a
+                        href={baseAsset(
+                          `content-downloads/${file.path.replace(/^downloads\//, "")}`,
+                        )}
+                        download
+                      >
+                        {file.title}
+                      </a>
+                      <p>{file.description}</p>
+                    </li>
+                  ) : null;
+                })}
+              </ul>
+            </section>
+          )}
           <div className="sc-actionbar">
             <p>
               {completed
@@ -536,7 +743,7 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
                       id: key,
                       courseId: course.id,
                       lessonId: id,
-                      completed: !s.completions[key]?.completed,
+                      completed: !completed,
                       contentVersion: lesson.contentVersion,
                       updatedAt,
                     },
@@ -552,14 +759,22 @@ export function Reader({ id, sectionId }: { id: string; sectionId?: string }) {
             aria-label="Previous and next lessons"
           >
             {previous && (
-              <a href={lessonHref(previous.lesson.id)}>
+              <a href={href(previous.lesson.id, undefined, path?.id)}>
                 ← {previous.lesson.title}
               </a>
             )}
             {next && (
-              <a href={lessonHref(next.lesson.id)}>{next.lesson.title} →</a>
+              <a href={href(next.lesson.id, undefined, path?.id)}>
+                {next.lesson.title} →
+              </a>
             )}
           </nav>
+          {!next && (
+            <p className="sc-hint">
+              End of this {path ? "roadmap" : "course"}. Choose a topic to
+              revisit or open <a href="#/review">Review</a>.
+            </p>
+          )}
         </article>
       </div>
     </div>
@@ -606,8 +821,9 @@ function TryDraft({
       </label>
       <SaveStatus />
       <p className="sc-hint">
-        Compare your reasoning with the answer in Check and revisit. This
-        response is not automatically graded.
+        Compare your reasoning with the explained solution or Check and revisit.
+        Your draft is not automatically graded; revealing an answer does not
+        complete the task.
       </p>
     </div>
   );

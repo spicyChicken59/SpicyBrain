@@ -8,11 +8,15 @@ const catalog = JSON.parse(
     "utf8",
   ),
 ) as Course[];
-export const fixtureLessons = catalog.flatMap((c) =>
-  c.modules.flatMap((m) => m.lessons),
-);
+// Keep the exact original regression fixture independent of new topic order.
+export const fixtureLessons = catalog
+  .flatMap((c) => c.modules.flatMap((m) => m.lessons))
+  .filter((l) => /^dbxfe-m\d{2}-l\d{2}$/.test(l.id))
+  .sort((a, b) => a.id.localeCompare(b.id));
 const sections = fixtureLessons.flatMap((l) =>
-  l.sections.map((section) => ({ lessonId: l.id, sectionId: section.id })),
+  ["why", "understand", "see", "deeper", "customer", "try", "revisit"].map(
+    (kind) => ({ lessonId: l.id, sectionId: `${l.id}-${kind}` }),
+  ),
 );
 export function fixtureNote(index: number, text: string) {
   const ref = sections[index % sections.length];
