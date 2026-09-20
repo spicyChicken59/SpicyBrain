@@ -1,0 +1,1740 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-delta",
+  "title": "Delta tables, commits and snapshots",
+  "summary": "Follow the same three files from an old snapshot through staging, commit and historical reconstruction.",
+  "outcomes": [
+    "Predict table contents from committed membership.",
+    "Separate atomic table changes from correct business inputs.",
+    "Explain retention and reader compatibility before promising a historical read."
+  ],
+  "startingAssumptions": [
+    "A file holds rows; compute reads and transforms them.",
+    "The platform module distinguishes durable storage from a running session."
+  ],
+  "lessonIds": [
+    "dbxfe-m03-l02"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "One connected file example establishes the mechanism before schema, concurrency and compatibility deepen it.",
+  "sources": [
+    {
+      "id": "dbxfe-delta-source-delta",
+      "title": "What is Delta Lake in Databricks?",
+      "url": "https://docs.databricks.com/aws/en/delta/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "This simplified classic replacement model does not depict every Delta feature or update implementation.",
+      "reviewedEvidence": "Introduction and update sections describe Parquet data plus a transaction log, atomic table operations and schema enforcement."
+    },
+    {
+      "id": "dbxfe-delta-source-concurrency",
+      "title": "Concurrency control",
+      "url": "https://docs.delta.io/concurrency-control/",
+      "publisher": "Delta Lake",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Open-source Delta Lake; read 2026-09-20.",
+      "caveat": "Open-source Delta documentation on supported storage. Metadata/protocol changes and target features can introduce other conflicts.",
+      "reviewedEvidence": "Optimistic concurrency section separates reading, staging files, and validating a commit; conflict matrix distinguishes ordinary INSERT pairs from overlapping changes."
+    },
+    {
+      "id": "dbxfe-delta-source-history",
+      "title": "Work with table history",
+      "url": "https://docs.databricks.com/aws/en/tables/history",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "AWS page has runtime-specific age limits; a history entry alone is not backup evidence.",
+      "reviewedEvidence": "Time-travel retention requires log and data files. RESTORE is a new data-changing operation with downstream duplicate-processing risk."
+    },
+    {
+      "id": "dbxfe-delta-source-protocol",
+      "title": "Delta Lake feature compatibility and protocols",
+      "url": "https://docs.databricks.com/aws/en/tables/features/feature-compatibility",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Confirm the precise runtime, table features and every reader/writer before changing production tables.",
+      "reviewedEvidence": "Reader/writer requirements and feature tables establish that client compatibility depends on enabled table features; an upgrade can exclude older clients."
+    },
+    {
+      "id": "dbxfe-delta-source-deletion-vectors",
+      "title": "Deletion vectors in Databricks",
+      "url": "https://docs.databricks.com/aws/en/tables/features/deletion-vectors",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "The core file-membership visual is a simplified table without deletion vectors. Support depends on client and operation; no feature is enabled or data purged.",
+      "reviewedEvidence": "Deletion vectors record row modifications in metadata and readers apply them when resolving table state; logical removal can precede physical file rewrite."
+    },
+    {
+      "id": "dbxfe-delta-source-column-mapping",
+      "title": "Rename and drop columns with Delta Lake column mapping",
+      "url": "https://docs.databricks.com/aws/en/tables/features/column-mapping",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Runtime, protocol, mapping mode and downstream limitations must be checked; no ALTER command is executed.",
+      "reviewedEvidence": "Column mapping supports metadata-only logical renames and drops without rewriting data files; non-additive changes can affect streaming readers and legacy path-based readers."
+    },
+    {
+      "id": "dbxfe-delta-source-change-feed",
+      "title": "Use change data feed: change data feed schema",
+      "url": "https://docs.databricks.com/aws/en/tables/features/change-data-feed",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "The September 16 page distinguishes automatic CDF requiring Runtime 19+ and eligible Unity Catalog tables from legacy Delta CDF. Check the selected mode and retention; this card only interprets change metadata.",
+      "reviewedEvidence": "Change records include insert, delete, update_preimage and update_postimage labels plus a table commit version; preimage is before and postimage is after the update."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-delta-guidance",
+      "description": "Original educational reasoning, diagnostic choices and worked decisions; not a vendor runbook.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent SpicyBrain curriculum."
+    },
+    {
+      "id": "dbxfe-delta-fiction",
+      "description": "Cinderline examples, quantities, states, outcomes and alternatives are synthetic.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "Original teaching examples; no Databricks or customer execution claim."
+    },
+    {
+      "id": "dbxfe-delta-claim-delta",
+      "description": "Introduction and update sections describe Parquet data plus a transaction log, atomic table operations and schema enforcement.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-source-delta"
+      ],
+      "context": "This simplified classic replacement model does not depict every Delta feature or update implementation."
+    },
+    {
+      "id": "dbxfe-delta-claim-concurrency",
+      "description": "Optimistic concurrency section separates reading, staging files, and validating a commit; conflict matrix distinguishes ordinary INSERT pairs from overlapping changes.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-source-concurrency"
+      ],
+      "context": "Open-source Delta documentation on supported storage. Metadata/protocol changes and target features can introduce other conflicts."
+    },
+    {
+      "id": "dbxfe-delta-claim-history",
+      "description": "Time-travel retention requires log and data files. RESTORE is a new data-changing operation with downstream duplicate-processing risk.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-source-history"
+      ],
+      "context": "AWS page has runtime-specific age limits; a history entry alone is not backup evidence."
+    },
+    {
+      "id": "dbxfe-delta-claim-protocol",
+      "description": "Reader/writer requirements and feature tables establish that client compatibility depends on enabled table features; an upgrade can exclude older clients.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-source-protocol"
+      ],
+      "context": "Confirm the precise runtime, table features and every reader/writer before changing production tables."
+    },
+    {
+      "id": "dbxfe-delta-claim-deletion-vectors",
+      "description": "Deletion vectors record row modifications in metadata and readers apply them when resolving table state; logical removal can precede physical file rewrite.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-source-deletion-vectors"
+      ],
+      "context": "The core file-membership visual is a simplified table without deletion vectors. Support depends on client and operation; no feature is enabled or data purged."
+    },
+    {
+      "id": "dbxfe-delta-claim-column-mapping",
+      "description": "Column mapping supports metadata-only logical renames and drops without rewriting data files; non-additive changes can affect streaming readers and legacy path-based readers.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-source-column-mapping"
+      ],
+      "context": "Runtime, protocol, mapping mode and downstream limitations must be checked; no ALTER command is executed."
+    },
+    {
+      "id": "dbxfe-delta-claim-change-feed",
+      "description": "Change records include insert, delete, update_preimage and update_postimage labels plus a table commit version; preimage is before and postimage is after the update.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-source-change-feed"
+      ],
+      "context": "The September 16 page distinguishes automatic CDF requiring Runtime 19+ and eligible Unity Catalog tables from legacy Delta CDF. Check the selected mode and retention; this card only interprets change metadata."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-delta-folder-concept",
+      "term": "snapshot",
+      "aliases": [],
+      "definition": "A consistent logical table state selected by committed metadata at a particular version.",
+      "example": "Version v0 selects A0 and C, so it contains 18 inspected units.",
+      "sourceIds": [
+        "dbxfe-delta-source-delta"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-stage-concept",
+      "term": "staged write",
+      "aliases": [],
+      "definition": "New data prepared by a writer before its changes become a committed table version.",
+      "example": "A1 can exist while the current snapshot still contains A0 and C.",
+      "sourceIds": [
+        "dbxfe-delta-source-concurrency"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-commit-concept",
+      "term": "commit",
+      "aliases": [],
+      "definition": "A successful transaction boundary that makes a new table state visible.",
+      "example": "v1 removes A0 from the current selection, adds A1 and retains C.",
+      "sourceIds": [
+        "dbxfe-delta-source-delta",
+        "dbxfe-delta-source-concurrency"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-history-concept",
+      "term": "time travel",
+      "aliases": [],
+      "definition": "Reading a retained earlier table version under the environment’s supported retention and runtime rules.",
+      "example": "Reconstructing v0 needs its history and the A0 and C data files.",
+      "sourceIds": [
+        "dbxfe-delta-source-history"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-meaning-concept",
+      "term": "business correctness",
+      "aliases": [],
+      "definition": "Agreement between published data and the defined business identity, ordering and metric rules.",
+      "example": "A transaction can atomically commit both A revisions even though only the latest should count.",
+      "sourceIds": [
+        "dbxfe-delta-source-delta"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-schema-concept",
+      "term": "schema enforcement",
+      "aliases": [],
+      "definition": "Checking a write against the table’s expected structural types and fields.",
+      "example": "An integer -3 can fit an integer column while violating a nonnegative inspection rule.",
+      "sourceIds": [
+        "dbxfe-delta-source-delta"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-protocol-concept",
+      "term": "table protocol",
+      "aliases": [],
+      "definition": "The compatibility requirements a client must satisfy to read or write the table’s enabled features.",
+      "example": "A feature-enabled table may remain valid while an older external reader can no longer interpret it.",
+      "sourceIds": [
+        "dbxfe-delta-source-protocol"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-concurrent-concept",
+      "term": "optimistic concurrency",
+      "aliases": [],
+      "definition": "Preparing work and checking for conflicting committed changes before accepting the new transaction.",
+      "example": "Two writers both replacing A0 cannot independently assume their original read is still current.",
+      "sourceIds": [
+        "dbxfe-delta-source-concurrency"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-transfer-concept",
+      "term": "reconciliation",
+      "aliases": [],
+      "definition": "Comparing a result with the expected population and quantities under a stated contract.",
+      "example": "If C changes from 8 to 6 after A is already 12, the new total is 18.",
+      "sourceIds": [
+        "dbxfe-delta-source-delta",
+        "dbxfe-delta-source-history"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-extension-deletion-vector-concept",
+      "term": "deletion vector",
+      "aliases": [],
+      "definition": "Metadata identifying rows in a data file that are logically removed from the current table state.",
+      "example": "A file holds rows A and C, but a deletion vector excludes A from the current logical read.",
+      "sourceIds": [
+        "dbxfe-delta-source-deletion-vectors"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-extension-column-mapping-concept",
+      "term": "column mapping",
+      "aliases": [],
+      "definition": "A table feature separating logical column identities/names from their physical representation in data files.",
+      "example": "A logical field can be renamed from checked_units to inspected_units without rewriting its existing data values.",
+      "sourceIds": [
+        "dbxfe-delta-source-column-mapping"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-extension-change-images-concept",
+      "term": "change data feed",
+      "aliases": [],
+      "definition": "A table interface exposing row changes and change metadata between committed table versions.",
+      "example": "An update from inspected=12 to inspected=14 can expose before and after images for the same business row.",
+      "sourceIds": [
+        "dbxfe-delta-source-change-feed"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-delta-folder-visual",
+      "kind": "nodes",
+      "title": "The folder is not the table",
+      "alt": "The folder is not the table. All three files exist; their existence does not select a version. The committed selection is A0 and C. A1 is not in this version.",
+      "caption": "A snapshot chooses membership before a query calculates a total. Synthetic teaching example.",
+      "textEquivalent": "Physical folder: All three files exist; their existence does not select a version. Nodes: A0: 10 inspected units. Earlier inspection-A replacement file. (context); A1: 12 inspected units. Corrected inspection-A replacement file. (context); C: 8 inspected units. Unchanged inspection-C file. (context). Equation: 10 + 12 + 8 = 30 physically stored units.\n\nRead v0: The committed selection is A0 and C. A1 is not in this version. Nodes: A0: 10 inspected units. Earlier inspection-A replacement file. (selected); A1: 12 inspected units. Corrected inspection-A replacement file. (excluded); C: 8 inspected units. Unchanged inspection-C file. (selected). Equation: v0: 10 + 8 = 18 inspected units.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "states": [
+        {
+          "id": "folder",
+          "title": "Physical folder",
+          "explanation": "All three files exist; their existence does not select a version.",
+          "nodes": [
+            {
+              "id": "a-zero",
+              "label": "A0",
+              "value": "10 inspected units",
+              "detail": "Earlier inspection-A replacement file.",
+              "status": "context"
+            },
+            {
+              "id": "a-one",
+              "label": "A1",
+              "value": "12 inspected units",
+              "detail": "Corrected inspection-A replacement file.",
+              "status": "context"
+            },
+            {
+              "id": "cee",
+              "label": "C",
+              "value": "8 inspected units",
+              "detail": "Unchanged inspection-C file.",
+              "status": "context"
+            }
+          ],
+          "connections": [],
+          "equation": "10 + 12 + 8 = 30 physically stored units"
+        },
+        {
+          "id": "snapshot-zero",
+          "title": "Read v0",
+          "explanation": "The committed selection is A0 and C. A1 is not in this version.",
+          "nodes": [
+            {
+              "id": "a-zero",
+              "label": "A0",
+              "value": "10 inspected units",
+              "detail": "Earlier inspection-A replacement file.",
+              "status": "selected"
+            },
+            {
+              "id": "a-one",
+              "label": "A1",
+              "value": "12 inspected units",
+              "detail": "Corrected inspection-A replacement file.",
+              "status": "excluded"
+            },
+            {
+              "id": "cee",
+              "label": "C",
+              "value": "8 inspected units",
+              "detail": "Unchanged inspection-C file.",
+              "status": "selected"
+            }
+          ],
+          "connections": [],
+          "equation": "v0: 10 + 8 = 18 inspected units"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-delta-stage-visual",
+      "kind": "nodes",
+      "title": "Writing a file is not committing",
+      "alt": "Writing a file is not committing. The writer prepared new bytes; current membership has not changed. No successful commit selected A1. Do not substitute 12 for 10.",
+      "caption": "Prepared bytes are not evidence of a committed table change. Synthetic teaching example.",
+      "textEquivalent": "A1 staged: The writer prepared new bytes; current membership has not changed. Nodes: A0: 10 inspected units. Earlier inspection-A replacement file. (selected); A1: 12 inspected units. Corrected inspection-A replacement file. (pending); C: 8 inspected units. Unchanged inspection-C file. (selected). Equation: current: 10 + 8 = 18.\n\nWriter fails: No successful commit selected A1. Do not substitute 12 for 10. Nodes: A0: 10 inspected units. Earlier inspection-A replacement file. (selected); A1: 12 inspected units. Corrected inspection-A replacement file. (warning); C: 8 inspected units. Unchanged inspection-C file. (selected). Equation: current remains 18.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-delta-claim-concurrency",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "states": [
+        {
+          "id": "prepared",
+          "title": "A1 staged",
+          "explanation": "The writer prepared new bytes; current membership has not changed.",
+          "nodes": [
+            {
+              "id": "a-zero",
+              "label": "A0",
+              "value": "10 inspected units",
+              "detail": "Earlier inspection-A replacement file.",
+              "status": "selected"
+            },
+            {
+              "id": "a-one",
+              "label": "A1",
+              "value": "12 inspected units",
+              "detail": "Corrected inspection-A replacement file.",
+              "status": "pending"
+            },
+            {
+              "id": "cee",
+              "label": "C",
+              "value": "8 inspected units",
+              "detail": "Unchanged inspection-C file.",
+              "status": "selected"
+            }
+          ],
+          "connections": [],
+          "equation": "current: 10 + 8 = 18"
+        },
+        {
+          "id": "failed-before-commit",
+          "title": "Writer fails",
+          "explanation": "No successful commit selected A1. Do not substitute 12 for 10.",
+          "nodes": [
+            {
+              "id": "a-zero",
+              "label": "A0",
+              "value": "10 inspected units",
+              "detail": "Earlier inspection-A replacement file.",
+              "status": "selected"
+            },
+            {
+              "id": "a-one",
+              "label": "A1",
+              "value": "12 inspected units",
+              "detail": "Corrected inspection-A replacement file.",
+              "status": "warning"
+            },
+            {
+              "id": "cee",
+              "label": "C",
+              "value": "8 inspected units",
+              "detail": "Unchanged inspection-C file.",
+              "status": "selected"
+            }
+          ],
+          "connections": [],
+          "equation": "current remains 18"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-delta-commit-visual",
+      "kind": "nodes",
+      "title": "The commit changes the picture",
+      "alt": "The commit changes the picture. Current v0 selects A0 and C. Current v1 selects A1 and C; A0 remains stored but is not current.",
+      "caption": "The new total is 20 because 12 replaces 10; it is not an extra 12. Synthetic teaching example.",
+      "textEquivalent": "Before commit: Current v0 selects A0 and C. Nodes: A0: 10 inspected units. Earlier inspection-A replacement file. (selected); A1: 12 inspected units. Corrected inspection-A replacement file. (pending); C: 8 inspected units. Unchanged inspection-C file. (selected). Equation: v0: 10 + 8 = 18.\n\nAfter successful commit: Current v1 selects A1 and C; A0 remains stored but is not current. Nodes: A0: 10 inspected units. Earlier inspection-A replacement file. (excluded); A1: 12 inspected units. Corrected inspection-A replacement file. (selected); C: 8 inspected units. Unchanged inspection-C file. (selected). Equation: v1: 12 + 8 = 20; exclude old 10.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-claim-concurrency",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "states": [
+        {
+          "id": "before",
+          "title": "Before commit",
+          "explanation": "Current v0 selects A0 and C.",
+          "nodes": [
+            {
+              "id": "a-zero",
+              "label": "A0",
+              "value": "10 inspected units",
+              "detail": "Earlier inspection-A replacement file.",
+              "status": "selected"
+            },
+            {
+              "id": "a-one",
+              "label": "A1",
+              "value": "12 inspected units",
+              "detail": "Corrected inspection-A replacement file.",
+              "status": "pending"
+            },
+            {
+              "id": "cee",
+              "label": "C",
+              "value": "8 inspected units",
+              "detail": "Unchanged inspection-C file.",
+              "status": "selected"
+            }
+          ],
+          "connections": [],
+          "equation": "v0: 10 + 8 = 18"
+        },
+        {
+          "id": "after",
+          "title": "After successful commit",
+          "explanation": "Current v1 selects A1 and C; A0 remains stored but is not current.",
+          "nodes": [
+            {
+              "id": "a-zero",
+              "label": "A0",
+              "value": "10 inspected units",
+              "detail": "Earlier inspection-A replacement file.",
+              "status": "excluded"
+            },
+            {
+              "id": "a-one",
+              "label": "A1",
+              "value": "12 inspected units",
+              "detail": "Corrected inspection-A replacement file.",
+              "status": "selected"
+            },
+            {
+              "id": "cee",
+              "label": "C",
+              "value": "8 inspected units",
+              "detail": "Unchanged inspection-C file.",
+              "status": "selected"
+            }
+          ],
+          "connections": [],
+          "equation": "v1: 12 + 8 = 20; exclude old 10"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-delta-history-visual",
+      "kind": "nodes",
+      "title": "History needs the evidence to remain",
+      "alt": "History needs the evidence to remain. v0 can be considered for reconstruction when history and files remain and runtime rules permit it. The history entry still exists, but required data is missing.",
+      "caption": "History plus required data plus supported runtime rules determine recoverability. Synthetic teaching example.",
+      "textEquivalent": "Dependencies retained: v0 can be considered for reconstruction when history and files remain and runtime rules permit it. Nodes: v0 history: present. Selects A0 and C. (selected); A0: 10 inspected units. Earlier inspection-A replacement file. (selected); A1: 12 inspected units. Corrected inspection-A replacement file. (excluded); C: 8 inspected units. Unchanged inspection-C file. (selected). Relationships: v0 history → A0: requires; v0 history → C: requires. Equation: expected v0: 18.\n\nA0 missing: The history entry still exists, but required data is missing. Nodes: v0 history: present. Metadata alone cannot supply absent rows. (selected); A0: missing. Required by v0. (warning); A1: 12. Cannot substitute a newer value. (excluded); C: 8. Present, but an incomplete reconstruction. (context). Relationships: v0 history → A0: missing dependency; v0 history → C: requires. Equation: complete v0 result unavailable.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-delta-claim-history",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "states": [
+        {
+          "id": "retained",
+          "title": "Dependencies retained",
+          "explanation": "v0 can be considered for reconstruction when history and files remain and runtime rules permit it.",
+          "nodes": [
+            {
+              "id": "history",
+              "label": "v0 history",
+              "value": "present",
+              "detail": "Selects A0 and C.",
+              "status": "selected"
+            },
+            {
+              "id": "a-zero",
+              "label": "A0",
+              "value": "10 inspected units",
+              "detail": "Earlier inspection-A replacement file.",
+              "status": "selected"
+            },
+            {
+              "id": "a-one",
+              "label": "A1",
+              "value": "12 inspected units",
+              "detail": "Corrected inspection-A replacement file.",
+              "status": "excluded"
+            },
+            {
+              "id": "cee",
+              "label": "C",
+              "value": "8 inspected units",
+              "detail": "Unchanged inspection-C file.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "history",
+              "to": "a-zero",
+              "label": "requires"
+            },
+            {
+              "from": "history",
+              "to": "cee",
+              "label": "requires"
+            }
+          ],
+          "equation": "expected v0: 18"
+        },
+        {
+          "id": "file-missing",
+          "title": "A0 missing",
+          "explanation": "The history entry still exists, but required data is missing.",
+          "nodes": [
+            {
+              "id": "history",
+              "label": "v0 history",
+              "value": "present",
+              "detail": "Metadata alone cannot supply absent rows.",
+              "status": "selected"
+            },
+            {
+              "id": "a-zero",
+              "label": "A0",
+              "value": "missing",
+              "detail": "Required by v0.",
+              "status": "warning"
+            },
+            {
+              "id": "a-one",
+              "label": "A1",
+              "value": "12",
+              "detail": "Cannot substitute a newer value.",
+              "status": "excluded"
+            },
+            {
+              "id": "cee",
+              "label": "C",
+              "value": "8",
+              "detail": "Present, but an incomplete reconstruction.",
+              "status": "context"
+            }
+          ],
+          "connections": [
+            {
+              "from": "history",
+              "to": "a-zero",
+              "label": "missing dependency"
+            },
+            {
+              "from": "history",
+              "to": "cee",
+              "label": "requires"
+            }
+          ],
+          "equation": "complete v0 result unavailable"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-delta-meaning-visual",
+      "kind": "table",
+      "title": "A correct transaction can contain a wrong answer",
+      "alt": "A correct transaction can contain a wrong answer. These identifiers solve different problems. Transaction success cannot repair the population chosen by the writer.",
+      "caption": "Transactions protect a boundary; business rules define what should cross it. Synthetic teaching example.",
+      "textEquivalent": "Three contracts: These identifiers solve different problems. Columns: Item; Meaning; Example. Rows: Source revision — Order of one business record — A revision 2 replaces A revision 1; Table version — Committed whole-table state — v1 may include many record changes; Metric contract — Which quantities count — 1 defective unit / 20 inspected units.\n\nAtomic but incorrect input: Transaction success cannot repair the population chosen by the writer. Columns: Writer input; Commit; Business result. Rows: A0=10, A1=12, C=8 — Succeeds atomically — 30; wrong for latest-inspection grain; A1=12, C=8 — Succeeds atomically — 20; correct for this contract.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "states": [
+        {
+          "id": "identities",
+          "title": "Three contracts",
+          "explanation": "These identifiers solve different problems.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Item",
+              "Meaning",
+              "Example"
+            ],
+            "rows": [
+              [
+                "Source revision",
+                "Order of one business record",
+                "A revision 2 replaces A revision 1"
+              ],
+              [
+                "Table version",
+                "Committed whole-table state",
+                "v1 may include many record changes"
+              ],
+              [
+                "Metric contract",
+                "Which quantities count",
+                "1 defective unit / 20 inspected units"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "wrong-input",
+          "title": "Atomic but incorrect input",
+          "explanation": "Transaction success cannot repair the population chosen by the writer.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Writer input",
+              "Commit",
+              "Business result"
+            ],
+            "rows": [
+              [
+                "A0=10, A1=12, C=8",
+                "Succeeds atomically",
+                "30; wrong for latest-inspection grain"
+              ],
+              [
+                "A1=12, C=8",
+                "Succeeds atomically",
+                "20; correct for this contract"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-delta-schema-visual",
+      "kind": "table",
+      "title": "A type check is one part of a contract",
+      "alt": "A type check is one part of a contract. Shape alone does not determine whether a record is trustworthy.",
+      "caption": "Structure, domain validity and identity agreement require different evidence. Synthetic teaching example.",
+      "textEquivalent": "Three checking layers: Shape alone does not determine whether a record is trustworthy. Columns: Input; Structure; Additional issue. Rows: inspected=\"many\" — Wrong numeric type — Requires explicit conversion or rejection; inspected=-3 — Integer shape — Violates nonnegative domain rule; A revision 2: 12 and 13 — Both integer rows — Conflicting evidence at same identity/version.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "states": [
+        {
+          "id": "layers",
+          "title": "Three checking layers",
+          "explanation": "Shape alone does not determine whether a record is trustworthy.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Input",
+              "Structure",
+              "Additional issue"
+            ],
+            "rows": [
+              [
+                "inspected=\"many\"",
+                "Wrong numeric type",
+                "Requires explicit conversion or rejection"
+              ],
+              [
+                "inspected=-3",
+                "Integer shape",
+                "Violates nonnegative domain rule"
+              ],
+              [
+                "A revision 2: 12 and 13",
+                "Both integer rows",
+                "Conflicting evidence at same identity/version"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-delta-protocol-visual",
+      "kind": "comparison",
+      "title": "Can every client understand this table?",
+      "alt": "Can every client understand this table?. All three consumers have evidence for the old feature set. The external client has not been verified against the new requirement.",
+      "caption": "A table feature change is also a change for its dependent clients. Synthetic teaching example.",
+      "textEquivalent": "Before change: All three consumers have evidence for the old feature set. Nodes: Table: old features. Current compatibility baseline. (selected); Scheduled writer: verified. Pinned implementation. (selected); SQL reader: verified. Current environment. (selected); External reader: verified. Older client. (selected). Relationships: Scheduled writer → Table: writes; Table → SQL reader: read; Table → External reader: read.\n\nProposed feature: The external client has not been verified against the new requirement. Nodes: Table: new requirement. Proposed only; not executed. (pending); Scheduled writer: test needed. Write compatibility. (pending); SQL reader: test needed. Read compatibility. (pending); External reader: unknown support. Potential dependency break. (warning). Relationships: Scheduled writer → Table: verify write; Table → SQL reader: verify read; Table → External reader: verify read.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-delta-claim-protocol",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "states": [
+        {
+          "id": "before",
+          "title": "Before change",
+          "explanation": "All three consumers have evidence for the old feature set.",
+          "nodes": [
+            {
+              "id": "table",
+              "label": "Table",
+              "value": "old features",
+              "detail": "Current compatibility baseline.",
+              "status": "selected"
+            },
+            {
+              "id": "writer",
+              "label": "Scheduled writer",
+              "value": "verified",
+              "detail": "Pinned implementation.",
+              "status": "selected"
+            },
+            {
+              "id": "sql",
+              "label": "SQL reader",
+              "value": "verified",
+              "detail": "Current environment.",
+              "status": "selected"
+            },
+            {
+              "id": "external",
+              "label": "External reader",
+              "value": "verified",
+              "detail": "Older client.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "writer",
+              "to": "table",
+              "label": "writes"
+            },
+            {
+              "from": "table",
+              "to": "sql",
+              "label": "read"
+            },
+            {
+              "from": "table",
+              "to": "external",
+              "label": "read"
+            }
+          ]
+        },
+        {
+          "id": "proposed",
+          "title": "Proposed feature",
+          "explanation": "The external client has not been verified against the new requirement.",
+          "nodes": [
+            {
+              "id": "table",
+              "label": "Table",
+              "value": "new requirement",
+              "detail": "Proposed only; not executed.",
+              "status": "pending"
+            },
+            {
+              "id": "writer",
+              "label": "Scheduled writer",
+              "value": "test needed",
+              "detail": "Write compatibility.",
+              "status": "pending"
+            },
+            {
+              "id": "sql",
+              "label": "SQL reader",
+              "value": "test needed",
+              "detail": "Read compatibility.",
+              "status": "pending"
+            },
+            {
+              "id": "external",
+              "label": "External reader",
+              "value": "unknown support",
+              "detail": "Potential dependency break.",
+              "status": "warning"
+            }
+          ],
+          "connections": [
+            {
+              "from": "writer",
+              "to": "table",
+              "label": "verify write"
+            },
+            {
+              "from": "table",
+              "to": "sql",
+              "label": "verify read"
+            },
+            {
+              "from": "table",
+              "to": "external",
+              "label": "verify read"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-delta-concurrent-visual",
+      "kind": "nodes",
+      "title": "Validate before accepting a second writer",
+      "alt": "Validate before accepting a second writer. W1 and W2 each read the same old state. W2 must validate against the intervening commit; stale assumptions are not automatically accepted.",
+      "caption": "Concurrency is validated against actual overlapping changes and feature context. Synthetic teaching example.",
+      "textEquivalent": "Both read v0: W1 and W2 each read the same old state. Nodes: v0: A0+C. Shared starting snapshot. (context); Writer 1: A1=12. Prepares replacement. (pending); Writer 2: A2=14. Also prepares replacement. (pending). Relationships: v0 → Writer 1: read; v0 → Writer 2: read.\n\nW1 commits first: W2 must validate against the intervening commit; stale assumptions are not automatically accepted. Nodes: v1: A1+C. W1 committed. (selected); Writer 1: complete. Its change is current. (selected); Writer 2: validate / conflict. Overlapping replacement needs review. (warning). Relationships: Writer 2 → v1: validate before commit.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-delta-claim-concurrency",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "states": [
+        {
+          "id": "both-read",
+          "title": "Both read v0",
+          "explanation": "W1 and W2 each read the same old state.",
+          "nodes": [
+            {
+              "id": "base",
+              "label": "v0",
+              "value": "A0+C",
+              "detail": "Shared starting snapshot.",
+              "status": "context"
+            },
+            {
+              "id": "w-one",
+              "label": "Writer 1",
+              "value": "A1=12",
+              "detail": "Prepares replacement.",
+              "status": "pending"
+            },
+            {
+              "id": "w-two",
+              "label": "Writer 2",
+              "value": "A2=14",
+              "detail": "Also prepares replacement.",
+              "status": "pending"
+            }
+          ],
+          "connections": [
+            {
+              "from": "base",
+              "to": "w-one",
+              "label": "read"
+            },
+            {
+              "from": "base",
+              "to": "w-two",
+              "label": "read"
+            }
+          ]
+        },
+        {
+          "id": "first-commits",
+          "title": "W1 commits first",
+          "explanation": "W2 must validate against the intervening commit; stale assumptions are not automatically accepted.",
+          "nodes": [
+            {
+              "id": "base",
+              "label": "v1",
+              "value": "A1+C",
+              "detail": "W1 committed.",
+              "status": "selected"
+            },
+            {
+              "id": "w-one",
+              "label": "Writer 1",
+              "value": "complete",
+              "detail": "Its change is current.",
+              "status": "selected"
+            },
+            {
+              "id": "w-two",
+              "label": "Writer 2",
+              "value": "validate / conflict",
+              "detail": "Overlapping replacement needs review.",
+              "status": "warning"
+            }
+          ],
+          "connections": [
+            {
+              "from": "w-two",
+              "to": "base",
+              "label": "validate before commit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-delta-transfer-visual",
+      "kind": "nodes",
+      "title": "Predict the changed file set",
+      "alt": "Predict the changed file set. v1 remains A1+C0. v2 selects A1+C1; C0 is excluded.",
+      "caption": "Select membership, apply the commit boundary, reconcile the quantity, then check historical dependencies. Synthetic teaching example.",
+      "textEquivalent": "C1 staged: v1 remains A1+C0. Nodes: A1: 12. Unchanged. (selected); C0: 8. Current before commit. (selected); C1: 6. Staged correction. (pending). Equation: 12 + 8 = 20.\n\nC1 committed: v2 selects A1+C1; C0 is excluded. Nodes: A1: 12. Unchanged. (selected); C0: 8. Not current. (excluded); C1: 6. Current correction. (selected). Equation: 12 + 6 = 18.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-claim-history",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "states": [
+        {
+          "id": "staged",
+          "title": "C1 staged",
+          "explanation": "v1 remains A1+C0.",
+          "nodes": [
+            {
+              "id": "inspection-a",
+              "label": "A1",
+              "value": "12",
+              "detail": "Unchanged.",
+              "status": "selected"
+            },
+            {
+              "id": "old-c",
+              "label": "C0",
+              "value": "8",
+              "detail": "Current before commit.",
+              "status": "selected"
+            },
+            {
+              "id": "new-c",
+              "label": "C1",
+              "value": "6",
+              "detail": "Staged correction.",
+              "status": "pending"
+            }
+          ],
+          "connections": [],
+          "equation": "12 + 8 = 20"
+        },
+        {
+          "id": "committed",
+          "title": "C1 committed",
+          "explanation": "v2 selects A1+C1; C0 is excluded.",
+          "nodes": [
+            {
+              "id": "inspection-a",
+              "label": "A1",
+              "value": "12",
+              "detail": "Unchanged.",
+              "status": "selected"
+            },
+            {
+              "id": "old-c",
+              "label": "C0",
+              "value": "8",
+              "detail": "Not current.",
+              "status": "excluded"
+            },
+            {
+              "id": "new-c",
+              "label": "C1",
+              "value": "6",
+              "detail": "Current correction.",
+              "status": "selected"
+            }
+          ],
+          "connections": [],
+          "equation": "12 + 6 = 18"
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-delta-folder-question",
+      "revision": "1",
+      "prompt": "Which total belongs to v0?",
+      "options": [
+        {
+          "id": "dbxfe-delta-folder-question-a",
+          "text": "18 inspected units",
+          "rationale": "v0 selects A0=10 and C=8."
+        },
+        {
+          "id": "dbxfe-delta-folder-question-b",
+          "text": "30 inspected units",
+          "rationale": "That adds the excluded replacement A1 as well."
+        },
+        {
+          "id": "dbxfe-delta-folder-question-c",
+          "text": "12 inspected units",
+          "rationale": "The newest-looking file does not define the complete snapshot."
+        }
+      ],
+      "correctOptionId": "dbxfe-delta-folder-question-a",
+      "conceptIds": [
+        "dbxfe-delta-folder-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-stage-question",
+      "revision": "1",
+      "prompt": "The writer fails after staging A1 and before commit. What can a current reader use?",
+      "options": [
+        {
+          "id": "dbxfe-delta-stage-question-b",
+          "text": "A1 and C, totaling 20",
+          "rationale": "This assumes a commit that did not succeed."
+        },
+        {
+          "id": "dbxfe-delta-stage-question-c",
+          "text": "All files, totaling 30",
+          "rationale": "Directory scanning ignores transaction membership."
+        },
+        {
+          "id": "dbxfe-delta-stage-question-a",
+          "text": "A0 and C, totaling 18",
+          "rationale": "Staging alone did not create a new committed selection."
+        }
+      ],
+      "correctOptionId": "dbxfe-delta-stage-question-a",
+      "conceptIds": [
+        "dbxfe-delta-stage-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-concurrency",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-commit-question",
+      "revision": "1",
+      "prompt": "Why exclude A0 after this commit even if its file still exists?",
+      "options": [
+        {
+          "id": "dbxfe-delta-commit-question-c",
+          "text": "Compute remembers which filename looks newer",
+          "rationale": "The committed protocol supplies state; a session guess does not."
+        },
+        {
+          "id": "dbxfe-delta-commit-question-a",
+          "text": "Committed membership now selects A1 in its place",
+          "rationale": "Current membership, not existence, governs the read."
+        },
+        {
+          "id": "dbxfe-delta-commit-question-b",
+          "text": "All older files are automatically deleted immediately",
+          "rationale": "Logical removal does not imply immediate physical deletion."
+        }
+      ],
+      "correctOptionId": "dbxfe-delta-commit-question-a",
+      "conceptIds": [
+        "dbxfe-delta-commit-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-claim-concurrency",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-history-question",
+      "revision": "1",
+      "prompt": "Does a visible history entry guarantee a complete old-version read after a required file was deleted?",
+      "options": [
+        {
+          "id": "dbxfe-delta-history-question-a",
+          "text": "No",
+          "rationale": "Both retained history and required data, plus runtime rules, matter."
+        },
+        {
+          "id": "dbxfe-delta-history-question-b",
+          "text": "Yes, the entry contains all rows",
+          "rationale": "History metadata is not a substitute for deleted data."
+        },
+        {
+          "id": "dbxfe-delta-history-question-c",
+          "text": "Yes, use the newest file instead",
+          "rationale": "That changes the requested historical result."
+        }
+      ],
+      "correctOptionId": "dbxfe-delta-history-question-a",
+      "conceptIds": [
+        "dbxfe-delta-history-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-history",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-meaning-question",
+      "revision": "1",
+      "prompt": "A writer atomically commits A0+A1+C. What is established?",
+      "options": [
+        {
+          "id": "dbxfe-delta-meaning-question-b",
+          "text": "Every business rule is correct",
+          "rationale": "A transaction mechanism does not infer source semantics."
+        },
+        {
+          "id": "dbxfe-delta-meaning-question-c",
+          "text": "Source revision 2 must equal table version 2",
+          "rationale": "Source and table versions have independent meanings."
+        },
+        {
+          "id": "dbxfe-delta-meaning-question-a",
+          "text": "The submitted change committed; the 30-unit metric is still wrong for this contract",
+          "rationale": "Atomic visibility is different from selecting the correct business records."
+        }
+      ],
+      "correctOptionId": "dbxfe-delta-meaning-question-a",
+      "conceptIds": [
+        "dbxfe-delta-meaning-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-schema-question",
+      "revision": "1",
+      "prompt": "Which value shows why a numeric schema does not prove business validity?",
+      "options": [
+        {
+          "id": "dbxfe-delta-schema-question-c",
+          "text": "A table name",
+          "rationale": "That is a naming issue, not the numerical domain counterexample."
+        },
+        {
+          "id": "dbxfe-delta-schema-question-a",
+          "text": "-3 inspected units",
+          "rationale": "It is numeric but invalid under the stated nonnegative contract."
+        },
+        {
+          "id": "dbxfe-delta-schema-question-b",
+          "text": "A correctly represented 12",
+          "rationale": "This is valid in the limited example, though other checks may remain."
+        }
+      ],
+      "correctOptionId": "dbxfe-delta-schema-question-a",
+      "conceptIds": [
+        "dbxfe-delta-schema-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-protocol-question",
+      "revision": "1",
+      "prompt": "A notebook reads the upgraded test table. Which conclusion is justified?",
+      "options": [
+        {
+          "id": "dbxfe-delta-protocol-question-a",
+          "text": "That tested notebook path works under its tested conditions",
+          "rationale": "Every other reader and writer still needs relevant evidence."
+        },
+        {
+          "id": "dbxfe-delta-protocol-question-b",
+          "text": "Every Delta client now works",
+          "rationale": "Different clients support different features."
+        },
+        {
+          "id": "dbxfe-delta-protocol-question-c",
+          "text": "The upgrade is automatically reversible",
+          "rationale": "Feature removal and compatibility have their own constraints."
+        }
+      ],
+      "correctOptionId": "dbxfe-delta-protocol-question-a",
+      "conceptIds": [
+        "dbxfe-delta-protocol-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-protocol",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-concurrent-question",
+      "revision": "1",
+      "prompt": "Do simultaneous INSERT operations always conflict?",
+      "options": [
+        {
+          "id": "dbxfe-delta-concurrent-question-b",
+          "text": "Yes, there can only be one writer process",
+          "rationale": "Concurrency support does not impose that blanket restriction."
+        },
+        {
+          "id": "dbxfe-delta-concurrent-question-c",
+          "text": "No concurrent operation can ever fail",
+          "rationale": "Conflicting reads/writes or metadata changes can fail validation."
+        },
+        {
+          "id": "dbxfe-delta-concurrent-question-a",
+          "text": "No; ordinary append pairs differ from overlapping replacements",
+          "rationale": "The documented matrix distinguishes operations; metadata and protocol changes add limits."
+        }
+      ],
+      "correctOptionId": "dbxfe-delta-concurrent-question-a",
+      "conceptIds": [
+        "dbxfe-delta-concurrent-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-concurrency",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ]
+    }
+  ],
+  "selfQuestions": [
+    {
+      "id": "dbxfe-delta-transfer-question",
+      "revision": "1",
+      "prompt": "Explain totals before and after commit, and the dependencies for reproducing v1.",
+      "modelAnswer": "Before commit: 20. After successful replacement: 18. Reproducing v1 needs its history, A1 and C0, and supported retention/runtime conditions.",
+      "reasoning": "The replacement changes membership only after commit; the old physical C0 must remain available for a complete historical reconstruction.",
+      "conceptIds": [
+        "dbxfe-delta-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-claim-history",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ]
+    }
+  ],
+  "beats": [
+    {
+      "id": "dbxfe-delta-folder",
+      "version": "1.0.0",
+      "title": "The folder is not the table",
+      "outcome": "Select the files belonging to one committed snapshot.",
+      "explanation": "A [[dbxfe-delta-folder-concept|snapshot]] says which stored data belongs to one table version. Here the folder contains A0, A1 and C, but version v0 selects only A0 and C. Add the selected quantities: 10 + 8 = 18 inspected units. File existence and table membership answer different questions.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-mechanism",
+      "conceptIds": [
+        "dbxfe-delta-folder-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "visualId": "dbxfe-delta-folder-visual",
+      "samajh": {
+        "text": "Godown mein saara samaan pada ho sakta hai, par current stock ka hisaab register se milta hai. Sirf shelves ginoge toh replaced maal bhi count ho jayega. Yahan files shelves jaisi hain; snapshot batata hai kaunsi files is version ka part hain.",
+        "mapping": "Shelves represent physical files; the register represents membership.",
+        "boundary": "The analogy explains membership, not the transaction protocol."
+      },
+      "questionIds": [
+        "dbxfe-delta-folder-question"
+      ],
+      "handbook": {
+        "markdown": "The reader needs a table state, not a recursive sum of the directory. Our deliberately small example treats each file as one inspection contribution; actual files usually contain many rows. A0 and A1 are alternative representations of inspection A. C is unchanged. Selecting both A files would count two representations of the same contribution.\n\nTrace the calculation in two steps: first resolve membership for v0; then evaluate the query over that membership. The membership is {A0, C}; the aggregate is 18. A different query might count rows or filter a plant, but it must still begin from the same consistent snapshot. Filename age is not the selection rule.\n\nStorage holds bytes, compute performs the calculation, Delta supplies the table-state protocol, and governance controls permitted access. Those responsibilities work together; a transaction log does not grant a user permission or run their query. Avoid reading Delta directories as uncoordinated Parquet files when you intend Delta table semantics. This visual is an authored model, not an executed Delta transaction.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l02-foundation-mechanism"
+        ]
+      },
+      "recap": "A snapshot chooses membership before a query calculates a total.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-delta-stage",
+      "version": "1.0.0",
+      "title": "Writing a file is not committing",
+      "outcome": "Predict a failure before commit without promoting staged data.",
+      "explanation": "The writer prepares A1 with a corrected value of 12. A [[dbxfe-delta-stage-concept|staged write]] is not yet the current table. Until validation and commit succeed, a current reader still selects A0 and C and obtains 18. Move the visual to the failed-writer state: the file can remain present without entering the snapshot.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-example",
+      "conceptIds": [
+        "dbxfe-delta-stage-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-concurrency",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "visualId": "dbxfe-delta-stage-visual",
+      "samajh": {
+        "text": "Corrected bill draft ho gaya, lekin approve nahi hua. Draft ka number dekh kar final accounts badal doge toh galat hoga. A1 ready hai; commit ke baad hi woh current table ka part ban sakti hai. Failure se draft file reh sakti hai.",
+        "mapping": "A prepared draft corresponds to staged data; approval corresponds to visibility after commit.",
+        "boundary": "Delta uses a formal commit protocol, not manual invoice approval."
+      },
+      "questionIds": [
+        "dbxfe-delta-stage-question"
+      ],
+      "handbook": {
+        "markdown": "A write has a preparation phase and a visibility boundary. In the classic file-replacement explanation, the writer reads the relevant prior state, writes candidate files, then validates whether its proposed change can commit. The preparation may take time and may fail. Readers do not infer success from the presence of those files.\n\nConsider three observations: A1 exists, the writer process stopped, and the latest committed table version remains v0. Only the third observation establishes the reader state in this example. A file timestamp cannot replace transaction evidence. Conversely, a client losing its response is not proof that the commit failed; inspect committed state before retrying an ambiguous operation.\n\nFor this beat the failure point is explicitly before commit, so 18 is unambiguous. Later recovery lessons examine failures after publication, where the answer differs. Do not delete arbitrary files to repair this demonstration in a real environment. Cleanup and retention follow table-management rules. The protected boundary is table visibility, not every external side effect a writer might also perform.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l02-foundation-example"
+        ]
+      },
+      "recap": "Prepared bytes are not evidence of a committed table change.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-delta-commit",
+      "version": "1.0.0",
+      "title": "The commit changes the picture",
+      "outcome": "Apply one atomic membership change and exclude the replaced file.",
+      "explanation": "A successful [[dbxfe-delta-commit-concept|commit]] changes the selection together: exclude A0, include A1, keep C. The new snapshot contains 12 + 8 = 20 inspected units. A0 may still physically exist. Logical removal from the current state is different from immediate deletion of its bytes; counting both versions would produce the wrong 30.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-example",
+      "conceptIds": [
+        "dbxfe-delta-commit-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-claim-concurrency",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "visualId": "dbxfe-delta-commit-visual",
+      "samajh": {
+        "text": "Purani 10 wali invoice ki jagah corrected 12 wali current hui. Dono invoices jod doge toh 10 extra count hoga. Old copy rakhna useful ho sakta hai, par current hisaab mein usko phir se include nahi karte. C ka 8 bilkul unchanged hai.",
+        "mapping": "Replacement changes the current contribution while preserving the unchanged contribution.",
+        "boundary": "Not every Delta update physically rewrites whole files this way."
+      },
+      "questionIds": [
+        "dbxfe-delta-commit-question"
+      ],
+      "handbook": {
+        "markdown": "The important unit is the complete committed state transition. In our synthetic replacement, remove A0 and add A1 belong to the same change. A reader should not construct an invented intermediate state containing neither A file or both replacement files. An already-running read can retain a consistent earlier snapshot; a later read can select the newly committed version.\n\nThe arithmetic changes by +2 because 12 replaces 10. It does not change by +12. Keeping the unchanged C=8 visible helps separate replacement from addition. A1 does not mean a new independent inspection; the business contract says it is a corrected representation of A. That meaning is an input to the write, not a fact Delta invents.\n\nTable version v1 is the transaction history position for the whole table. The source revision of A is a business ordering field. One transaction may contain many business revisions, and a maintenance transaction need not correspond to a new inspection revision. Diagnose a wrong total at both levels: did the writer choose the right rows, and did the table publish the intended change?",
+        "sourceSectionIds": [
+          "dbxfe-m03-l02-foundation-example"
+        ]
+      },
+      "recap": "The new total is 20 because 12 replaces 10; it is not an extra 12.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": [
+        "dbxfe-delta-media-snapshot"
+      ]
+    },
+    {
+      "id": "dbxfe-delta-history",
+      "version": "1.0.0",
+      "title": "History needs the evidence to remain",
+      "outcome": "Identify why a historical read can fail despite a visible history entry.",
+      "explanation": "To reconstruct v0, [[dbxfe-delta-history-concept|time travel]] needs its history and required data files. A visible history entry is not enough if A0 has been removed. Retention and runtime limits also apply. The visual keeps the requested version fixed while removing one dependency: the result becomes unavailable, not an invented partial total.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-limits",
+      "conceptIds": [
+        "dbxfe-delta-history-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-history",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "visualId": "dbxfe-delta-history-visual",
+      "samajh": {
+        "text": "Purani recipe mil gayi, par zaroori ingredients ab hain hi nahi. Recipe se pata hai kya chahiye tha; usse missing ingredient wapas nahi aa jata. Waise hi log old version ka selection batata hai, lekin required data files bhi bachni chahiye.",
+        "mapping": "Recipe records requirements; ingredients represent retained data dependencies.",
+        "boundary": "Runtime and retention checks add limits beyond this dependency analogy."
+      },
+      "questionIds": [
+        "dbxfe-delta-history-question"
+      ],
+      "handbook": {
+        "markdown": "Keep three questions separate: can you inspect operation history, are the necessary data files retained, and does the target runtime permit the requested age? They are related but not identical. A historical report should record the requested table version and the assumptions needed to reproduce it. A result silently missing A0 is not a successful reproduction of our v0.\n\nThe current AWS documentation describes separate history and deleted-file retention settings and runtime-specific time-travel age restrictions. Check the actual table and runtime; do not convert a remembered default into an archival promise. Increasing a setting later cannot resurrect bytes already deleted. Retention decisions also change storage obligations and costs.\n\nA historical SELECT reads an old state; RESTORE changes current table state through a new operation. Downstream streaming consumers may treat restored data as new updates. That makes restore a coordinated recovery decision with reconciliation, not a harmless way to look backward. This lesson performs neither VACUUM nor RESTORE. Use a separate backup and recovery design when long-term archival or disaster recovery is required.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l02-foundation-limits"
+        ]
+      },
+      "recap": "History plus required data plus supported runtime rules determine recoverability.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-delta-meaning",
+      "version": "1.0.0",
+      "title": "A correct transaction can contain a wrong answer",
+      "outcome": "Separate table atomicity, source order and metric meaning.",
+      "explanation": "Atomic table behavior cannot decide whether A1 replaces A0 or represents a separate event. That is [[dbxfe-delta-meaning-concept|business correctness]]. If a writer submits the wrong business population, a successful transaction can preserve the mistake consistently. Keep source revision, table version and the metric definition separate when explaining what a commit proves.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-understand",
+      "conceptIds": [
+        "dbxfe-delta-meaning-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "visualId": "dbxfe-delta-meaning-visual",
+      "questionIds": [
+        "dbxfe-delta-meaning-question"
+      ],
+      "handbook": {
+        "markdown": "Start a correctness discussion by naming the grain: one current accepted inspection per inspection ID. Under that contract, an older representation of A cannot contribute alongside its replacement. If the source instead represented additive events, the rule would differ. The table format does not know which business contract the customer intended.\n\nUse a small reconciliation ledger before blaming storage. Raw evidence may contain repeated deliveries, older revisions and invalid records. The resolver identifies the intended current population. A subsequent table transaction makes the selected update visible. Finally, the metric uses its agreed numerator and denominator. Failures at any layer can produce a plausible number.\n\nFor Cinderline, A2 has 12 inspected and 1 defective; C1 has 8 and 0. Accepted totals are 20 and 1, hence 5%. A successful commit containing 30 inspected units should be investigated as a population error, even if the log is internally consistent. Preserve the wrong run as diagnostic evidence rather than describing ACID as broken. The ingestion module teaches the corrected conservative publication gate explicitly.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l02-understand"
+        ]
+      },
+      "recap": "Transactions protect a boundary; business rules define what should cross it.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-delta-schema",
+      "version": "1.0.0",
+      "title": "A type check is one part of a contract",
+      "outcome": "Distinguish structural schema checks from domain and cross-record checks.",
+      "explanation": "[[dbxfe-delta-schema-concept|schema enforcement]] checks structural compatibility. It does not make every accepted integer meaningful. A quantity of -3 may fit an integer column but violate our nonnegative rule; two individually valid records may still conflict about the same revision. Teach each check at the layer where it has the needed evidence.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-understand",
+      "conceptIds": [
+        "dbxfe-delta-schema-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "visualId": "dbxfe-delta-schema-visual",
+      "questionIds": [
+        "dbxfe-delta-schema-question"
+      ],
+      "handbook": {
+        "markdown": "A schema makes a useful promise about representation: column names, data types and relevant nullability. Domain rules make a different promise, such as inspected being nonnegative and defective not exceeding inspected. Cross-record rules need relationships: one event ID should not describe two payloads under our source contract. Do not collapse these into a single green quality icon.\n\nFor the row A2=(12, 1), structural and quantity checks pass. For B1=(-3, 1), the numeric representation can still be well-formed, but the domain check fails. For two A2 rows with quantities 12 and 13, each can be structurally valid; their disagreement requires retained evidence. The resolution policy then determines whether publication can proceed.\n\nSchema evolution is a deliberate change in the representation contract, not a cure for invalid data. Before allowing a new field or changed type, ask how existing producers, readers and transformations behave. A tolerant cast may convert a bad string into NULL, moving the failure into a later stage. Preserve that distinction and reconcile counts so a structurally convenient conversion does not silently change the metric population.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l02-understand"
+        ]
+      },
+      "recap": "Structure, domain validity and identity agreement require different evidence.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-delta-protocol",
+      "version": "1.0.0",
+      "title": "Can every client understand this table?",
+      "outcome": "Plan a feature change around all readers and writers.",
+      "explanation": "A [[dbxfe-delta-protocol-concept|table protocol]] tells clients which capabilities they need. Enabling a feature can change that requirement even when familiar columns remain. Check the scheduled writer, SQL readers and external consumers before the change. “Our notebook works” tests one client; it does not prove the whole dependency graph still works.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-limits",
+      "conceptIds": [
+        "dbxfe-delta-protocol-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-protocol",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "visualId": "dbxfe-delta-protocol-visual",
+      "questionIds": [
+        "dbxfe-delta-protocol-question"
+      ],
+      "handbook": {
+        "markdown": "Make a dependency inventory with client, version, read/write role, feature support, owner and rollback plan. The table can remain internally valid while a client rejects a requirement it does not understand. Reader and writer requirements are related but distinct; checking one role cannot stand in for the other.\n\nIn the visual, a nightly writer, an analyst query and an external export all touch the same table. A notebook-only test misses the export. A bounded evaluation should include representative reads and writes on a nonproduction copy, followed by row-level reconciliation. Record which feature was enabled and which exact client versions were tested. Do not infer compatibility from a product logo.\n\nSome features alter protocol requirements; not every feature can simply be turned off as a rollback. The current feature-compatibility page is the decision reference for the precise table and runtime. A schema-compatible projection does not necessarily remove an underlying protocol requirement. This module teaches how to frame the review; it does not authorize or execute a production feature upgrade.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l02-foundation-limits"
+        ]
+      },
+      "recap": "A table feature change is also a change for its dependent clients.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-delta-concurrent",
+      "version": "1.0.0",
+      "title": "Validate before accepting a second writer",
+      "outcome": "Explain conflict detection without claiming all writes conflict.",
+      "explanation": "With [[dbxfe-delta-concurrent-concept|optimistic concurrency]], two writers can prepare work from the same starting state. Acceptance depends on what changed before each commit. An overlapping replacement may fail validation instead of silently corrupting state. Ordinary append pairs have different conflict behavior; “concurrent” alone does not tell you whether a particular pair will succeed.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-limits",
+      "conceptIds": [
+        "dbxfe-delta-concurrent-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-concurrency",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "visualId": "dbxfe-delta-concurrent-visual",
+      "questionIds": [
+        "dbxfe-delta-concurrent-question"
+      ],
+      "handbook": {
+        "markdown": "A useful explanation of optimistic concurrency separates preparation from acceptance. Both writers can do work, but the later committer must validate whether intervening changes invalidate what it assumed. If the conflict matters, a failure protects the table rather than indicating that partial changes should be counted.\n\nOur writers both replace a file they read. This deliberately creates overlapping responsibility. A fresh retry must re-evaluate the latest table and the business ordering rule; blindly resubmitting stale conclusions can still be logically wrong. In contrast, ordinary independent append operations occupy a different cell in the documented conflict matrix. Do not say that every simultaneous write conflicts, or that every append succeeds regardless of other changes.\n\nMetadata, schema and protocol changes can introduce additional conflicts. The physical scope read by a command also matters: apparently disjoint business predicates do not prove disjoint file access. Modern features may change detailed concurrency behavior. Use the current target-specific documentation when designing an actual workload. The visual is a reasoning exercise with an explicit classic replacement assumption, not a benchmark or executable concurrency test.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l02-foundation-limits"
+        ]
+      },
+      "recap": "Concurrency is validated against actual overlapping changes and feature context.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-delta-transfer",
+      "version": "1.0.0",
+      "title": "Predict the changed file set",
+      "outcome": "Transfer snapshot reasoning to a different corrected contribution.",
+      "explanation": "Now change C rather than A. Current v1 contains A1=12 and C0=8. A writer stages C1=6. Before commit the total stays 20; after a successful replacement it becomes 18. Use [[dbxfe-delta-transfer-concept|reconciliation]] to check both membership and arithmetic, then state what would be needed to reproduce the earlier 20.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-task",
+      "conceptIds": [
+        "dbxfe-delta-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-delta",
+        "dbxfe-delta-claim-history",
+        "dbxfe-delta-guidance",
+        "dbxfe-delta-fiction"
+      ],
+      "visualId": "dbxfe-delta-transfer-visual",
+      "questionIds": [
+        "dbxfe-delta-transfer-question"
+      ],
+      "handbook": {
+        "markdown": "Write the selected set before calculating: v1={A1, C0}; v2={A1, C1}. The proposed correction reduces the accepted inspected population by 2. If your answer is 26, you counted both C representations. If your answer is 6, you dropped the unchanged A contribution. If your answer changes before commit, you confused staging with visibility.\n\nNext separate observation from inference. Seeing C1 in storage proves preparation occurred, not acceptance. Seeing a committed v2 identifies the new table state, but business reconciliation must still confirm that C1 was the intended correction. Reproducing v1 later needs the actual old files and metadata, not just a remembered total.\n\nFor a customer explanation: “We can read a consistent committed table state and track its changes. We must separately validate your correction rule and retention needs.” This is stronger than promising that transactions make all data correct forever. Review the linked canonical cards on file membership, source versus table version and compatibility, then compare your applied answer with the model. Opening this recap is not evidence that you completed the exercise.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l02-foundation-task"
+        ]
+      },
+      "recap": "Select membership, apply the commit boundary, reconcile the quantity, then check historical dependencies.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m03-l02-card1",
+      "beatId": "dbxfe-delta-folder"
+    },
+    {
+      "cardId": "dbxfe-m03-l02-card2",
+      "beatId": "dbxfe-delta-meaning"
+    },
+    {
+      "cardId": "dbxfe-m03-l02-card3",
+      "beatId": "dbxfe-delta-protocol"
+    },
+    {
+      "cardId": "dbxfe-m03-l02-foundation-card1",
+      "beatId": "dbxfe-delta-folder"
+    },
+    {
+      "cardId": "dbxfe-m03-l02-foundation-card2",
+      "beatId": "dbxfe-delta-meaning"
+    },
+    {
+      "cardId": "dbxfe-m03-l02-foundation-card3",
+      "beatId": "dbxfe-delta-stage"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-delta-extension-deletion-vector",
+      "revision": "1",
+      "prompt": "Does a logically deleted row always disappear immediately from its Parquet file?",
+      "answer": "No. With a deletion vector, readers exclude the row using metadata even while its bytes remain in the file.",
+      "explanation": "The core visual selects whole files to explain snapshots. A [[dbxfe-delta-extension-deletion-vector-concept|deletion vector]] adds row-level interpretation: imagine file F contains A and C, and table metadata marks A deleted. A compatible table reader returns C; directly reading F as ordinary Parquet can still encounter A. Logical deletion, file rewrite and eventual removal of old files are different steps. The reviewed documentation describes separate operations for physically applying changes and cleaning old files. This card performs none of them and makes no erasure guarantee. Before enabling the feature, check every reader/writer’s compatibility and the particular operation being used.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-mechanism",
+      "conceptIds": [
+        "dbxfe-delta-extension-deletion-vector-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-deletion-vectors",
+        "dbxfe-delta-fiction",
+        "dbxfe-delta-guidance"
+      ],
+      "beatId": "dbxfe-delta-folder",
+      "whyItMatters": "Extends the simple file-selection model and prevents treating logical deletion as physical data erasure."
+    },
+    {
+      "id": "dbxfe-delta-extension-change-images",
+      "revision": "1",
+      "prompt": "A change feed shows A=12 as update_preimage and A=14 as update_postimage. Should a current-state consumer sum them to 26?",
+      "answer": "No. They describe the before and after images of one update; the intended current quantity is 14.",
+      "explanation": "A [[dbxfe-delta-extension-change-images-concept|change data feed]] reports changes, not a bag of new independent business entities. The change-type label tells the consumer how to interpret each record. In this invented update, 12 is the prior quantity and 14 its replacement. A current-state sink should apply the update under its identity/order contract rather than append both into the current metric. The feed’s commit version identifies the table change and is not automatically the upstream inspection revision. Current Databricks documentation distinguishes automatic and legacy feed modes with different prerequisites. Select and verify that mode, starting boundary, schema behavior and retention before implementing a consumer.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-understand",
+      "conceptIds": [
+        "dbxfe-delta-extension-change-images-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-change-feed",
+        "dbxfe-delta-fiction",
+        "dbxfe-delta-guidance"
+      ],
+      "beatId": "dbxfe-delta-meaning",
+      "whyItMatters": "Prevents double counting before/after images while connecting table changes to the upstream business contract."
+    },
+    {
+      "id": "dbxfe-delta-extension-column-mapping",
+      "revision": "1",
+      "prompt": "Why can a metadata-only column rename still break a downstream consumer?",
+      "answer": "The stored values may not need rewriting, but consumers can depend on the old logical name or unsupported schema-change behavior.",
+      "explanation": "[[dbxfe-delta-extension-column-mapping-concept|column mapping]] allows supported logical renames and drops without rewriting every data file. Suppose a report expects checked_units and the table renames it inspected_units. The values can stay in existing files while the report’s reference becomes invalid. This is a contract change for consumers even if the storage operation is lightweight. Streaming reads, change feeds and clients that interpret physical directory names have documented compatibility constraints. Inventory those dependencies, test the intended rename with representative readers, and plan the schema transition. Metadata-only describes how data files are changed; it does not mean application behavior is unchanged.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-understand",
+      "conceptIds": [
+        "dbxfe-delta-extension-column-mapping-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-column-mapping",
+        "dbxfe-delta-fiction",
+        "dbxfe-delta-guidance"
+      ],
+      "beatId": "dbxfe-delta-schema",
+      "whyItMatters": "Makes schema evolution a consumer-contract decision instead of equating low rewrite cost with low risk."
+    },
+    {
+      "id": "dbxfe-delta-extension-checkpoint",
+      "revision": "1",
+      "prompt": "Does a Delta transaction-log checkpoint mean the same thing as a streaming-query checkpoint?",
+      "answer": "No. A table-log checkpoint compacts table metadata state; a streaming checkpoint tracks a particular query’s progress and state.",
+      "explanation": "The table-history documentation describes aggregated metadata checkpoints that avoid replaying all JSON history. That mechanism is distinct from the per-query recovery state taught in orchestration. Neither name alone promises archived data remains available.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-limits",
+      "conceptIds": [
+        "dbxfe-delta-history-concept"
+      ],
+      "claimIds": [
+        "dbxfe-delta-claim-history"
+      ],
+      "beatId": "dbxfe-delta-history",
+      "whyItMatters": "A shared word should not lead to deleting the wrong recovery evidence."
+    }
+  ],
+  "recap": {
+    "title": "One table, four boundaries",
+    "markdown": "**Files → selected snapshot → successful commit → retained historical dependencies.** Compute calculates; business rules select the intended population; compatibility determines which clients can interpret it. Review the canonical cards, or choose the researched extension cards deliberately.",
+    "visualId": "dbxfe-delta-transfer-visual"
+  },
+  "appliedTask": {
+    "title": "Explain a failed correction",
+    "prompt": "A1=12 and C0=8 are current. C1=6 is staged, then the writer fails before commit. Later a successful retry replaces C0. Give both totals and explain whether a visible v1 history entry is enough after C0 is deleted.",
+    "modelAnswer": "The failed attempt leaves 20. The successful replacement yields 18. A visible v1 history entry is insufficient after required C0 is deleted; complete time travel also needs retained data and supported runtime/retention conditions.",
+    "reasoning": "The answer follows membership and the commit boundary, then checks historical dependencies. It does not infer acceptance from a file timestamp.",
+    "beatIds": [
+      "dbxfe-delta-folder",
+      "dbxfe-delta-stage",
+      "dbxfe-delta-commit",
+      "dbxfe-delta-history",
+      "dbxfe-delta-transfer"
+    ]
+  },
+  "scenarioIds": []
+}

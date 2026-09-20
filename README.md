@@ -2,9 +2,11 @@
 
 **Learn it. See it. Use it. Remember it.**
 
-A static, content-driven study hub for explanations, diagrams, applied practice, retrieval, notes, and resumption. Start with **Reliable Data Foundations**: understand the platform, transform typed data, and reason through corrections, conflicts and replay. Today, Learn, Review and Notebook keep a clear route through the material. Databricks is the first major domain; field practice is one application of that knowledge.
+A static, content-driven learning platform. Choose a course, follow its module map, and learn one visual beat at a time. Each module connects **Deck, Handbook and Cards**: concise English teaching, controlled diagrams, optional Samajh analogies, in-context definitions, deliberate answer reveals and exact resumption. Today, Courses, Review and Notebook keep the main route small. Databricks is the first domain; field practice applies the technical foundations.
 
-The catalog retains the original 12-module course and now contains **43 lessons, 144 flashcards, 96 explained checks, 18 original diagrams, 12 scenarios and the capstone**. The deeper path has ten core topics and two optional bridges, alongside applied field practice and a focused replay roadmap. These are views of shared canonical topics. Cinderline, conversations, datasets, targets and figures are fictional or hypothetical. AWS-specific examples are labeled. This is independent education, not official onboarding, an interview course, a credential or an employer assessment. Local Python/Spark execution is reported separately; no Databricks execution is claimed.
+The complete course has **16 modules, 135 teaching beats and 208 cards**: the original 144 plus 64 researched extensions. All **43 original lessons, 96 checks, 18 SVG diagrams, 12 scenarios and the capstone** remain accessible with their identities and history. New beats add their own questions, staged visuals, complete handbook sections and 16 curated video references with authored alternatives. Video players contact their providers only after an explicit load choice. Original roadmaps and playbooks remain secondary views of the canonical material.
+
+Cinderline, conversations, datasets, targets and figures are fictional or hypothetical. AWS-specific examples are labeled. This is independent education, not official onboarding, an interview question bank, a credential or an employer assessment. Local Python/Spark execution is reported separately; no Databricks execution is claimed.
 
 ## Run locally
 
@@ -41,6 +43,8 @@ Reading requires no account or workspace. Notes, drafts, completion, attempts, r
 
 ## Review and authorship
 
+- [Teacher-first milestone and acceptance boundaries](docs/teacher-first/MILESTONE.md)
+- [Complete course coverage](docs/teacher-first/COVERAGE.md), [editorial review](docs/teacher-first/EDITORIAL-REVIEW.md) and [media review](docs/teacher-first/MEDIA-REVIEW.md)
 - [Architecture and supported boundaries](docs/ARCHITECTURE.md)
 - [Add or revise a content package](docs/AUTHORING.md)
 - [Study data, migration, and review algorithm](docs/STUDY-DATA.md)

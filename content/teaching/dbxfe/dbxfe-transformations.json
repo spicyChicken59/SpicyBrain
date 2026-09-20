@@ -1,0 +1,1678 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-transformations",
+  "title": "SQL, Python and PySpark transformations",
+  "summary": "Build the intended rows, compute a weighted metric, and diagnose a join that quietly multiplies them.",
+  "outcomes": [
+    "Explain a row’s grain before filtering, grouping or joining.",
+    "Trace equivalent SQL and PySpark transformations over typed input.",
+    "Preserve unknowns and detect multiplying joins with explicit expected output."
+  ],
+  "startingAssumptions": [
+    "A row contains fields; SUM adds quantities.",
+    "The optional Python bridge introduces records, conversion, functions and assertions."
+  ],
+  "lessonIds": [
+    "dbxfe-m04-l01",
+    "dbxfe-python-bridge",
+    "dbxfe-dataframes",
+    "dbxfe-grain-joins"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "Concrete intermediate rows and matching pairs teach the mechanism. Existing complete locally tested code remains canonical and unchanged.",
+  "sources": [
+    {
+      "id": "dbxfe-transformations-source-frame",
+      "title": "PySpark DataFrame quickstart, 4.0.4",
+      "url": "https://spark.apache.org/docs/4.0.4/api/python/getting_started/quickstart_df.html",
+      "publisher": "Apache Software Foundation",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Apache Spark 4.0.4 primary API documentation.",
+      "caveat": "Pinned local Spark 4.0.4. This is not a Databricks Runtime compatibility or production performance claim.",
+      "reviewedEvidence": "Creation, column access, filtering, grouping and SQL sections distinguish typed lazy DataFrames, column expressions, actions and the shared SQL execution engine."
+    },
+    {
+      "id": "dbxfe-transformations-source-null",
+      "title": "Spark 4.0.4 NULL semantics",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-null-semantics.html",
+      "publisher": "Apache Software Foundation",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Apache Spark 4.0.4 SQL reference.",
+      "caveat": "Null-safe equality expresses a different rule; choosing it requires a business meaning for missing keys.",
+      "reviewedEvidence": "Comparison and aggregate sections distinguish unknown comparisons, explicit null checks, COUNT(*) and COUNT(column)."
+    },
+    {
+      "id": "dbxfe-transformations-source-join",
+      "title": "Spark 4.0.4 JOIN reference",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-syntax-qry-select-join.html",
+      "publisher": "Apache Software Foundation",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Apache Spark 4.0.4 SQL reference.",
+      "caveat": "Join type does not establish input key uniqueness or business grain.",
+      "reviewedEvidence": "Inner joins combine matching rows; left-semi returns left rows with a match and left-anti those without one."
+    },
+    {
+      "id": "dbxfe-transformations-source-plan",
+      "title": "DataFrame.explain, 4.0.4",
+      "url": "https://spark.apache.org/docs/4.0.4/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.explain.html",
+      "publisher": "Apache Software Foundation",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Apache Spark 4.0.4 API reference.",
+      "caveat": "A planned operator is not observed runtime latency; adaptive execution can change plans.",
+      "reviewedEvidence": "Explain API supports logical/physical plan views and formatted plan output."
+    },
+    {
+      "id": "dbxfe-transformations-source-python",
+      "title": "Python 3.12 data structures",
+      "url": "https://docs.python.org/3.12/tutorial/datastructures.html#dictionaries",
+      "publisher": "Python Software Foundation",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Python 3.12.14 documentation.",
+      "caveat": "Python 3.12 language reference, not a distributed execution model.",
+      "reviewedEvidence": "Dictionary and iteration sections explain keyed records and traversal; a dictionary is not a declared tabular schema."
+    },
+    {
+      "id": "dbxfe-transformations-source-csv",
+      "title": "Python 3.12 csv module",
+      "url": "https://docs.python.org/3.12/library/csv.html#csv.DictReader",
+      "publisher": "Python Software Foundation",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Python 3.12.14 documentation.",
+      "caveat": "CSV dialect and malformed-row policy remain application decisions.",
+      "reviewedEvidence": "DictReader maps header fields to records; ordinary CSV reading returns strings and requires deliberate numeric conversion."
+    },
+    {
+      "id": "dbxfe-transformations-source-union-name",
+      "title": "DataFrame.unionByName",
+      "url": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.unionByName.html",
+      "publisher": "Apache Software Foundation",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Apache Spark primary API reference identifies PySpark 4.2.0 on 2026-09-20. APIs predate the unchanged Spark 4.0.4 exercise pin; these additional examples are hand-worked, not newly executed.",
+      "caveat": "Name alignment does not prove unit, meaning or type compatibility; optional extension only, no new execution claim.",
+      "reviewedEvidence": "unionByName aligns columns by name; allowMissingColumns=True fills absent fields with null. The API dates to 2.3 and the missing-column option to 3.1."
+    },
+    {
+      "id": "dbxfe-transformations-source-explode-outer",
+      "title": "pyspark.sql.functions.explode_outer",
+      "url": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.explode_outer.html",
+      "publisher": "Apache Software Foundation",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Apache Spark primary API reference identifies PySpark 4.2.0 on 2026-09-20. APIs predate the unchanged Spark 4.0.4 exercise pin; these additional examples are hand-worked, not newly executed.",
+      "caveat": "The operation changes output grain; a null placeholder is not a known list element. API dates to 2.3.",
+      "reviewedEvidence": "explode_outer emits a row per array/map element and emits a null result for empty or null input, unlike ordinary explode."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-transformations-guidance",
+      "description": "Original educational reasoning, diagnostic choices and worked decisions; not a vendor runbook.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent SpicyBrain curriculum."
+    },
+    {
+      "id": "dbxfe-transformations-fiction",
+      "description": "Cinderline examples, quantities, states, outcomes and alternatives are synthetic.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "Original teaching examples; no Databricks or customer execution claim."
+    },
+    {
+      "id": "dbxfe-transformations-claim-frame",
+      "description": "Creation, column access, filtering, grouping and SQL sections distinguish typed lazy DataFrames, column expressions, actions and the shared SQL execution engine.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-transformations-source-frame"
+      ],
+      "context": "Pinned local Spark 4.0.4. This is not a Databricks Runtime compatibility or production performance claim."
+    },
+    {
+      "id": "dbxfe-transformations-claim-null",
+      "description": "Comparison and aggregate sections distinguish unknown comparisons, explicit null checks, COUNT(*) and COUNT(column).",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-transformations-source-null"
+      ],
+      "context": "Null-safe equality expresses a different rule; choosing it requires a business meaning for missing keys."
+    },
+    {
+      "id": "dbxfe-transformations-claim-join",
+      "description": "Inner joins combine matching rows; left-semi returns left rows with a match and left-anti those without one.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-transformations-source-join"
+      ],
+      "context": "Join type does not establish input key uniqueness or business grain."
+    },
+    {
+      "id": "dbxfe-transformations-claim-plan",
+      "description": "Explain API supports logical/physical plan views and formatted plan output.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-transformations-source-plan"
+      ],
+      "context": "A planned operator is not observed runtime latency; adaptive execution can change plans."
+    },
+    {
+      "id": "dbxfe-transformations-claim-python",
+      "description": "Dictionary and iteration sections explain keyed records and traversal; a dictionary is not a declared tabular schema.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-transformations-source-python"
+      ],
+      "context": "Python 3.12 language reference, not a distributed execution model."
+    },
+    {
+      "id": "dbxfe-transformations-claim-csv",
+      "description": "DictReader maps header fields to records; ordinary CSV reading returns strings and requires deliberate numeric conversion.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-transformations-source-csv"
+      ],
+      "context": "CSV dialect and malformed-row policy remain application decisions."
+    },
+    {
+      "id": "dbxfe-transformations-claim-union-name",
+      "description": "unionByName aligns columns by name; allowMissingColumns=True fills absent fields with null. The API dates to 2.3 and the missing-column option to 3.1.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-transformations-source-union-name"
+      ],
+      "context": "Name alignment does not prove unit, meaning or type compatibility; optional extension only, no new execution claim."
+    },
+    {
+      "id": "dbxfe-transformations-claim-explode-outer",
+      "description": "explode_outer emits a row per array/map element and emits a null result for empty or null input, unlike ordinary explode.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-transformations-source-explode-outer"
+      ],
+      "context": "The operation changes output grain; a null placeholder is not a known list element. API dates to 2.3."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-transformations-grain-concept",
+      "term": "grain",
+      "aliases": [],
+      "definition": "The real-world meaning of one row in a particular relation.",
+      "example": "Accepted input: one current inspection. Grouped output: one plant total.",
+      "sourceIds": [
+        "dbxfe-transformations-source-frame"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-python-concept",
+      "term": "dictionary",
+      "aliases": [],
+      "definition": "A Python collection mapping keys to values, without automatically enforcing a table schema.",
+      "example": "{\"inspected\":\"12\"} contains a string until it is deliberately converted.",
+      "sourceIds": [
+        "dbxfe-transformations-source-python",
+        "dbxfe-transformations-source-csv"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-schema-concept",
+      "term": "NULL",
+      "aliases": [],
+      "definition": "A marker for an unknown or absent value, rather than the numeric value zero.",
+      "example": "NULL >=0 is unknown; inspected=0 is a known quantity.",
+      "sourceIds": [
+        "dbxfe-transformations-source-frame",
+        "dbxfe-transformations-source-null"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-expressions-concept",
+      "term": "lazy evaluation",
+      "aliases": [],
+      "definition": "Planning a transformation before computing its rows when an action requires them.",
+      "example": "Selecting inspected-defective describes accepted units; show or collect requests results.",
+      "sourceIds": [
+        "dbxfe-transformations-source-frame"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-weighted-concept",
+      "term": "weighted rate",
+      "aliases": [],
+      "definition": "A rate calculated from the summed numerator divided by the summed denominator for the intended population.",
+      "example": "A1/12 and C0/8 combine to 1/20=5%, not the average of their percentages.",
+      "sourceIds": [
+        "dbxfe-transformations-source-frame",
+        "dbxfe-transformations-source-null"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-joins-concept",
+      "term": "join cardinality",
+      "aliases": [],
+      "definition": "How many output rows a join produces from matching input keys.",
+      "example": "Two inspections matched to three events at the same plant produce six row pairs.",
+      "sourceIds": [
+        "dbxfe-transformations-source-join"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-plan-concept",
+      "term": "shuffle",
+      "aliases": [],
+      "definition": "Redistributing rows between execution partitions, often to bring matching or grouped keys together.",
+      "example": "Rows for the same plant may move together before a grouped aggregation.",
+      "sourceIds": [
+        "dbxfe-transformations-source-plan",
+        "dbxfe-transformations-source-frame"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-transfer-concept",
+      "term": "independent expectation",
+      "aliases": [],
+      "definition": "An expected result calculated from the stated contract before comparing implementations.",
+      "example": "Adding D=5 inspected, 1 defective makes 2/25=8%, regardless of interface.",
+      "sourceIds": [
+        "dbxfe-transformations-source-frame",
+        "dbxfe-transformations-source-join"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-extension-union-by-name-concept",
+      "term": "name-aligned union",
+      "aliases": [],
+      "definition": "Combining rows while aligning fields by their names rather than their positional order.",
+      "example": "Fields [inspection_id, inspected] align with [inspected, inspection_id] by name.",
+      "sourceIds": [
+        "dbxfe-transformations-source-union-name"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-extension-explode-outer-concept",
+      "term": "array expansion",
+      "aliases": [],
+      "definition": "Turning elements stored inside one row into separate output rows, changing the result grain.",
+      "example": "Inspection A with tags [scratch,dent] expands into two inspection-tag rows.",
+      "sourceIds": [
+        "dbxfe-transformations-source-explode-outer"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-transformations-grain-visual",
+      "kind": "table",
+      "title": "Say what one row means",
+      "alt": "Say what one row means. Two rows, one per accepted inspection. One row, one per plant; inspection identity no longer identifies output rows.",
+      "caption": "Name the input and output grain at every transformation boundary. Synthetic teaching example.",
+      "textEquivalent": "Input: inspection grain: Two rows, one per accepted inspection. Columns: Inspection; Plant; Inspected; Defective. Rows: A — North — 12 — 1; C — North — 8 — 0.\n\nOutput: plant grain: One row, one per plant; inspection identity no longer identifies output rows. Columns: Plant; Inspected; Defective. Rows: North — 20 — 1.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "states": [
+        {
+          "id": "inspection",
+          "title": "Input: inspection grain",
+          "explanation": "Two rows, one per accepted inspection.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspection",
+              "Plant",
+              "Inspected",
+              "Defective"
+            ],
+            "rows": [
+              [
+                "A",
+                "North",
+                "12",
+                "1"
+              ],
+              [
+                "C",
+                "North",
+                "8",
+                "0"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "plant",
+          "title": "Output: plant grain",
+          "explanation": "One row, one per plant; inspection identity no longer identifies output rows.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Plant",
+              "Inspected",
+              "Defective"
+            ],
+            "rows": [
+              [
+                "North",
+                "20",
+                "1"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-python-visual",
+      "kind": "table",
+      "title": "A record needs deliberate conversion",
+      "alt": "A record needs deliberate conversion. Headers give keys; they do not validate numeric meaning. Rejected evidence is separate from accepted arithmetic.",
+      "caption": "Representation, conversion and validity are separate decisions. Synthetic teaching example.",
+      "textEquivalent": "Raw record values: Headers give keys; they do not validate numeric meaning. Columns: ID; Raw inspected; Meaning now. Rows: A — \"12\" — Text; B — \"many\" — Text.\n\nDeliberate parsing: Rejected evidence is separate from accepted arithmetic. Columns: ID; Outcome; Evidence. Rows: A — Accepted inspected=12 — Integer conversion succeeded; B — Rejected — Raw \"many\" and conversion reason retained.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-transformations-claim-python",
+        "dbxfe-transformations-claim-csv",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "states": [
+        {
+          "id": "text",
+          "title": "Raw record values",
+          "explanation": "Headers give keys; they do not validate numeric meaning.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "ID",
+              "Raw inspected",
+              "Meaning now"
+            ],
+            "rows": [
+              [
+                "A",
+                "\"12\"",
+                "Text"
+              ],
+              [
+                "B",
+                "\"many\"",
+                "Text"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "parsed",
+          "title": "Deliberate parsing",
+          "explanation": "Rejected evidence is separate from accepted arithmetic.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "ID",
+              "Outcome",
+              "Evidence"
+            ],
+            "rows": [
+              [
+                "A",
+                "Accepted inspected=12",
+                "Integer conversion succeeded"
+              ],
+              [
+                "B",
+                "Rejected",
+                "Raw \"many\" and conversion reason retained"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-schema-visual",
+      "kind": "table",
+      "title": "Unknown is not zero",
+      "alt": "Unknown is not zero. A filter keeps true conditions; unknown is not true. The domain contract determines treatment.",
+      "caption": "A missing quantity needs an explicit policy; it is not automatically zero. Synthetic teaching example.",
+      "textEquivalent": "Evaluate inspected >=0: A filter keeps true conditions; unknown is not true. Columns: Inspected; Comparison; Interpretation. Rows: 12 — TRUE — Known nonnegative; 0 — TRUE — Known zero; NULL — UNKNOWN — No known quantity.\n\nState a policy: The domain contract determines treatment. Columns: Case; Our decision; Reason. Rows: Missing inspected — Reject with evidence — Cannot verify quantity; 0 inspected, 0 defective — Valid row; undefined ratio — Known empty denominator; 12 inspected, 1 defective — Accept — Known valid quantities.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-claim-null",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "states": [
+        {
+          "id": "comparison",
+          "title": "Evaluate inspected >=0",
+          "explanation": "A filter keeps true conditions; unknown is not true.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspected",
+              "Comparison",
+              "Interpretation"
+            ],
+            "rows": [
+              [
+                "12",
+                "TRUE",
+                "Known nonnegative"
+              ],
+              [
+                "0",
+                "TRUE",
+                "Known zero"
+              ],
+              [
+                "NULL",
+                "UNKNOWN",
+                "No known quantity"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "policy",
+          "title": "State a policy",
+          "explanation": "The domain contract determines treatment.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Case",
+              "Our decision",
+              "Reason"
+            ],
+            "rows": [
+              [
+                "Missing inspected",
+                "Reject with evidence",
+                "Cannot verify quantity"
+              ],
+              [
+                "0 inspected, 0 defective",
+                "Valid row; undefined ratio",
+                "Known empty denominator"
+              ],
+              [
+                "12 inspected, 1 defective",
+                "Accept",
+                "Known valid quantities"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-expressions-visual",
+      "kind": "nodes",
+      "title": "A Column describes work",
+      "alt": "A Column describes work. No displayed result is evidence of execution yet. An action computes the requested result; this visual shows authored expected values.",
+      "caption": "A planned expression describes work; an action asks for its result. Synthetic teaching example.",
+      "textEquivalent": "Build the plan: No displayed result is evidence of execution yet. Nodes: Input: A12/1, C8/0. Typed synthetic rows. (context); Filter: Known valid quantities. Retains intended rows. (pending); Expression: inspected - defective. Describes accepted units per row. (pending); Action: show / bounded result. Requests computation. (context). Relationships: Input → Filter: plan; Filter → Expression: plan; Expression → Action: execute when requested.\n\nExpected output: An action computes the requested result; this visual shows authored expected values. Columns: Inspection; Accepted units. Rows: A — 11; C — 8.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "states": [
+        {
+          "id": "plan",
+          "title": "Build the plan",
+          "explanation": "No displayed result is evidence of execution yet.",
+          "nodes": [
+            {
+              "id": "input",
+              "label": "Input",
+              "value": "A12/1, C8/0",
+              "detail": "Typed synthetic rows.",
+              "status": "context"
+            },
+            {
+              "id": "filter",
+              "label": "Filter",
+              "value": "Known valid quantities",
+              "detail": "Retains intended rows.",
+              "status": "pending"
+            },
+            {
+              "id": "derive",
+              "label": "Expression",
+              "value": "inspected - defective",
+              "detail": "Describes accepted units per row.",
+              "status": "pending"
+            },
+            {
+              "id": "action",
+              "label": "Action",
+              "value": "show / bounded result",
+              "detail": "Requests computation.",
+              "status": "context"
+            }
+          ],
+          "connections": [
+            {
+              "from": "input",
+              "to": "filter",
+              "label": "plan"
+            },
+            {
+              "from": "filter",
+              "to": "derive",
+              "label": "plan"
+            },
+            {
+              "from": "derive",
+              "to": "action",
+              "label": "execute when requested"
+            }
+          ]
+        },
+        {
+          "id": "result",
+          "title": "Expected output",
+          "explanation": "An action computes the requested result; this visual shows authored expected values.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspection",
+              "Accepted units"
+            ],
+            "rows": [
+              [
+                "A",
+                "11"
+              ],
+              [
+                "C",
+                "8"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-weighted-visual",
+      "kind": "equation",
+      "title": "Sum the counts before dividing",
+      "alt": "Sum the counts before dividing. Unequal denominators mean the percentages carry different weights. Use the intended population totals.",
+      "caption": "The shared metric is 1/20; syntax equivalence includes population and denominator policy. Synthetic teaching example.",
+      "textEquivalent": "Individual inspections: Unequal denominators mean the percentages carry different weights. Columns: Inspection; Inspected; Defective; Rate. Rows: A — 12 — 1 — 8.33%; C — 8 — 0 — 0%. Equation: (8.33% + 0%) / 2 ≈ 4.17%: not the unit rate.\n\nSum then divide: Use the intended population totals. Columns: Plant; Inspected; Defective; Unit rate. Rows: North — 20 — 1 — 5%. Equation: (1 + 0) / (12 + 8) = 1 / 20 = 5%.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-claim-null",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "states": [
+        {
+          "id": "per-row",
+          "title": "Individual inspections",
+          "explanation": "Unequal denominators mean the percentages carry different weights.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspection",
+              "Inspected",
+              "Defective",
+              "Rate"
+            ],
+            "rows": [
+              [
+                "A",
+                "12",
+                "1",
+                "8.33%"
+              ],
+              [
+                "C",
+                "8",
+                "0",
+                "0%"
+              ]
+            ]
+          },
+          "equation": "(8.33% + 0%) / 2 ≈ 4.17%: not the unit rate"
+        },
+        {
+          "id": "aggregate",
+          "title": "Sum then divide",
+          "explanation": "Use the intended population totals.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Plant",
+              "Inspected",
+              "Defective",
+              "Unit rate"
+            ],
+            "rows": [
+              [
+                "North",
+                "20",
+                "1",
+                "5%"
+              ]
+            ]
+          },
+          "equation": "(1 + 0) / (12 + 8) = 1 / 20 = 5%"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-joins-visual",
+      "kind": "table",
+      "title": "A join makes matching pairs",
+      "alt": "A join makes matching pairs. 2 × 3 =6 pairs; sum inspected=60. A left-semi join preserves the two left rows: total 20. Aggregate both relations to plant grain before joining the summaries.",
+      "caption": "A join’s matching pairs can multiply quantities before SUM sees them. Synthetic teaching example.",
+      "textEquivalent": "All matching pairs: 2 × 3 =6 pairs; sum inspected=60. Columns: Inspection; Event; Repeated inspected. Rows: A — e1 — 12; A — e2 — 12; A — e3 — 12; C — e1 — 8; C — e2 — 8; C — e3 — 8.\n\nIf only existence matters: A left-semi join preserves the two left rows: total 20. Columns: Inspection retained; Inspected; Why. Rows: A — 12 — At least one North event exists; C — 8 — At least one North event exists.\n\nIf event counts are needed: Aggregate both relations to plant grain before joining the summaries. Columns: Plant; Inspected; Event count. Rows: North — 20 — 3.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-transformations-claim-join",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "states": [
+        {
+          "id": "pairs",
+          "title": "All matching pairs",
+          "explanation": "2 × 3 =6 pairs; sum inspected=60.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspection",
+              "Event",
+              "Repeated inspected"
+            ],
+            "rows": [
+              [
+                "A",
+                "e1",
+                "12"
+              ],
+              [
+                "A",
+                "e2",
+                "12"
+              ],
+              [
+                "A",
+                "e3",
+                "12"
+              ],
+              [
+                "C",
+                "e1",
+                "8"
+              ],
+              [
+                "C",
+                "e2",
+                "8"
+              ],
+              [
+                "C",
+                "e3",
+                "8"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "semi",
+          "title": "If only existence matters",
+          "explanation": "A left-semi join preserves the two left rows: total 20.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspection retained",
+              "Inspected",
+              "Why"
+            ],
+            "rows": [
+              [
+                "A",
+                "12",
+                "At least one North event exists"
+              ],
+              [
+                "C",
+                "8",
+                "At least one North event exists"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "aligned",
+          "title": "If event counts are needed",
+          "explanation": "Aggregate both relations to plant grain before joining the summaries.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Plant",
+              "Inspected",
+              "Event count"
+            ],
+            "rows": [
+              [
+                "North",
+                "20",
+                "3"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-plan-visual",
+      "kind": "nodes",
+      "title": "Read a plan as an explanation of work",
+      "alt": "Read a plan as an explanation of work. Rows for the same plant start in different partitions. The teaching redistribution puts each plant together for totals.",
+      "caption": "Plans explain work and movement; measured runs establish performance. Synthetic teaching example.",
+      "textEquivalent": "Before grouping: Rows for the same plant start in different partitions. Nodes: Partition A: North A12; South D5. Mixed plant keys. (context); Partition B: North C8; South E7. Mixed plant keys. (context); North group: Waiting. Needs matching keys. (pending); South group: Waiting. Needs matching keys. (pending). Relationships: Partition A → North group: North row; Partition B → North group: North row; Partition A → South group: South row; Partition B → South group: South row.\n\nAfter grouping: The teaching redistribution puts each plant together for totals. Nodes: Input partition A: Read. Original distribution. (context); Input partition B: Read. Original distribution. (context); North group: 20 inspected. 12+8. (selected); South group: 12 inspected. 5+7. (selected). Relationships: Input partition A → North group: keys redistributed; Input partition B → South group: keys redistributed; Input partition A → South group: South contribution: 5; Input partition B → North group: North contribution: 8.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-transformations-claim-plan",
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "states": [
+        {
+          "id": "before",
+          "title": "Before grouping",
+          "explanation": "Rows for the same plant start in different partitions.",
+          "nodes": [
+            {
+              "id": "p-one",
+              "label": "Partition A",
+              "value": "North A12; South D5",
+              "detail": "Mixed plant keys.",
+              "status": "context"
+            },
+            {
+              "id": "p-two",
+              "label": "Partition B",
+              "value": "North C8; South E7",
+              "detail": "Mixed plant keys.",
+              "status": "context"
+            },
+            {
+              "id": "north",
+              "label": "North group",
+              "value": "Waiting",
+              "detail": "Needs matching keys.",
+              "status": "pending"
+            },
+            {
+              "id": "south",
+              "label": "South group",
+              "value": "Waiting",
+              "detail": "Needs matching keys.",
+              "status": "pending"
+            }
+          ],
+          "connections": [
+            {
+              "from": "p-one",
+              "to": "north",
+              "label": "North row"
+            },
+            {
+              "from": "p-two",
+              "to": "north",
+              "label": "North row"
+            },
+            {
+              "from": "p-one",
+              "to": "south",
+              "label": "South row"
+            },
+            {
+              "from": "p-two",
+              "to": "south",
+              "label": "South row"
+            }
+          ]
+        },
+        {
+          "id": "after",
+          "title": "After grouping",
+          "explanation": "The teaching redistribution puts each plant together for totals.",
+          "nodes": [
+            {
+              "id": "p-one",
+              "label": "Input partition A",
+              "value": "Read",
+              "detail": "Original distribution.",
+              "status": "context"
+            },
+            {
+              "id": "p-two",
+              "label": "Input partition B",
+              "value": "Read",
+              "detail": "Original distribution.",
+              "status": "context"
+            },
+            {
+              "id": "north",
+              "label": "North group",
+              "value": "20 inspected",
+              "detail": "12+8.",
+              "status": "selected"
+            },
+            {
+              "id": "south",
+              "label": "South group",
+              "value": "12 inspected",
+              "detail": "5+7.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "p-one",
+              "to": "north",
+              "label": "keys redistributed"
+            },
+            {
+              "from": "p-two",
+              "to": "south",
+              "label": "keys redistributed"
+            },
+            {
+              "from": "p-one",
+              "to": "south",
+              "label": "South contribution: 5"
+            },
+            {
+              "from": "p-two",
+              "to": "north",
+              "label": "North contribution: 8"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-transfer-visual",
+      "kind": "table",
+      "title": "Change the population and predict again",
+      "alt": "Change the population and predict again. Expected total 25 inspected, 2 defective; rate 8%. Equal ratios do not prove equal populations.",
+      "caption": "Check keys and component totals; a correct-looking ratio can conceal duplication. Synthetic teaching example.",
+      "textEquivalent": "Expected business rows: Expected total 25 inspected, 2 defective; rate 8%. Columns: Inspection; Inspected; Defective. Rows: A — 12 — 1; C — 8 — 0; D — 5 — 1.\n\nA ratio can hide multiplication: Equal ratios do not prove equal populations. Columns: Approach; Inspected; Defective; Rate. Rows: Naive 4-event join — 100 — 8 — 8%; Correct population — 25 — 2 — 8%.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-claim-join",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "states": [
+        {
+          "id": "expected",
+          "title": "Expected business rows",
+          "explanation": "Expected total 25 inspected, 2 defective; rate 8%.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspection",
+              "Inspected",
+              "Defective"
+            ],
+            "rows": [
+              [
+                "A",
+                "12",
+                "1"
+              ],
+              [
+                "C",
+                "8",
+                "0"
+              ],
+              [
+                "D",
+                "5",
+                "1"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "trap",
+          "title": "A ratio can hide multiplication",
+          "explanation": "Equal ratios do not prove equal populations.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Approach",
+              "Inspected",
+              "Defective",
+              "Rate"
+            ],
+            "rows": [
+              [
+                "Naive 4-event join",
+                "100",
+                "8",
+                "8%"
+              ],
+              [
+                "Correct population",
+                "25",
+                "2",
+                "8%"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-transformations-grain-question",
+      "revision": "1",
+      "prompt": "Which operation changes these two inspection rows into one plant row?",
+      "options": [
+        {
+          "id": "dbxfe-transformations-grain-question-a",
+          "text": "Grouping by plant and summing quantities",
+          "rationale": "The grouping key defines the output grain."
+        },
+        {
+          "id": "dbxfe-transformations-grain-question-b",
+          "text": "Selecting inspection_id and inspected",
+          "rationale": "Projection changes columns but preserves these input rows."
+        },
+        {
+          "id": "dbxfe-transformations-grain-question-c",
+          "text": "Renaming inspected to units",
+          "rationale": "A name change does not aggregate the population."
+        }
+      ],
+      "correctOptionId": "dbxfe-transformations-grain-question-a",
+      "conceptIds": [
+        "dbxfe-transformations-grain-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-python-question",
+      "revision": "1",
+      "prompt": "Why preserve the rejected raw value \"many\"?",
+      "options": [
+        {
+          "id": "dbxfe-transformations-python-question-b",
+          "text": "So it can be counted as zero without disclosure",
+          "rationale": "Replacing invalid input with zero changes the population silently."
+        },
+        {
+          "id": "dbxfe-transformations-python-question-c",
+          "text": "Because a dictionary enforces numeric types",
+          "rationale": "A dictionary itself does not enforce that schema."
+        },
+        {
+          "id": "dbxfe-transformations-python-question-a",
+          "text": "So the problem can be inspected and corrected",
+          "rationale": "A reason plus raw evidence supports reconciliation and recovery."
+        }
+      ],
+      "correctOptionId": "dbxfe-transformations-python-question-a",
+      "conceptIds": [
+        "dbxfe-transformations-python-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-python",
+        "dbxfe-transformations-claim-csv",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-schema-question",
+      "revision": "1",
+      "prompt": "Which statement correctly distinguishes NULL from 0?",
+      "options": [
+        {
+          "id": "dbxfe-transformations-schema-question-c",
+          "text": "NULL = NULL is always TRUE in ordinary SQL equality",
+          "rationale": "Ordinary equality with NULL is unknown; null-safe equality is a separate operator."
+        },
+        {
+          "id": "dbxfe-transformations-schema-question-a",
+          "text": "NULL is unknown; 0 is a known numeric value",
+          "rationale": "Do not invent zero from an absent measurement."
+        },
+        {
+          "id": "dbxfe-transformations-schema-question-b",
+          "text": "They are interchangeable in every sum and filter",
+          "rationale": "That can alter counts and quality meaning."
+        }
+      ],
+      "correctOptionId": "dbxfe-transformations-schema-question-a",
+      "conceptIds": [
+        "dbxfe-transformations-schema-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-claim-null",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-expressions-question",
+      "revision": "1",
+      "prompt": "What does building a filtered DataFrame primarily establish?",
+      "options": [
+        {
+          "id": "dbxfe-transformations-expressions-question-a",
+          "text": "A transformation plan",
+          "rationale": "An action is needed to obtain computed row results."
+        },
+        {
+          "id": "dbxfe-transformations-expressions-question-b",
+          "text": "That all rows already passed a production execution",
+          "rationale": "Planning does not establish completed execution."
+        },
+        {
+          "id": "dbxfe-transformations-expressions-question-c",
+          "text": "That the result is automatically persisted permanently",
+          "rationale": "Evaluation and persistence are separate choices."
+        }
+      ],
+      "correctOptionId": "dbxfe-transformations-expressions-question-a",
+      "conceptIds": [
+        "dbxfe-transformations-expressions-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-weighted-question",
+      "revision": "1",
+      "prompt": "What is the unit defect rate for 12/1 and 8/0?",
+      "options": [
+        {
+          "id": "dbxfe-transformations-weighted-question-b",
+          "text": "About 4.17%",
+          "rationale": "That is the unweighted mean of the two inspection percentages."
+        },
+        {
+          "id": "dbxfe-transformations-weighted-question-c",
+          "text": "50%",
+          "rationale": "That counts inspections with any defect, not defective units."
+        },
+        {
+          "id": "dbxfe-transformations-weighted-question-a",
+          "text": "5%",
+          "rationale": "Summed defects 1 divided by summed inspected 20."
+        }
+      ],
+      "correctOptionId": "dbxfe-transformations-weighted-question-a",
+      "conceptIds": [
+        "dbxfe-transformations-weighted-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-claim-null",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-joins-question",
+      "revision": "1",
+      "prompt": "Four matching North events now accompany two inspections totaling 20. What is the naive joined sum?",
+      "options": [
+        {
+          "id": "dbxfe-transformations-joins-question-c",
+          "text": "20",
+          "rationale": "That requires a corrected existence or aligned-grain approach."
+        },
+        {
+          "id": "dbxfe-transformations-joins-question-a",
+          "text": "80",
+          "rationale": "Each inspection is repeated four times."
+        },
+        {
+          "id": "dbxfe-transformations-joins-question-b",
+          "text": "24",
+          "rationale": "Adding event count to inspected mixes units."
+        }
+      ],
+      "correctOptionId": "dbxfe-transformations-joins-question-a",
+      "conceptIds": [
+        "dbxfe-transformations-joins-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-join",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-plan-question",
+      "revision": "1",
+      "prompt": "What does a shuffle conceptually do?",
+      "options": [
+        {
+          "id": "dbxfe-transformations-plan-question-a",
+          "text": "Redistributes rows between partitions",
+          "rationale": "Matching/grouped keys often need to be brought together."
+        },
+        {
+          "id": "dbxfe-transformations-plan-question-b",
+          "text": "Deletes all duplicated business events",
+          "rationale": "Identity deduplication requires a separate rule."
+        },
+        {
+          "id": "dbxfe-transformations-plan-question-c",
+          "text": "Guarantees faster execution",
+          "rationale": "Movement has costs and must be measured in context."
+        }
+      ],
+      "correctOptionId": "dbxfe-transformations-plan-question-a",
+      "conceptIds": [
+        "dbxfe-transformations-plan-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-plan",
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-transfer-question",
+      "revision": "1",
+      "prompt": "Both queries return 8%, but one reports 100 inspected and 8 defective. Are they equivalent?",
+      "options": [
+        {
+          "id": "dbxfe-transformations-transfer-question-b",
+          "text": "Yes; only the percentage matters",
+          "rationale": "Correctness includes the intended population and quantities."
+        },
+        {
+          "id": "dbxfe-transformations-transfer-question-c",
+          "text": "No; 8% must be mathematically wrong",
+          "rationale": "8% is correct for 2/25; the issue is duplicated components."
+        },
+        {
+          "id": "dbxfe-transformations-transfer-question-a",
+          "text": "No; the ratio hides fourfold duplication",
+          "rationale": "Expected row identities and component totals expose the error."
+        }
+      ],
+      "correctOptionId": "dbxfe-transformations-transfer-question-a",
+      "conceptIds": [
+        "dbxfe-transformations-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-claim-join",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ]
+    }
+  ],
+  "selfQuestions": [],
+  "beats": [
+    {
+      "id": "dbxfe-transformations-grain",
+      "version": "1.0.0",
+      "title": "Say what one row means",
+      "outcome": "Track the grain before and after grouping.",
+      "explanation": "Before choosing syntax, name the [[dbxfe-transformations-grain-concept|grain]]. A and C are two current inspections at Plant North. Grouping them changes the output to one plant row: 20 inspected and 1 defective. Selecting fewer columns need not change the grain; grouping usually does. Keep those operations distinct so a later join does not accidentally duplicate a total.",
+      "lessonId": "dbxfe-m04-l01",
+      "sectionId": "dbxfe-m04-l01-foundation-start",
+      "conceptIds": [
+        "dbxfe-transformations-grain-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "visualId": "dbxfe-transformations-grain-visual",
+      "samajh": {
+        "text": "Pehle bolo ek row kis cheez ki hai. Do inspection slips ko plant ke total mein jod diya toh ab row ek slip nahi, poore plant ka hisaab hai. Column ka naam same reh sakta hai, lekin row ka meaning badal gaya. Join se pehle yeh yaad rakhna zaroori hai.",
+        "mapping": "Individual slips become a grouped plant ledger entry.",
+        "boundary": "Grouping rules depend on the exact selected keys and aggregation."
+      },
+      "questionIds": [
+        "dbxfe-transformations-grain-question"
+      ],
+      "handbook": {
+        "markdown": "Write a one-sentence contract above every important intermediate relation. For accepted inspections: one current accepted row per inspection ID. For plant totals: one row per plant for the selected reporting population. For quality events: one row per event. These contracts make otherwise plausible joins and counts inspectable.\n\nA projection chooses columns. A filter chooses rows. A derived expression calculates a field on each retained row. A grouping combines rows under a key. They can all appear in one query, but each contributes a different change. In our example, retaining A and C then summing quantities gives 20 and 1. The metric must later divide those totals, not average the individual percentages.\n\nThe input here is already accepted and current; transformation syntax does not resolve changing source evidence automatically. If raw deliveries include repeats or older revisions, first apply the ingestion contract. Small expected tables are a useful test because a correct-looking total can hide a wrong population. Record expected row identities as well as the final number. A changed input in the final task checks whether the reasoning transfers beyond memorizing 20.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l01-foundation-start"
+        ]
+      },
+      "recap": "Name the input and output grain at every transformation boundary.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-transformations-python",
+      "version": "1.0.0",
+      "title": "A record needs deliberate conversion",
+      "outcome": "Read a Python record and explain accepted versus rejected parsing results.",
+      "explanation": "A Python [[dbxfe-transformations-python-concept|dictionary]] can represent one input record, but its field values are not automatically valid numbers. CSV text “12” must be deliberately converted; “many” cannot be treated as twelve. The optional bridge keeps rejected raw input and a reason, so an error becomes inspectable evidence instead of a silently vanished row.",
+      "lessonId": "dbxfe-python-bridge",
+      "sectionId": "dbxfe-python-bridge-records",
+      "conceptIds": [
+        "dbxfe-transformations-python-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-python",
+        "dbxfe-transformations-claim-csv",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "visualId": "dbxfe-transformations-python-visual",
+      "questionIds": [
+        "dbxfe-transformations-python-question"
+      ],
+      "handbook": {
+        "markdown": "Read the complete bridge below as a small local program. Imports make library functions available; a function names reusable behavior; a loop visits records; a conditional chooses a branch; an exception handler handles expected conversion failure. The accepted and rejected lists describe different outcomes. An assertion checks one explicit expectation; it is not a general proof of correctness.\n\nTrace one good and one bad input before running anything. A numeric string becomes an integer. A malformed value produces a reason attached to retained input. Domain checks then decide whether the number is sensible. This is ordinary Python processing of a tiny local input, not a Spark cluster loop or an arbitrary browser code runner.\n\nThe exact code below is reused from the preserved canonical bridge and its historical local exercise evidence. No new execution is claimed by this deck. Its independent expected output and changed-input task remain in the optional download. If functions, lists or assertions are unfamiliar, use that bridge before the DataFrame beat.\n\n~~~python\nimport json\nimport csv\nfrom io import StringIO\n\ndef units(value):\n    if type(value) is int:\n        result = value\n    elif isinstance(value, str) and value.strip().isdigit():\n        result = int(value.strip())\n    else:\n        raise ValueError(\"quantity must be an integer\")\n    if result < 0:\n        raise ValueError(\"quantity must be nonnegative\")\n    return result\n\ndef parse(rows):\n    accepted, rejected = [], []\n    for index, row in enumerate(rows):\n        try:\n            key = row.get(\"inspection_id\")\n            if not isinstance(key, str) or not key.strip():\n                raise ValueError(\"inspection_id is required\")\n            if \"inspected_units\" not in row:\n                raise ValueError(\"inspected_units is missing\")\n            count = units(row[\"inspected_units\"])\n            accepted.append({\"inspection_id\": key.strip(),\n                             \"inspected_units\": count})\n        except ValueError as error:\n            rejected.append({\"index\": index, \"raw\": row,\n                             \"reason\": str(error)})\n    return accepted, rejected\n\nrows = json.loads('[{\"inspection_id\":\"A\",\"inspected_units\":\"12\"},'\n                  '{\"inspection_id\":\"B\",\"inspected_units\":null},'\n                  '{\"inspection_id\":\"C\"}]')\naccepted, rejected = parse(rows)\nassert accepted == [{\"inspection_id\": \"A\", \"inspected_units\": 12}]\nassert [r[\"reason\"] for r in rejected] == [\n    \"quantity must be an integer\", \"inspected_units is missing\"]\ncsv_rows = list(csv.DictReader(StringIO(\n    \"inspection_id,inspected_units\\nD,8\\nE,eight\\n\")))\nassert parse(csv_rows)[0] == [{\"inspection_id\": \"D\", \"inspected_units\": 8}]\n~~~",
+        "sourceSectionIds": [
+          "dbxfe-python-bridge-records"
+        ]
+      },
+      "recap": "Representation, conversion and validity are separate decisions.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-transformations-schema",
+      "version": "1.0.0",
+      "title": "Unknown is not zero",
+      "outcome": "Explain schema, null checks and three-valued filtering.",
+      "explanation": "A schema declares columns and types; it does not decide what a missing value means. [[dbxfe-transformations-schema-concept|NULL]] inspected units are unknown, while zero inspected units are known. An ordinary comparison with NULL is unknown. Use an explicit null policy and explicit checks so missing data does not quietly pass or disappear from the metric population.",
+      "lessonId": "dbxfe-dataframes",
+      "sectionId": "dbxfe-dataframes-expressions",
+      "conceptIds": [
+        "dbxfe-transformations-schema-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-claim-null",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "visualId": "dbxfe-transformations-schema-visual",
+      "questionIds": [
+        "dbxfe-transformations-schema-question"
+      ],
+      "handbook": {
+        "markdown": "An explicit DataFrame schema prevents the reader from guessing every type from a sample. It still needs a domain contract. For inspected and defective counts, require known integers, nonnegative values and defective no greater than inspected. A nullable integer type can represent both 12 and unknown; it does not say both are acceptable for reporting.\n\nIn Spark, use isNull/isNotNull when testing missing values. Ordinary equality to a null literal does not become a general missing-value test. For combined Column conditions in PySpark, use parenthesized expressions with & or | rather than Python and/or, which ask for a single local truth value. SQL expresses the corresponding conditions with AND/OR.\n\nCOUNT(*) counts rows, while COUNT(column) excludes null values in that column. If a quality report shows three input rows and two known quantities, that difference is evidence, not necessarily a bug in counting. The complete preserved typed-input example includes imports, schema, intermediate output and a changed-input repair. Use its exact source section for runnable detail; do not treat a nullable schema alone as validation.",
+        "sourceSectionIds": [
+          "dbxfe-dataframes-expressions",
+          "dbxfe-dataframes-worked",
+          "dbxfe-dataframes-solution"
+        ]
+      },
+      "recap": "A missing quantity needs an explicit policy; it is not automatically zero.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-transformations-expressions",
+      "version": "1.0.0",
+      "title": "A Column describes work",
+      "outcome": "Distinguish a lazy expression from an executed result.",
+      "explanation": "A Spark Column is an expression describing work across rows. With [[dbxfe-transformations-expressions-concept|lazy evaluation]], selecting or filtering builds a plan; an action requests results. For A=(12, 1), inspected−defective will yield 11. That prediction comes from the data and expression, not from assuming every earlier line has already executed across the cluster.",
+      "lessonId": "dbxfe-dataframes",
+      "sectionId": "dbxfe-dataframes-expressions",
+      "conceptIds": [
+        "dbxfe-transformations-expressions-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "visualId": "dbxfe-transformations-expressions-visual",
+      "questionIds": [
+        "dbxfe-transformations-expressions-question"
+      ],
+      "handbook": {
+        "markdown": "A Python scalar such as total=20 is a local value. A PySpark Column such as col(\"inspected\")-col(\"defective\") is a symbolic expression evaluated over rows by Spark. Confusing them leads to errors such as trying to use Python and between two Column conditions. Keep parentheses around each comparison and use the Column operators intended for composition.\n\nTrace the synthetic pipeline: typed input has A12/1 and C8/0; validation retains both; projection derives accepted units 11 and 8. Grouping later changes grain, but this expression does not. An action asks Spark to produce results; a write can persist them to a destination with its own semantics. Planning, computing and committing are different events.\n\nFor small local tests, collect can make expected-row comparisons convenient. It brings the result to the driver and is not a safe default for an unbounded dataset. Use bounded inspection and appropriate distributed checks for large data. The canonical DataFrame example and its independent outputs remain available below as exact supporting references. No cloud execution is implied by moving the teaching visual.",
+        "sourceSectionIds": [
+          "dbxfe-dataframes-worked",
+          "dbxfe-dataframes-limits"
+        ]
+      },
+      "recap": "A planned expression describes work; an action asks for its result.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-transformations-weighted",
+      "version": "1.0.0",
+      "title": "Sum the counts before dividing",
+      "outcome": "Compute equivalent SQL/PySpark results with an explicit denominator.",
+      "explanation": "Our unit defect rate is total defective units divided by total inspected units. A contributes 1/12 and C contributes 0/8, so the combined [[dbxfe-transformations-weighted-concept|weighted rate]] is 1/20=5%. Averaging the two percentages gives about 4.17%, answering a different question. SQL and PySpark must preserve the same accepted rows, grouping and zero-denominator policy.",
+      "lessonId": "dbxfe-m04-l01",
+      "sectionId": "dbxfe-m04-l01-foundation-example",
+      "conceptIds": [
+        "dbxfe-transformations-weighted-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-claim-null",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "visualId": "dbxfe-transformations-weighted-visual",
+      "samajh": {
+        "text": "Ek inspection mein 12 units aur doosri mein 8 hain. Dono percentages ko equal weight doge toh har inspection ko same importance milti hai, har unit ko nahi. Unit defect rate chahiye toh pehle saare defective units aur saare inspected units jodo, phir divide karo.",
+        "mapping": "The denominator decides what receives equal weight.",
+        "boundary": "An average of inspection rates can be valid for a different explicitly named metric."
+      },
+      "questionIds": [
+        "dbxfe-transformations-weighted-question"
+      ],
+      "handbook": {
+        "markdown": "The denominator is part of the meaning, not merely syntax. For plant reporting, aggregate accepted defective and inspected quantities, then divide. If the sum of inspected units is zero, our worked contract returns an undefined/null rate instead of claiming 0% quality loss. The known counts can still be displayed.\n\nThe complete canonical example below constructs its synthetic typed input and implements the same transformation in SQL and PySpark. It compares the North and South results against explicit expected rows. Both interfaces also define a null result for a zero denominator, although this displayed input has no zero-denominator plant. This is stronger than only asserting that two interfaces agree: two implementations can share the same mistake. The changed-input task adds a valid row and requires recomputing the expectation.\n\nThis code is reproduced verbatim from the preserved locally executed example, pinned to the exercise environment; the historical execution evidence does not establish Databricks performance or arbitrary runtime compatibility. Inspect its imports, schema, filters, projections, group keys and final ratio one step at a time.\n\n~~~python\r\nfrom pyspark.sql import SparkSession, functions as F, types as T\r\nspark = SparkSession.builder.master(\"local[2]\").appName(\"weighted-metric\").getOrCreate()\r\nschema = \"inspection_id string, plant string, inspected_units long, defective_units long\"\r\ndf = spark.createDataFrame([\r\n    (\"A\", \"North\", 12, 1), (\"C\", \"North\", 8, 0), (\"S\", \"South\", 10, 2)\r\n], schema)\r\ndf.createOrReplaceTempView(\"accepted_inspections\")\r\nsql_result = spark.sql(\"\"\"\r\nWITH checked AS (\r\n  SELECT inspection_id, plant, inspected_units, defective_units\r\n  FROM accepted_inspections\r\n  WHERE inspected_units IS NOT NULL AND defective_units IS NOT NULL\r\n    AND inspected_units >= 0 AND defective_units >= 0\r\n    AND defective_units <= inspected_units\r\n), totals AS (\r\n  SELECT plant, SUM(inspected_units) AS inspected,\r\n         SUM(defective_units) AS defective\r\n  FROM checked GROUP BY plant\r\n)\r\nSELECT plant, inspected, defective,\r\n       CASE WHEN inspected > 0\r\n            THEN CAST(defective AS DOUBLE) / inspected\r\n            ELSE CAST(NULL AS DOUBLE) END AS defect_rate\r\nFROM totals\r\n\"\"\")\r\nchecked = df.filter(F.col(\"inspected_units\").isNotNull()\r\n    & F.col(\"defective_units\").isNotNull()\r\n    & (F.col(\"inspected_units\") >= 0)\r\n    & (F.col(\"defective_units\") >= 0)\r\n    & (F.col(\"defective_units\") <= F.col(\"inspected_units\")))\r\nselected = checked.select(\"inspection_id\", \"plant\", \"inspected_units\", \"defective_units\")\r\ntotals = selected.groupBy(\"plant\").agg(\r\n    F.sum(\"inspected_units\").alias(\"inspected\"),\r\n    F.sum(\"defective_units\").alias(\"defective\"))\r\npy_result = totals.select(\"plant\", \"inspected\", \"defective\",\r\n    F.when(F.col(\"inspected\") > 0,\r\n           F.col(\"defective\").cast(\"double\") / F.col(\"inspected\"))\r\n     .otherwise(F.lit(None).cast(\"double\")).alias(\"defect_rate\"))\r\nexpected = [(\"North\", 20, 1, 0.05), (\"South\", 10, 2, 0.2)]\r\nassert [tuple(r) for r in sql_result.orderBy(\"plant\").collect()] == expected\r\nassert [tuple(r) for r in py_result.orderBy(\"plant\").collect()] == expected\r\nassert sql_result.dtypes == py_result.dtypes == [\r\n    (\"plant\", \"string\"), (\"inspected\", \"bigint\"),\r\n    (\"defective\", \"bigint\"), (\"defect_rate\", \"double\")]\r\nspark.stop()\r\n~~~",
+        "sourceSectionIds": [
+          "dbxfe-m04-l01-foundation-example"
+        ]
+      },
+      "recap": "The shared metric is 1/20; syntax equivalence includes population and denominator policy.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-transformations-joins",
+      "version": "1.0.0",
+      "title": "A join makes matching pairs",
+      "outcome": "Predict multiplication and choose an appropriate corrected relation.",
+      "explanation": "A join combines every matching pair. Two North inspections joined to three North events produce six rows, so each inspection quantity appears three times. The resulting 60 inspected units look numeric but are wrong for the 20-unit population. Check [[dbxfe-transformations-joins-concept|join cardinality]] before aggregating; choose existence filtering or aggregate each side to the intended common grain.",
+      "lessonId": "dbxfe-grain-joins",
+      "sectionId": "dbxfe-grain-joins-cardinality",
+      "conceptIds": [
+        "dbxfe-transformations-joins-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-join",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "visualId": "dbxfe-transformations-joins-visual",
+      "questionIds": [
+        "dbxfe-transformations-joins-question"
+      ],
+      "handbook": {
+        "markdown": "Count pairs before touching the aggregate. For each left row with key North, an ordinary matching join emits one row for every matching right row. With two inspections and three events, six output rows are expected relational behavior. The query can be technically valid while the metric is wrong.\n\nChoose a correction from the question. If you need inspections only when any event exists, a left-semi join expresses membership without bringing event rows into the output. If you need plant inspected totals alongside event counts, aggregate inspections and events separately to one row per plant, then join those summaries. If you need individual inspection-event associations, choose an appropriate finer key and verify its meaning.\n\nDISTINCT after an incorrect join is not a universal repair: it can discard legitimate equal-valued observations or hide a bad grain. Check uniqueness on the proposed dimension key and inspect unmatched rows. The canonical lesson includes complete flawed and corrected SQL/PySpark, six explicit pairs, expected totals and an actual local plan inspection. Reuse those exact references for execution; the visual’s changed event count is an arithmetic transfer exercise.",
+        "sourceSectionIds": [
+          "dbxfe-grain-joins-worked",
+          "dbxfe-grain-joins-plans"
+        ]
+      },
+      "recap": "A join’s matching pairs can multiply quantities before SUM sees them.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": [
+        "dbxfe-transformations-media-join"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-plan",
+      "version": "1.0.0",
+      "title": "Read a plan as an explanation of work",
+      "outcome": "Interpret scan/filter/join/aggregate/shuffle without inferring a benchmark.",
+      "explanation": "A physical plan describes how Spark proposes to perform the work. Scans read data, filters reduce rows, joins form matches, and aggregates combine groups. A [[dbxfe-transformations-plan-concept|shuffle]] redistributes rows across partitions. Inspect these operations to explain data movement, but do not turn a tiny local plan into a production speed claim.",
+      "lessonId": "dbxfe-grain-joins",
+      "sectionId": "dbxfe-grain-joins-plans",
+      "conceptIds": [
+        "dbxfe-transformations-plan-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-plan",
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "visualId": "dbxfe-transformations-plan-visual",
+      "questionIds": [
+        "dbxfe-transformations-plan-question"
+      ],
+      "handbook": {
+        "markdown": "Read a plan from inputs toward the result and ask what each operator does to row count, columns and distribution. A scan supplies rows; a filter reduces the population; a projection changes columns; a join may multiply rows; an aggregate changes grain. An exchange or shuffle often marks movement needed to organize keys across partitions.\n\nThe visual is a conceptual redistribution, not a literal scheduler trace. An optimizer can choose different strategies based on statistics and configuration, and adaptive execution can change the final physical plan. An explain output is useful evidence about planned work, but runtime measurements establish elapsed time, skew and spill.\n\nIn the canonical local example, compare the flawed and corrected join’s actual output and inspected plan. A small input may use a strategy that would not remain appropriate at customer scale. Record the runtime and input basis when sharing an observation. Do not sum parallel task durations and call that user latency. The SQL analytics module develops that distinction with a timing experiment. A good explanation connects an operator to the rows it processes instead of reciting operator names.",
+        "sourceSectionIds": [
+          "dbxfe-grain-joins-plans"
+        ]
+      },
+      "recap": "Plans explain work and movement; measured runs establish performance.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-transformations-transfer",
+      "version": "1.0.0",
+      "title": "Change the population and predict again",
+      "outcome": "Recompute a metric and defend a nonmultiplying join on new input.",
+      "explanation": "Add inspection D with 5 inspected and 1 defective to North’s A12/1 and C8/0. The new unit rate is 2/25=8%. Four matching events must not multiply that denominator. Write the [[dbxfe-transformations-transfer-concept|independent expectation]] before executing either interface, then choose a join that preserves the population your question actually needs.",
+      "lessonId": "dbxfe-m04-l01",
+      "sectionId": "dbxfe-m04-l01-foundation-task",
+      "conceptIds": [
+        "dbxfe-transformations-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-claim-join",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "visualId": "dbxfe-transformations-transfer-visual",
+      "questionIds": [
+        "dbxfe-transformations-transfer-question"
+      ],
+      "handbook": {
+        "markdown": "Calculate the changed expectation by hand: inspected=12+8+5=25; defective=1+0+1=2; unit rate=8%. An event-existence filter should retain the three inspections. A plant summary joined to one event-count summary should contain one plant row with 25, 2 and event_count 4.\n\nNow inspect the deceptive case: an ordinary plant join repeats all three inspections four times. It yields twelve pairs, 100 inspected and 8 defective. The ratio is still 8%, so comparing only the final percentage misses the defect. This is why tests should include grain, keys, row count, numerator and denominator, not only a formatted KPI.\n\nSQL/PySpark agreement is useful evidence only when both agree with an independently justified result. Add null, zero-denominator and unmatched-key cases according to the same contract. Do not generalize a single fixture into proof for arbitrary business data. The canonical executable bundle remains the optional local route; this deck’s applied task is self-comparison on changed arithmetic and join reasoning. Review the existing cards on grain, laziness, NULL and weighted rates before choosing extension cards.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l01-foundation-task"
+        ]
+      },
+      "recap": "Check keys and component totals; a correct-looking ratio can conceal duplication.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m04-l01-card1",
+      "beatId": "dbxfe-transformations-grain"
+    },
+    {
+      "cardId": "dbxfe-m04-l01-card2",
+      "beatId": "dbxfe-transformations-expressions"
+    },
+    {
+      "cardId": "dbxfe-m04-l01-card3",
+      "beatId": "dbxfe-transformations-weighted"
+    },
+    {
+      "cardId": "dbxfe-m04-l01-foundation-card1",
+      "beatId": "dbxfe-transformations-grain"
+    },
+    {
+      "cardId": "dbxfe-m04-l01-foundation-card2",
+      "beatId": "dbxfe-transformations-weighted"
+    },
+    {
+      "cardId": "dbxfe-m04-l01-foundation-card3",
+      "beatId": "dbxfe-transformations-transfer"
+    },
+    {
+      "cardId": "dbxfe-python-bridge-foundation-card1",
+      "beatId": "dbxfe-transformations-python"
+    },
+    {
+      "cardId": "dbxfe-python-bridge-foundation-card2",
+      "beatId": "dbxfe-transformations-python"
+    },
+    {
+      "cardId": "dbxfe-python-bridge-foundation-card3",
+      "beatId": "dbxfe-transformations-python"
+    },
+    {
+      "cardId": "dbxfe-dataframes-foundation-card1",
+      "beatId": "dbxfe-transformations-schema"
+    },
+    {
+      "cardId": "dbxfe-dataframes-foundation-card2",
+      "beatId": "dbxfe-transformations-schema"
+    },
+    {
+      "cardId": "dbxfe-dataframes-foundation-card3",
+      "beatId": "dbxfe-transformations-expressions"
+    },
+    {
+      "cardId": "dbxfe-grain-joins-foundation-card1",
+      "beatId": "dbxfe-transformations-joins"
+    },
+    {
+      "cardId": "dbxfe-grain-joins-foundation-card2",
+      "beatId": "dbxfe-transformations-joins"
+    },
+    {
+      "cardId": "dbxfe-grain-joins-foundation-card3",
+      "beatId": "dbxfe-transformations-plan"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-transformations-extension-union-by-name",
+      "revision": "1",
+      "prompt": "The second input reverses column order and lacks defective. What does unionByName(..., allowMissingColumns=True) do?",
+      "answer": "It aligns matching fields by name and supplies NULL for the missing defective field; it does not justify replacing that unknown with zero.",
+      "explanation": "A [[dbxfe-transformations-extension-union-by-name-concept|name-aligned union]] protects against positional column confusion when appending records from differently ordered schemas. Imagine one input contains inspection_id=A, inspected=12, defective=1, while the second has inspected=8, inspection_id=C and no defective field. The combined C row has inspected 8 and defective NULL. That NULL records absence, not a measured zero. A matching column name also does not prove compatible business meaning: kilograms and grams can share a name. Verify types, units and quality rules before treating the union as accepted data. This hand-worked extension does not execute Spark or modify the canonical exercise.",
+      "lessonId": "dbxfe-dataframes",
+      "sectionId": "dbxfe-dataframes-expressions",
+      "conceptIds": [
+        "dbxfe-transformations-extension-union-by-name-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-union-name",
+        "dbxfe-transformations-fiction",
+        "dbxfe-transformations-guidance"
+      ],
+      "beatId": "dbxfe-transformations-schema",
+      "whyItMatters": "Connects schema evolution to row meaning rather than silently inventing missing measurements."
+    },
+    {
+      "id": "dbxfe-transformations-extension-null-safe",
+      "revision": "1",
+      "prompt": "Does null-safe equality automatically make a safe business-key join?",
+      "answer": "No. It can match two NULL values, but the domain must decide whether missing identities should match.",
+      "explanation": "Spark’s <=> treats two nulls as equal. If unknown inspection IDs do not identify the same entity, using it on that key can create false associations even though the syntax works.",
+      "lessonId": "dbxfe-dataframes",
+      "sectionId": "dbxfe-dataframes-expressions",
+      "conceptIds": [
+        "dbxfe-transformations-schema-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-null",
+        "dbxfe-transformations-claim-join"
+      ],
+      "beatId": "dbxfe-transformations-schema",
+      "whyItMatters": "Technical null handling must not invent identity."
+    },
+    {
+      "id": "dbxfe-transformations-extension-anti",
+      "revision": "1",
+      "prompt": "Which join expresses left-side records with no matching right-side key?",
+      "answer": "A left-anti join.",
+      "explanation": "It is useful for reconciliation, such as accepted inspections whose plant key has no approved dimension record. Inspect missingness and key rules; the join does not itself decide how to repair unmatched records.",
+      "lessonId": "dbxfe-grain-joins",
+      "sectionId": "dbxfe-grain-joins-cardinality",
+      "conceptIds": [
+        "dbxfe-transformations-joins-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-join"
+      ],
+      "beatId": "dbxfe-transformations-joins",
+      "whyItMatters": "Turn silent omissions into an explicit exception population."
+    },
+    {
+      "id": "dbxfe-transformations-extension-explode-outer",
+      "revision": "1",
+      "prompt": "A has two tags, B has an empty array and C has a null array. How many rows does explode_outer produce?",
+      "answer": "Four: two rows for A, one NULL-tag placeholder for B and one for C.",
+      "explanation": "[[dbxfe-transformations-extension-explode-outer-concept|array expansion]] changes one inspection row into one row per tag. With A=[scratch,dent], B=[] and C=NULL, ordinary element expansion would omit B and C. The outer form retains each as one null-tag placeholder, making four output rows. Those placeholders do not prove that B and C mean the same thing: an empty known list differs from an unknown list, so preserve the original field if that distinction matters. Counting output rows is no longer counting inspections. Keep the inspection key and choose distinct inspection counts or explicit tag counts to match the question.",
+      "lessonId": "dbxfe-m04-l01",
+      "sectionId": "dbxfe-m04-l01-foundation-start",
+      "conceptIds": [
+        "dbxfe-transformations-extension-explode-outer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-explode-outer",
+        "dbxfe-transformations-fiction",
+        "dbxfe-transformations-guidance"
+      ],
+      "beatId": "dbxfe-transformations-grain",
+      "whyItMatters": "Prevents a nested-data transformation from silently dropping records or inflating a business count."
+    }
+  ],
+  "recap": {
+    "title": "Preserve meaning through the transformation",
+    "markdown": "**Declare grain → type and validate → transform → align joins → aggregate counts → divide.** Check independently expected keys and totals in both interfaces. Use the preserved bridge/code depth when needed, then review the linked canonical cards.",
+    "visualId": "dbxfe-transformations-transfer-visual"
+  },
+  "appliedTask": {
+    "title": "A percentage that hides a bad join",
+    "prompt": "North has A12/1, C8/0, D5/1 and four matching events. Predict the naive join’s rows and totals. Give two valid alternatives for event existence versus event-count reporting.",
+    "modelAnswer": "The naive join has 12 rows, 100 inspected and 8 defective; 8% hides duplication. For existence use a left-semi join preserving 3 inspections, 25/2. For event-count reporting aggregate each side to plant grain then join one North row with 25 inspected, 2 defective, 4 events.",
+    "reasoning": "Matching pairs multiply both components equally, so the ratio alone cannot validate the population. The correction depends on the requested output grain.",
+    "beatIds": [
+      "dbxfe-transformations-grain",
+      "dbxfe-transformations-weighted",
+      "dbxfe-transformations-joins",
+      "dbxfe-transformations-transfer"
+    ]
+  },
+  "scenarioIds": []
+}

@@ -1,0 +1,1547 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-m03",
+  "title": "Platform mental models and cloud responsibilities",
+  "summary": "Follow a request, identify who performs each responsibility, and keep durable data separate from a running session.",
+  "outcomes": [
+    "Trace a query through identity, governance, compute and storage.",
+    "Distinguish account, workspace, metastore and compute boundaries on AWS.",
+    "Choose the next diagnostic evidence without promising an unverified architecture."
+  ],
+  "startingAssumptions": [
+    "No cloud workspace is required.",
+    "Read a small table and add two quantities; cloud vocabulary is reintroduced in context."
+  ],
+  "lessonIds": [
+    "dbxfe-m03-l01",
+    "dbxfe-m03-l03",
+    "dbxfe-workspace-compute",
+    "dbxfe-cloud-bridge"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "Request-path and restart examples replace a product-name tour. Two contrasting workloads prevent capability from becoming an invented requirement.",
+  "sources": [
+    {
+      "id": "dbxfe-m03-source-architecture",
+      "title": "High-level architecture",
+      "url": "https://docs.databricks.com/aws/en/getting-started/high-level-architecture",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "AWS context only. Serverless workspaces and serverless compute are related but distinct choices; storage responsibilities depend on workspace type.",
+      "reviewedEvidence": "Object hierarchy separates account/workspace/metastore. Classic compute resources are in the customer AWS account; serverless compute is in the Databricks-managed plane."
+    },
+    {
+      "id": "dbxfe-m03-source-compute",
+      "title": "Compute",
+      "url": "https://docs.databricks.com/aws/en/compute/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Workload support, region and entitlement require current target-specific verification.",
+      "reviewedEvidence": "Compute overview distinguishes workload resources including SQL warehouses and resources for notebook and job work."
+    },
+    {
+      "id": "dbxfe-m03-source-storage",
+      "title": "What is Amazon S3?",
+      "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html",
+      "publisher": "Amazon Web Services",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "AWS S3 primary documentation read 2026-09-20.",
+      "caveat": "General-purpose object-storage concepts; do not confuse S3 object versioning with a Delta table version.",
+      "reviewedEvidence": "How S3 works identifies bucket/key/object. Data consistency section describes atomic single-key updates but no general atomic update across multiple keys."
+    },
+    {
+      "id": "dbxfe-m03-source-route",
+      "title": "Configure route tables",
+      "url": "https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Route_Tables.html",
+      "publisher": "Amazon Web Services",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "AWS VPC primary documentation read 2026-09-20.",
+      "caveat": "A route alone does not establish all reachability, TLS or resource authorization.",
+      "reviewedEvidence": "A VPC route table supplies destination/target rules directing network traffic."
+    },
+    {
+      "id": "dbxfe-m03-source-dns",
+      "title": "What is Amazon Route 53?",
+      "url": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/Welcome.html",
+      "publisher": "Amazon Web Services",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "AWS DNS primary documentation read 2026-09-20.",
+      "caveat": "Successful resolution alone proves neither end-to-end transport nor permission.",
+      "reviewedEvidence": "DNS resolution translates a domain name into a destination used to reach a resource; Route 53 also offers registration and health checks."
+    },
+    {
+      "id": "dbxfe-m03-source-workspace-binding",
+      "title": "Workspace-catalog binding",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/workspace-catalog-binding",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Bindings add a workspace boundary; they do not grant the underlying object privileges. Default workspace catalogs have special default binding behavior.",
+      "reviewedEvidence": "An isolated catalog can restrict access to assigned workspaces; an unbound workspace is denied even when the user holds object privileges."
+    },
+    {
+      "id": "dbxfe-m03-source-route-priority",
+      "title": "How route priority works",
+      "url": "https://docs.aws.amazon.com/vpc/latest/userguide/route-tables-priority.html",
+      "publisher": "AWS",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Primary Amazon VPC guide reviewed 2026-09-20.",
+      "caveat": "AWS VPC context only. The example compares distinct IPv4 prefixes, not every equal-prefix, propagated-route or prefix-list tie.",
+      "reviewedEvidence": "AWS VPC routing generally selects the most specific matching destination, called longest prefix match; equal/overlapping routes have additional precedence rules."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-m03-guidance",
+      "description": "Original educational reasoning, diagnostic choices and worked decisions; not a vendor runbook.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent SpicyBrain curriculum."
+    },
+    {
+      "id": "dbxfe-m03-fiction",
+      "description": "Cinderline examples, quantities, states, outcomes and alternatives are synthetic.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "Original teaching examples; no Databricks or customer execution claim."
+    },
+    {
+      "id": "dbxfe-m03-claim-architecture",
+      "description": "Object hierarchy separates account/workspace/metastore. Classic compute resources are in the customer AWS account; serverless compute is in the Databricks-managed plane.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m03-source-architecture"
+      ],
+      "context": "AWS context only. Serverless workspaces and serverless compute are related but distinct choices; storage responsibilities depend on workspace type."
+    },
+    {
+      "id": "dbxfe-m03-claim-compute",
+      "description": "Compute overview distinguishes workload resources including SQL warehouses and resources for notebook and job work.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m03-source-compute"
+      ],
+      "context": "Workload support, region and entitlement require current target-specific verification."
+    },
+    {
+      "id": "dbxfe-m03-claim-storage",
+      "description": "How S3 works identifies bucket/key/object. Data consistency section describes atomic single-key updates but no general atomic update across multiple keys.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m03-source-storage"
+      ],
+      "context": "General-purpose object-storage concepts; do not confuse S3 object versioning with a Delta table version."
+    },
+    {
+      "id": "dbxfe-m03-claim-route",
+      "description": "A VPC route table supplies destination/target rules directing network traffic.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m03-source-route"
+      ],
+      "context": "A route alone does not establish all reachability, TLS or resource authorization."
+    },
+    {
+      "id": "dbxfe-m03-claim-dns",
+      "description": "DNS resolution translates a domain name into a destination used to reach a resource; Route 53 also offers registration and health checks.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m03-source-dns"
+      ],
+      "context": "Successful resolution alone proves neither end-to-end transport nor permission."
+    },
+    {
+      "id": "dbxfe-m03-claim-workspace-binding",
+      "description": "An isolated catalog can restrict access to assigned workspaces; an unbound workspace is denied even when the user holds object privileges.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m03-source-workspace-binding"
+      ],
+      "context": "Bindings add a workspace boundary; they do not grant the underlying object privileges. Default workspace catalogs have special default binding behavior."
+    },
+    {
+      "id": "dbxfe-m03-claim-route-priority",
+      "description": "AWS VPC routing generally selects the most specific matching destination, called longest prefix match; equal/overlapping routes have additional precedence rules.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m03-source-route-priority"
+      ],
+      "context": "AWS VPC context only. The example compares distinct IPv4 prefixes, not every equal-prefix, propagated-route or prefix-list tie."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-m03-decision-concept",
+      "term": "workload fit",
+      "aliases": [],
+      "definition": "How well a proposed system meets a particular job, operating constraint and evidence requirement.",
+      "example": "A daily single-source report may need less change than corrected multi-source shift analytics.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m03-responsibilities-concept",
+      "term": "compute",
+      "aliases": [],
+      "definition": "Resources that execute a query or program over data.",
+      "example": "Compute reads accepted A=12 and C=8 and calculates 20 inspected units.",
+      "sourceIds": [
+        "dbxfe-m03-source-architecture",
+        "dbxfe-m03-source-compute",
+        "dbxfe-m03-source-storage"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-hierarchy-concept",
+      "term": "metastore",
+      "aliases": [],
+      "definition": "A Unity Catalog governance container associated with regional data and AI assets and attached workspaces.",
+      "example": "Two workspaces in one region can use the same attached metastore while serving different teams.",
+      "sourceIds": [
+        "dbxfe-m03-source-architecture"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-boundary-concept",
+      "term": "trust boundary",
+      "aliases": [],
+      "definition": "A boundary where operating responsibility or access control changes.",
+      "example": "AWS classic compute runs in the customer account; serverless compute runs in a Databricks-managed plane.",
+      "sourceIds": [
+        "dbxfe-m03-source-architecture"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-durability-concept",
+      "term": "session state",
+      "aliases": [],
+      "definition": "Values and temporary execution context associated with a running interactive session.",
+      "example": "A Python variable holding 20 disappears after a fresh process starts unless rebuilt or persisted.",
+      "sourceIds": [
+        "dbxfe-m03-source-architecture",
+        "dbxfe-m03-source-storage"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-network-concept",
+      "term": "DNS resolution",
+      "aliases": [],
+      "definition": "Translating a domain name into information used to locate a network destination.",
+      "example": "Resolving a storage hostname does not grant permission to read an object.",
+      "sourceIds": [
+        "dbxfe-m03-source-dns",
+        "dbxfe-m03-source-route",
+        "dbxfe-m03-source-storage"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-workload-concept",
+      "term": "SQL warehouse",
+      "aliases": [],
+      "definition": "Compute used to execute SQL analytics workloads in Databricks.",
+      "example": "A dashboard query can use a SQL warehouse, while its data definition remains a separate responsibility.",
+      "sourceIds": [
+        "dbxfe-m03-source-compute"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-transfer-concept",
+      "term": "diagnostic boundary",
+      "aliases": [],
+      "definition": "The specific stage at which available evidence changes from known success to unresolved behavior.",
+      "example": "A workload reaches S3 but receives AccessDenied; authorization evidence is now more useful than a larger cluster.",
+      "sourceIds": [
+        "dbxfe-m03-source-architecture",
+        "dbxfe-m03-source-storage",
+        "dbxfe-m03-source-route"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-extension-workspace-binding-concept",
+      "term": "workspace-catalog binding",
+      "aliases": [],
+      "definition": "An access boundary limiting which workspaces may use a catalog.",
+      "example": "A production catalog bound only to the production workspace is unavailable from an unbound development workspace.",
+      "sourceIds": [
+        "dbxfe-m03-source-workspace-binding"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-extension-route-priority-concept",
+      "term": "longest prefix match",
+      "aliases": [],
+      "definition": "Selecting the most specific matching destination prefix in a route table.",
+      "example": "For destination 10.2.3.4, an applicable 10.2.0.0/16 route is more specific than 0.0.0.0/0.",
+      "sourceIds": [
+        "dbxfe-m03-source-route-priority"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-m03-decision-visual",
+      "kind": "comparison",
+      "title": "Start with the decision, then the platform",
+      "alt": "Start with the decision, then the platform. Choose evidence for the job, not the longest capability list.",
+      "caption": "A capability earns a place when it serves a real workload requirement. Synthetic teaching example.",
+      "textEquivalent": "Different work: Choose evidence for the job, not the longest capability list. Columns: Question; Cinderline; Retailer. Rows: Input shape — ERP + corrected CSV + events — One reconciled export; Decision timing — Shift change — Daily close; Operating capacity — Small data team — One analyst; First comparison — Shared governed path vs integration fixes — Improve existing report vs add platform.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "states": [
+        {
+          "id": "requirements",
+          "title": "Different work",
+          "explanation": "Choose evidence for the job, not the longest capability list.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Question",
+              "Cinderline",
+              "Retailer"
+            ],
+            "rows": [
+              [
+                "Input shape",
+                "ERP + corrected CSV + events",
+                "One reconciled export"
+              ],
+              [
+                "Decision timing",
+                "Shift change",
+                "Daily close"
+              ],
+              [
+                "Operating capacity",
+                "Small data team",
+                "One analyst"
+              ],
+              [
+                "First comparison",
+                "Shared governed path vs integration fixes",
+                "Improve existing report vs add platform"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m03-responsibilities-visual",
+      "kind": "nodes",
+      "title": "Five responsibilities in one query",
+      "alt": "Five responsibilities in one query. The analyst asks for the sum from an approved table. The permitted computation adds selected quantities; storage is not the query engine.",
+      "caption": "Submit, authorize, execute, select and retain are different responsibilities. Synthetic teaching example.",
+      "textEquivalent": "Request: The analyst asks for the sum from an approved table. Nodes: Analyst: SUM inspected. Named principal. (selected); Governance: May read?. Checks permitted object access. (pending); Compute: Waiting. Runs the query if permitted. (context); Table state: A=12, C=8. Selected logical data. (context); Storage: Durable files. Persists bytes. (context). Relationships: Analyst → Governance: request; Governance → Compute: permitted action; Compute → Table state: read selected state; Table state → Storage: required data.\n\nResult: The permitted computation adds selected quantities; storage is not the query engine. Nodes: Analyst: 20 inspected. Receives result. (selected); Governance: Read permitted. Does not define the business metric. (selected); Compute: 12 + 8. Executes calculation. (selected); Table state: A=12, C=8. Consistent selection. (selected); Storage: Files remain. Independent of this result display. (context). Relationships: Storage → Compute: read data; Compute → Analyst: 20 inspected.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-claim-compute",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "states": [
+        {
+          "id": "request",
+          "title": "Request",
+          "explanation": "The analyst asks for the sum from an approved table.",
+          "nodes": [
+            {
+              "id": "analyst",
+              "label": "Analyst",
+              "value": "SUM inspected",
+              "detail": "Named principal.",
+              "status": "selected"
+            },
+            {
+              "id": "governance",
+              "label": "Governance",
+              "value": "May read?",
+              "detail": "Checks permitted object access.",
+              "status": "pending"
+            },
+            {
+              "id": "compute",
+              "label": "Compute",
+              "value": "Waiting",
+              "detail": "Runs the query if permitted.",
+              "status": "context"
+            },
+            {
+              "id": "table",
+              "label": "Table state",
+              "value": "A=12, C=8",
+              "detail": "Selected logical data.",
+              "status": "context"
+            },
+            {
+              "id": "storage",
+              "label": "Storage",
+              "value": "Durable files",
+              "detail": "Persists bytes.",
+              "status": "context"
+            }
+          ],
+          "connections": [
+            {
+              "from": "analyst",
+              "to": "governance",
+              "label": "request"
+            },
+            {
+              "from": "governance",
+              "to": "compute",
+              "label": "permitted action"
+            },
+            {
+              "from": "compute",
+              "to": "table",
+              "label": "read selected state"
+            },
+            {
+              "from": "table",
+              "to": "storage",
+              "label": "required data"
+            }
+          ]
+        },
+        {
+          "id": "result",
+          "title": "Result",
+          "explanation": "The permitted computation adds selected quantities; storage is not the query engine.",
+          "nodes": [
+            {
+              "id": "analyst",
+              "label": "Analyst",
+              "value": "20 inspected",
+              "detail": "Receives result.",
+              "status": "selected"
+            },
+            {
+              "id": "governance",
+              "label": "Governance",
+              "value": "Read permitted",
+              "detail": "Does not define the business metric.",
+              "status": "selected"
+            },
+            {
+              "id": "compute",
+              "label": "Compute",
+              "value": "12 + 8",
+              "detail": "Executes calculation.",
+              "status": "selected"
+            },
+            {
+              "id": "table",
+              "label": "Table state",
+              "value": "A=12, C=8",
+              "detail": "Consistent selection.",
+              "status": "selected"
+            },
+            {
+              "id": "storage",
+              "label": "Storage",
+              "value": "Files remain",
+              "detail": "Independent of this result display.",
+              "status": "context"
+            }
+          ],
+          "connections": [
+            {
+              "from": "storage",
+              "to": "compute",
+              "label": "read data"
+            },
+            {
+              "from": "compute",
+              "to": "analyst",
+              "label": "20 inspected"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m03-hierarchy-visual",
+      "kind": "nodes",
+      "title": "An account is not a workspace",
+      "alt": "An account is not a workspace. Two teams collaborate separately but can reference a shared governance context.",
+      "caption": "Account scope, workspace context and governed data scope are related but distinct. Synthetic teaching example.",
+      "textEquivalent": "Scopes: Two teams collaborate separately but can reference a shared governance context. Nodes: Account: Organization scope. Manages identities and workspace/metastore constructs. (context); Operations workspace: Shift analytics. Collaboration/workloads. (selected); Science workspace: Maintenance study. Collaboration/workloads. (selected); Regional metastore: Governed assets. Attached to both example workspaces. (selected). Relationships: Account → Operations workspace: manages; Account → Science workspace: manages; Operations workspace → Regional metastore: attached; Science workspace → Regional metastore: attached.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "states": [
+        {
+          "id": "scope",
+          "title": "Scopes",
+          "explanation": "Two teams collaborate separately but can reference a shared governance context.",
+          "nodes": [
+            {
+              "id": "account",
+              "label": "Account",
+              "value": "Organization scope",
+              "detail": "Manages identities and workspace/metastore constructs.",
+              "status": "context"
+            },
+            {
+              "id": "ops",
+              "label": "Operations workspace",
+              "value": "Shift analytics",
+              "detail": "Collaboration/workloads.",
+              "status": "selected"
+            },
+            {
+              "id": "science",
+              "label": "Science workspace",
+              "value": "Maintenance study",
+              "detail": "Collaboration/workloads.",
+              "status": "selected"
+            },
+            {
+              "id": "meta",
+              "label": "Regional metastore",
+              "value": "Governed assets",
+              "detail": "Attached to both example workspaces.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "account",
+              "to": "ops",
+              "label": "manages"
+            },
+            {
+              "from": "account",
+              "to": "science",
+              "label": "manages"
+            },
+            {
+              "from": "ops",
+              "to": "meta",
+              "label": "attached"
+            },
+            {
+              "from": "science",
+              "to": "meta",
+              "label": "attached"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m03-boundary-visual",
+      "kind": "comparison",
+      "title": "Classic and serverless move the compute boundary",
+      "alt": "Classic and serverless move the compute boundary. Compute is within the customer AWS account boundary. The compute operator boundary changes; data access still needs validation.",
+      "caption": "Changing the compute model changes responsibility, not the need for an approved data path. Synthetic teaching example.",
+      "textEquivalent": "AWS classic: Compute is within the customer AWS account boundary. Nodes: Workspace: Control plane. Databricks-managed entry and services. (context); Compute: Customer AWS account. Classic resources. (selected); Required data: Approved locations. Needs network path and credentials. (context). Relationships: Workspace → Compute: submit work; Compute → Required data: authorized access.\n\nAWS serverless: The compute operator boundary changes; data access still needs validation. Nodes: Workspace: Control plane. Databricks-managed entry and services. (context); Compute: Databricks-managed plane. Serverless resources. (selected); Required data: Approved locations. Verify supported regional connectivity. (pending). Relationships: Workspace → Compute: submit work; Compute → Required data: authorized access.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "states": [
+        {
+          "id": "classic",
+          "title": "AWS classic",
+          "explanation": "Compute is within the customer AWS account boundary.",
+          "nodes": [
+            {
+              "id": "workspace",
+              "label": "Workspace",
+              "value": "Control plane",
+              "detail": "Databricks-managed entry and services.",
+              "status": "context"
+            },
+            {
+              "id": "compute",
+              "label": "Compute",
+              "value": "Customer AWS account",
+              "detail": "Classic resources.",
+              "status": "selected"
+            },
+            {
+              "id": "data",
+              "label": "Required data",
+              "value": "Approved locations",
+              "detail": "Needs network path and credentials.",
+              "status": "context"
+            }
+          ],
+          "connections": [
+            {
+              "from": "workspace",
+              "to": "compute",
+              "label": "submit work"
+            },
+            {
+              "from": "compute",
+              "to": "data",
+              "label": "authorized access"
+            }
+          ]
+        },
+        {
+          "id": "serverless",
+          "title": "AWS serverless",
+          "explanation": "The compute operator boundary changes; data access still needs validation.",
+          "nodes": [
+            {
+              "id": "workspace",
+              "label": "Workspace",
+              "value": "Control plane",
+              "detail": "Databricks-managed entry and services.",
+              "status": "context"
+            },
+            {
+              "id": "compute",
+              "label": "Compute",
+              "value": "Databricks-managed plane",
+              "detail": "Serverless resources.",
+              "status": "selected"
+            },
+            {
+              "id": "data",
+              "label": "Required data",
+              "value": "Approved locations",
+              "detail": "Verify supported regional connectivity.",
+              "status": "pending"
+            }
+          ],
+          "connections": [
+            {
+              "from": "workspace",
+              "to": "compute",
+              "label": "submit work"
+            },
+            {
+              "from": "compute",
+              "to": "data",
+              "label": "authorized access"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m03-durability-visual",
+      "kind": "comparison",
+      "title": "Stop the session: what remains?",
+      "alt": "Stop the session: what remains?. These three states can coexist. Rebuild the execution context rather than trusting stale display.",
+      "caption": "Rebuild session values from explicit durable inputs; old output is historical. Synthetic teaching example.",
+      "textEquivalent": "Session running: These three states can coexist. Columns: Item; State; Reason. Rows: Committed inspection table — Durable input — Persisted independently of the process; Python variable total=20 — Available — In this running session; Displayed old notebook output — Visible — A presentation of a past result.\n\nFresh session: Rebuild the execution context rather than trusting stale display. Columns: Item; State; Next action. Rows: Committed inspection table — Read again under permission — Confirm intended table/version; Python variable total — Not assumed present — Recompute or load deliberately; Displayed old output — Still historical evidence — Do not treat as a fresh execution.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "states": [
+        {
+          "id": "running",
+          "title": "Session running",
+          "explanation": "These three states can coexist.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Item",
+              "State",
+              "Reason"
+            ],
+            "rows": [
+              [
+                "Committed inspection table",
+                "Durable input",
+                "Persisted independently of the process"
+              ],
+              [
+                "Python variable total=20",
+                "Available",
+                "In this running session"
+              ],
+              [
+                "Displayed old notebook output",
+                "Visible",
+                "A presentation of a past result"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "restarted",
+          "title": "Fresh session",
+          "explanation": "Rebuild the execution context rather than trusting stale display.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Item",
+              "State",
+              "Next action"
+            ],
+            "rows": [
+              [
+                "Committed inspection table",
+                "Read again under permission",
+                "Confirm intended table/version"
+              ],
+              [
+                "Python variable total",
+                "Not assumed present",
+                "Recompute or load deliberately"
+              ],
+              [
+                "Displayed old output",
+                "Still historical evidence",
+                "Do not treat as a fresh execution"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m03-network-visual",
+      "kind": "nodes",
+      "title": "Name, route and permission are separate checks",
+      "alt": "Name, route and permission are separate checks. One success does not substitute for another. Use the narrowest justified inference.",
+      "caption": "A resolved name, reachable service and allowed operation are different observations. Synthetic teaching example.",
+      "textEquivalent": "One request, separate evidence: One success does not substitute for another. Columns: Stage; Question; Evidence. Rows: DNS — Where does the name resolve? — Resolution result; Network — Can this workload reach the endpoint? — Relevant connection/error evidence; Authorization — May this identity perform this action? — Effective identity and policy/error evidence.\n\nTwo distinct failures: Use the narrowest justified inference. Columns: Observation; What it suggests; What it does not prove. Rows: DNS succeeds; connection times out — Investigate transport/path — The object grant is correct; S3 responds AccessDenied — Request reached an authorization response — Which exact policy or identity caused denial.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m03-claim-dns",
+        "dbxfe-m03-claim-route",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "states": [
+        {
+          "id": "path",
+          "title": "One request, separate evidence",
+          "explanation": "One success does not substitute for another.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Stage",
+              "Question",
+              "Evidence"
+            ],
+            "rows": [
+              [
+                "DNS",
+                "Where does the name resolve?",
+                "Resolution result"
+              ],
+              [
+                "Network",
+                "Can this workload reach the endpoint?",
+                "Relevant connection/error evidence"
+              ],
+              [
+                "Authorization",
+                "May this identity perform this action?",
+                "Effective identity and policy/error evidence"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "failure",
+          "title": "Two distinct failures",
+          "explanation": "Use the narrowest justified inference.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Observation",
+              "What it suggests",
+              "What it does not prove"
+            ],
+            "rows": [
+              [
+                "DNS succeeds; connection times out",
+                "Investigate transport/path",
+                "The object grant is correct"
+              ],
+              [
+                "S3 responds AccessDenied",
+                "Request reached an authorization response",
+                "Which exact policy or identity caused denial"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m03-workload-visual",
+      "kind": "table",
+      "title": "Choose compute for the work you will test",
+      "alt": "Choose compute for the work you will test. The test differs even if data is shared.",
+      "caption": "Compute is chosen for a specific work pattern and validated against that pattern. Synthetic teaching example.",
+      "textEquivalent": "Work shapes the test: The test differs even if data is shared. Columns: Work; Important behavior; Evidence to collect. Rows: Interactive exploration — A person changes questions — Bounded result correctness and response; Scheduled transformation — Repeat after failure — Inputs, output reconciliation, recovery; Morning BI — Many people request results — Queue, execution, latency distribution.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m03-claim-compute",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "states": [
+        {
+          "id": "jobs",
+          "title": "Work shapes the test",
+          "explanation": "The test differs even if data is shared.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Work",
+              "Important behavior",
+              "Evidence to collect"
+            ],
+            "rows": [
+              [
+                "Interactive exploration",
+                "A person changes questions",
+                "Bounded result correctness and response"
+              ],
+              [
+                "Scheduled transformation",
+                "Repeat after failure",
+                "Inputs, output reconciliation, recovery"
+              ],
+              [
+                "Morning BI",
+                "Many people request results",
+                "Queue, execution, latency distribution"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m03-transfer-visual",
+      "kind": "table",
+      "title": "Locate the next useful piece of evidence",
+      "alt": "Locate the next useful piece of evidence. Choose evidence at the failed boundary.",
+      "caption": "Diagnose the request that failed, with its identity, path and action. Synthetic teaching example.",
+      "textEquivalent": "What is known?: Choose evidence at the failed boundary. Columns: Observation; Known; Still unknown. Rows: Workspace UI opens — That user reaches the UI — Job principal and object permission; Name resolves — DNS stage succeeded — All path and policy conditions; S3 AccessDenied — Service authorization response received — Exact deny cause and permitted fix.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-claim-route",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "states": [
+        {
+          "id": "evidence",
+          "title": "What is known?",
+          "explanation": "Choose evidence at the failed boundary.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Observation",
+              "Known",
+              "Still unknown"
+            ],
+            "rows": [
+              [
+                "Workspace UI opens",
+                "That user reaches the UI",
+                "Job principal and object permission"
+              ],
+              [
+                "Name resolves",
+                "DNS stage succeeded",
+                "All path and policy conditions"
+              ],
+              [
+                "S3 AccessDenied",
+                "Service authorization response received",
+                "Exact deny cause and permitted fix"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-m03-decision-question",
+      "revision": "1",
+      "prompt": "Which requirement change most clearly justifies revisiting the retailer’s current setup?",
+      "options": [
+        {
+          "id": "dbxfe-m03-decision-question-a",
+          "text": "Several teams now need governed reuse of multiple changing sources",
+          "rationale": "This changes integration, governance and operating requirements."
+        },
+        {
+          "id": "dbxfe-m03-decision-question-b",
+          "text": "A vendor has more features",
+          "rationale": "Capability alone does not establish a need."
+        },
+        {
+          "id": "dbxfe-m03-decision-question-c",
+          "text": "Another customer migrated",
+          "rationale": "Their workload and constraints may differ."
+        }
+      ],
+      "correctOptionId": "dbxfe-m03-decision-question-a",
+      "conceptIds": [
+        "dbxfe-m03-decision-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-responsibilities-question",
+      "revision": "1",
+      "prompt": "Which responsibility adds the selected quantities to produce 20?",
+      "options": [
+        {
+          "id": "dbxfe-m03-responsibilities-question-b",
+          "text": "The workspace’s name",
+          "rationale": "The collaboration environment does not itself define arithmetic execution."
+        },
+        {
+          "id": "dbxfe-m03-responsibilities-question-c",
+          "text": "A table access grant",
+          "rationale": "Permission allows an action; it does not calculate the result."
+        },
+        {
+          "id": "dbxfe-m03-responsibilities-question-a",
+          "text": "Compute",
+          "rationale": "It executes the query over selected data."
+        }
+      ],
+      "correctOptionId": "dbxfe-m03-responsibilities-question-a",
+      "conceptIds": [
+        "dbxfe-m03-responsibilities-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-claim-compute",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-hierarchy-question",
+      "revision": "1",
+      "prompt": "Two workspaces share a metastore. Does that automatically permit every user to read every table?",
+      "options": [
+        {
+          "id": "dbxfe-m03-hierarchy-question-c",
+          "text": "No table can be shared across workspaces",
+          "rationale": "A shared metastore can support a common governed view."
+        },
+        {
+          "id": "dbxfe-m03-hierarchy-question-a",
+          "text": "No; effective identity and object privileges still matter",
+          "rationale": "Shared governance context is not a blanket grant."
+        },
+        {
+          "id": "dbxfe-m03-hierarchy-question-b",
+          "text": "Yes; attachment replaces privileges",
+          "rationale": "Attachment and authorization are different facts."
+        }
+      ],
+      "correctOptionId": "dbxfe-m03-hierarchy-question-a",
+      "conceptIds": [
+        "dbxfe-m03-hierarchy-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-boundary-question",
+      "revision": "1",
+      "prompt": "Which statement is accurate for the documented AWS alternatives?",
+      "options": [
+        {
+          "id": "dbxfe-m03-boundary-question-a",
+          "text": "The compute operating boundary differs; access paths still need validation",
+          "rationale": "The deployment model does not settle all security requirements."
+        },
+        {
+          "id": "dbxfe-m03-boundary-question-b",
+          "text": "All processing always runs in the customer AWS account",
+          "rationale": "That excludes the serverless model."
+        },
+        {
+          "id": "dbxfe-m03-boundary-question-c",
+          "text": "Serverless means no identity or networking decisions remain",
+          "rationale": "Data access still needs supported paths and permissions."
+        }
+      ],
+      "correctOptionId": "dbxfe-m03-boundary-question-a",
+      "conceptIds": [
+        "dbxfe-m03-boundary-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-durability-question",
+      "revision": "1",
+      "prompt": "After restarting, an old output cell still shows 20. What does that prove?",
+      "options": [
+        {
+          "id": "dbxfe-m03-durability-question-b",
+          "text": "The current session has variable total=20",
+          "rationale": "The visible output may be historical."
+        },
+        {
+          "id": "dbxfe-m03-durability-question-c",
+          "text": "The persisted table was deleted",
+          "rationale": "Session restart does not itself imply table deletion."
+        },
+        {
+          "id": "dbxfe-m03-durability-question-a",
+          "text": "A prior displayed result exists",
+          "rationale": "It does not prove the new process has rebuilt its variables or read current data."
+        }
+      ],
+      "correctOptionId": "dbxfe-m03-durability-question-a",
+      "conceptIds": [
+        "dbxfe-m03-durability-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-network-question",
+      "revision": "1",
+      "prompt": "Successful DNS resolution establishes which fact?",
+      "options": [
+        {
+          "id": "dbxfe-m03-network-question-c",
+          "text": "Every firewall and route permits the connection",
+          "rationale": "Later network stages can still fail."
+        },
+        {
+          "id": "dbxfe-m03-network-question-a",
+          "text": "The name resolved to destination information",
+          "rationale": "It is not an end-to-end permission test."
+        },
+        {
+          "id": "dbxfe-m03-network-question-b",
+          "text": "SELECT was granted on the table",
+          "rationale": "DNS does not evaluate table privileges."
+        }
+      ],
+      "correctOptionId": "dbxfe-m03-network-question-a",
+      "conceptIds": [
+        "dbxfe-m03-network-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-dns",
+        "dbxfe-m03-claim-route",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-workload-question",
+      "revision": "1",
+      "prompt": "What does choosing a SQL warehouse settle?",
+      "options": [
+        {
+          "id": "dbxfe-m03-workload-question-a",
+          "text": "An execution resource for SQL analytics",
+          "rationale": "Metric definitions, access and workload validation remain necessary."
+        },
+        {
+          "id": "dbxfe-m03-workload-question-b",
+          "text": "Which defect-rate denominator is correct",
+          "rationale": "That is a business metric contract."
+        },
+        {
+          "id": "dbxfe-m03-workload-question-c",
+          "text": "A guarantee that every dashboard is fast",
+          "rationale": "Actual query shape and workload conditions still matter."
+        }
+      ],
+      "correctOptionId": "dbxfe-m03-workload-question-a",
+      "conceptIds": [
+        "dbxfe-m03-workload-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-compute",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ]
+    }
+  ],
+  "selfQuestions": [
+    {
+      "id": "dbxfe-m03-transfer-question",
+      "revision": "1",
+      "prompt": "Write a two-sentence update to Cinderline naming what is known and the next owner/evidence.",
+      "modelAnswer": "The scheduled request reaches an S3 authorization response, but the job’s effective principal and permitted resource/action are not yet verified. The platform/security owner should inspect that identity and safe error/policy evidence, then test the narrow intended read.",
+      "reasoning": "The update reports observations, preserves uncertainty and assigns a bounded next check; workspace access does not establish job data access.",
+      "conceptIds": [
+        "dbxfe-m03-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-claim-route",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ]
+    }
+  ],
+  "beats": [
+    {
+      "id": "dbxfe-m03-decision",
+      "version": "1.0.0",
+      "title": "Start with the decision, then the platform",
+      "outcome": "Choose a workload comparison from an actual customer need.",
+      "explanation": "Cinderline needs a reconciled shift-change quality number from inspections, corrections and events. A retailer needs one dependable daily export. [[dbxfe-m03-decision-concept|workload fit]] asks what each decision requires. A broader platform can be useful, but its list of capabilities does not prove either customer should migrate. Keep improving the current system as a real comparison.",
+      "lessonId": "dbxfe-m03-l01",
+      "sectionId": "dbxfe-m03-l01-understand",
+      "conceptIds": [
+        "dbxfe-m03-decision-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "visualId": "dbxfe-m03-decision-visual",
+      "samajh": {
+        "text": "Har kaam ke liye poora workshop lena zaroori nahi. Pehle dekho repair kya hai, kitni baar hogi, aur kaun sambhalega. Cinderline ke multiple sources ka problem retailer ke ek daily report jaisa nahi. Platform ki capability tab useful hai jab woh actual requirement se judti hai.",
+        "mapping": "Tool choice follows the work and operating responsibility.",
+        "boundary": "Software architecture also includes governance, scale and migration constraints."
+      },
+      "questionIds": [
+        "dbxfe-m03-decision-question"
+      ],
+      "handbook": {
+        "markdown": "Define the decision first: who acts, on which result, by when, and what happens if that result is wrong or late? Then write the current path. For the retailer, a verified daily export already reaches the analyst. A new platform introduces work: moving data, maintaining access, validating calculations and operating failures. That work needs a justified benefit.\n\nFor Cinderline, separate corrected inspections and events repeatedly create conflicting quality reports. A shared governed analytical path might reduce repeated interpretation. Test that hypothesis on representative records and users. Preserve the current system as a baseline and compare correctness, freshness, effort and constraints; do not equate a prettier demo with a superior operating design.\n\nLake, warehouse and lakehouse are architecture vocabulary, not mutually exclusive guarantees. Products overlap and coexistence may be appropriate. An honest recommendation could be to improve the current path, evaluate a bounded new workload, or defer migration until a deciding constraint is answered. This is original professional guidance, not a Databricks competitive assertion or an employer qualification rubric.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l01-understand"
+        ]
+      },
+      "recap": "A capability earns a place when it serves a real workload requirement.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m03-responsibilities",
+      "version": "1.0.0",
+      "title": "Five responsibilities in one query",
+      "outcome": "Trace where a request is named, permitted, executed and stored.",
+      "explanation": "The workspace is where an analyst submits work. Identity and governance determine the permitted action; [[dbxfe-m03-responsibilities-concept|compute]] executes it; storage retains the data. A table format defines a consistent table state. Follow the arrows for a query returning 20 inspected units. No single box performs all five responsibilities.",
+      "lessonId": "dbxfe-workspace-compute",
+      "sectionId": "dbxfe-workspace-compute-responsibilities",
+      "conceptIds": [
+        "dbxfe-m03-responsibilities-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-claim-compute",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "visualId": "dbxfe-m03-responsibilities-visual",
+      "samajh": {
+        "text": "Library mein catalogue batata hai kitab kahan hai, card se permission milti hai, aur reader kitab padh kar answer nikalta hai. Catalogue khud calculation nahi karta. Waise hi workspace, governance, compute aur storage ko ek hi cheez mat samjho; har responsibility ka apna role hai.",
+        "mapping": "Catalogue and permissions organize access; the reader performs work.",
+        "boundary": "A platform request has distributed checks beyond a physical-library interaction."
+      },
+      "questionIds": [
+        "dbxfe-m03-responsibilities-question"
+      ],
+      "handbook": {
+        "markdown": "Use verbs to keep the architecture explainable: submit, authorize, execute, select and retain. A workspace organizes collaboration and workload entry points. A user or service principal supplies identity. Governance rules authorize an object operation. Compute runs the query. The table protocol supplies a consistent interpretation of stored data. Storage holds the underlying bytes. Real implementation calls are more detailed than this teaching sequence.\n\nFor the synthetic request, selected rows contain A=12 and C=8. The SQL expression SUM(inspected) evaluates to 20. A permission failure happens before a useful result; a wrong metric definition can instead produce a successful but misleading result. That distinction helps choose the owner of a problem.\n\nDo not infer that reading a named table grants direct unrestricted access to its storage path. The actual credential and access mechanisms depend on the chosen configuration. Likewise a notebook is an authoring surface, not a durable database transaction by itself. Explain only the verified path and leave unresolved deployment details visible. The next beat places these responsibilities in the account/workspace/metastore hierarchy.",
+        "sourceSectionIds": [
+          "dbxfe-workspace-compute-responsibilities"
+        ]
+      },
+      "recap": "Submit, authorize, execute, select and retain are different responsibilities.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": [
+        "dbxfe-m03-media-platform"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-hierarchy",
+      "version": "1.0.0",
+      "title": "An account is not a workspace",
+      "outcome": "Place collaboration and governance without confusing their scopes.",
+      "explanation": "An account manages organization-level constructs. A workspace is a collaboration and workload environment. A [[dbxfe-m03-hierarchy-concept|metastore]] organizes governed assets and can serve multiple attached workspaces in the same region. Naming a workspace does not tell you which data a principal may read. Keep identity, attachment and object permission as separate facts.",
+      "lessonId": "dbxfe-m03-l03",
+      "sectionId": "dbxfe-m03-l03-understand",
+      "conceptIds": [
+        "dbxfe-m03-hierarchy-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "visualId": "dbxfe-m03-hierarchy-visual",
+      "questionIds": [
+        "dbxfe-m03-hierarchy-question"
+      ],
+      "handbook": {
+        "markdown": "Imagine operations and science teams in separate workspaces. Both need the accepted inspection table, but only an approved quality group should inspect restricted raw payloads. Sharing a regional metastore can give a consistent governed object context without erasing those access distinctions. The account manages broader identity and workspace arrangements.\n\nWhen diagnosing a missing table, ask which account and workspace are active, which metastore is attached, which catalog/schema/object is referenced, and which identity is executing. A similarly named table in another catalog is not necessarily the same dataset. An accessible UI page does not prove the query uses the intended environment.\n\nThe teaching hierarchy is intentionally smaller than a full account design. Region, workspace type, enabled features and organizational isolation rules need explicit review. Do not invent a universal one-metastore-per-company layout or promise cross-region equivalence from this example. Unity Catalog naming and parent usage privileges are developed in the security module. Here the goal is enough orientation to ask the next precise question rather than treating every permission problem as a missing notebook.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l03-understand"
+        ]
+      },
+      "recap": "Account scope, workspace context and governed data scope are related but distinct.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m03-boundary",
+      "version": "1.0.0",
+      "title": "Classic and serverless move the compute boundary",
+      "outcome": "Label the operator boundary correctly for an AWS proposal.",
+      "explanation": "The [[dbxfe-m03-boundary-concept|trust boundary]] depends on the selected compute model. On AWS, classic compute resources run in the customer’s AWS account; serverless compute runs in a Databricks-managed plane. Both still need an authorized path to required data. These are alternative deployment explanations, not proof that either automatically satisfies Cinderline’s security policy.",
+      "lessonId": "dbxfe-workspace-compute",
+      "sectionId": "dbxfe-workspace-compute-limits",
+      "conceptIds": [
+        "dbxfe-m03-boundary-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "visualId": "dbxfe-m03-boundary-visual",
+      "questionIds": [
+        "dbxfe-m03-boundary-question"
+      ],
+      "handbook": {
+        "markdown": "A useful architecture drawing names the cloud, region, workspace type, compute type, data locations and operating owner. The classic/serverless distinction concerns where compute resources are operated; it is not a shortcut for proving compliance or private connectivity. Cinderline’s restricted source path is still a requirement to validate.\n\nKeep workspace type separate from compute type. Current AWS documentation also distinguishes classic workspace storage from default storage in serverless workspaces. A copied old architecture picture may omit that distinction. For an initial conversation, state only the selected compute boundary and record storage/network questions for the relevant specialist.\n\nA sound customer sentence is: “These options place compute in different operating boundaries; we will verify the supported path to your sources in the chosen region.” An unsound sentence is: “Serverless removes all your security work.” Avoid importing Azure or GCP resource details into an AWS diagram. An accompanying video from another cloud can teach the conceptual separation, but its deployment steps are not instructions for this AWS example.",
+        "sourceSectionIds": [
+          "dbxfe-workspace-compute-limits"
+        ]
+      },
+      "recap": "Changing the compute model changes responsibility, not the need for an approved data path.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m03-durability",
+      "version": "1.0.0",
+      "title": "Stop the session: what remains?",
+      "outcome": "Distinguish durable input from session state that must be rebuilt.",
+      "explanation": "A stopped session does not by itself delete a properly persisted table. It can remove your local variables, temporary context and cached work. Treat [[dbxfe-m03-durability-concept|session state]] as reconstructible. On restart, read the durable inputs and rerun the transformation in order; a notebook’s old displayed output is not proof that the new session contains those values.",
+      "lessonId": "dbxfe-workspace-compute",
+      "sectionId": "dbxfe-workspace-compute-worked",
+      "conceptIds": [
+        "dbxfe-m03-durability-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "visualId": "dbxfe-m03-durability-visual",
+      "samajh": {
+        "text": "Desk band karne se filing cabinet ki documents gayab nahi hoti. Lekin desk par jo rough calculation thi, use dobara banana pad sakta hai. Notebook mein purana 20 dikh raha hai toh bas pichla result dikh raha hai; nayi session ne abhi calculation ki ho, zaroori nahi.",
+        "mapping": "Durable files resemble retained documents; scratch work resembles session values.",
+        "boundary": "Actual persistence depends on the configured storage and write succeeding."
+      },
+      "questionIds": [
+        "dbxfe-m03-durability-question"
+      ],
+      "handbook": {
+        "markdown": "Reproducibility needs explicit inputs and ordered transformations. A session can succeed because an earlier cell created a variable or temporary view that is no longer visible near the calculation. Restarting reveals that hidden dependency. Prefer a clear setup/read/transform/check flow whose meaning does not rely on accidental execution order.\n\nIn this example the table is durable and contains 20 inspected units; a Python total variable is merely one computed representation. After a fresh session starts, verify the table identity and then compute the total again. If the underlying table changed, a newly computed result may differ legitimately; record the version or data cut-off when reproduction matters.\n\nPersistence is conditional on a successful write to the intended durable location and its lifecycle. Do not generalize this example to every local path or temporary artifact. Workspace files, internal workspace system data and governed data objects also have different purposes. A notebook export is not automatically a data backup. The optional cloud bridge explains object storage; the Delta module explains how a committed table state chooses its data.",
+        "sourceSectionIds": [
+          "dbxfe-workspace-compute-worked"
+        ]
+      },
+      "recap": "Rebuild session values from explicit durable inputs; old output is historical.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m03-network",
+      "version": "1.0.0",
+      "title": "Name, route and permission are separate checks",
+      "outcome": "Distinguish DNS, network routing and authorization evidence.",
+      "explanation": "A request needs a destination, a usable path and permission for the intended action. [[dbxfe-m03-network-concept|DNS resolution]] addresses the name. Routing directs traffic. Resource policies govern allowed operations. Passing one check does not imply the others passed. This separation makes “I cannot read the data” a diagnosable observation rather than one vague platform problem.",
+      "lessonId": "dbxfe-cloud-bridge",
+      "sectionId": "dbxfe-cloud-bridge-path",
+      "conceptIds": [
+        "dbxfe-m03-network-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-dns",
+        "dbxfe-m03-claim-route",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "visualId": "dbxfe-m03-network-visual",
+      "questionIds": [
+        "dbxfe-m03-network-question"
+      ],
+      "handbook": {
+        "markdown": "Follow one actual request with an explicit origin and destination. A laptop, classic compute resource and serverless workload may use different paths and identities. An administrator’s successful browser access is not necessarily evidence for a scheduled workload’s connection. Record the environment and the exact action being attempted.\n\nFor a timeout, investigate the path with the network owner: DNS answer, route, endpoint, transport restrictions and service availability. For a service AccessDenied response, preserve a safe error description and inspect the effective principal, action, resource and relevant policy context. An authorization response helps locate the failure, but it does not by itself identify which policy is responsible.\n\nNever solve a narrow failure by reflexively granting broad administration. Likewise, do not promise that adding a route fixes permission. S3 object access and Unity Catalog table access operate at different boundaries in a governed request; the chosen configuration determines their relationship. The security module develops the permitted-consumer test. This bridge is a model for evidence collection, not an executed AWS network test or a deployment recipe.",
+        "sourceSectionIds": [
+          "dbxfe-cloud-bridge-path"
+        ]
+      },
+      "recap": "A resolved name, reachable service and allowed operation are different observations.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m03-workload",
+      "version": "1.0.0",
+      "title": "Choose compute for the work you will test",
+      "outcome": "Tie a compute choice to a workload and measurable constraints.",
+      "explanation": "A [[dbxfe-m03-workload-concept|SQL warehouse]] provides compute for SQL analytics; it does not define the business meaning of a dashboard. Interactive exploration, scheduled transformations and BI serving have different patterns. Choose a supported execution path, then test the actual workload’s correctness, latency, concurrency and operating needs. Product labels alone do not establish the best configuration.",
+      "lessonId": "dbxfe-m03-l01",
+      "sectionId": "dbxfe-m03-l01-understand",
+      "conceptIds": [
+        "dbxfe-m03-workload-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-compute",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "visualId": "dbxfe-m03-workload-visual",
+      "questionIds": [
+        "dbxfe-m03-workload-question"
+      ],
+      "handbook": {
+        "markdown": "Separate a resource choice from the evidence needed to justify it. A dashboard with twelve simultaneous users poses a capacity question. A single transformation with an exploding join poses a data-shape question. The same slow end-to-end time can come from different causes, so merely increasing a resource label may spend more without resolving the problem.\n\nFor Cinderline, begin with an agreed accepted inspection population and a reproducible query. Record the intended execution path, data version, user population and latency target before comparing alternatives. A notebook demonstration can establish a calculation on a small input; it does not establish morning BI capacity. A Jobs run can schedule that work; it does not replace the calculation’s correctness checks.\n\nCurrent compute documentation describes supported workload resources, but exact availability, policies and entitlements are deployment inputs. No paid workspace or cloud execution is required here. The analytics and orchestration modules turn these broad responsibilities into specific diagnostic experiments and recovery tests. Keep a credible current-state alternative if the proposed resource adds operational work without a measured benefit.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l01-understand"
+        ]
+      },
+      "recap": "Compute is chosen for a specific work pattern and validated against that pattern.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m03-transfer",
+      "version": "1.0.0",
+      "title": "Locate the next useful piece of evidence",
+      "outcome": "Explain a changed request without jumping from symptom to architecture promise.",
+      "explanation": "A scheduled quality job resolves the storage name and receives AccessDenied. The same analyst can open the workspace UI. Those observations do not prove the workload has the analyst’s identity or data privileges. Locate the [[dbxfe-m03-transfer-concept|diagnostic boundary]]: inspect the job’s effective identity, requested resource and safe error evidence before changing compute size.",
+      "lessonId": "dbxfe-m03-l03",
+      "sectionId": "dbxfe-m03-l03-understand",
+      "conceptIds": [
+        "dbxfe-m03-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-architecture",
+        "dbxfe-m03-claim-storage",
+        "dbxfe-m03-claim-route",
+        "dbxfe-m03-guidance",
+        "dbxfe-m03-fiction"
+      ],
+      "visualId": "dbxfe-m03-transfer-visual",
+      "questionIds": [
+        "dbxfe-m03-transfer-question"
+      ],
+      "handbook": {
+        "markdown": "A good diagnostic update has observation, implication and next evidence. Observation: the scheduled request returns AccessDenied. Implication: an authorization boundary responded; no dataset result was obtained. Next evidence: effective workload identity, requested action/resource, applicable policies and a narrow reproduction. Avoid claiming a root cause before that evidence is available. For an unfamiliar product question, state the unknown, verify current official documentation for the target cloud, and involve the responsible specialist before promising support.\n\nThe analyst’s UI success concerns a different request. It does not establish the job’s service principal, cloud credentials or network path. Increasing compute size cannot create an absent grant. Switching deployment models without understanding the failing boundary can introduce more variables and make the failure harder to explain.\n\nAfter a scoped correction, repeat the allowed read and a relevant denied action with the intended identity. Preserve the outcome, environment and timestamp; do not call the whole architecture compliant based on one success. Then reconnect to the original decision: can the accepted quality metric be served correctly by shift change? The visual recap is a route through responsibilities, and the linked cards retrieve those distinctions without claiming mastery from a page visit.",
+        "sourceSectionIds": [
+          "dbxfe-m03-l03-understand"
+        ]
+      },
+      "recap": "Diagnose the request that failed, with its identity, path and action.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m03-l01-card1",
+      "beatId": "dbxfe-m03-decision"
+    },
+    {
+      "cardId": "dbxfe-m03-l01-card2",
+      "beatId": "dbxfe-m03-decision"
+    },
+    {
+      "cardId": "dbxfe-m03-l01-card3",
+      "beatId": "dbxfe-m03-workload"
+    },
+    {
+      "cardId": "dbxfe-m03-l03-card1",
+      "beatId": "dbxfe-m03-responsibilities"
+    },
+    {
+      "cardId": "dbxfe-m03-l03-card2",
+      "beatId": "dbxfe-m03-boundary"
+    },
+    {
+      "cardId": "dbxfe-m03-l03-card3",
+      "beatId": "dbxfe-m03-transfer"
+    },
+    {
+      "cardId": "dbxfe-workspace-compute-foundation-card1",
+      "beatId": "dbxfe-m03-responsibilities"
+    },
+    {
+      "cardId": "dbxfe-workspace-compute-foundation-card2",
+      "beatId": "dbxfe-m03-durability"
+    },
+    {
+      "cardId": "dbxfe-workspace-compute-foundation-card3",
+      "beatId": "dbxfe-m03-boundary"
+    },
+    {
+      "cardId": "dbxfe-cloud-bridge-foundation-card1",
+      "beatId": "dbxfe-m03-network"
+    },
+    {
+      "cardId": "dbxfe-cloud-bridge-foundation-card2",
+      "beatId": "dbxfe-m03-network"
+    },
+    {
+      "cardId": "dbxfe-cloud-bridge-foundation-card3",
+      "beatId": "dbxfe-m03-transfer"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-m03-extension-object-version",
+      "revision": "1",
+      "prompt": "Is an S3 object version the same as a Delta table version?",
+      "answer": "No. S3 versioning identifies versions of individual objects; a Delta table version describes a committed table state.",
+      "explanation": "A table can depend on multiple data and metadata objects. Keeping object versions does not by itself provide the coordinated table interpretation taught in Delta.",
+      "lessonId": "dbxfe-workspace-compute",
+      "sectionId": "dbxfe-workspace-compute-worked",
+      "conceptIds": [
+        "dbxfe-m03-durability-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-storage"
+      ],
+      "beatId": "dbxfe-m03-durability",
+      "whyItMatters": "Avoid confusing object recovery with consistent table recovery."
+    },
+    {
+      "id": "dbxfe-m03-extension-multi-key",
+      "revision": "1",
+      "prompt": "Does an atomic S3 update to one key imply an atomic update across all table files?",
+      "answer": "No. Single-key atomicity is not a general cross-key transaction.",
+      "explanation": "The S3 consistency documentation distinguishes single-object updates from coordinated changes across keys. A table protocol provides additional coordination; strong object consistency does not choose table membership.",
+      "lessonId": "dbxfe-workspace-compute",
+      "sectionId": "dbxfe-workspace-compute-responsibilities",
+      "conceptIds": [
+        "dbxfe-m03-responsibilities-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-storage"
+      ],
+      "beatId": "dbxfe-m03-responsibilities",
+      "whyItMatters": "Explains why a transaction log matters even over strongly consistent storage."
+    },
+    {
+      "id": "dbxfe-m03-extension-workspace-binding",
+      "revision": "1",
+      "prompt": "An analyst has table SELECT but uses a workspace not bound to an isolated catalog. Is SELECT sufficient?",
+      "answer": "No. The workspace binding can deny that access despite the object grant.",
+      "explanation": "[[dbxfe-m03-extension-workspace-binding-concept|workspace-catalog binding]] connects the processing environment to a governed data domain. In the invented case, both workspaces attach to the same metastore, but the production catalog is assigned only to the production workspace. The analyst’s SELECT grant does not override that boundary from development. Conversely, allowing a workspace does not grant every user permission to every table. Review both workspace assignment and effective object privileges. A binding can also restrict a workspace to read-only access. This is useful when separating environments, but it does not by itself establish every network, identity or regulatory requirement.",
+      "lessonId": "dbxfe-m03-l03",
+      "sectionId": "dbxfe-m03-l03-understand",
+      "conceptIds": [
+        "dbxfe-m03-extension-workspace-binding-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-workspace-binding",
+        "dbxfe-m03-fiction",
+        "dbxfe-m03-guidance"
+      ],
+      "beatId": "dbxfe-m03-hierarchy",
+      "whyItMatters": "Adds an environment boundary to the platform map without confusing it with a user-level grant."
+    },
+    {
+      "id": "dbxfe-m03-extension-route-priority",
+      "revision": "1",
+      "prompt": "Both 0.0.0.0/0 and 10.2.0.0/16 match destination 10.2.3.4. Which route is selected in this distinct-prefix example?",
+      "answer": "The 10.2.0.0/16 route, because it is the more specific match.",
+      "explanation": "[[dbxfe-m03-extension-route-priority-concept|longest prefix match]] explains why the mere presence of a default route does not identify the path a request actually takes. The suffix /16 fixes more leading address bits than /0, so the narrower matching destination wins in this example. If that route targets a peering connection, adding a default internet route does not divert this matching traffic. Inspect the route table associated with the actual source subnet and the resolved destination. This is route selection only: the destination can still be unreachable or deny the requested action. Equal-prefix and other tie cases require the documented additional priority rules.",
+      "lessonId": "dbxfe-cloud-bridge",
+      "sectionId": "dbxfe-cloud-bridge-path",
+      "conceptIds": [
+        "dbxfe-m03-extension-route-priority-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m03-claim-route-priority",
+        "dbxfe-m03-fiction",
+        "dbxfe-m03-guidance"
+      ],
+      "beatId": "dbxfe-m03-network",
+      "whyItMatters": "Helps diagnose the actual selected path instead of treating any visible route as proof of connectivity."
+    }
+  ],
+  "recap": {
+    "title": "Trace the responsibility, then ask for evidence",
+    "markdown": "**Decision → permitted request → compute → selected table data → result.** Account/workspace/metastore establish context; cloud boundaries locate responsibility; durable input outlives a session. Review the core cards by these ideas, or deliberately add researched extensions.",
+    "visualId": "dbxfe-m03-responsibilities-visual"
+  },
+  "appliedTask": {
+    "title": "A new session and a denied job",
+    "prompt": "An analyst restarts a session, sees an old output of 20 and can open the workspace. A scheduled job receives AccessDenied from storage. Explain what remains unproved and choose the next check.",
+    "modelAnswer": "The old output does not prove a current calculation; rebuild session state from verified durable inputs. UI access does not prove the job’s data access. Inspect the job identity, action/resource and authorization evidence with the owner, then test the intended read and relevant denial.",
+    "reasoning": "These observations concern different contexts. The model distinguishes display, execution state and authorization instead of treating them as one success signal.",
+    "beatIds": [
+      "dbxfe-m03-durability",
+      "dbxfe-m03-network",
+      "dbxfe-m03-transfer"
+    ]
+  },
+  "scenarioIds": [
+    "dbxfe-m03-scenario"
+  ]
+}

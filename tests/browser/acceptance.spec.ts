@@ -20,20 +20,16 @@ for (const base of ["/", "/SpicyBrain/"])
     );
     await ready(page, base);
     await expect(
-      page.getByText("No study activity yet.", { exact: false }),
+      page.getByRole("heading", { name:"One idea. A little clearer." }),
     ).toBeVisible();
     await shot(page, base === "/" ? "01-start-desktop" : "01-start-nested");
     await page
       .getByRole("navigation", { name: "Main navigation" })
-      .getByRole("link", { name: "Learn", exact: true })
+      .getByRole("link", { name: "Courses", exact: true })
       .click();
-    await page
-      .getByRole("link", { name: "Course library", exact: true })
-      .click();
-    await expect(page.getByText("12 modules · 43 lessons")).toBeVisible();
-    await page.getByRole("link", { name: /12 modules/ }).click();
-    await expect(page.locator(".module-block")).toHaveCount(12);
-    await expect(page.locator(".module-block ol li")).toHaveCount(43);
+    await expect(page.getByText("16 modules",{exact:true})).toBeVisible();
+    await page.locator(".teacher-course-card").click();
+    await expect(page.locator(".teacher-module-map>li")).toHaveCount(16);
     await shot(page, "02-course-map");
     await nav(page, `#/lesson/${lesson}/${section}`);
     await expect(page.locator(`#${section}`)).toBeVisible();
@@ -100,11 +96,11 @@ for (const base of ["/", "/SpicyBrain/"])
       .toBe(true);
     await shot(page, "04-reader");
     await nav(page, "#/");
-    await page.getByRole("link", { name: "Resume learning" }).click();
+    await page.getByRole("link", { name: "Resume saved lesson" }).click();
     await expect(page).toHaveURL(new RegExp(lesson));
     await page.goBack();
     await expect(
-      page.getByRole("link", { name: "Resume learning" }),
+      page.getByRole("link", { name: "Resume saved lesson" }),
     ).toBeVisible();
     await page.goForward();
     await expect(page.locator(".reader")).toBeVisible();

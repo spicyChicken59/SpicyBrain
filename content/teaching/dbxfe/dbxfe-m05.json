@@ -1,0 +1,1586 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-m05",
+  "title": "SQL analytics and performance",
+  "summary": "Agree what the number means, locate the delay, then test one plausible improvement.",
+  "outcomes": [
+    "Write a metric contract with population, time and exclusions.",
+    "Separate queue, execution and presentation delays.",
+    "Interpret join/skew/spill/cache evidence and evaluate a controlled performance experiment."
+  ],
+  "startingAssumptions": [
+    "A weighted rate divides summed counts; a join can multiply the population.",
+    "All timings, user counts and cost units here are synthetic."
+  ],
+  "lessonIds": [
+    "dbxfe-m05-l01",
+    "dbxfe-m05-l02",
+    "dbxfe-m05-l03"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "A45-second dashboard has several possible causes. Worked timing and threshold examples teach evidence-led decisions without platform benchmark claims.",
+  "sources": [
+    {
+      "id": "dbxfe-m05-source-sql",
+      "title": "Data warehousing on Databricks",
+      "url": "https://docs.databricks.com/aws/en/sql/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Capability does not establish an agreed customer definition or a performance advantage.",
+      "reviewedEvidence": "SQL warehouses execute analytical work through SQL, notebooks, Jobs and BI interfaces; metric views can centralize reusable metric calculations."
+    },
+    {
+      "id": "dbxfe-m05-source-profile",
+      "title": "Query profile",
+      "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "An execution profile does not include every dashboard/user-perceived delay.",
+      "reviewedEvidence": "Profiles expose operators, rows and resource metrics. Aggregate task time differs from wall time; cached queries may lack profiles; ownership or monitoring permission is required."
+    },
+    {
+      "id": "dbxfe-m05-source-capacity",
+      "title": "SQL warehouse sizing, scaling and queuing behavior",
+      "url": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-behavior",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "No fixed instance size, queue limit, cost rate or proportional speedup is assumed. Verify target type/region/configuration.",
+      "reviewedEvidence": "Size and cluster count concern different resource dimensions; serverless and classic/pro workload management differ."
+    },
+    {
+      "id": "dbxfe-m05-source-skew",
+      "title": "Skew and spill",
+      "url": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage-page",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Symptoms require actual stage/task evidence; no single threshold is taught as a universal diagnosis.",
+      "reviewedEvidence": "Spill moves execution data from memory to disk; skew appears when a few tasks take much longer than others."
+    },
+    {
+      "id": "dbxfe-m05-source-cache",
+      "title": "Query caching",
+      "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-caching",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "UI, result and disk caches differ; AI/BI dashboards have their own cache behavior. Do not infer a cold run from warehouse restart alone.",
+      "reviewedEvidence": "Result caching avoids recomputation; local result cache and serverless remote result cache have different lifecycles."
+    },
+    {
+      "id": "dbxfe-m05-source-having",
+      "title": "HAVING clause",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-having",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks SQL and Databricks Runtime; arithmetic below is an original hypothetical fixture.",
+      "caveat": "Original hypothetical workflow or arithmetic, not an executed product test. Databricks SQL and Databricks Runtime; arithmetic below is an original hypothetical fixture.",
+      "reviewedEvidence": "HAVING filters GROUP BY results; permitted expressions use grouping expressions, aggregates or constants. Examples distinguish grouped-result conditions."
+    },
+    {
+      "id": "dbxfe-m05-source-approximate-percentile",
+      "title": "approx_percentile aggregate function",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/functions/approx_percentile",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks SQL and Runtime. The exact acceptance-count recommendation below is original measurement guidance.",
+      "caveat": "Original hypothetical workflow or arithmetic, not an executed product test. Databricks SQL and Runtime. The exact acceptance-count recommendation below is original measurement guidance.",
+      "reviewedEvidence": "The function returns an approximate percentile; a positive integer accuracy parameter trades memory for accuracy. It is a synonym of percentile_approx."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-m05-guidance",
+      "description": "Original educational reasoning, diagnostic choices and worked decisions; not a vendor runbook.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent SpicyBrain curriculum."
+    },
+    {
+      "id": "dbxfe-m05-fiction",
+      "description": "Cinderline examples, quantities, states, outcomes and alternatives are synthetic.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "Original teaching examples; no Databricks or customer execution claim."
+    },
+    {
+      "id": "dbxfe-m05-claim-sql",
+      "description": "SQL warehouses execute analytical work through SQL, notebooks, Jobs and BI interfaces; metric views can centralize reusable metric calculations.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m05-source-sql"
+      ],
+      "context": "Capability does not establish an agreed customer definition or a performance advantage."
+    },
+    {
+      "id": "dbxfe-m05-claim-profile",
+      "description": "Profiles expose operators, rows and resource metrics. Aggregate task time differs from wall time; cached queries may lack profiles; ownership or monitoring permission is required.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m05-source-profile"
+      ],
+      "context": "An execution profile does not include every dashboard/user-perceived delay."
+    },
+    {
+      "id": "dbxfe-m05-claim-capacity",
+      "description": "Size and cluster count concern different resource dimensions; serverless and classic/pro workload management differ.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m05-source-capacity"
+      ],
+      "context": "No fixed instance size, queue limit, cost rate or proportional speedup is assumed. Verify target type/region/configuration."
+    },
+    {
+      "id": "dbxfe-m05-claim-skew",
+      "description": "Spill moves execution data from memory to disk; skew appears when a few tasks take much longer than others.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m05-source-skew"
+      ],
+      "context": "Symptoms require actual stage/task evidence; no single threshold is taught as a universal diagnosis."
+    },
+    {
+      "id": "dbxfe-m05-claim-cache",
+      "description": "Result caching avoids recomputation; local result cache and serverless remote result cache have different lifecycles.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m05-source-cache"
+      ],
+      "context": "UI, result and disk caches differ; AI/BI dashboards have their own cache behavior. Do not infer a cold run from warehouse restart alone."
+    },
+    {
+      "id": "dbxfe-m05-claim-having",
+      "description": "HAVING filters GROUP BY results; permitted expressions use grouping expressions, aggregates or constants. Examples distinguish grouped-result conditions.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m05-source-having"
+      ],
+      "context": "Original hypothetical workflow or arithmetic, not an executed product test. Databricks SQL and Databricks Runtime; arithmetic below is an original hypothetical fixture."
+    },
+    {
+      "id": "dbxfe-m05-claim-approximate-percentile",
+      "description": "The function returns an approximate percentile; a positive integer accuracy parameter trades memory for accuracy. It is a synonym of percentile_approx.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m05-source-approximate-percentile"
+      ],
+      "context": "Original hypothetical workflow or arithmetic, not an executed product test. Databricks SQL and Runtime. The exact acceptance-count recommendation below is original measurement guidance."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-m05-metric-concept",
+      "term": "metric contract",
+      "aliases": [],
+      "definition": "An agreed meaning for a measure, including population, grain, numerator, denominator, time, exclusions and owner.",
+      "example": "Unit defect rate 1/20=5% differs from inspections-with-defect 1/2=50%.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m05-serving-concept",
+      "term": "data lineage",
+      "aliases": [],
+      "definition": "The relationships showing how a result depends on upstream data and transformations.",
+      "example": "A displayed 5% depends on acceptedA/C quantities, aggregation and a stated cut-off.",
+      "sourceIds": [
+        "dbxfe-m05-source-sql"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-latency-concept",
+      "term": "latency",
+      "aliases": [],
+      "definition": "Elapsed time from a specified request point to a usable result.",
+      "example": "30 seconds waiting+5 executing+10 presenting=45 seconds experienced.",
+      "sourceIds": [
+        "dbxfe-m05-source-profile"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-execution-concept",
+      "term": "skew",
+      "aliases": [],
+      "definition": "Uneven work distribution in which a few tasks take much longer than the others.",
+      "example": "One hot-key partition processes 90 rows while three others process 3, 3, 4.",
+      "sourceIds": [
+        "dbxfe-m05-source-profile",
+        "dbxfe-m05-source-skew"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-cache-concept",
+      "term": "result cache",
+      "aliases": [],
+      "definition": "Stored query output that can be reused instead of recomputing the query.",
+      "example": "A repeated query may return quickly from cached results without a new execution profile.",
+      "sourceIds": [
+        "dbxfe-m05-source-cache",
+        "dbxfe-m05-source-profile"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-capacity-concept",
+      "term": "throughput",
+      "aliases": [],
+      "definition": "Completed work per unit of time under a stated workload and measurement window.",
+      "example": "12 queries per minute says something different from one query taking 5 seconds.",
+      "sourceIds": [
+        "dbxfe-m05-source-capacity"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-experiment-concept",
+      "term": "controlled experiment",
+      "aliases": [],
+      "definition": "A comparison that holds relevant conditions stable while changing a stated hypothesis and measuring agreed outcomes.",
+      "example": "Compare one capacity setting with fixed query, data, cache policy and 12-user workload.",
+      "sourceIds": [
+        "dbxfe-m05-source-capacity",
+        "dbxfe-m05-source-profile"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-transfer-concept",
+      "term": "tail latency",
+      "aliases": [],
+      "definition": "The slower end of the request-latency distribution, beyond the typical or median experience.",
+      "example": "A median 5 s can coexist with 10% of requests exceeding 60 s.",
+      "sourceIds": [
+        "dbxfe-m05-source-profile"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-extension-having-concept",
+      "term": "Group filter",
+      "aliases": [],
+      "definition": "A condition applied to aggregated groups, rather than to each input row.",
+      "example": "No. The row filter drops both North rows; the group filter keeps North's total 20.",
+      "sourceIds": [
+        "dbxfe-m05-source-having"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-extension-approximate-percentile-concept",
+      "term": "Approximate percentile",
+      "aliases": [],
+      "definition": "An estimated distribution cutoff whose computation trades resource use for accuracy.",
+      "example": "No. Check the agreed request count and strict timing predicate directly, preserving failures and missing measurements.",
+      "sourceIds": [
+        "dbxfe-m05-source-approximate-percentile"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-m05-metric-visual",
+      "kind": "equation",
+      "title": "5% and 50% can both be correct",
+      "alt": "5% and 50% can both be correct. Every inspected unit contributes to the denominator. Every inspection contributes one observation.",
+      "caption": "A number has meaning only with its population and denominator. Synthetic teaching example.",
+      "textEquivalent": "Count units: Every inspected unit contributes to the denominator. Columns: Numerator; Denominator; Result. Rows: 1 defective unit — 20 inspected units — 5%. Equation: 1 / (12 + 8) = 5%.\n\nCount inspections: Every inspection contributes one observation. Columns: Numerator; Denominator; Result. Rows: 1 inspection with any defect — 2 inspections — 50%. Equation: 1 / 2 = 50%.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "states": [
+        {
+          "id": "units",
+          "title": "Count units",
+          "explanation": "Every inspected unit contributes to the denominator.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Numerator",
+              "Denominator",
+              "Result"
+            ],
+            "rows": [
+              [
+                "1 defective unit",
+                "20 inspected units",
+                "5%"
+              ]
+            ]
+          },
+          "equation": "1 / (12 + 8) = 5%"
+        },
+        {
+          "id": "inspections",
+          "title": "Count inspections",
+          "explanation": "Every inspection contributes one observation.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Numerator",
+              "Denominator",
+              "Result"
+            ],
+            "rows": [
+              [
+                "1 inspection with any defect",
+                "2 inspections",
+                "50%"
+              ]
+            ]
+          },
+          "equation": "1 / 2 = 50%"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m05-serving-visual",
+      "kind": "nodes",
+      "title": "The dashboard is the last mile",
+      "alt": "The dashboard is the last mile. Each link explains a different responsibility. A fresh render can display older business evidence.",
+      "caption": "Trace the KPI to rows and show the data cut-off, not only query time. Synthetic teaching example.",
+      "textEquivalent": "Trace the number: Each link explains a different responsibility. Nodes: Retained evidence: 5 baseline deliveries. Includes B and replay. (context); Accepted state: A2, C1. B excluded with reason. (selected); Metric: 1 /20 =5%. Unit defect contract. (selected); Dashboard: 5% +cut-off +coverage. Presentation and decision context. (selected). Relationships: Retained evidence → Accepted state: resolve; Accepted state → Metric: aggregate; Metric → Dashboard: serve.\n\nTwo timestamps: A fresh render can display older business evidence. Columns: Label; What it tells you. Rows: Query ran at 09:00 — When execution occurred; Data accepted through 08:30 — The reporting cut-off; stale_previous — New evidence currently blocks a replacement report.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m05-claim-sql",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "states": [
+        {
+          "id": "trace",
+          "title": "Trace the number",
+          "explanation": "Each link explains a different responsibility.",
+          "nodes": [
+            {
+              "id": "raw",
+              "label": "Retained evidence",
+              "value": "5 baseline deliveries",
+              "detail": "Includes B and replay.",
+              "status": "context"
+            },
+            {
+              "id": "accepted",
+              "label": "Accepted state",
+              "value": "A2, C1",
+              "detail": "B excluded with reason.",
+              "status": "selected"
+            },
+            {
+              "id": "metric",
+              "label": "Metric",
+              "value": "1 /20 =5%",
+              "detail": "Unit defect contract.",
+              "status": "selected"
+            },
+            {
+              "id": "dashboard",
+              "label": "Dashboard",
+              "value": "5% +cut-off +coverage",
+              "detail": "Presentation and decision context.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "raw",
+              "to": "accepted",
+              "label": "resolve"
+            },
+            {
+              "from": "accepted",
+              "to": "metric",
+              "label": "aggregate"
+            },
+            {
+              "from": "metric",
+              "to": "dashboard",
+              "label": "serve"
+            }
+          ]
+        },
+        {
+          "id": "labels",
+          "title": "Two timestamps",
+          "explanation": "A fresh render can display older business evidence.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Label",
+              "What it tells you"
+            ],
+            "rows": [
+              [
+                "Query ran at 09:00",
+                "When execution occurred"
+              ],
+              [
+                "Data accepted through 08:30",
+                "The reporting cut-off"
+              ],
+              [
+                "stale_previous",
+                "New evidence currently blocks a replacement report"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m05-latency-visual",
+      "kind": "table",
+      "title": "The same 45 seconds can mean different work",
+      "alt": "The same 45 seconds can mean different work. These are invented teaching observations, not product benchmarks. A hypothesis still needs underlying evidence.",
+      "caption": "Equal total latency can hide different bottlenecks; compare its components. Synthetic teaching example.",
+      "textEquivalent": "Synthetic timing ledger: These are invented teaching observations, not product benchmarks. Columns: Run; Queue; Execution; Transfer/render; Total. Rows: A peak — 30 s — 5 s — 10 s — 45 s; B quiet — 0 s — 5 s — 10 s — 15 s; C changed join — 0 s — 35 s — 10 s — 45 s.\n\nChoose the comparison: A hypothesis still needs underlying evidence. Columns: Comparison; Changed observation; First hypothesis. Rows: A vs B — Queue+30 s — Peak admission/capacity/workload timing; B vs C — Execution+30 s — Changed query/data work.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "states": [
+        {
+          "id": "timing",
+          "title": "Synthetic timing ledger",
+          "explanation": "These are invented teaching observations, not product benchmarks.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Run",
+              "Queue",
+              "Execution",
+              "Transfer/render",
+              "Total"
+            ],
+            "rows": [
+              [
+                "A peak",
+                "30 s",
+                "5 s",
+                "10 s",
+                "45 s"
+              ],
+              [
+                "B quiet",
+                "0 s",
+                "5 s",
+                "10 s",
+                "15 s"
+              ],
+              [
+                "C changed join",
+                "0 s",
+                "35 s",
+                "10 s",
+                "45 s"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "compare",
+          "title": "Choose the comparison",
+          "explanation": "A hypothesis still needs underlying evidence.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Comparison",
+              "Changed observation",
+              "First hypothesis"
+            ],
+            "rows": [
+              [
+                "A vs B",
+                "Queue+30 s",
+                "Peak admission/capacity/workload timing"
+              ],
+              [
+                "B vs C",
+                "Execution+30 s",
+                "Changed query/data work"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m05-execution-visual",
+      "kind": "comparison",
+      "title": "Inspect rows, imbalance and spilled work",
+      "alt": "Inspect rows, imbalance and spilled work. Fix grain before paying to process a wrong intermediate population. Averages can hide the tail task. Spill is a symptom to connect with work, not a standalone universal diagnosis.",
+      "caption": "Explain the intermediate work; final result size is only one observation. Synthetic teaching example.",
+      "textEquivalent": "Multiplying join: Fix grain before paying to process a wrong intermediate population. Columns: Stage; Rows; Meaning. Rows: Inspection input — 2 — A, C; Event input — 3 — Same plant; Join output — 6 — Every matching pair.\n\nUneven partitions: Averages can hide the tail task. Columns: Partition; Rows; Synthetic consequence. Rows: North-heavy — 90 — One task remains busy; Other 1 — 3 — Finishes early; Other 2 — 3 — Finishes early; Other 3 — 4 — Finishes early.\n\nMemory pressure: Spill is a symptom to connect with work, not a standalone universal diagnosis. Columns: Observation; Mechanism; Next evidence. Rows: Spill bytes nonzero — Execution work moved to disk — Operator/input size and memory context; Small final result — Does not imply small intermediate work — Rows before aggregation.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-claim-skew",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "states": [
+        {
+          "id": "join",
+          "title": "Multiplying join",
+          "explanation": "Fix grain before paying to process a wrong intermediate population.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Stage",
+              "Rows",
+              "Meaning"
+            ],
+            "rows": [
+              [
+                "Inspection input",
+                "2",
+                "A, C"
+              ],
+              [
+                "Event input",
+                "3",
+                "Same plant"
+              ],
+              [
+                "Join output",
+                "6",
+                "Every matching pair"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "skew",
+          "title": "Uneven partitions",
+          "explanation": "Averages can hide the tail task.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Partition",
+              "Rows",
+              "Synthetic consequence"
+            ],
+            "rows": [
+              [
+                "North-heavy",
+                "90",
+                "One task remains busy"
+              ],
+              [
+                "Other 1",
+                "3",
+                "Finishes early"
+              ],
+              [
+                "Other 2",
+                "3",
+                "Finishes early"
+              ],
+              [
+                "Other 3",
+                "4",
+                "Finishes early"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "spill",
+          "title": "Memory pressure",
+          "explanation": "Spill is a symptom to connect with work, not a standalone universal diagnosis.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Observation",
+              "Mechanism",
+              "Next evidence"
+            ],
+            "rows": [
+              [
+                "Spill bytes nonzero",
+                "Execution work moved to disk",
+                "Operator/input size and memory context"
+              ],
+              [
+                "Small final result",
+                "Does not imply small intermediate work",
+                "Rows before aggregation"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m05-cache-visual",
+      "kind": "comparison",
+      "title": "A cached answer is a different experiment",
+      "alt": "A cached answer is a different experiment. The query performs input/operator work. A result-cache hit can bypass a new execution of the same work.",
+      "caption": "State the cache policy; a faster reuse path does not prove a faster execution plan. Synthetic teaching example.",
+      "textEquivalent": "Execute: The query performs input/operator work. Nodes: Input: Read data. Relevant rows and files. (context); Operators: Compute. Join/filter/aggregate. (selected); Result: 5%. Computed output. (selected). Relationships: Input → Operators: process; Operators → Result: produce.\n\nReuse result: A result-cache hit can bypass a new execution of the same work. Nodes: Input: No equivalent fresh scan. Do not infer a new full execution. (excluded); Result cache: Reuse output. Different work path. (selected); Result: 5%. Same value, different work. (selected). Relationships: Result cache → Result: return cached output.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m05-claim-cache",
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "states": [
+        {
+          "id": "compute",
+          "title": "Execute",
+          "explanation": "The query performs input/operator work.",
+          "nodes": [
+            {
+              "id": "input",
+              "label": "Input",
+              "value": "Read data",
+              "detail": "Relevant rows and files.",
+              "status": "context"
+            },
+            {
+              "id": "operators",
+              "label": "Operators",
+              "value": "Compute",
+              "detail": "Join/filter/aggregate.",
+              "status": "selected"
+            },
+            {
+              "id": "result",
+              "label": "Result",
+              "value": "5%",
+              "detail": "Computed output.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "input",
+              "to": "operators",
+              "label": "process"
+            },
+            {
+              "from": "operators",
+              "to": "result",
+              "label": "produce"
+            }
+          ]
+        },
+        {
+          "id": "reuse",
+          "title": "Reuse result",
+          "explanation": "A result-cache hit can bypass a new execution of the same work.",
+          "nodes": [
+            {
+              "id": "input",
+              "label": "Input",
+              "value": "No equivalent fresh scan",
+              "detail": "Do not infer a new full execution.",
+              "status": "excluded"
+            },
+            {
+              "id": "operators",
+              "label": "Result cache",
+              "value": "Reuse output",
+              "detail": "Different work path.",
+              "status": "selected"
+            },
+            {
+              "id": "result",
+              "label": "Result",
+              "value": "5%",
+              "detail": "Same value, different work.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "operators",
+              "to": "result",
+              "label": "return cached output"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m05-capacity-visual",
+      "kind": "table",
+      "title": "Faster one query and serving many are different goals",
+      "alt": "Faster one query and serving many are different goals. No single number describes service behavior. Capacity conclusions need both benefit and operating cost context.",
+      "caption": "Capacity must serve the workload distribution, not only a single fast query. Synthetic teaching example.",
+      "textEquivalent": "Three measurements: No single number describes service behavior. Columns: Measure; Synthetic observation; Question. Rows: Concurrency — 12 simultaneous users — How much work arrives together?; Latency — 5 s for one result — How long does one user wait?; Throughput — 12 completed/minute — How much useful work finishes?.\n\nTwo workload windows: Capacity conclusions need both benefit and operating cost context. Columns: Window; What to measure; Why. Rows: Morning peak — Queue, latency distribution, failures, usage — Required service; Quiet period — Latency and idle usage — Avoid paying for unneeded peak capacity.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m05-claim-capacity",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "states": [
+        {
+          "id": "dimensions",
+          "title": "Three measurements",
+          "explanation": "No single number describes service behavior.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Measure",
+              "Synthetic observation",
+              "Question"
+            ],
+            "rows": [
+              [
+                "Concurrency",
+                "12 simultaneous users",
+                "How much work arrives together?"
+              ],
+              [
+                "Latency",
+                "5 s for one result",
+                "How long does one user wait?"
+              ],
+              [
+                "Throughput",
+                "12 completed/minute",
+                "How much useful work finishes?"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "windows",
+          "title": "Two workload windows",
+          "explanation": "Capacity conclusions need both benefit and operating cost context.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Window",
+              "What to measure",
+              "Why"
+            ],
+            "rows": [
+              [
+                "Morning peak",
+                "Queue, latency distribution, failures, usage",
+                "Required service"
+              ],
+              [
+                "Quiet period",
+                "Latency and idle usage",
+                "Avoid paying for unneeded peak capacity"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m05-experiment-visual",
+      "kind": "table",
+      "title": "Change one hypothesis and keep the denominator",
+      "alt": "Change one hypothesis and keep the denominator. Set the acceptance rule before seeing results. Stage changes or label the result exploratory.",
+      "caption": "Fix the workload and success rule before changing a performance hypothesis. Synthetic teaching example.",
+      "textEquivalent": "Before running: Set the acceptance rule before seeing results. Columns: Item; Fixed or measured. Rows: Query/data/cut-off — Fixed; Cache/concurrency/workload mix — Comparable and recorded; Candidate change — One stated hypothesis; Success criterion — 95% of requests under 15 s; errors tracked; Cost basis — Total test cost with exclusions stated.\n\nAn uninterpretable comparison: Stage changes or label the result exploratory. Columns: Change made together; Why attribution fails. Rows: New join +larger warehouse +warm cache — Cannot isolate which caused the difference; Remove difficult queries — The tested population is no longer comparable.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m05-claim-capacity",
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "states": [
+        {
+          "id": "design",
+          "title": "Before running",
+          "explanation": "Set the acceptance rule before seeing results.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Item",
+              "Fixed or measured"
+            ],
+            "rows": [
+              [
+                "Query/data/cut-off",
+                "Fixed"
+              ],
+              [
+                "Cache/concurrency/workload mix",
+                "Comparable and recorded"
+              ],
+              [
+                "Candidate change",
+                "One stated hypothesis"
+              ],
+              [
+                "Success criterion",
+                "95% of requests under 15 s; errors tracked"
+              ],
+              [
+                "Cost basis",
+                "Total test cost with exclusions stated"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "confounded",
+          "title": "An uninterpretable comparison",
+          "explanation": "Stage changes or label the result exploratory.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Change made together",
+              "Why attribution fails"
+            ],
+            "rows": [
+              [
+                "New join +larger warehouse +warm cache",
+                "Cannot isolate which caused the difference"
+              ],
+              [
+                "Remove difficult queries",
+                "The tested population is no longer comparable"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m05-transfer-visual",
+      "kind": "table",
+      "title": "A better median can still fail the goal",
+      "alt": "A better median can still fail the goal. These are invented observations and arbitrary units, not product prices. A single summary cannot replace the agreed service threshold.",
+      "caption": "Report against the original threshold; the median cannot certify the tail. Synthetic teaching example.",
+      "textEquivalent": "Synthetic candidate result: These are invented observations and arbitrary units, not product prices. Columns: Measure; Baseline; Candidate. Rows: Median latency — 8 s — 5 s; Slowest 10% — Unresolved — Above 60 s; Total test cost — 100 arbitrary units — 130 arbitrary units; Goal — 95% under 15 s — Not met.\n\nAcceptance reasoning: A single summary cannot replace the agreed service threshold. Columns: Fact; Implication. Rows: 10% exceed 60 s — At least 10% exceed 15 s; Goal allows at most 5% outside threshold — Candidate fails this criterion; Median improved — Report benefit without calling objective met.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "states": [
+        {
+          "id": "results",
+          "title": "Synthetic candidate result",
+          "explanation": "These are invented observations and arbitrary units, not product prices.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Measure",
+              "Baseline",
+              "Candidate"
+            ],
+            "rows": [
+              [
+                "Median latency",
+                "8 s",
+                "5 s"
+              ],
+              [
+                "Slowest 10%",
+                "Unresolved",
+                "Above 60 s"
+              ],
+              [
+                "Total test cost",
+                "100 arbitrary units",
+                "130 arbitrary units"
+              ],
+              [
+                "Goal",
+                "95% under 15 s",
+                "Not met"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "reason",
+          "title": "Acceptance reasoning",
+          "explanation": "A single summary cannot replace the agreed service threshold.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Fact",
+              "Implication"
+            ],
+            "rows": [
+              [
+                "10% exceed 60 s",
+                "At least 10% exceed 15 s"
+              ],
+              [
+                "Goal allows at most 5% outside threshold",
+                "Candidate fails this criterion"
+              ],
+              [
+                "Median improved",
+                "Report benefit without calling objective met"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-m05-metric-question",
+      "revision": "1",
+      "prompt": "Why can 5% and 50% both be correct here?",
+      "options": [
+        {
+          "id": "dbxfe-m05-metric-question-a",
+          "text": "They count different denominator units",
+          "rationale": "One counts inspected units, the other inspections."
+        },
+        {
+          "id": "dbxfe-m05-metric-question-b",
+          "text": "One query must be slow",
+          "rationale": "Performance does not determine metric meaning."
+        },
+        {
+          "id": "dbxfe-m05-metric-question-c",
+          "text": "The data must be duplicated",
+          "rationale": "Different valid definitions can produce different rates without duplication."
+        }
+      ],
+      "correctOptionId": "dbxfe-m05-metric-question-a",
+      "conceptIds": [
+        "dbxfe-m05-metric-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-serving-question",
+      "revision": "1",
+      "prompt": "The dashboard query ran at 09:00 over an 08:30 snapshot. What is the safe freshness statement?",
+      "options": [
+        {
+          "id": "dbxfe-m05-serving-question-b",
+          "text": "All source data is current through 09:00",
+          "rationale": "That was not established."
+        },
+        {
+          "id": "dbxfe-m05-serving-question-c",
+          "text": "The report is invalid solely because it is 30 minutes old",
+          "rationale": "Acceptable freshness depends on the contract and status."
+        },
+        {
+          "id": "dbxfe-m05-serving-question-a",
+          "text": "Executed 09:00; data cut-off 08:30",
+          "rationale": "Execution and population freshness are different facts."
+        }
+      ],
+      "correctOptionId": "dbxfe-m05-serving-question-a",
+      "conceptIds": [
+        "dbxfe-m05-serving-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-sql",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-latency-question",
+      "revision": "1",
+      "prompt": "For A versusB, which delay changed?",
+      "options": [
+        {
+          "id": "dbxfe-m05-latency-question-c",
+          "text": "Rendering doubled",
+          "rationale": "Rendering remains 10 seconds."
+        },
+        {
+          "id": "dbxfe-m05-latency-question-a",
+          "text": "Queue time increased by 30 seconds",
+          "rationale": "Execution and presentation are equal in this synthetic comparison."
+        },
+        {
+          "id": "dbxfe-m05-latency-question-b",
+          "text": "The query execution became 30 seconds slower",
+          "rationale": "Execution remains 5 seconds."
+        }
+      ],
+      "correctOptionId": "dbxfe-m05-latency-question-a",
+      "conceptIds": [
+        "dbxfe-m05-latency-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-execution-question",
+      "revision": "1",
+      "prompt": "Why can a one-row final result still require expensive execution?",
+      "options": [
+        {
+          "id": "dbxfe-m05-execution-question-a",
+          "text": "Large joins or groups can create substantial intermediate work",
+          "rationale": "Final cardinality does not describe all operators."
+        },
+        {
+          "id": "dbxfe-m05-execution-question-b",
+          "text": "A one-row result always means a bug",
+          "rationale": "A legitimate aggregation can return one row."
+        },
+        {
+          "id": "dbxfe-m05-execution-question-c",
+          "text": "Result size guarantees memory demand",
+          "rationale": "Intermediate distributions and operations determine demand too."
+        }
+      ],
+      "correctOptionId": "dbxfe-m05-execution-question-a",
+      "conceptIds": [
+        "dbxfe-m05-execution-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-claim-skew",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-cache-question",
+      "revision": "1",
+      "prompt": "A rewritten query appears faster, but only its run used cached results. What can you conclude?",
+      "options": [
+        {
+          "id": "dbxfe-m05-cache-question-b",
+          "text": "The rewrite is proven faster",
+          "rationale": "The observed speed may be reuse rather than better execution."
+        },
+        {
+          "id": "dbxfe-m05-cache-question-c",
+          "text": "Caching is always wrong",
+          "rationale": "Caching can be useful; the experiment must account for it."
+        },
+        {
+          "id": "dbxfe-m05-cache-question-a",
+          "text": "The comparison is confounded",
+          "rationale": "Cache state changed as well as query text."
+        }
+      ],
+      "correctOptionId": "dbxfe-m05-cache-question-a",
+      "conceptIds": [
+        "dbxfe-m05-cache-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-cache",
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-capacity-question",
+      "revision": "1",
+      "prompt": "Which observation measures throughput?",
+      "options": [
+        {
+          "id": "dbxfe-m05-capacity-question-c",
+          "text": "A user waited 8 seconds",
+          "rationale": "That describes latency."
+        },
+        {
+          "id": "dbxfe-m05-capacity-question-a",
+          "text": "120 completed queries in 10 minutes",
+          "rationale": "It counts completed work over a time interval."
+        },
+        {
+          "id": "dbxfe-m05-capacity-question-b",
+          "text": "12 users currently submitting work",
+          "rationale": "That describes concurrency."
+        }
+      ],
+      "correctOptionId": "dbxfe-m05-capacity-question-a",
+      "conceptIds": [
+        "dbxfe-m05-capacity-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-capacity",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-experiment-question",
+      "revision": "1",
+      "prompt": "Why avoid changing the join and warehouse size in the same first experiment?",
+      "options": [
+        {
+          "id": "dbxfe-m05-experiment-question-a",
+          "text": "It becomes harder to attribute the result",
+          "rationale": "Either change or their interaction may cause the difference."
+        },
+        {
+          "id": "dbxfe-m05-experiment-question-b",
+          "text": "Two changes can never improve performance",
+          "rationale": "They can, but the causal conclusion is weaker."
+        },
+        {
+          "id": "dbxfe-m05-experiment-question-c",
+          "text": "Only hardware experiments are valid",
+          "rationale": "Query and data-shape hypotheses can be tested too."
+        }
+      ],
+      "correctOptionId": "dbxfe-m05-experiment-question-a",
+      "conceptIds": [
+        "dbxfe-m05-experiment-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-capacity",
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-transfer-question",
+      "revision": "1",
+      "prompt": "Has the 95%-under 15 s goal been met?",
+      "options": [
+        {
+          "id": "dbxfe-m05-transfer-question-b",
+          "text": "Yes, because median 5 s is below 15 s",
+          "rationale": "The median says only half the requests meet that value."
+        },
+        {
+          "id": "dbxfe-m05-transfer-question-c",
+          "text": "Cannot know whether median improved",
+          "rationale": "The given median improved; the separate goal still fails."
+        },
+        {
+          "id": "dbxfe-m05-transfer-question-a",
+          "text": "No",
+          "rationale": "If 10% exceed 60 s, at least 10% exceed 15 s."
+        }
+      ],
+      "correctOptionId": "dbxfe-m05-transfer-question-a",
+      "conceptIds": [
+        "dbxfe-m05-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ]
+    }
+  ],
+  "selfQuestions": [],
+  "beats": [
+    {
+      "id": "dbxfe-m05-metric",
+      "version": "1.0.0",
+      "title": "5% and 50% can both be correct",
+      "outcome": "Name the numerator and denominator before comparing reports.",
+      "explanation": "A has 12 inspected units and 1 defective; C has 8 and 0. The unit defect rate is 5%, while half the inspections found any defect. A [[dbxfe-m05-metric-concept|metric contract]] names which question the report answers. A fast dashboard titled “quality 50%” is still ambiguous. Resolve meaning before tuning the query that calculates it.",
+      "lessonId": "dbxfe-m05-l01",
+      "sectionId": "dbxfe-m05-l01-understand",
+      "conceptIds": [
+        "dbxfe-m05-metric-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "visualId": "dbxfe-m05-metric-visual",
+      "samajh": {
+        "text": "Ek question hai kitne units defective nikle; doosra hai kitni inspections mein koi defect mila. Same records se dono numbers aa sakte hain. Denominator badla toh question badal gaya. Sirf “quality” label se reader ko guess karna padega; naam mein quantity clear rakho.",
+        "mapping": "The counted unit determines the meaning of the rate.",
+        "boundary": "Neither metric is universally preferable; the decision and contract choose it."
+      },
+      "questionIds": [
+        "dbxfe-m05-metric-question"
+      ],
+      "handbook": {
+        "markdown": "Write the metric as a sentence before SQL: accepted defective units divided by accepted inspected units, grouped by plant and business day, with an explicit correction and exclusion policy. Name the owner who approves changes. For a zero denominator, our example returns undefined rather than 0%, because no inspected population establishes a rate.\n\nThe same source supports another metric: inspections with at least one defect divided by inspections. A contributes one positive inspection and C one negative, so the result is 50%. That measure may answer a useful operational question, but it is not interchangeable with the 5% unit rate. A dashboard should label both clearly if both are shown.\n\nAlso record the time basis: event time, ingestion cut-off and business-day zone can differ. Is historical reporting restated after corrections or shown as known at the meeting? Either can be coherent if labeled and owned. Product semantic-layer tools can help reuse a definition, but they cannot negotiate this business agreement. Reconcile representative rows before treating visual agreement as correctness.",
+        "sourceSectionIds": [
+          "dbxfe-m05-l01-understand"
+        ]
+      },
+      "recap": "A number has meaning only with its population and denominator.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m05-serving",
+      "version": "1.0.0",
+      "title": "The dashboard is the last mile",
+      "outcome": "Trace a visible metric back to accepted records and its freshness.",
+      "explanation": "A dashboard presents the result; it does not establish the result’s trustworthiness. Follow [[dbxfe-m05-serving-concept|data lineage]] backward from 5% to totals 1/20, to accepted A and C, and to retained evidence. Show freshness and exclusions beside the number. A query can run today over a previous snapshot, so execution time alone is not a data freshness label.",
+      "lessonId": "dbxfe-m05-l01",
+      "sectionId": "dbxfe-m05-l01-understand",
+      "conceptIds": [
+        "dbxfe-m05-serving-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-sql",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "visualId": "dbxfe-m05-serving-visual",
+      "questionIds": [
+        "dbxfe-m05-serving-question"
+      ],
+      "handbook": {
+        "markdown": "Pick one displayed figure and explain every dependency needed to reproduce it. The accepted population determines which inspections count. The metric logic determines the numerator and denominator. The serving query applies the requested filters. The dashboard formats the result and should make its time/coverage limits visible.\n\nFor Cinderline, a 5% display can be correct for the last verified 20/1 snapshot while a later correction remains unresolved. Label it previous or stale according to the publication policy; do not relabel the latest successful query execution as the latest accepted source state. This matters when people act at shift change.\n\nDatabricks SQL supplies analytical interfaces and execution resources. Reusable metric definitions can reduce copy-paste drift, but a central definition still needs an owner, representative tests and an explicit change process. Lineage helps locate dependencies; it does not prove the source is complete or the business rule is right. In a review, ask the analyst to trace one number to rows and state which excluded inputs or unresolved issues are not represented. That demonstration is more informative than a screenshot alone.",
+        "sourceSectionIds": [
+          "dbxfe-m05-l01-understand"
+        ]
+      },
+      "recap": "Trace the KPI to rows and show the data cut-off, not only query time.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m05-latency",
+      "version": "1.0.0",
+      "title": "The same 45 seconds can mean different work",
+      "outcome": "Decompose end-to-end delay before choosing a remedy.",
+      "explanation": "Separate waiting, execution and presentation. RunA spends 30 seconds queued, 5 executing and 10 transferring/rendering; runC spends 0, 35 and 10. Both feel like 45 seconds, but the dominant delay differs. Define [[dbxfe-m05-latency-concept|latency]] at the user boundary, then inspect the stage that explains the difference before proposing more capacity or a query rewrite.",
+      "lessonId": "dbxfe-m05-l02",
+      "sectionId": "dbxfe-m05-l02-understand",
+      "conceptIds": [
+        "dbxfe-m05-latency-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "visualId": "dbxfe-m05-latency-visual",
+      "questionIds": [
+        "dbxfe-m05-latency-question"
+      ],
+      "handbook": {
+        "markdown": "Define measurement start and end before comparing runs. A user may include dashboard loading, waiting for compute, query planning/execution, result transfer and browser rendering. A query profile has its own scope. Neither is wrong, but subtracting differently scoped durations can produce an invented bottleneck.\n\nOur ledger holds execution and presentation constant for A versusB, isolating a queue difference. That suggests investigating peak concurrency, workload arrival and capacity. B versusC instead changes execution while queue and presentation remain equal; inspect the changed join and its rows/operators. Neither table proves the ultimate root cause without run evidence.\n\nRecord query text, input snapshot, warehouse type/configuration, user population, cache conditions and failures. Compare representative cases rather than one lucky run. A remedy that makes execution faster may have little effect when most user time is waiting or rendering. Conversely, reducing queues will not repair a multiplying join. The next beat looks inside execution while preserving the end-to-end view.",
+        "sourceSectionIds": [
+          "dbxfe-m05-l02-understand"
+        ]
+      },
+      "recap": "Equal total latency can hide different bottlenecks; compare its components.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m05-execution",
+      "version": "1.0.0",
+      "title": "Inspect rows, imbalance and spilled work",
+      "outcome": "Connect profile evidence to a bounded query hypothesis.",
+      "explanation": "Execution evidence can reveal a multiplying join, [[dbxfe-m05-execution-concept|skew]], or spill from execution memory to disk. These are different mechanisms. A hot key can leave one task working while others finish; a large intermediate relation can consume memory even when the final result is tiny. Inspect rows and task distributions before treating a larger resource as the explanation.",
+      "lessonId": "dbxfe-m05-l02",
+      "sectionId": "dbxfe-m05-l02-understand",
+      "conceptIds": [
+        "dbxfe-m05-execution-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-claim-skew",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "visualId": "dbxfe-m05-execution-visual",
+      "questionIds": [
+        "dbxfe-m05-execution-question"
+      ],
+      "handbook": {
+        "markdown": "Start with correctness: compare input and output row counts around joins. An unexpectedly large relation may reflect the many-to-many behavior taught in transformations. Next inspect whether work is balanced. If one partition or task receives much more data, adding parallel resources may leave much of that capacity idle while the hot task dominates.\n\nSpill occurs when execution work moves from memory to disk. It can accompany joins, sorts and aggregations. Connect spill metrics to the relevant operator and data volume before deciding between reducing work, changing distribution or testing capacity. A tiny final result can hide a large intermediate relation.\n\nThe visual numbers are synthetic and do not prescribe a tuning threshold. A real profile needs permissions and actual run context. Operator labels from a video about another Spark execution engine illustrate concepts; they do not establish Databricks Photon implementation or benchmark claims. The remedy should be a falsifiable hypothesis: for example, correcting the join grain should reduce intermediate rows while preserving independently expected totals. Measure the result rather than accepting an operator-name explanation.",
+        "sourceSectionIds": [
+          "dbxfe-m05-l02-understand"
+        ]
+      },
+      "recap": "Explain the intermediate work; final result size is only one observation.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": [
+        "dbxfe-m05-media-execution"
+      ]
+    },
+    {
+      "id": "dbxfe-m05-cache",
+      "version": "1.0.0",
+      "title": "A cached answer is a different experiment",
+      "outcome": "Identify cache conditions that confound performance comparisons.",
+      "explanation": "A [[dbxfe-m05-cache-concept|result cache]] can avoid work altogether. Comparing a cold execution with a cached answer does not isolate the effect of a SQL rewrite. Record cache conditions deliberately; a missing profile may be consistent with cached results. Restarting a warehouse alone is not a universal cold-cache guarantee because cache layers and lifecycles differ.",
+      "lessonId": "dbxfe-m05-l02",
+      "sectionId": "dbxfe-m05-l02-understand",
+      "conceptIds": [
+        "dbxfe-m05-cache-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-cache",
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "visualId": "dbxfe-m05-cache-visual",
+      "questionIds": [
+        "dbxfe-m05-cache-question"
+      ],
+      "handbook": {
+        "markdown": "Choose what you want to measure: uncached execution efficiency, repeated-query user experience, or the realistic mix of both. Then hold or document the cache policy accordingly. A valid workload test can include warm caches, but the comparison must use a comparable basis and disclose it.\n\nDatabricks documents separate UI, result and disk cache behavior, with different lifecycle details. In particular serverless remote result caching can survive a warehouse restart. Therefore “we restarted” is not enough evidence that every cache was cold. AI/BI dashboards also have their own behavior; a SQL editor observation is not automatically a dashboard observation.\n\nA profile may be unavailable for a cached query, while access permissions can also govern what the user sees. Record the exact observation rather than concluding that the engine performed zero work or that monitoring is broken. In the synthetic A/B/C experiment, cache conditions are held fixed by assumption. In a real test they must be verified and recorded alongside query, data, configuration and concurrency. Do not disable useful caching in production merely to imitate a benchmark.",
+        "sourceSectionIds": [
+          "dbxfe-m05-l02-understand"
+        ]
+      },
+      "recap": "State the cache policy; a faster reuse path does not prove a faster execution plan.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m05-capacity",
+      "version": "1.0.0",
+      "title": "Faster one query and serving many are different goals",
+      "outcome": "Distinguish latency, throughput and concurrency in a capacity decision.",
+      "explanation": "Concurrency is simultaneous work; latency is time to a result; [[dbxfe-m05-capacity-concept|throughput]] is completed work over time. Warehouse size and cluster count address different capacity dimensions, and serverless behavior differs from classic/pro. Test the morning population and a quiet period. Extra capacity can reduce a queue without fixing a bad join, or add idle cost without meeting the tail-latency target.",
+      "lessonId": "dbxfe-m05-l03",
+      "sectionId": "dbxfe-m05-l03-understand",
+      "conceptIds": [
+        "dbxfe-m05-capacity-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-capacity",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "visualId": "dbxfe-m05-capacity-visual",
+      "questionIds": [
+        "dbxfe-m05-capacity-question"
+      ],
+      "handbook": {
+        "markdown": "A system can be fast for one query and still queue under simultaneous demand. It can also complete many small queries while one important long query misses its deadline. Specify the workload population and distribution instead of relying only on averages.\n\nCurrent warehouse documentation distinguishes resources per cluster from scaling multiple clusters and describes different management for serverless versus classic/pro. The lesson does not turn those differences into a universal sizing rule or guarantee of proportional speedup. Inspect queue and spill evidence in the actual target environment, then test one justified change.\n\nFor Cinderline, include the twelve-user morning refresh pattern and a two-user quiet check. Measure allowed workload completed, latency distribution, failures and the full agreed cost basis. A candidate that improves the median but leaves a critical tail unresolved may not meet the objective. A quiet-period test detects idle consumption that a short peak test would miss. Synthetic cost units in the next beat are comparison arithmetic only, not rates, quotations or an instruction to provision paid resources.",
+        "sourceSectionIds": [
+          "dbxfe-m05-l03-understand"
+        ]
+      },
+      "recap": "Capacity must serve the workload distribution, not only a single fast query.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m05-experiment",
+      "version": "1.0.0",
+      "title": "Change one hypothesis and keep the denominator",
+      "outcome": "Design an interpretable cost/performance comparison.",
+      "explanation": "A [[dbxfe-m05-experiment-concept|controlled experiment]] needs a fixed workload and an agreed success criterion. Hold query, input snapshot, cache policy and concurrency comparable; change one capacity or query hypothesis. Record failures and excluded work. A faster run that quietly drops hard queries changes the denominator of success, just as dropping inspections can distort a quality metric.",
+      "lessonId": "dbxfe-m05-l03",
+      "sectionId": "dbxfe-m05-l03-understand",
+      "conceptIds": [
+        "dbxfe-m05-experiment-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-capacity",
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "visualId": "dbxfe-m05-experiment-visual",
+      "questionIds": [
+        "dbxfe-m05-experiment-question"
+      ],
+      "handbook": {
+        "markdown": "Write the hypothesis in a form that could be wrong. “Peak queueing is the main delay; changing this capacity setting should reduce queue time without changing query results” is testable. “Make it faster” is not specific enough to select evidence. Preserve input and expected output so performance work cannot silently change correctness.\n\nFor each run record workload size, completion/failure counts, latency distribution, queue/execution breakdown and the agreed usage/cost basis. Include test duration and idle/start behavior where relevant. If data movement or another charge is excluded, say so. Do not present a synthetic unit or list price as a customer’s total cost.\n\nMultiple simultaneous changes can still be useful exploratory work, but label the conclusion accordingly. A follow-up can isolate the most plausible factor. A real experiment also needs an authorized budget/stop condition and an owner; none is executed here. The applied result next deliberately improves one statistic while failing the actual objective, so the learner must report both rather than choosing whichever number looks favorable.",
+        "sourceSectionIds": [
+          "dbxfe-m05-l03-understand"
+        ]
+      },
+      "recap": "Fix the workload and success rule before changing a performance hypothesis.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m05-transfer",
+      "version": "1.0.0",
+      "title": "A better median can still fail the goal",
+      "outcome": "Read a performance result against its original acceptance criterion.",
+      "explanation": "The candidate lowers median latency from 8 seconds to 5, but 10% of requests still exceed 60 seconds. The goal was 95% under 15 seconds. That goal is not met: at most 90% can be under 15. Report the median improvement, unresolved [[dbxfe-m05-transfer-concept|tail latency]] and higher test cost together, then choose evidence for the slow subgroup.",
+      "lessonId": "dbxfe-m05-l03",
+      "sectionId": "dbxfe-m05-l03-understand",
+      "conceptIds": [
+        "dbxfe-m05-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-profile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "visualId": "dbxfe-m05-transfer-visual",
+      "questionIds": [
+        "dbxfe-m05-transfer-question"
+      ],
+      "handbook": {
+        "markdown": "Evaluate the agreed criterion directly. Out of 100 hypothetical requests, at least 10 are slower than 60 seconds and therefore slower than 15 seconds. The goal allows no more than 5 requests outside 15 seconds. Even without knowing the other 90 exact timings, the candidate cannot meet the stated target.\n\nReport three findings: the typical experience improved, the slow subgroup remains unacceptable, and test cost increased by 30 arbitrary units under the same stated basis. Do not hide any of them behind a single “faster” label. The next investigation should identify which queries/users or operators form the tail and compare queue, skew, spill, data volume and cache evidence.\n\nA customer recommendation might be a targeted follow-up, not automatic rejection of every change or blanket approval of more capacity. Retain the population and failure counts so the next result is comparable. This is a synthetic interpretation exercise, not a vendor benchmark. Review canonical cards on metric meaning, query evidence and capacity, then choose source-backed extensions about profile access and cache/time scope deliberately.",
+        "sourceSectionIds": [
+          "dbxfe-m05-l03-understand"
+        ]
+      },
+      "recap": "Report against the original threshold; the median cannot certify the tail.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m05-l01-card1",
+      "beatId": "dbxfe-m05-metric"
+    },
+    {
+      "cardId": "dbxfe-m05-l01-card2",
+      "beatId": "dbxfe-m05-metric"
+    },
+    {
+      "cardId": "dbxfe-m05-l01-card3",
+      "beatId": "dbxfe-m05-serving"
+    },
+    {
+      "cardId": "dbxfe-m05-l02-card1",
+      "beatId": "dbxfe-m05-latency"
+    },
+    {
+      "cardId": "dbxfe-m05-l02-card2",
+      "beatId": "dbxfe-m05-execution"
+    },
+    {
+      "cardId": "dbxfe-m05-l02-card3",
+      "beatId": "dbxfe-m05-experiment"
+    },
+    {
+      "cardId": "dbxfe-m05-l03-card1",
+      "beatId": "dbxfe-m05-capacity"
+    },
+    {
+      "cardId": "dbxfe-m05-l03-card2",
+      "beatId": "dbxfe-m05-capacity"
+    },
+    {
+      "cardId": "dbxfe-m05-l03-card3",
+      "beatId": "dbxfe-m05-transfer"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-m05-extension-task-time",
+      "revision": "1",
+      "prompt": "Why can aggregate task time exceed wall-clock query duration?",
+      "answer": "Tasks can run concurrently, and aggregate task time sums their durations.",
+      "explanation": "Four tasks running for 5 seconds in parallel contribute about 20 task-seconds while that concurrent phase lasts about 5 wall-clock seconds. Scheduling and other overhead add context; do not equate the sums.",
+      "lessonId": "dbxfe-m05-l02",
+      "sectionId": "dbxfe-m05-l02-understand",
+      "conceptIds": [
+        "dbxfe-m05-latency-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-profile"
+      ],
+      "beatId": "dbxfe-m05-latency",
+      "whyItMatters": "Prevents a misleading bottleneck or savings calculation."
+    },
+    {
+      "id": "dbxfe-m05-extension-profile-access",
+      "revision": "1",
+      "prompt": "What access is needed to view a query profile?",
+      "answer": "Query ownership or at least the documented warehouse monitoring permission.",
+      "explanation": "The current source specifies ownership or CAN MONITOR on the executing SQL warehouse. A missing view may reflect access or cached execution, so inspect the specific case rather than assuming monitoring failure.",
+      "lessonId": "dbxfe-m05-l02",
+      "sectionId": "dbxfe-m05-l02-understand",
+      "conceptIds": [
+        "dbxfe-m05-execution-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-profile"
+      ],
+      "beatId": "dbxfe-m05-execution",
+      "whyItMatters": "Diagnostic plans need the right observer identity."
+    },
+    {
+      "id": "dbxfe-m05-extension-approximate-percentile",
+      "revision": "1",
+      "prompt": "May an approximate percentile alone certify an exact requirement that at least 95% of requests finish strictly under 15 seconds?",
+      "answer": "No. Check the agreed request count and strict timing predicate directly, preserving failures and missing measurements.",
+      "explanation": "An [[dbxfe-m05-extension-approximate-percentile-concept|approximate percentile]] is useful for exploring a large timing distribution, but a release condition may require exact counting. The documented function exposes an accuracy setting that changes memory and approximation accuracy. In an original 100-request example, 94 finish below 15 seconds and 6 finish exactly at 15. The strict-under condition has 94 successes, so a 95% target fails even though rounding the times can make the boundary look harmless. Compute the agreed Boolean predicate over the agreed denominator, and state how failures and missing measurements are handled. Use percentile summaries alongside that result rather than silently replacing the contract. This is arithmetic and measurement guidance, not an executed benchmark or a claim about a particular approximation error.",
+      "lessonId": "dbxfe-m05-l03",
+      "sectionId": "dbxfe-m05-l03-understand",
+      "conceptIds": [
+        "dbxfe-m05-extension-approximate-percentile-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-approximate-percentile",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "beatId": "dbxfe-m05-experiment",
+      "whyItMatters": "Approximation and threshold-boundary choices must not silently redefine a pass."
+    },
+    {
+      "id": "dbxfe-m05-extension-having",
+      "revision": "1",
+      "prompt": "North has inspection quantities 12 and 8. To retain plants totaling at least 20, should WHERE inspected>=20 replace HAVING SUM(inspected)>=20?",
+      "answer": "No. The row filter drops both North rows; the group filter keeps North's total 20.",
+      "explanation": "Filter placement changes meaning. Our synthetic input has North inspections 12 and 8, plus South 15. Grouping first produces North 20 and South 15; HAVING SUM(inspected)>=20 keeps North. A WHERE inspected>=20 condition instead removes every input row, because none individually reaches 20. The faster empty result would answer the wrong question. Before moving a condition earlier to reduce work, establish whether it concerns input records or their aggregate. The documented HAVING clause operates on grouped results; its expressions use grouping terms, aggregates or constants. Inspect keys and totals after a rewrite, then measure performance. These expected results are hand-worked, not a claim that either query was run.",
+      "lessonId": "dbxfe-m05-l02",
+      "sectionId": "dbxfe-m05-l02-understand",
+      "conceptIds": [
+        "dbxfe-m05-extension-having-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m05-claim-having",
+        "dbxfe-m05-guidance",
+        "dbxfe-m05-fiction"
+      ],
+      "beatId": "dbxfe-m05-execution",
+      "whyItMatters": "A plausible optimization can change the business population instead of merely reducing work."
+    }
+  ],
+  "recap": {
+    "title": "Meaning first, evidence second, one test next",
+    "markdown": "**Metric contract → traced rows/freshness → queue/execution/presentation → operator evidence → controlled test → threshold and cost decision.** Review linked core cards before adding extensions. All benchmark-like numbers here are synthetic.",
+    "visualId": "dbxfe-m05-latency-visual"
+  },
+  "appliedTask": {
+    "title": "Recommend the next experiment",
+    "prompt": "A peak dashboard waits 30 s, executes 5 s and renders 10 s. A candidate lowers median latency to 5 s but leaves 10% of requests above 60 s and increases cost. The goal is 95% under 15 s. What should the customer hear and what evidence comes next?",
+    "modelAnswer": "The candidate improves the median but fails the agreed tail criterion and costs more. Inspect the slow subgroup’s queue/execution breakdown and representative profiles, preserving query/data/cache/concurrency conditions; test a targeted hypothesis and measure the same threshold, failures and total cost basis.",
+    "reasoning": "The recommendation reports all material evidence and directs the next test toward the unresolved delay rather than declaring success from a favorable summary.",
+    "beatIds": [
+      "dbxfe-m05-latency",
+      "dbxfe-m05-execution",
+      "dbxfe-m05-experiment",
+      "dbxfe-m05-transfer"
+    ]
+  },
+  "scenarioIds": [
+    "dbxfe-m05-scenario"
+  ]
+}

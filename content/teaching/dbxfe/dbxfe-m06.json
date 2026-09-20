@@ -1,0 +1,1577 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-m06",
+  "title": "Unity Catalog, security and deployment boundaries",
+  "summary": "Name the asset, identify the principal, test the allowed work, and keep connectivity separate from permission.",
+  "outcomes": [
+    "Explain namespace and managed/external lifecycle responsibilities.",
+    "Reason about basic table-read privileges with representative identities.",
+    "Frame a cloud-labeled access and sharing validation without overclaiming."
+  ],
+  "startingAssumptions": [
+    "The platform module separates account, workspace, metastore, compute and storage.",
+    "Use the cloud bridge if DNS, route or principal vocabulary is unfamiliar."
+  ],
+  "lessonIds": [
+    "dbxfe-m06-l01",
+    "dbxfe-m06-l02",
+    "dbxfe-m06-l03"
+  ],
+  "optionalBridgeLessonIds": [
+    "dbxfe-cloud-bridge"
+  ],
+  "editorialRationale": "An analyst access case builds from names through privilege conjunctions and negative tests; sharing/deployment are explicit additional boundaries.",
+  "sources": [
+    {
+      "id": "dbxfe-m06-source-unity",
+      "title": "What is Unity Catalog?",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Governance coverage and object capabilities depend on supported operations; names alone grant no access.",
+      "reviewedEvidence": "The object model uses catalog.schema.object for tables and other assets and distinguishes managed from external lifecycle responsibility."
+    },
+    {
+      "id": "dbxfe-m06-source-privileges",
+      "title": "Unity Catalog privileges reference",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Privilege Model 1.0; older metastores and additional access policies/configuration need review. Beta fine-grained DML is not used as a general requirement.",
+      "reviewedEvidence": "SELECT on a table also requires parent USE CATALOG and USE SCHEMA. BROWSE enables discovery rather than data read; parent grants can inherit to current/future objects."
+    },
+    {
+      "id": "dbxfe-m06-source-external",
+      "title": "Work with external tables",
+      "url": "https://docs.databricks.com/aws/en/tables/external",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Cloud lifecycle, direct path access and external writers remain explicit responsibilities; no DROP is executed.",
+      "reviewedEvidence": "Dropping an external table removes the registered table without deleting its underlying cloud files."
+    },
+    {
+      "id": "dbxfe-m06-source-managed",
+      "title": "Unity Catalog managed tables",
+      "url": "https://docs.databricks.com/aws/en/tables/managed",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Do not promise an exact recovery duration without checking current configuration and runtime. No lifecycle command is executed.",
+      "reviewedEvidence": "Managed table data lifecycle includes delayed deletion after drop/recovery period; managed differs from external file ownership/lifecycle."
+    },
+    {
+      "id": "dbxfe-m06-source-network",
+      "title": "Serverless compute plane networking",
+      "url": "https://docs.databricks.com/aws/en/security/network/serverless-network-security/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "AWS only; exact region, endpoints, workspace type and feature availability require specialist verification.",
+      "reviewedEvidence": "The Databricks-managed serverless plane needs configured connectivity to customer resources, with networking cost/availability context."
+    },
+    {
+      "id": "dbxfe-m06-source-architecture",
+      "title": "High-level architecture",
+      "url": "https://docs.databricks.com/aws/en/getting-started/high-level-architecture",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Do not copy Azure/GCP network resource instructions into this AWS example.",
+      "reviewedEvidence": "Classic compute uses the customer AWS account; serverless compute uses the Databricks-managed plane; workspaces attach to governance context."
+    },
+    {
+      "id": "dbxfe-m06-source-sharing",
+      "title": "What is OpenSharing?",
+      "url": "https://docs.databricks.com/aws/en/opensharing",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "The historical delta-sharing URL now redirects here. Revoking service access does not erase recipient copies already obtained; confirm asset/client support.",
+      "reviewedEvidence": "Current sharing overview distinguishes recipient paths and allows revoking future access at defined granularities."
+    },
+    {
+      "id": "dbxfe-m06-source-lineage",
+      "title": "Lineage in Unity Catalog",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Lineage is dependency evidence, not complete proof of correctness, authorization or all external activity.",
+      "reviewedEvidence": "Lineage documentation lists operation/object coverage limits, including path-based column lineage and some UDF patterns."
+    },
+    {
+      "id": "dbxfe-m06-source-masks",
+      "title": "Row filters and column masks",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Table-level masks differ from ABAC policies and dynamic views. They are query visibility controls, not proof of encryption or universal protection of every external path.",
+      "reviewedEvidence": "Column masks are query-time functions returning original or masked column values; row filters restrict returned rows. Supported access paths and runtimes have explicit limits."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-m06-guidance",
+      "description": "Original educational reasoning, diagnostic choices and worked decisions; not a vendor runbook.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent SpicyBrain curriculum."
+    },
+    {
+      "id": "dbxfe-m06-fiction",
+      "description": "Cinderline examples, quantities, states, outcomes and alternatives are synthetic.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "Original teaching examples; no Databricks or customer execution claim."
+    },
+    {
+      "id": "dbxfe-m06-claim-unity",
+      "description": "The object model uses catalog.schema.object for tables and other assets and distinguishes managed from external lifecycle responsibility.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m06-source-unity"
+      ],
+      "context": "Governance coverage and object capabilities depend on supported operations; names alone grant no access."
+    },
+    {
+      "id": "dbxfe-m06-claim-privileges",
+      "description": "SELECT on a table also requires parent USE CATALOG and USE SCHEMA. BROWSE enables discovery rather than data read; parent grants can inherit to current/future objects.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m06-source-privileges"
+      ],
+      "context": "Privilege Model 1.0; older metastores and additional access policies/configuration need review. Beta fine-grained DML is not used as a general requirement."
+    },
+    {
+      "id": "dbxfe-m06-claim-external",
+      "description": "Dropping an external table removes the registered table without deleting its underlying cloud files.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m06-source-external"
+      ],
+      "context": "Cloud lifecycle, direct path access and external writers remain explicit responsibilities; no DROP is executed."
+    },
+    {
+      "id": "dbxfe-m06-claim-managed",
+      "description": "Managed table data lifecycle includes delayed deletion after drop/recovery period; managed differs from external file ownership/lifecycle.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m06-source-managed"
+      ],
+      "context": "Do not promise an exact recovery duration without checking current configuration and runtime. No lifecycle command is executed."
+    },
+    {
+      "id": "dbxfe-m06-claim-network",
+      "description": "The Databricks-managed serverless plane needs configured connectivity to customer resources, with networking cost/availability context.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m06-source-network"
+      ],
+      "context": "AWS only; exact region, endpoints, workspace type and feature availability require specialist verification."
+    },
+    {
+      "id": "dbxfe-m06-claim-architecture",
+      "description": "Classic compute uses the customer AWS account; serverless compute uses the Databricks-managed plane; workspaces attach to governance context.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m06-source-architecture"
+      ],
+      "context": "Do not copy Azure/GCP network resource instructions into this AWS example."
+    },
+    {
+      "id": "dbxfe-m06-claim-sharing",
+      "description": "Current sharing overview distinguishes recipient paths and allows revoking future access at defined granularities.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m06-source-sharing"
+      ],
+      "context": "The historical delta-sharing URL now redirects here. Revoking service access does not erase recipient copies already obtained; confirm asset/client support."
+    },
+    {
+      "id": "dbxfe-m06-claim-lineage",
+      "description": "Lineage documentation lists operation/object coverage limits, including path-based column lineage and some UDF patterns.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m06-source-lineage"
+      ],
+      "context": "Lineage is dependency evidence, not complete proof of correctness, authorization or all external activity."
+    },
+    {
+      "id": "dbxfe-m06-claim-masks",
+      "description": "Column masks are query-time functions returning original or masked column values; row filters restrict returned rows. Supported access paths and runtimes have explicit limits.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m06-source-masks"
+      ],
+      "context": "Table-level masks differ from ABAC policies and dynamic views. They are query visibility controls, not proof of encryption or universal protection of every external path."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-m06-names-concept",
+      "term": "namespace",
+      "aliases": [],
+      "definition": "A naming hierarchy that distinguishes an object within its context.",
+      "example": "quality.accepted.inspections names catalog quality, schema accepted and table inspections.",
+      "sourceIds": [
+        "dbxfe-m06-source-unity",
+        "dbxfe-m06-source-architecture"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-lifecycle-concept",
+      "term": "external table",
+      "aliases": [],
+      "definition": "A governed table whose underlying storage lifecycle remains externally managed.",
+      "example": "Dropping an external table registration does not delete its cloud files.",
+      "sourceIds": [
+        "dbxfe-m06-source-unity",
+        "dbxfe-m06-source-external",
+        "dbxfe-m06-source-managed"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-principals-concept",
+      "term": "principal",
+      "aliases": [],
+      "definition": "An identity such as a user, group or service principal to which permissions apply.",
+      "example": "A scheduled pipeline identity needs different work permissions from a read-only analyst group.",
+      "sourceIds": [
+        "dbxfe-m06-source-privileges"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-read-concept",
+      "term": "usage privilege",
+      "aliases": [],
+      "definition": "Permission to interact with objects within a named catalog or schema, without itself granting data read access.",
+      "example": "USE CATALOG quality and USE SCHEMA quality.accepted accompany SELECT on the table.",
+      "sourceIds": [
+        "dbxfe-m06-source-privileges"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-negative-concept",
+      "term": "negative access test",
+      "aliases": [],
+      "definition": "A deliberate check that an identity is prevented from an action outside its intended permissions.",
+      "example": "The reporting analyst can read accepted metrics but cannot modify raw inspections.",
+      "sourceIds": [
+        "dbxfe-m06-source-privileges"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-network-concept",
+      "term": "network reachability",
+      "aliases": [],
+      "definition": "Whether the relevant origin can connect through the required path to the destination service.",
+      "example": "The table grant can be correct while a restricted source endpoint is unreachable.",
+      "sourceIds": [
+        "dbxfe-m06-source-network",
+        "dbxfe-m06-source-architecture"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-sharing-concept",
+      "term": "data recipient",
+      "aliases": [],
+      "definition": "The external consumer identity or organization authorized to receive a defined shared data scope.",
+      "example": "An approved supplier receives a subset of quality results, not automatic access to all raw inspections.",
+      "sourceIds": [
+        "dbxfe-m06-source-sharing",
+        "dbxfe-m06-source-lineage"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-transfer-concept",
+      "term": "effective access",
+      "aliases": [],
+      "definition": "The permissions and conditions that actually apply to the acting principal in the tested context.",
+      "example": "A group grant may exist but the scheduled identity or inherited scope can differ from expectations.",
+      "sourceIds": [
+        "dbxfe-m06-source-privileges",
+        "dbxfe-m06-source-architecture",
+        "dbxfe-m06-source-network"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-extension-column-mask-concept",
+      "term": "column mask",
+      "aliases": [],
+      "definition": "A query-time rule controlling the value returned for a column.",
+      "example": "An analyst sees a redacted contact field while an approved steward may see its original value.",
+      "sourceIds": [
+        "dbxfe-m06-source-masks"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-m06-names-visual",
+      "kind": "nodes",
+      "title": "A three-part name locates an asset",
+      "alt": "A three-part name locates an asset. Each segment narrows the intended object. Resolve identity and environment before changing grants.",
+      "caption": "The name identifies the requested asset; access and storage lifecycle remain separate. Synthetic teaching example.",
+      "textEquivalent": "Three-part object name: Each segment narrows the intended object. Nodes: quality: Catalog. Governance container. (selected); accepted: Schema. Groups accepted objects. (selected); inspections: Table. The intended data object. (selected). Relationships: quality → accepted: contains; accepted → inspections: contains.\n\nNames need context: Resolve identity and environment before changing grants. Columns: Question; Why it matters. Rows: Which workspace/metastore? — Same text can appear in different environments; Which catalog/schema/object? — Avoid default-namespace ambiguity; Which effective principal? — Name does not imply permission.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m06-claim-unity",
+        "dbxfe-m06-claim-architecture",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "states": [
+        {
+          "id": "name",
+          "title": "Three-part object name",
+          "explanation": "Each segment narrows the intended object.",
+          "nodes": [
+            {
+              "id": "catalog",
+              "label": "quality",
+              "value": "Catalog",
+              "detail": "Governance container.",
+              "status": "selected"
+            },
+            {
+              "id": "schema",
+              "label": "accepted",
+              "value": "Schema",
+              "detail": "Groups accepted objects.",
+              "status": "selected"
+            },
+            {
+              "id": "object",
+              "label": "inspections",
+              "value": "Table",
+              "detail": "The intended data object.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "catalog",
+              "to": "schema",
+              "label": "contains"
+            },
+            {
+              "from": "schema",
+              "to": "object",
+              "label": "contains"
+            }
+          ]
+        },
+        {
+          "id": "context",
+          "title": "Names need context",
+          "explanation": "Resolve identity and environment before changing grants.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Question",
+              "Why it matters"
+            ],
+            "rows": [
+              [
+                "Which workspace/metastore?",
+                "Same text can appear in different environments"
+              ],
+              [
+                "Which catalog/schema/object?",
+                "Avoid default-namespace ambiguity"
+              ],
+              [
+                "Which effective principal?",
+                "Name does not imply permission"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m06-lifecycle-visual",
+      "kind": "comparison",
+      "title": "Who manages the files after the table changes?",
+      "alt": "Who manages the files after the table changes?. No lifecycle operation is executed in this lesson. One person may hold multiple roles, but the responsibilities remain distinct.",
+      "caption": "Governance, file lifecycle and business meaning have different owners and evidence. Synthetic teaching example.",
+      "textEquivalent": "Two lifecycle models: No lifecycle operation is executed in this lesson. Columns: Responsibility; Managed table; External table. Rows: Governed object access — Unity Catalog — Unity Catalog for governed access; Underlying file lifecycle — Managed lifecycle — External responsibility; Drop consequence — Recovery/later deletion rules apply — Files remain after registration drop.\n\nTwo ownership questions: One person may hold multiple roles, but the responsibilities remain distinct. Columns: Owner role; Decision. Rows: Technical object owner — Who administers this object under policy?; Quality metric owner — Which population, denominator and correction rules are approved?; Cloud storage owner — Who manages retention and direct access?.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m06-claim-unity",
+        "dbxfe-m06-claim-external",
+        "dbxfe-m06-claim-managed",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "states": [
+        {
+          "id": "responsibilities",
+          "title": "Two lifecycle models",
+          "explanation": "No lifecycle operation is executed in this lesson.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Responsibility",
+              "Managed table",
+              "External table"
+            ],
+            "rows": [
+              [
+                "Governed object access",
+                "Unity Catalog",
+                "Unity Catalog for governed access"
+              ],
+              [
+                "Underlying file lifecycle",
+                "Managed lifecycle",
+                "External responsibility"
+              ],
+              [
+                "Drop consequence",
+                "Recovery/later deletion rules apply",
+                "Files remain after registration drop"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "owners",
+          "title": "Two ownership questions",
+          "explanation": "One person may hold multiple roles, but the responsibilities remain distinct.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Owner role",
+              "Decision"
+            ],
+            "rows": [
+              [
+                "Technical object owner",
+                "Who administers this object under policy?"
+              ],
+              [
+                "Quality metric owner",
+                "Which population, denominator and correction rules are approved?"
+              ],
+              [
+                "Cloud storage owner",
+                "Who manages retention and direct access?"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m06-principals-visual",
+      "kind": "table",
+      "title": "Test the identity that will do the work",
+      "alt": "Test the identity that will do the work. This is a fictional proposal, not configured privileges.",
+      "caption": "Validate the actual acting identity and purpose, not a convenient administrator. Synthetic teaching example.",
+      "textEquivalent": "Proposed Cinderline access matrix: This is a fictional proposal, not configured privileges. Columns: Principal; Required work; Not required. Rows: Reporting analysts — Read approved daily metric — Modify raw input; Pipeline service principal — Read approved source; write accepted output — Administer entire account; Quality steward — Inspect permitted quarantined evidence — Read unrelated sensitive datasets.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "states": [
+        {
+          "id": "matrix",
+          "title": "Proposed Cinderline access matrix",
+          "explanation": "This is a fictional proposal, not configured privileges.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Principal",
+              "Required work",
+              "Not required"
+            ],
+            "rows": [
+              [
+                "Reporting analysts",
+                "Read approved daily metric",
+                "Modify raw input"
+              ],
+              [
+                "Pipeline service principal",
+                "Read approved source; write accepted output",
+                "Administer entire account"
+              ],
+              [
+                "Quality steward",
+                "Inspect permitted quarantined evidence",
+                "Read unrelated sensitive datasets"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m06-read-visual",
+      "kind": "table",
+      "title": "Three basic grants work together",
+      "alt": "Three basic grants work together. SELECT alone is insufficient. This does not assert end-to-end execution is configured.",
+      "caption": "Parent usage plus table SELECT is a basic conjunction, not a full deployment guarantee. Synthetic teaching example.",
+      "textEquivalent": "Missing parent usage: SELECT alone is insufficient. Columns: Required basic privilege; Analyst state. Rows: USE CATALOG quality — Yes; USE SCHEMA quality.accepted — No; SELECT quality.accepted.inspections — Yes; Basic read requirement — Not satisfied.\n\nParent usage corrected: This does not assert end-to-end execution is configured. Columns: Required basic privilege; Analyst state. Rows: USE CATALOG quality — Yes; USE SCHEMA quality.accepted — Yes; SELECT quality.accepted.inspections — Yes; Basic read requirement — Satisfied; other boundaries still apply.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "states": [
+        {
+          "id": "missing",
+          "title": "Missing parent usage",
+          "explanation": "SELECT alone is insufficient.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Required basic privilege",
+              "Analyst state"
+            ],
+            "rows": [
+              [
+                "USE CATALOG quality",
+                "Yes"
+              ],
+              [
+                "USE SCHEMA quality.accepted",
+                "No"
+              ],
+              [
+                "SELECT quality.accepted.inspections",
+                "Yes"
+              ],
+              [
+                "Basic read requirement",
+                "Not satisfied"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "complete",
+          "title": "Parent usage corrected",
+          "explanation": "This does not assert end-to-end execution is configured.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Required basic privilege",
+              "Analyst state"
+            ],
+            "rows": [
+              [
+                "USE CATALOG quality",
+                "Yes"
+              ],
+              [
+                "USE SCHEMA quality.accepted",
+                "Yes"
+              ],
+              [
+                "SELECT quality.accepted.inspections",
+                "Yes"
+              ],
+              [
+                "Basic read requirement",
+                "Satisfied; other boundaries still apply"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m06-negative-visual",
+      "kind": "table",
+      "title": "A useful test includes a denial",
+      "alt": "A useful test includes a denial. Both results matter. One positive test cannot certify the denied boundary.",
+      "caption": "Correct access means intended work succeeds and relevant prohibited work remains denied. Synthetic teaching example.",
+      "textEquivalent": "Expected consumer test: Both results matter. Columns: Operation; Expected outcome; Evidence. Rows: Read approved metric — Allowed — Correct object/result under analyst identity; Modify raw inspections — Denied — Intended boundary holds.\n\nUnexpected broad access: One positive test cannot certify the denied boundary. Columns: Operation; Observed outcome; Decision. Rows: Read approved metric — Allowed — Functional path works; Modify raw inspections — Allowed — Scope review needed; do not accept as least privilege.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "states": [
+        {
+          "id": "expected",
+          "title": "Expected consumer test",
+          "explanation": "Both results matter.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Operation",
+              "Expected outcome",
+              "Evidence"
+            ],
+            "rows": [
+              [
+                "Read approved metric",
+                "Allowed",
+                "Correct object/result under analyst identity"
+              ],
+              [
+                "Modify raw inspections",
+                "Denied",
+                "Intended boundary holds"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "overscope",
+          "title": "Unexpected broad access",
+          "explanation": "One positive test cannot certify the denied boundary.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Operation",
+              "Observed outcome",
+              "Decision"
+            ],
+            "rows": [
+              [
+                "Read approved metric",
+                "Allowed",
+                "Functional path works"
+              ],
+              [
+                "Modify raw inspections",
+                "Allowed",
+                "Scope review needed; do not accept as least privilege"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m06-network-visual",
+      "kind": "comparison",
+      "title": "A grant cannot repair an unreachable path",
+      "alt": "A grant cannot repair an unreachable path. Do not fix a timeout by guessing a broad grant. These alternatives are not an approved network design.",
+      "caption": "Name the origin/path and the permission separately before diagnosing the deployment. Synthetic teaching example.",
+      "textEquivalent": "Two independent boundaries: Do not fix a timeout by guessing a broad grant. Columns: Permission; Path; Interpretation. Rows: Allowed — Reachable — Necessary evidence; verify intended operation; Allowed — Blocked — Investigate connectivity; Denied — Reachable — Investigate authorization; Unknown — Unknown — Collect identity/path/error context.\n\nAWS operating context: These alternatives are not an approved network design. Columns: Model; Compute responsibility; Still needed. Rows: Classic — Customer AWS account — Approved source path andidentity; Serverless — Databricks-managed plane — Supported regional connectivity andidentity.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m06-claim-network",
+        "dbxfe-m06-claim-architecture",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "states": [
+        {
+          "id": "matrix",
+          "title": "Two independent boundaries",
+          "explanation": "Do not fix a timeout by guessing a broad grant.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Permission",
+              "Path",
+              "Interpretation"
+            ],
+            "rows": [
+              [
+                "Allowed",
+                "Reachable",
+                "Necessary evidence; verify intended operation"
+              ],
+              [
+                "Allowed",
+                "Blocked",
+                "Investigate connectivity"
+              ],
+              [
+                "Denied",
+                "Reachable",
+                "Investigate authorization"
+              ],
+              [
+                "Unknown",
+                "Unknown",
+                "Collect identity/path/error context"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "cloud",
+          "title": "AWS operating context",
+          "explanation": "These alternatives are not an approved network design.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Model",
+              "Compute responsibility",
+              "Still needed"
+            ],
+            "rows": [
+              [
+                "Classic",
+                "Customer AWS account",
+                "Approved source path andidentity"
+              ],
+              [
+                "Serverless",
+                "Databricks-managed plane",
+                "Supported regional connectivity andidentity"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m06-sharing-visual",
+      "kind": "timeline",
+      "title": "Sharing adds a recipient and a lifecycle",
+      "alt": "Sharing adds a recipient and a lifecycle. Only the agreed data subset is shared. Revocation closes the service path; previously obtained copies require separate obligations.",
+      "caption": "Sharing is a scoped relationship with a recipient, lifecycle and honest revocation limits. Synthetic teaching example.",
+      "textEquivalent": "Approved scope: Only the agreed data subset is shared. Nodes: Provider: Approved quality subset. Raw sensitive fields excluded. (selected); Sharing boundary: Named recipient +policy. Supported asset/client path. (selected); Recipient: Permitted consumption. Purpose and retention obligations. (selected). Relationships: Provider → Sharing boundary: publish subset; Sharing boundary → Recipient: authorized access.\n\nFuture access revoked: Revocation closes the service path; previously obtained copies require separate obligations. Nodes: Provider: Revocation owner. Records decision and time. (selected); Sharing boundary: Access revoked. Future requests restricted. (excluded); Recipient: Prior copies may exist. Cannot assume remote erasure. (warning). Relationships: Provider → Sharing boundary: revoke; Sharing boundary → Recipient: future access denied.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m06-claim-sharing",
+        "dbxfe-m06-claim-lineage",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "states": [
+        {
+          "id": "approved",
+          "title": "Approved scope",
+          "explanation": "Only the agreed data subset is shared.",
+          "nodes": [
+            {
+              "id": "provider",
+              "label": "Provider",
+              "value": "Approved quality subset",
+              "detail": "Raw sensitive fields excluded.",
+              "status": "selected"
+            },
+            {
+              "id": "share",
+              "label": "Sharing boundary",
+              "value": "Named recipient +policy",
+              "detail": "Supported asset/client path.",
+              "status": "selected"
+            },
+            {
+              "id": "recipient",
+              "label": "Recipient",
+              "value": "Permitted consumption",
+              "detail": "Purpose and retention obligations.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "provider",
+              "to": "share",
+              "label": "publish subset"
+            },
+            {
+              "from": "share",
+              "to": "recipient",
+              "label": "authorized access"
+            }
+          ]
+        },
+        {
+          "id": "revoked",
+          "title": "Future access revoked",
+          "explanation": "Revocation closes the service path; previously obtained copies require separate obligations.",
+          "nodes": [
+            {
+              "id": "provider",
+              "label": "Provider",
+              "value": "Revocation owner",
+              "detail": "Records decision and time.",
+              "status": "selected"
+            },
+            {
+              "id": "share",
+              "label": "Sharing boundary",
+              "value": "Access revoked",
+              "detail": "Future requests restricted.",
+              "status": "excluded"
+            },
+            {
+              "id": "recipient",
+              "label": "Recipient",
+              "value": "Prior copies may exist",
+              "detail": "Cannot assume remote erasure.",
+              "status": "warning"
+            }
+          ],
+          "connections": [
+            {
+              "from": "provider",
+              "to": "share",
+              "label": "revoke"
+            },
+            {
+              "from": "share",
+              "to": "recipient",
+              "label": "future access denied"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m06-transfer-visual",
+      "kind": "table",
+      "title": "Make the consumer test concrete",
+      "alt": "Make the consumer test concrete. Do not assume workspace UI success proves data access. Acceptance is bounded to these tested conditions.",
+      "caption": "A concrete consumer test states identity, object, allowed work, denied work and limits. Synthetic teaching example.",
+      "textEquivalent": "Collect bounded evidence: Do not assume workspace UI success proves data access. Columns: Check; Expected evidence. Rows: Identity/object — Intended analyst and qualified table; Basic object grants — SELECT +USE CATALOG +USE SCHEMA; Execution context — Intended workspace/compute access; Failure stage — Safe exact error; network path if relevant.\n\nAfter scoped correction: Acceptance is bounded to these tested conditions. Columns: Test; Required result. Rows: Read approved metric as analyst — Allowed with correct data; Modify raw input as analyst — Denied; Record evidence — Identity, scope, environment, time and limits.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-claim-architecture",
+        "dbxfe-m06-claim-network",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "states": [
+        {
+          "id": "diagnose",
+          "title": "Collect bounded evidence",
+          "explanation": "Do not assume workspace UI success proves data access.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Check",
+              "Expected evidence"
+            ],
+            "rows": [
+              [
+                "Identity/object",
+                "Intended analyst and qualified table"
+              ],
+              [
+                "Basic object grants",
+                "SELECT +USE CATALOG +USE SCHEMA"
+              ],
+              [
+                "Execution context",
+                "Intended workspace/compute access"
+              ],
+              [
+                "Failure stage",
+                "Safe exact error; network path if relevant"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "accept",
+          "title": "After scoped correction",
+          "explanation": "Acceptance is bounded to these tested conditions.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Test",
+              "Required result"
+            ],
+            "rows": [
+              [
+                "Read approved metric as analyst",
+                "Allowed with correct data"
+              ],
+              [
+                "Modify raw input as analyst",
+                "Denied"
+              ],
+              [
+                "Record evidence",
+                "Identity, scope, environment, time and limits"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-m06-names-question",
+      "revision": "1",
+      "prompt": "What does quality.accepted.inspections establish by itself?",
+      "options": [
+        {
+          "id": "dbxfe-m06-names-question-a",
+          "text": "The intended three-part object name",
+          "rationale": "Environment and effective access still need verification."
+        },
+        {
+          "id": "dbxfe-m06-names-question-b",
+          "text": "Every workspace user can read the table",
+          "rationale": "Names are not grants."
+        },
+        {
+          "id": "dbxfe-m06-names-question-c",
+          "text": "The data must be physically inside the notebook",
+          "rationale": "The object name is not a session storage path."
+        }
+      ],
+      "correctOptionId": "dbxfe-m06-names-question-a",
+      "conceptIds": [
+        "dbxfe-m06-names-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-unity",
+        "dbxfe-m06-claim-architecture",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-lifecycle-question",
+      "revision": "1",
+      "prompt": "Does dropping an external table registration automatically delete its cloud data?",
+      "options": [
+        {
+          "id": "dbxfe-m06-lifecycle-question-b",
+          "text": "Yes, every table type has identical deletion behavior",
+          "rationale": "Managed/external lifecycle differs."
+        },
+        {
+          "id": "dbxfe-m06-lifecycle-question-c",
+          "text": "It means all external path access was governed",
+          "rationale": "Direct storage access needs separate review."
+        },
+        {
+          "id": "dbxfe-m06-lifecycle-question-a",
+          "text": "No",
+          "rationale": "The underlying file lifecycle remains external."
+        }
+      ],
+      "correctOptionId": "dbxfe-m06-lifecycle-question-a",
+      "conceptIds": [
+        "dbxfe-m06-lifecycle-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-unity",
+        "dbxfe-m06-claim-external",
+        "dbxfe-m06-claim-managed",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-principals-question",
+      "revision": "1",
+      "prompt": "An admin can read the report. What is still unproved?",
+      "options": [
+        {
+          "id": "dbxfe-m06-principals-question-c",
+          "text": "Every analyst must become an admin",
+          "rationale": "That would erase the intended access boundary."
+        },
+        {
+          "id": "dbxfe-m06-principals-question-a",
+          "text": "The intended analyst can perform the allowed read with appropriate scope",
+          "rationale": "Admin privileges may bypass the missing consumer grants."
+        },
+        {
+          "id": "dbxfe-m06-principals-question-b",
+          "text": "The SQL expression can ever run",
+          "rationale": "The admin test offers preliminary functional evidence."
+        }
+      ],
+      "correctOptionId": "dbxfe-m06-principals-question-a",
+      "conceptIds": [
+        "dbxfe-m06-principals-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-read-question",
+      "revision": "1",
+      "prompt": "The analyst has SELECT and USE CATALOG but lacks USE SCHEMA. What is the narrow missing basic requirement?",
+      "options": [
+        {
+          "id": "dbxfe-m06-read-question-a",
+          "text": "USE SCHEMA on the parent schema",
+          "rationale": "The documented table read needs all three basic privileges."
+        },
+        {
+          "id": "dbxfe-m06-read-question-b",
+          "text": "Account-wide administration",
+          "rationale": "That is broader than the identified need."
+        },
+        {
+          "id": "dbxfe-m06-read-question-c",
+          "text": "A new physical copy of the table",
+          "rationale": "Copying data does not explain or repair this grant condition."
+        }
+      ],
+      "correctOptionId": "dbxfe-m06-read-question-a",
+      "conceptIds": [
+        "dbxfe-m06-read-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-negative-question",
+      "revision": "1",
+      "prompt": "Read succeeds and a prohibited raw write also succeeds. What should the reviewer conclude?",
+      "options": [
+        {
+          "id": "dbxfe-m06-negative-question-b",
+          "text": "Access is fully validated because both operations work",
+          "rationale": "The second success violates the proposed scope."
+        },
+        {
+          "id": "dbxfe-m06-negative-question-c",
+          "text": "All raw data must be deleted",
+          "rationale": "That does not address the permission cause."
+        },
+        {
+          "id": "dbxfe-m06-negative-question-a",
+          "text": "Functionality works but the intended access boundary failed",
+          "rationale": "Inspect effective grants and identity before acceptance."
+        }
+      ],
+      "correctOptionId": "dbxfe-m06-negative-question-a",
+      "conceptIds": [
+        "dbxfe-m06-negative-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-network-question",
+      "revision": "1",
+      "prompt": "A required endpoint times out. Does granting SELECT prove the path is fixed?",
+      "options": [
+        {
+          "id": "dbxfe-m06-network-question-c",
+          "text": "Only if the user is an administrator",
+          "rationale": "A broader role does not prove transport works."
+        },
+        {
+          "id": "dbxfe-m06-network-question-a",
+          "text": "No",
+          "rationale": "Object authorization and transport reachability require separate evidence."
+        },
+        {
+          "id": "dbxfe-m06-network-question-b",
+          "text": "Yes; grants create routes",
+          "rationale": "SELECT does not configure network routing."
+        }
+      ],
+      "correctOptionId": "dbxfe-m06-network-question-a",
+      "conceptIds": [
+        "dbxfe-m06-network-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-network",
+        "dbxfe-m06-claim-architecture",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-sharing-question",
+      "revision": "1",
+      "prompt": "What should a sharing agreement avoid promising?",
+      "options": [
+        {
+          "id": "dbxfe-m06-sharing-question-a",
+          "text": "That revoking service access erases all recipient-held copies",
+          "rationale": "Prior copies have a separate lifecycle and obligations."
+        },
+        {
+          "id": "dbxfe-m06-sharing-question-b",
+          "text": "A named data subset and recipient",
+          "rationale": "Those are useful scope definitions."
+        },
+        {
+          "id": "dbxfe-m06-sharing-question-c",
+          "text": "A review of supported asset/client behavior",
+          "rationale": "That is necessary validation."
+        }
+      ],
+      "correctOptionId": "dbxfe-m06-sharing-question-a",
+      "conceptIds": [
+        "dbxfe-m06-sharing-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-sharing",
+        "dbxfe-m06-claim-lineage",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ]
+    }
+  ],
+  "selfQuestions": [
+    {
+      "id": "dbxfe-m06-transfer-question",
+      "revision": "1",
+      "prompt": "Write the recommendation without granting blanket administration.",
+      "modelAnswer": "Verify the analyst’s effective identity and qualified object, then check parent usage and SELECT plus execution/error context. If USE SCHEMA is the identified gap, ask the authorized owner for that scoped correction and repeat both the allowed read and prohibited raw modification; investigate network evidence separately when relevant.",
+      "reasoning": "It separates known privilege gaps from other possible failures and validates scope rather than maximizing access.",
+      "conceptIds": [
+        "dbxfe-m06-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-claim-architecture",
+        "dbxfe-m06-claim-network",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ]
+    }
+  ],
+  "beats": [
+    {
+      "id": "dbxfe-m06-names",
+      "version": "1.0.0",
+      "title": "A three-part name locates an asset",
+      "outcome": "Read catalog.schema.object without treating it as an access grant.",
+      "explanation": "Read quality.accepted.inspections as catalog, schema and object. This [[dbxfe-m06-names-concept|namespace]] tells you which asset is intended; it does not grant permission or prove that another workspace points at the same environment. Unity Catalog organizes governed objects, while the workspace supplies collaboration context. Confirm both before diagnosing an apparently missing or different table.",
+      "lessonId": "dbxfe-m06-l01",
+      "sectionId": "dbxfe-m06-l01-foundation-mechanism",
+      "conceptIds": [
+        "dbxfe-m06-names-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-unity",
+        "dbxfe-m06-claim-architecture",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "visualId": "dbxfe-m06-names-visual",
+      "samajh": {
+        "text": "Building, floor aur room number address ko precise banate hain. Address pata hona room mein enter karne ki permission nahi hai. Catalog, schema aur table bhi location clear karte hain; kaun read kar sakta hai woh alag rule hai. Galat building mein same room number ho sakta hai.",
+        "mapping": "Address hierarchy models names; entry permission models authorization.",
+        "boundary": "Unity Catalog scope and inheritance are software rules beyond a building analogy."
+      },
+      "questionIds": [
+        "dbxfe-m06-names-question"
+      ],
+      "handbook": {
+        "markdown": "A fully qualified name reduces accidental dependence on a session’s default catalog or schema. In this example quality is the catalog, accepted the schema and inspections the table. The name tells the reader which logical object is requested, while a metastore/workspace relationship supplies governance context.\n\nIf two colleagues see different results, check the actual environment, effective object and data version before blaming the calculation. Similarly, a missing-object error can reflect a wrong name or context as well as access restrictions. Preserve the exact safe error and qualified identifier. Do not turn an unknown object into a new table just to make a demo run.\n\nUnity Catalog governs more than tables, and not every securable uses this same three-level shape. Storage credentials, external locations and shares have their own positions and responsibilities. This beat teaches the table path used by the course, not a universal object-layout rule. The next beat separates object governance from underlying file lifecycle, because a clear name still does not say who is responsible for the stored bytes.",
+        "sourceSectionIds": [
+          "dbxfe-m06-l01-foundation-mechanism"
+        ]
+      },
+      "recap": "The name identifies the requested asset; access and storage lifecycle remain separate.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": [
+        "dbxfe-m06-media-governance"
+      ]
+    },
+    {
+      "id": "dbxfe-m06-lifecycle",
+      "version": "1.0.0",
+      "title": "Who manages the files after the table changes?",
+      "outcome": "Distinguish managed/external lifecycle and business ownership.",
+      "explanation": "Managed and external tables differ in file lifecycle responsibility, not simply in whether they have a governed name. An [[dbxfe-m06-lifecycle-concept|external table]] can be governed through Unity Catalog while its cloud files have separate owners and policies. Also distinguish the technical object owner from the business metric owner: permission to administer a table does not decide what “defect rate” means.",
+      "lessonId": "dbxfe-m06-l01",
+      "sectionId": "dbxfe-m06-l01-understand",
+      "conceptIds": [
+        "dbxfe-m06-lifecycle-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-unity",
+        "dbxfe-m06-claim-external",
+        "dbxfe-m06-claim-managed",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "visualId": "dbxfe-m06-lifecycle-visual",
+      "questionIds": [
+        "dbxfe-m06-lifecycle-question"
+      ],
+      "handbook": {
+        "markdown": "Begin a lifecycle review with object type and storage path ownership. A managed table delegates its underlying lifecycle to the platform’s managed behavior, including defined recovery and eventual deletion rules. An external table registers data whose file lifecycle is managed separately. That does not make external tables ungoverned, nor does a governed registration automatically control every external writer.\n\nFor Cinderline, ask who can alter the raw object path outside the intended table interface, who owns retention, and what happens when a table is dropped or renamed. A direct cloud deletion can affect readers regardless of a neat catalog structure. No deletion or permission change is performed by this exercise.\n\nSeparately assign metric ownership. A platform administrator may be able to administer the table but should not silently redefine the unit defect denominator. The quality lead approves business meaning; data/platform owners implement and operate it. Lineage and documentation help locate dependencies, but do not replace these decisions. Record recovery expectations from the actual target configuration rather than promising a default number of days as an immutable guarantee.",
+        "sourceSectionIds": [
+          "dbxfe-m06-l01-understand"
+        ]
+      },
+      "recap": "Governance, file lifecycle and business meaning have different owners and evidence.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m06-principals",
+      "version": "1.0.0",
+      "title": "Test the identity that will do the work",
+      "outcome": "Distinguish human, group and workload principals in a proposed access matrix.",
+      "explanation": "A [[dbxfe-m06-principals-concept|principal]] is who or what acts. An administrator’s successful query is not evidence for the analyst or scheduled job. Define the work first: analysts read the approved metric; a pipeline identity writes accepted output; a steward investigates quarantine. Then test those identities with the intended scope rather than borrowing a broad account to make everything pass.",
+      "lessonId": "dbxfe-m06-l02",
+      "sectionId": "dbxfe-m06-l02-understand",
+      "conceptIds": [
+        "dbxfe-m06-principals-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "visualId": "dbxfe-m06-principals-visual",
+      "questionIds": [
+        "dbxfe-m06-principals-question"
+      ],
+      "handbook": {
+        "markdown": "Separate authentication from authorization. Authentication establishes the acting identity; authorization evaluates permitted actions. A service principal used by a scheduled pipeline may not have the same grants, credentials or workspace access as the human who authored the notebook. Record the effective execution identity, not only the person who clicked Run.\n\nAn access matrix should state purpose and scope before translating it into product privileges. The analyst needs the approved report, not every raw source. The pipeline needs defined writes, not account administration. The steward may need restricted exception evidence, which can contain sensitive raw values. Appropriate groups can simplify administration, but group membership and inherited grants must still be verified.\n\nUse a representative non-administrator identity for acceptance tests. A successful administrator demo establishes a preliminary functional path, not least-privilege validation. Also test an intentionally prohibited operation. This module’s examples remain proposed and synthetic; no real principal is created and no cloud permission is changed. The next beat works through the basic table-read conjunction under the documented privilege model.",
+        "sourceSectionIds": [
+          "dbxfe-m06-l02-understand"
+        ]
+      },
+      "recap": "Validate the actual acting identity and purpose, not a convenient administrator.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m06-read",
+      "version": "1.0.0",
+      "title": "Three basic grants work together",
+      "outcome": "Evaluate parent usage and table-read requirements as a conjunction.",
+      "explanation": "For the basic table read, SELECT works with USE CATALOG and USE SCHEMA. A [[dbxfe-m06-read-concept|usage privilege]] lets the principal use the containing namespace; it does not itself expose every row. The visual toggles the missing parent grant while keeping the table unchanged. These are basic object requirements, not the entire workspace, compute, policy and network setup.",
+      "lessonId": "dbxfe-m06-l01",
+      "sectionId": "dbxfe-m06-l01-foundation-example",
+      "conceptIds": [
+        "dbxfe-m06-read-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "visualId": "dbxfe-m06-read-visual",
+      "questionIds": [
+        "dbxfe-m06-read-question"
+      ],
+      "handbook": {
+        "markdown": "Evaluate the conjunction explicitly: table SELECT, parent USE SCHEMA and parent USE CATALOG. If one basic requirement is absent, the table-level read condition is not satisfied. Conversely, having those grants does not prove that the principal can reach the workspace, use the intended compute, pass additional policies or access every underlying resource through every path.\n\nIn our fictional matrix, the missing schema usage is the identified gap. The responsible owner should review and grant only the intended scope through the approved process. Then repeat the read as the analyst and repeat a prohibited write. Do not treat the diagram as evidence of a configured environment.\n\nCheck effective privileges, including group membership, inheritance and ownership. A broad parent grant can apply to more assets than an individual table grant. The current reference describes Privilege Model 1.0; older metastores may differ. Avoid copying tutorial ALL PRIVILEGES statements as a shortcut. Fine-grained DML privileges are marked Beta in the reviewed page and are not a general prerequisite here. The purpose is a teachable minimum table-read model with its limits clearly stated.",
+        "sourceSectionIds": [
+          "dbxfe-m06-l01-foundation-example",
+          "dbxfe-m06-l01-foundation-solution"
+        ]
+      },
+      "recap": "Parent usage plus table SELECT is a basic conjunction, not a full deployment guarantee.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m06-negative",
+      "version": "1.0.0",
+      "title": "A useful test includes a denial",
+      "outcome": "Explain the evidence gained by allowed and prohibited operations.",
+      "explanation": "An allowed read proves one intended path works. A [[dbxfe-m06-negative-concept|negative access test]] checks an important boundary: the same analyst should not modify raw inspections. Run both with the actual principal and record the scope. If the prohibited write succeeds, the read success is not enough to call access correct; inspect inherited grants or ownership that may have broadened it.",
+      "lessonId": "dbxfe-m06-l02",
+      "sectionId": "dbxfe-m06-l02-understand",
+      "conceptIds": [
+        "dbxfe-m06-negative-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "visualId": "dbxfe-m06-negative-visual",
+      "questionIds": [
+        "dbxfe-m06-negative-question"
+      ],
+      "handbook": {
+        "markdown": "Choose negative tests from the stated access matrix, not arbitrary destructive operations. A controlled nonproduction test or safe permission validation can establish whether a prohibited capability is available without damaging real data. The important fact is which identity and object/action were evaluated. This course performs no actual grant or write.\n\nA negative test can reveal inherited privilege, group membership, ownership or use of the wrong identity. If an analyst test was accidentally run as an administrator, both success and denial conclusions may be meaningless for the intended consumer. Capture that context alongside the result.\n\nDo not call one denied operation proof that the whole system is secure. It is bounded evidence for a named policy condition at a time. Re-test after material membership, ownership or policy changes. A customer-facing statement should be precise: “The approved read and this prohibited modification were checked using the intended consumer identity.” That is more useful than a blanket assurance based on a working demo. The next beat adds the independent network boundary.",
+        "sourceSectionIds": [
+          "dbxfe-m06-l02-understand"
+        ]
+      },
+      "recap": "Correct access means intended work succeeds and relevant prohibited work remains denied.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m06-network",
+      "version": "1.0.0",
+      "title": "A grant cannot repair an unreachable path",
+      "outcome": "Separate access-control and connectivity diagnosis in AWS context.",
+      "explanation": "Permission and [[dbxfe-m06-network-concept|network reachability]] are independent. A granted table read may still fail through an unavailable execution path; a reachable endpoint may deny the request. On AWS the classic/serverless compute boundary also changes who operates the path. State origin, destination, identity, region and intended action before asking a specialist to validate the deployment.",
+      "lessonId": "dbxfe-m06-l03",
+      "sectionId": "dbxfe-m06-l03-understand",
+      "conceptIds": [
+        "dbxfe-m06-network-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-network",
+        "dbxfe-m06-claim-architecture",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "visualId": "dbxfe-m06-network-visual",
+      "samajh": {
+        "text": "Key hai par building tak road blocked hai toh key badalne se help nahi hogi. Road open hai par key wrong hai toh bhi andar nahi ja sakte. Network path aur permission dono check karo, aur kis origin se request ja rahi hai woh clear rakho.",
+        "mapping": "Road models connectivity; key models authorization.",
+        "boundary": "Cloud identity, endpoint and policy layers are more complex than a physical lock."
+      },
+      "questionIds": [
+        "dbxfe-m06-network-question"
+      ],
+      "handbook": {
+        "markdown": "Begin with the actual requesting workload. A user’s browser, a classic compute resource and a serverless job may have different network origins and effective identities. An approved diagram must name the chosen cloud and region, resource locations, DNS/egress ownership and the supported connectivity mechanism.\n\nFor Cinderline’s restricted source, ask which fields may leave the source, which destinations are permitted, who controls the path, and how operations will detect and handle failures. A serverless network feature may depend on region, resource type and entitlement; the current documentation also includes networking cost considerations. A generic product diagram is not customer approval.\n\nKeep the response bounded: “We will verify this path and principal in the selected AWS model.” Do not transpose Azure private-resource names or assume another cloud’s setup is equivalent. If the conceptual video uses Azure, treat it as a governance overview and return to AWS sources for deployment specifics. The optional canonical cloud bridge explains DNS, routing and service-denial evidence at the exact point needed.",
+        "sourceSectionIds": [
+          "dbxfe-m06-l03-understand"
+        ]
+      },
+      "recap": "Name the origin/path and the permission separately before diagnosing the deployment.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m06-sharing",
+      "version": "1.0.0",
+      "title": "Sharing adds a recipient and a lifecycle",
+      "outcome": "Define external sharing scope and limits before treating an internal grant as sufficient.",
+      "explanation": "An internal analyst grant does not define an external sharing arrangement. Name the [[dbxfe-m06-sharing-concept|data recipient]], data subset, purpose, freshness, allowed use and revocation owner. Current sharing mechanisms provide controlled access paths, but revoking future access cannot erase copies a recipient already obtained. Make that lifecycle boundary part of the agreement rather than hiding it behind “secure sharing.”",
+      "lessonId": "dbxfe-m06-l02",
+      "sectionId": "dbxfe-m06-l02-deeper",
+      "conceptIds": [
+        "dbxfe-m06-sharing-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-sharing",
+        "dbxfe-m06-claim-lineage",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "visualId": "dbxfe-m06-sharing-visual",
+      "questionIds": [
+        "dbxfe-m06-sharing-question"
+      ],
+      "handbook": {
+        "markdown": "Describe the sharing relationship before selecting a feature: provider, recipient, data classification, subset, permitted purpose, refresh expectation, retention obligations and revocation/audit owner. An internal group grant is a different relationship from a partner consuming data through an external sharing protocol.\n\nThe current official delta-sharing URL redirects to the OpenSharing overview. This module records that current source naming without renaming historical lesson IDs or implying that every old feature behaves identically. The chosen protocol path, asset type, recipient client, region and feature support must be verified for the actual deployment.\n\nAn approved access path can be revoked, but data already copied by the recipient is not automatically recalled. Address that through the applicable agreement and operating process; do not turn a permission toggle into an erasure guarantee. Lineage can help inspect dependencies but has documented coverage limits, including unsupported patterns. It is evidence to use with other records, not proof that every external use is known. The course uses a fictional supplier case and performs no sharing action.",
+        "sourceSectionIds": [
+          "dbxfe-m06-l02-deeper"
+        ]
+      },
+      "recap": "Sharing is a scoped relationship with a recipient, lifecycle and honest revocation limits.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m06-transfer",
+      "version": "1.0.0",
+      "title": "Make the consumer test concrete",
+      "outcome": "Write a bounded diagnosis and acceptance statement for a failed analyst query.",
+      "explanation": "An analyst has SELECT, can open the workspace, but cannot read quality.accepted.inspections. Inspect [[dbxfe-m06-transfer-concept|effective access]]: identity, qualified object, parent usage, execution context and exact error. If USE SCHEMA is missing, propose the narrow correction, then test the allowed read and denied raw modification. Keep network validation separate if the evidence points there.",
+      "lessonId": "dbxfe-m06-l01",
+      "sectionId": "dbxfe-m06-l01-foundation-task",
+      "conceptIds": [
+        "dbxfe-m06-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges",
+        "dbxfe-m06-claim-architecture",
+        "dbxfe-m06-claim-network",
+        "dbxfe-m06-guidance",
+        "dbxfe-m06-fiction"
+      ],
+      "visualId": "dbxfe-m06-transfer-visual",
+      "questionIds": [
+        "dbxfe-m06-transfer-question"
+      ],
+      "handbook": {
+        "markdown": "A useful diagnosis narrows uncertainty instead of escalating privileges until an error disappears. Start with the effective principal, environment and exact object. Then check the basic table-read requirements and whether inherited grants/ownership change the expected scope. Inspect execution access and connectivity according to the actual error.\n\nThe proposed correction in this fixture is parent schema usage, not account administration or a copy of the raw table. After the authorized owner applies it in a real setting, use the intended analyst to test the approved read and a safe negative access condition. Record results and limitations. A successful administrator run remains separate preliminary evidence.\n\nFor the security lead: “We identified a missing basic parent privilege and will validate the corrected consumer path plus the intended denial. This does not yet certify every network, sharing or regulatory requirement.” That sentence is deliberately bounded without being evasive. Review the canonical cards on naming, owners, privileges and cloud boundaries, then choose the researched extensions about discovery, inheritance and lineage. No real privileges have been changed by this learning module.",
+        "sourceSectionIds": [
+          "dbxfe-m06-l01-foundation-task"
+        ]
+      },
+      "recap": "A concrete consumer test states identity, object, allowed work, denied work and limits.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m06-l01-card1",
+      "beatId": "dbxfe-m06-names"
+    },
+    {
+      "cardId": "dbxfe-m06-l01-card2",
+      "beatId": "dbxfe-m06-lifecycle"
+    },
+    {
+      "cardId": "dbxfe-m06-l01-card3",
+      "beatId": "dbxfe-m06-lifecycle"
+    },
+    {
+      "cardId": "dbxfe-m06-l01-foundation-card1",
+      "beatId": "dbxfe-m06-read"
+    },
+    {
+      "cardId": "dbxfe-m06-l01-foundation-card2",
+      "beatId": "dbxfe-m06-negative"
+    },
+    {
+      "cardId": "dbxfe-m06-l01-foundation-card3",
+      "beatId": "dbxfe-m06-names"
+    },
+    {
+      "cardId": "dbxfe-m06-l02-card1",
+      "beatId": "dbxfe-m06-principals"
+    },
+    {
+      "cardId": "dbxfe-m06-l02-card2",
+      "beatId": "dbxfe-m06-read"
+    },
+    {
+      "cardId": "dbxfe-m06-l02-card3",
+      "beatId": "dbxfe-m06-negative"
+    },
+    {
+      "cardId": "dbxfe-m06-l03-card1",
+      "beatId": "dbxfe-m06-network"
+    },
+    {
+      "cardId": "dbxfe-m06-l03-card2",
+      "beatId": "dbxfe-m06-network"
+    },
+    {
+      "cardId": "dbxfe-m06-l03-card3",
+      "beatId": "dbxfe-m06-network"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-m06-extension-browse",
+      "revision": "1",
+      "prompt": "Does BROWSE mean a principal can SELECT the data?",
+      "answer": "No. BROWSE supports discovery and metadata/access requests; data read has separate requirements.",
+      "explanation": "The current privilege reference distinguishes catalog discovery from SELECT and parent usage requirements. Seeing an asset name is not proof that its rows are readable.",
+      "lessonId": "dbxfe-m06-l01",
+      "sectionId": "dbxfe-m06-l01-foundation-mechanism",
+      "conceptIds": [
+        "dbxfe-m06-names-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges"
+      ],
+      "beatId": "dbxfe-m06-names",
+      "whyItMatters": "Avoid confusing findability with permission."
+    },
+    {
+      "id": "dbxfe-m06-extension-inheritance",
+      "revision": "1",
+      "prompt": "Why review a schema-level SELECT grant differently from one table grant?",
+      "answer": "It can inherit to current and future tables/views in that schema under the documented model.",
+      "explanation": "A broad parent grant may exceed the intended one-report scope and can affect assets created later. Inspect effective access and the governing privilege model rather than assuming only today’s table is covered.",
+      "lessonId": "dbxfe-m06-l01",
+      "sectionId": "dbxfe-m06-l01-foundation-example",
+      "conceptIds": [
+        "dbxfe-m06-read-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-privileges"
+      ],
+      "beatId": "dbxfe-m06-read",
+      "whyItMatters": "Access changes can have future scope as well as immediate effects."
+    },
+    {
+      "id": "dbxfe-m06-extension-column-mask",
+      "revision": "1",
+      "prompt": "An analyst sees a masked contact value. What additional evidence is needed before saying access is correctly governed?",
+      "answer": "Test the actual allowed and denied identities, applicable rows/columns and supported access paths; a masked display alone is not an encryption or universal-access guarantee.",
+      "explanation": "A [[dbxfe-m06-extension-column-mask-concept|column mask]] changes what a permitted query returns for a field. A row filter instead changes which rows are returned. In the fictional case, a reporting analyst may see a redacted supplier contact while an approved steward sees the original. Verify the policy’s actual identity conditions and data types, then test both outcomes. A screenshot under one user is only one observation. Current documentation lists runtime and interface limits, including restrictions on path-based access. Do not describe a query mask as encryption of stored bytes or assume it secures separately accessible copies. This extension configures no real policy.",
+      "lessonId": "dbxfe-m06-l02",
+      "sectionId": "dbxfe-m06-l02-understand",
+      "conceptIds": [
+        "dbxfe-m06-extension-column-mask-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-masks",
+        "dbxfe-m06-fiction",
+        "dbxfe-m06-guidance"
+      ],
+      "beatId": "dbxfe-m06-negative",
+      "whyItMatters": "Extends grant reasoning to returned data while keeping the enforcement boundary explicit."
+    },
+    {
+      "id": "dbxfe-m06-extension-lineage",
+      "revision": "1",
+      "prompt": "Does a lineage graph prove every dependency or access path was captured?",
+      "answer": "No. Coverage has documented operation and object limitations.",
+      "explanation": "The reviewed source lists cases such as path-based column references and some UDF patterns with incomplete capture. Treat visible lineage as useful evidence, and investigate unrepresented paths rather than inferring they do not exist.",
+      "lessonId": "dbxfe-m06-l02",
+      "sectionId": "dbxfe-m06-l02-deeper",
+      "conceptIds": [
+        "dbxfe-m06-sharing-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m06-claim-lineage"
+      ],
+      "beatId": "dbxfe-m06-sharing",
+      "whyItMatters": "An incomplete graph should not become a universal governance guarantee."
+    }
+  ],
+  "recap": {
+    "title": "Name, identity, permission, path and lifecycle",
+    "markdown": "**Locate the object → identify the principal → check scoped grants → test allowed and denied work → validate the cloud path → govern sharing/lifecycle.** Core cards preserve their existing IDs and review history; extension cards are an explicit additional choice.",
+    "visualId": "dbxfe-m06-transfer-visual"
+  },
+  "appliedTask": {
+    "title": "An analyst, a parent grant and a supplier",
+    "prompt": "The analyst lacks USE SCHEMA but has SELECT. An admin demo works. The team also wants to send a supplier the report. Write the narrow next steps and one sharing limit.",
+    "modelAnswer": "Verify identity/object/context, ask the authorized owner to correct the missing schema usage, and test the intended analyst’s read and prohibited raw modification. Scope supplier sharing separately by recipient, subset, purpose, freshness and revocation owner; revoking future access does not erase already obtained copies.",
+    "reasoning": "Admin success does not validate the consumer. Internal grants do not establish an external sharing contract, and technical access controls have lifecycle limits.",
+    "beatIds": [
+      "dbxfe-m06-principals",
+      "dbxfe-m06-read",
+      "dbxfe-m06-negative",
+      "dbxfe-m06-sharing",
+      "dbxfe-m06-transfer"
+    ]
+  },
+  "scenarioIds": [
+    "dbxfe-m06-scenario"
+  ]
+}

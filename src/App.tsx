@@ -1,154 +1,17 @@
 import { useEffect, useState } from "react";
-import { courses, findLesson, lessonHref } from "./catalog";
-import { Today, Learn, Roadmap, completionLabel } from "./hub";
+import { beatHref, findLesson, lessonHref } from "./catalog";
+import { Learn, Roadmap } from "./hub";
+import {
+  TeacherToday,
+  TeacherCourses,
+  ModuleWorkspace,
+  CourseHandbook,
+} from "./teaching";
 import { Notebook, Search, Settings } from "./notebook-settings";
 import { Practice, Review } from "./practice-review";
 import { Reader } from "./reader";
-import { MD, PageTitle, StorageNotice, baseAsset, useStudy } from "./ui";
+import { PageTitle, StorageNotice, baseAsset, useStudy } from "./ui";
 
-function Courses({ id }: { id?: string }) {
-  const { data } = useStudy(),
-    course = courses.find((c) => c.id === id);
-  if (id && !course)
-    return (
-      <>
-        <PageTitle
-          eyebrow="course unavailable"
-          title="That course is not in this catalog."
-        />
-        <a href="#/courses">Browse current courses</a>
-      </>
-    );
-  if (!course)
-    return (
-      <>
-        <PageTitle eyebrow="learn something useful" title="Your courses">
-          <p>
-            Complete learning paths, built around understanding and practical
-            work.
-          </p>
-        </PageTitle>
-        {courses.map((c) => (
-          <a className="course-card" key={c.id} href={`#/course/${c.id}`}>
-            <div>
-              <p className="sc-eyebrow">
-                {c.modules.length} modules ·{" "}
-                {c.modules.reduce((n, m) => n + m.lessons.length, 0)} lessons
-              </p>
-              <h2>{c.title}</h2>
-              <p>{c.subtitle}</p>
-              <p>{c.summary}</p>
-              <span className="course-link">Explore this course →</span>
-            </div>
-            <div className="course-cover sc-on-ink" aria-hidden="true">
-              <span>
-                Learn.
-                <br />
-                See.
-                <br />
-                Use.
-                <br />
-                Remember.
-              </span>
-              <span className="cover-rule" />
-            </div>
-          </a>
-        ))}
-      </>
-    );
-  return (
-    <>
-      <a className="sc-link--quiet" href="#/courses">
-        ← All courses
-      </a>
-      <PageTitle eyebrow="your course map" title={course.title}>
-        <p>{course.subtitle}</p>
-      </PageTitle>
-      <div className="course-intro">
-        <p>{course.summary}</p>
-        <details className="sc-details">
-          <summary>Outcomes, prerequisites & optional refreshers</summary>
-          <h2>What you will practice</h2>
-          <ul>
-            {course.objectives.map((o) => (
-              <li key={o}>{o}</li>
-            ))}
-          </ul>
-          <p>
-            Prerequisites:{" "}
-            {course.prerequisiteIds.length
-              ? course.prerequisiteIds
-                  .map(
-                    (id) =>
-                      findLesson(id)?.lesson.title ??
-                      courses.find((c) => c.id === id)?.title ??
-                      id,
-                  )
-                  .join(", ")
-              : "Curiosity and basic familiarity with data. Use the optional refreshers whenever useful."}{" "}
-            Nothing is locked.
-          </p>
-          {course.refreshers.map((r) => (
-            <details className="sc-details" key={r.title}>
-              <summary>{r.title}</summary>
-              <MD>{r.markdown}</MD>
-            </details>
-          ))}
-        </details>
-      </div>
-      <div className="course-map">
-        {course.modules.map((m, i) => (
-          <section className="module-block" key={m.id}>
-            <div className="module-heading">
-              <span className="module-number">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <div>
-                <h2>{m.title}</h2>
-                <p>{m.summary}</p>
-              </div>
-            </div>
-            <ol>
-              {m.lessons.map((l) => (
-                <li key={l.id}>
-                  <a href={lessonHref(l.id)}>
-                    <span>
-                      <strong>{l.title}</strong>
-                      <span>{l.summary}</span>
-                    </span>
-                    <span className="lesson-state">
-                      {completionLabel(l, data)}{" "}
-                      <span aria-hidden="true">→</span>
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ol>
-            <a className="module-practice" href={`#/practice/${m.scenarioId}`}>
-              Apply this module →
-            </a>
-          </section>
-        ))}
-      </div>
-      {course.capstoneId && (
-        <div className="sc-actionbar">
-          <p>Bring the course ideas together in the capstone.</p>
-          <a
-            className="sc-btn sc-btn--primary"
-            href={`#/practice/${course.capstoneId}`}
-          >
-            Open the capstone →
-          </a>
-        </div>
-      )}
-      <p className="sc-hint">
-        Reading times are estimates. Completion is your explicit choice; it does
-        not establish mastery. Sources checked{" "}
-        {course.sources[0]?.accessDate ?? course.reviewDate}.
-      </p>
-    </>
-  );
-}
 export default function App() {
   const [hash, setHash] = useState(location.hash || "#/"),
     { data, status } = useStudy();
@@ -158,7 +21,7 @@ export default function App() {
     fromValue = params.get("from"),
     from =
       fromValue &&
-      /^#\/lesson\/[a-z0-9-]+(?:\/[a-z0-9-]+)?(?:\?path=[a-z0-9-]+)?$/.test(
+      /^#\/(?:lesson|module)\/[a-z0-9-]+(?:\/[a-z0-9-]+)?(?:\?(?:path|view)=[a-z0-9-]+(?:&detour=1)?)?$/.test(
         fromValue,
       )
         ? fromValue
@@ -178,7 +41,7 @@ export default function App() {
     else document.documentElement.dataset.theme = data.settings.theme;
   }, [data.settings.theme]);
   useEffect(() => {
-    if (page !== "lesson") {
+    if (page !== "lesson" && page !== "module") {
       window.scrollTo(0, 0);
       document.querySelector<HTMLElement>("main h1")?.focus();
     }
@@ -186,7 +49,7 @@ export default function App() {
   }, [page, id]);
   const nav = [
     ["start", "Today"],
-    ["learn", "Learn"],
+    ["courses", "Courses"],
     ["review", "Review"],
     ["notebook", "Notebook"],
   ];
@@ -219,13 +82,16 @@ export default function App() {
                 href={p === "start" ? "#/" : `#/${p}`}
                 aria-current={
                   page === p ||
-                  (p === "learn" &&
+                  (p === "courses" &&
                     [
                       "courses",
                       "course",
                       "lesson",
                       "path",
                       "practice",
+                      "module",
+                      "handbook",
+                      "learn",
                     ].includes(page))
                     ? "page"
                     : undefined
@@ -237,7 +103,7 @@ export default function App() {
           </nav>
           <a
             className="settings-link"
-            href={`#/search${from ? `?from=${encodeURIComponent(from)}` : page === "lesson" ? `?from=${encodeURIComponent(lessonHref(id, data.positions[id]?.sectionId ?? section, pathId))}` : ""}`}
+            href={`#/search${from ? `?from=${encodeURIComponent(from)}` : page === "module" ? `?from=${encodeURIComponent(beatHref(id, section, params.get("view") ?? "deck"))}` : page === "lesson" ? `?from=${encodeURIComponent(lessonHref(id, data.positions[id]?.sectionId ?? section, pathId))}` : ""}`}
             aria-current={page === "search" ? "page" : undefined}
           >
             Search
@@ -259,13 +125,13 @@ export default function App() {
         <StorageNotice />
         {from && (
           <p className="detour-return">
-            <a href={from}>← Return to your learning path and saved topic</a>
+            <a href={from}>← Return to your saved learning context</a>
           </p>
         )}
         {status === "loading" ? (
           <p role="status">Opening your learning space…</p>
         ) : page === "start" ? (
-          <Today />
+          <TeacherToday />
         ) : page === "learn" ? (
           <Learn
             view={id}
@@ -275,7 +141,17 @@ export default function App() {
         ) : page === "path" ? (
           <Roadmap id={id} />
         ) : page === "courses" || page === "course" ? (
-          <Courses id={id} />
+          <TeacherCourses id={id} />
+        ) : page === "module" ? (
+          <ModuleWorkspace
+            id={id}
+            beatId={section}
+            view={params.get("view") ?? undefined}
+            extensionId={params.get("extension") ?? undefined}
+            detour={params.get("detour") === "1" || !!from}
+          />
+        ) : page === "handbook" ? (
+          <CourseHandbook id={id} />
         ) : page === "lesson" ? (
           <Reader
             key={`${id}-${pathId ?? "direct"}`}

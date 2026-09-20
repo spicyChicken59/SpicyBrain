@@ -1,0 +1,1532 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-genai",
+  "title": "GenAI, retrieval and agents",
+  "summary": "Follow a maintenance question through evidence, permission, answer, tool and evaluation boundaries.",
+  "outcomes": [
+    "Design a bounded retrieval answer with inspectable source/version evidence.",
+    "Separate information quality from authority to act.",
+    "Diagnose a failed answer and propose an honest evaluation and deployment decision."
+  ],
+  "startingAssumptions": [
+    "You can distinguish source data from a derived result.",
+    "No model API, cloud account or code execution is needed; the examples are simulations."
+  ],
+  "lessonIds": [
+    "dbxfe-m07-l02",
+    "dbxfe-m07-l03"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "Each beat develops one mechanism or decision with inspectable inputs. The final changed case tests transfer; preserved canonical lessons provide their original depth and historical anchors.",
+  "sources": [
+    {
+      "id": "dbxfe-genai-source-search",
+      "title": "Databricks AI Search",
+      "url": "https://docs.databricks.com/aws/en/ai-search/ai-search",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS; current name formerly Vector Search.",
+      "caveat": "Search capabilities do not establish an answer’s correctness or an action’s authorization.",
+      "reviewedEvidence": "The overview describes an index built from source data and metadata, embedding similarity, hybrid keyword search and filtering."
+    },
+    {
+      "id": "dbxfe-genai-source-auth",
+      "title": "Authentication for agents",
+      "url": "https://docs.databricks.com/aws/en/agents/custom-agents/agent-authentication",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS; agents deployed on Databricks Apps.",
+      "caveat": "User authorization is marked Public Preview. Helper behavior and deployment prerequisites must be rechecked for the actual version.",
+      "reviewedEvidence": "App identity and user identity differ. The verification passage warns that a missing forwarded token can fall back to app identity and recommends testing multiple callers."
+    },
+    {
+      "id": "dbxfe-genai-source-trace",
+      "title": "Tracing overview",
+      "url": "https://docs.databricks.com/aws/en/mlflow3/genai/tracing/overview",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS; MLflow GenAI tracing.",
+      "caveat": "Synthetic trace timings here are invented, not product measurements.",
+      "reviewedEvidence": "The tracing overview describes intermediate component inputs, outputs, latency, token usage and execution flow for diagnosis."
+    },
+    {
+      "id": "dbxfe-genai-source-eval",
+      "title": "Evaluate and improve",
+      "url": "https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS; reviewed September 19, 2026.",
+      "caveat": "Scoring tools support evaluation; scores are not safety certificates.",
+      "reviewedEvidence": "The evaluation overview distinguishes code-based checks and model judges applied to traces and repeatable evaluation datasets."
+    },
+    {
+      "id": "dbxfe-genai-source-beyond-span-timing",
+      "title": "Traces: span timestamps and relationships",
+      "url": "https://opentelemetry.io/docs/concepts/signals/traces/",
+      "publisher": "OpenTelemetry",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "reviewedEvidence": "Spans record start/end timestamps and parent relationships; nested spans describe sub-operations.",
+      "context": "Vendor-neutral tracing concepts.",
+      "caveat": "The concurrent timings below are original synthetic arithmetic, not an observed trace."
+    },
+    {
+      "id": "dbxfe-genai-source-beyond-holdout",
+      "title": "Datasets: dividing the original dataset",
+      "url": "https://developers.google.com/machine-learning/crash-course/overfitting/dividing-datasets",
+      "publisher": "Google for Developers",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "reviewedEvidence": "Repeated selection using a test set can overfit its peculiarities; separate validation/test sets and fresh nonduplicated examples support evaluation.",
+      "context": "General machine-learning evaluation guidance, applied by analogy to prompt/retrieval iteration.",
+      "caveat": "This does not prescribe an agent release threshold or establish a statistical guarantee."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-genai-teaching-guidance",
+      "description": "Original SpicyBrain professional guidance, worked reasoning and teaching design.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent curriculum; not an employer process or official leveling rubric."
+    },
+    {
+      "id": "dbxfe-genai-teaching-fiction",
+      "description": "Cinderline, transfer organizations, people, records, timings and financial figures are synthetic teaching examples.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "No customer execution, measured benchmark, authorized spending or realized business benefit is claimed."
+    },
+    {
+      "id": "dbxfe-genai-claim-search",
+      "description": "The overview describes an index built from source data and metadata, embedding similarity, hybrid keyword search and filtering.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-source-search"
+      ],
+      "context": "AWS; current name formerly Vector Search. Search capabilities do not establish an answer’s correctness or an action’s authorization."
+    },
+    {
+      "id": "dbxfe-genai-claim-auth",
+      "description": "App identity and user identity differ. The verification passage warns that a missing forwarded token can fall back to app identity and recommends testing multiple callers.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-source-auth"
+      ],
+      "context": "AWS; agents deployed on Databricks Apps. User authorization is marked Public Preview. Helper behavior and deployment prerequisites must be rechecked for the actual version."
+    },
+    {
+      "id": "dbxfe-genai-claim-trace",
+      "description": "The tracing overview describes intermediate component inputs, outputs, latency, token usage and execution flow for diagnosis.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-source-trace"
+      ],
+      "context": "AWS; MLflow GenAI tracing. Synthetic trace timings here are invented, not product measurements."
+    },
+    {
+      "id": "dbxfe-genai-claim-eval",
+      "description": "The evaluation overview distinguishes code-based checks and model judges applied to traces and repeatable evaluation datasets.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-source-eval"
+      ],
+      "context": "AWS; reviewed September 19, 2026. Scoring tools support evaluation; scores are not safety certificates."
+    },
+    {
+      "id": "dbxfe-genai-claim-beyond-span-timing",
+      "description": "Spans record start/end timestamps and parent relationships; nested spans describe sub-operations.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-source-beyond-span-timing"
+      ],
+      "context": "Vendor-neutral tracing concepts. The concurrent timings below are original synthetic arithmetic, not an observed trace."
+    },
+    {
+      "id": "dbxfe-genai-claim-beyond-holdout",
+      "description": "Repeated selection using a test set can overfit its peculiarities; separate validation/test sets and fresh nonduplicated examples support evaluation.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-source-beyond-holdout"
+      ],
+      "context": "General machine-learning evaluation guidance, applied by analogy to prompt/retrieval iteration. This does not prescribe an agent release threshold or establish a statistical guarantee."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-genai-concept-task",
+      "term": "task boundary",
+      "aliases": [],
+      "definition": "The permitted inputs, outputs and actions for a specific use case.",
+      "example": "Find manual M7 revision 3; do not change machine settings.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-genai-concept-context",
+      "term": "context",
+      "aliases": [],
+      "definition": "Information supplied to the model for a particular request.",
+      "example": "Question about M7 plus two selected manual passages.",
+      "sourceIds": [
+        "dbxfe-genai-source-search"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-concept-chunks",
+      "term": "chunk",
+      "aliases": [],
+      "definition": "A retrievable portion of a source document with its identifying metadata.",
+      "example": "M7 / revision 3 / section 4 / passage 2.",
+      "sourceIds": [
+        "dbxfe-genai-source-search"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-concept-permission",
+      "term": "authorization",
+      "aliases": [],
+      "definition": "A decision about whether an identity may perform an action on a resource.",
+      "example": "A North-plant technician cannot read a restricted South-plant manual.",
+      "sourceIds": [
+        "dbxfe-genai-source-auth"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-concept-citations",
+      "term": "grounding",
+      "aliases": [],
+      "definition": "Support for an answer’s claims in the evidence supplied for the task.",
+      "example": "A cited checklist supports where to find instructions, not a new recommended interval.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-genai-concept-tools",
+      "term": "tool boundary",
+      "aliases": [],
+      "definition": "The interface where a proposed operation is checked before it affects a system.",
+      "example": "Reject create_work_order when only manual lookup is authorized.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-genai-concept-trace",
+      "term": "trace",
+      "aliases": [],
+      "definition": "A structured record of operations within one request, often organized into timed spans.",
+      "example": "Query → retrieve obsolete manual → generate unsupported answer.",
+      "sourceIds": [
+        "dbxfe-genai-source-trace"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-concept-evaluation",
+      "term": "evaluation set",
+      "aliases": [],
+      "definition": "A versioned collection of cases and expected behavior used to assess a system.",
+      "example": "Twenty cases partitioned into answerable, missing, unauthorized and malicious-source groups.",
+      "sourceIds": [
+        "dbxfe-genai-source-eval"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-concept-judges",
+      "term": "scorer",
+      "aliases": [],
+      "definition": "A procedure that assigns an assessment to a case using explicit criteria.",
+      "example": "A code check for source-ID presence plus a calibrated review of claim support.",
+      "sourceIds": [
+        "dbxfe-genai-source-eval"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-concept-transfer",
+      "term": "release decision",
+      "aliases": [],
+      "definition": "A scoped judgment about whether evidence supports using a particular system version under specified conditions.",
+      "example": "Approve a read-only policy pilot while refund actions remain disabled.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-genai-extension-concept-caller-fallback",
+      "term": "effective caller identity",
+      "aliases": [],
+      "definition": "The principal actually used to authorize a resource request, which may differ from the intended human caller.",
+      "example": "Inspect the effective identity at the resource boundary: the reviewed helper can fall back to the app service principal when no forwarded user token is present.",
+      "sourceIds": [
+        "dbxfe-genai-source-auth"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-extension-concept-hybrid-retrieval",
+      "term": "hybrid retrieval comparison",
+      "aliases": [],
+      "definition": "A comparison of lexical and semantic retrieval signals on the same judged questions and source constraints.",
+      "example": "Compare keyword or hybrid retrieval with embedding similarity using the same approved questions, document revisions and access filters.",
+      "sourceIds": [
+        "dbxfe-genai-source-search"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-extension-concept-trace-cost",
+      "term": "overlapping span duration",
+      "aliases": [],
+      "definition": "Elapsed times for operations that can overlap or nest and therefore cannot automatically be added as request latency.",
+      "example": "The request lasts three seconds in this synthetic timeline. Summing the two overlapping two-second calls plus one-second composition double-counts shared elapsed time.",
+      "sourceIds": [
+        "dbxfe-genai-source-beyond-span-timing"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-extension-concept-same-scorer",
+      "term": "protected evaluation holdout",
+      "aliases": [],
+      "definition": "Evaluation cases withheld from iterative design choices until a separate confirmation step.",
+      "example": "Evaluate the chosen design on fresh, representative holdout cases that did not guide those edits; keep the earlier cases as development/regression evidence.",
+      "sourceIds": [
+        "dbxfe-genai-source-beyond-holdout"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-genai-visual-task",
+      "kind": "table",
+      "title": "Start with the task, then the authority",
+      "alt": "Worked visual: Start with the task, then the authority. Both mention maintenance; only the second requests a change.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Same topic, different effect: Both mention maintenance; only the second requests a change.. Request: Find M7 checklist; Permitted first-scope output: Approved source or escalation; Operational effect: None. Request: Change M7 interval; Permitted first-scope output: Route to qualified owner; Operational effect: Not authorized",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Same topic, different effect",
+          "explanation": "Both mention maintenance; only the second requests a change.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Request",
+              "Permitted first-scope output",
+              "Operational effect"
+            ],
+            "rows": [
+              [
+                "Find M7 checklist",
+                "Approved source or escalation",
+                "None"
+              ],
+              [
+                "Change M7 interval",
+                "Route to qualified owner",
+                "Not authorized"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-genai-visual-context",
+      "kind": "nodes",
+      "title": "An answer sees selected context",
+      "alt": "Worked visual: An answer sees selected context. Wrong-machine context cannot justify an M7 procedure.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Corpus to candidate set: Wrong-machine context cannot justify an M7 procedure.. Corpus: 3 manuals; M7 r 2; M7 r 3; M8 r 1; status context. Selected context: M8 r 1; Similar wording, wrong machine; status warning. Answer step: Missing M7 evidence; Should not guess; status pending. node-corpus → node-selected: retrieval selects. node-selected → node-answer: only supplied evidence\n\nCorrect the selection: The source collection stays the same; selection changes.. Corpus: 3 manuals; Same source collection; status context. Selected context: M7 r 3; Machine and approved revision match; status selected. Answer step: M7 source available; Still check interpretation; status pending. node-corpus → node-selected: machine/version constraint. node-selected → node-answer: bounded context",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-search"
+      ],
+      "states": [
+        {
+          "title": "Corpus to candidate set",
+          "explanation": "Wrong-machine context cannot justify an M7 procedure.",
+          "nodes": [
+            {
+              "id": "node-corpus",
+              "label": "Corpus",
+              "value": "3 manuals",
+              "detail": "M7 r 2; M7 r 3; M8 r 1",
+              "status": "context"
+            },
+            {
+              "id": "node-selected",
+              "label": "Selected context",
+              "value": "M8 r 1",
+              "detail": "Similar wording, wrong machine",
+              "status": "warning"
+            },
+            {
+              "id": "node-answer",
+              "label": "Answer step",
+              "value": "Missing M7 evidence",
+              "detail": "Should not guess",
+              "status": "pending"
+            }
+          ],
+          "connections": [
+            {
+              "to": "node-selected",
+              "label": "retrieval selects",
+              "from": "node-corpus"
+            },
+            {
+              "to": "node-answer",
+              "label": "only supplied evidence",
+              "from": "node-selected"
+            }
+          ],
+          "id": "start"
+        },
+        {
+          "title": "Correct the selection",
+          "explanation": "The source collection stays the same; selection changes.",
+          "nodes": [
+            {
+              "id": "node-corpus",
+              "label": "Corpus",
+              "value": "3 manuals",
+              "detail": "Same source collection",
+              "status": "context"
+            },
+            {
+              "id": "node-selected",
+              "label": "Selected context",
+              "value": "M7 r 3",
+              "detail": "Machine and approved revision match",
+              "status": "selected"
+            },
+            {
+              "id": "node-answer",
+              "label": "Answer step",
+              "value": "M7 source available",
+              "detail": "Still check interpretation",
+              "status": "pending"
+            }
+          ],
+          "connections": [
+            {
+              "to": "node-selected",
+              "label": "machine/version constraint",
+              "from": "node-corpus"
+            },
+            {
+              "to": "node-answer",
+              "label": "bounded context",
+              "from": "node-selected"
+            }
+          ],
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-genai-visual-chunks",
+      "kind": "table",
+      "title": "Keep the label attached to the passage",
+      "alt": "Worked visual: Keep the label attached to the passage. The passage cannot be evaluated against the requested machine.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Text without identity: The passage cannot be evaluated against the requested machine.. Chunk: passage-2; Visible text: Inspection checklist; Missing evidence: Machine, revision, section\n\nIdentity travels with text: Stable labels separate current evidence from an old near-match.. Chunk: passage-2-r 3; Machine / revision: M7 / approved r 3; Source locator: Manual M7, section 4. Chunk: passage-2-r 2; Machine / revision: M7 / obsolete r 2; Source locator: Retained for audit, excluded from current answer",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-search"
+      ],
+      "states": [
+        {
+          "title": "Text without identity",
+          "explanation": "The passage cannot be evaluated against the requested machine.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Chunk",
+              "Visible text",
+              "Missing evidence"
+            ],
+            "rows": [
+              [
+                "passage-2",
+                "Inspection checklist",
+                "Machine, revision, section"
+              ]
+            ]
+          },
+          "id": "start"
+        },
+        {
+          "title": "Identity travels with text",
+          "explanation": "Stable labels separate current evidence from an old near-match.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Chunk",
+              "Machine / revision",
+              "Source locator"
+            ],
+            "rows": [
+              [
+                "passage-2-r 3",
+                "M7 / approved r 3",
+                "Manual M7, section 4"
+              ],
+              [
+                "passage-2-r 2",
+                "M7 / obsolete r 2",
+                "Retained for audit, excluded from current answer"
+              ]
+            ]
+          },
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-genai-visual-permission",
+      "kind": "table",
+      "title": "Similarity and permission are separate tests",
+      "alt": "Worked visual: Similarity and permission are separate tests. Equal relevance does not imply equal permission.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Ranking alone: Equal relevance does not imply equal permission.. Passage: North M7 r 3; Relevant?: Yes; North technician access: Permitted. Passage: South M7 r 3; Relevant?: Yes; North technician access: Denied\n\nEnforced request context: Restricted text is excluded from the caller’s evidence set, not merely hidden in the final wording.. Passage: North M7 r 3; Included in caller context?: Yes; Reason: Relevant and permitted. Passage: South M7 r 3; Included in caller context?: No; Reason: Caller lacks access",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-auth"
+      ],
+      "states": [
+        {
+          "title": "Ranking alone",
+          "explanation": "Equal relevance does not imply equal permission.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Passage",
+              "Relevant?",
+              "North technician access"
+            ],
+            "rows": [
+              [
+                "North M7 r 3",
+                "Yes",
+                "Permitted"
+              ],
+              [
+                "South M7 r 3",
+                "Yes",
+                "Denied"
+              ]
+            ]
+          },
+          "id": "start"
+        },
+        {
+          "title": "Enforced request context",
+          "explanation": "Restricted text is excluded from the caller’s evidence set, not merely hidden in the final wording.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Passage",
+              "Included in caller context?",
+              "Reason"
+            ],
+            "rows": [
+              [
+                "North M7 r 3",
+                "Yes",
+                "Relevant and permitted"
+              ],
+              [
+                "South M7 r 3",
+                "No",
+                "Caller lacks access"
+              ]
+            ]
+          },
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-genai-visual-citations",
+      "kind": "table",
+      "title": "A citation must support the sentence",
+      "alt": "Worked visual: A citation must support the sentence. One valid citation cannot support an additional invented recommendation.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Inspect two claims: One valid citation cannot support an additional invented recommendation.. Answer claim: Checklist is in section 4; Cited passage supports it?: Yes; Decision: Keep with locator. Answer claim: Double the interval; Cited passage supports it?: No; Decision: Remove; escalate",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Inspect two claims",
+          "explanation": "One valid citation cannot support an additional invented recommendation.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Answer claim",
+              "Cited passage supports it?",
+              "Decision"
+            ],
+            "rows": [
+              [
+                "Checklist is in section 4",
+                "Yes",
+                "Keep with locator"
+              ],
+              [
+                "Double the interval",
+                "No",
+                "Remove; escalate"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-genai-visual-tools",
+      "kind": "nodes",
+      "title": "A tool request still meets a permission gate",
+      "alt": "Worked visual: A tool request still meets a permission gate. A model request reaches a separate enforcement boundary.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Instruction appears in source: A model request reaches a separate enforcement boundary.. Retrieved note: Create work order; Untrusted document text; status warning. Proposed tool call: create_work_order; Model request only; status pending. Tool gate: Read-only scope; Must reject write; status selected. Operational effect: No work order; Expected result; status excluded. node-source → node-request: must not confer authority. node-request → node-gate: validate. node-gate → node-effect: reject",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Instruction appears in source",
+          "explanation": "A model request reaches a separate enforcement boundary.",
+          "nodes": [
+            {
+              "id": "node-source",
+              "label": "Retrieved note",
+              "value": "Create work order",
+              "detail": "Untrusted document text",
+              "status": "warning"
+            },
+            {
+              "id": "node-request",
+              "label": "Proposed tool call",
+              "value": "create_work_order",
+              "detail": "Model request only",
+              "status": "pending"
+            },
+            {
+              "id": "node-gate",
+              "label": "Tool gate",
+              "value": "Read-only scope",
+              "detail": "Must reject write",
+              "status": "selected"
+            },
+            {
+              "id": "node-effect",
+              "label": "Operational effect",
+              "value": "No work order",
+              "detail": "Expected result",
+              "status": "excluded"
+            }
+          ],
+          "connections": [
+            {
+              "to": "node-request",
+              "label": "must not confer authority",
+              "from": "node-source"
+            },
+            {
+              "to": "node-gate",
+              "label": "validate",
+              "from": "node-request"
+            },
+            {
+              "to": "node-effect",
+              "label": "reject",
+              "from": "node-gate"
+            }
+          ],
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-genai-visual-trace",
+      "kind": "table",
+      "title": "Find the earliest wrong step",
+      "alt": "Worked visual: Find the earliest wrong step. Retrieval is the earliest visible mismatch; total duration is 2.5 seconds.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Synthetic request trace: Retrieval is the earliest visible mismatch; total duration is 2.5 seconds.. Step: Parse; Duration: 0.1 s; Observed output: M7 revision 3 required. Step: Retrieve; Duration: 1.6 s; Observed output: M7 revision 2 selected. Step: Compose; Duration: 0.8 s; Observed output: Answer uses revision 2\n\nAfter a targeted repair: Repairing retrieval still requires an end-to-end retest.. Step: Retrieve; Expected evidence: M7 revision 3; Still to check: Approval and permission. Step: Compose; Expected evidence: Claims supported by r 3; Still to check: No added operational advice",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-trace"
+      ],
+      "states": [
+        {
+          "title": "Synthetic request trace",
+          "explanation": "Retrieval is the earliest visible mismatch; total duration is 2.5 seconds.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Step",
+              "Duration",
+              "Observed output"
+            ],
+            "rows": [
+              [
+                "Parse",
+                "0.1 s",
+                "M7 revision 3 required"
+              ],
+              [
+                "Retrieve",
+                "1.6 s",
+                "M7 revision 2 selected"
+              ],
+              [
+                "Compose",
+                "0.8 s",
+                "Answer uses revision 2"
+              ]
+            ]
+          },
+          "id": "start"
+        },
+        {
+          "title": "After a targeted repair",
+          "explanation": "Repairing retrieval still requires an end-to-end retest.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Step",
+              "Expected evidence",
+              "Still to check"
+            ],
+            "rows": [
+              [
+                "Retrieve",
+                "M7 revision 3",
+                "Approval and permission"
+              ],
+              [
+                "Compose",
+                "Claims supported by r 3",
+                "No added operational advice"
+              ]
+            ]
+          },
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-genai-visual-evaluation",
+      "kind": "table",
+      "title": "Include the cases that should refuse",
+      "alt": "Worked visual: Include the cases that should refuse. Counts total 20. Success differs by group.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Synthetic coverage plan: Counts total 20. Success differs by group.. Case group: Answerable; Count: 12; Expected behavior: Supported answer. Case group: Missing evidence; Count: 4; Expected behavior: Abstain or escalate. Case group: Unauthorized; Count: 2; Expected behavior: No restricted disclosure. Case group: Malicious source; Count: 2; Expected behavior: No unauthorized effect\n\nA misleading headline: A boundary failure remains visible despite a high aggregate.. Measure: Overall attractive answers; Result: 18/20; Interpretation: Not a safety decision. Measure: Unauthorized disclosure; Result: 1 of 2; Interpretation: Blocking under this proposed policy",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-eval"
+      ],
+      "states": [
+        {
+          "title": "Synthetic coverage plan",
+          "explanation": "Counts total 20. Success differs by group.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Case group",
+              "Count",
+              "Expected behavior"
+            ],
+            "rows": [
+              [
+                "Answerable",
+                "12",
+                "Supported answer"
+              ],
+              [
+                "Missing evidence",
+                "4",
+                "Abstain or escalate"
+              ],
+              [
+                "Unauthorized",
+                "2",
+                "No restricted disclosure"
+              ],
+              [
+                "Malicious source",
+                "2",
+                "No unauthorized effect"
+              ]
+            ]
+          },
+          "id": "start"
+        },
+        {
+          "title": "A misleading headline",
+          "explanation": "A boundary failure remains visible despite a high aggregate.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Measure",
+              "Result",
+              "Interpretation"
+            ],
+            "rows": [
+              [
+                "Overall attractive answers",
+                "18/20",
+                "Not a safety decision"
+              ],
+              [
+                "Unauthorized disclosure",
+                "1 of 2",
+                "Blocking under this proposed policy"
+              ]
+            ]
+          },
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-genai-visual-judges",
+      "kind": "table",
+      "title": "A judge’s score needs a human basis",
+      "alt": "Worked visual: A judge’s score needs a human basis. The judge makes two distinct errors against the authored case expectations.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Calibration examples: The judge makes two distinct errors against the authored case expectations.. Output: Source-backed location; Expected assessment: Accept; Judge result to investigate: Accept. Output: Confident invented interval; Expected assessment: Reject; Judge result to investigate: Accept: false approval. Output: No approved manual found; Expected assessment: Accept for missing case; Judge result to investigate: Reject: false penalty",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-eval"
+      ],
+      "states": [
+        {
+          "title": "Calibration examples",
+          "explanation": "The judge makes two distinct errors against the authored case expectations.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Output",
+              "Expected assessment",
+              "Judge result to investigate"
+            ],
+            "rows": [
+              [
+                "Source-backed location",
+                "Accept",
+                "Accept"
+              ],
+              [
+                "Confident invented interval",
+                "Reject",
+                "Accept: false approval"
+              ],
+              [
+                "No approved manual found",
+                "Accept for missing case",
+                "Reject: false penalty"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-genai-visual-transfer",
+      "kind": "table",
+      "title": "Transfer the boundaries to a returns assistant",
+      "alt": "Worked visual: Transfer the boundaries to a returns assistant. The mechanism transfers while the operational authority changes.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "One chain, two domains: The mechanism transfers while the operational authority changes.. Boundary: Evidence identity; Maintenance: Machine / manual revision; Retail transfer: Product / policy revision. Boundary: Read-only output; Maintenance: Locate checklist; Retail transfer: Locate return clause. Boundary: Separate effect; Maintenance: Change work order; Retail transfer: Issue refund. Boundary: Missing evidence; Maintenance: Qualified maintenance owner; Retail transfer: Support policy owner. Boundary: Expansion gate; Maintenance: Scoped evaluated behavior; Retail transfer: Scoped evaluated behavior",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "One chain, two domains",
+          "explanation": "The mechanism transfers while the operational authority changes.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Boundary",
+              "Maintenance",
+              "Retail transfer"
+            ],
+            "rows": [
+              [
+                "Evidence identity",
+                "Machine / manual revision",
+                "Product / policy revision"
+              ],
+              [
+                "Read-only output",
+                "Locate checklist",
+                "Locate return clause"
+              ],
+              [
+                "Separate effect",
+                "Change work order",
+                "Issue refund"
+              ],
+              [
+                "Missing evidence",
+                "Qualified maintenance owner",
+                "Support policy owner"
+              ],
+              [
+                "Expansion gate",
+                "Scoped evaluated behavior",
+                "Scoped evaluated behavior"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    }
+  ],
+  "questions": [],
+  "selfQuestions": [
+    {
+      "id": "dbxfe-genai-check-task",
+      "revision": "1",
+      "prompt": "A user asks for the checklist and then asks to extend the interval. What changed in the task?",
+      "modelAnswer": "The second request crosses from finding information to changing an operational decision. The read-only scope does not authorize that change; route it to the qualified owner.",
+      "reasoning": "Classify the requested effect, not the wording or apparent confidence. A relevant document cannot enlarge the agreed authority.",
+      "conceptIds": [
+        "dbxfe-genai-concept-task"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-check-context",
+      "revision": "1",
+      "prompt": "The correct manual exists in storage but is absent from the supplied context. Which boundary should you inspect first?",
+      "modelAnswer": "Inspect retrieval and context assembly, including query, metadata filters and whether the approved document was indexed. Do not assume the answer model had access merely because the file existed.",
+      "reasoning": "Available corpus and actual request context are different states. The earliest missing evidence identifies the next diagnostic step.",
+      "conceptIds": [
+        "dbxfe-genai-concept-context"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-search"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-check-chunks",
+      "revision": "1",
+      "prompt": "Why retain a source locator if the model can reproduce the paragraph?",
+      "modelAnswer": "A locator lets a reviewer inspect the original context, revision and applicability. Reproduced text alone cannot establish that it came from the permitted current source.",
+      "reasoning": "Evidence must be inspectable independently of the generated wording. The metadata supports that check.",
+      "conceptIds": [
+        "dbxfe-genai-concept-chunks"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-search"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-check-permission",
+      "revision": "1",
+      "prompt": "Both passages rank highly. What must be true before the South passage can be supplied to the North technician’s answer?",
+      "modelAnswer": "The actual caller must be authorized for that resource under the selected identity model. Relevance does not grant access.",
+      "reasoning": "The decision is about resource authority. Changing the answer wording after unauthorized retrieval does not undo disclosure risk.",
+      "conceptIds": [
+        "dbxfe-genai-concept-permission"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-auth"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-check-citations",
+      "revision": "1",
+      "prompt": "A link opens the correct current manual. Does that alone prove the complete answer is grounded? Explain.",
+      "modelAnswer": "No. Compare each material claim with the relevant passage. A valid current source may not support the answer’s interpretation or an added recommendation.",
+      "reasoning": "Link validity is weaker evidence than claim support; narrowing an answer preserves usefulness without inventing authority.",
+      "conceptIds": [
+        "dbxfe-genai-concept-citations"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-check-tools",
+      "revision": "1",
+      "prompt": "The guard rejects a forbidden write. What should the evaluation record preserve besides “no work order”?",
+      "modelAnswer": "Preserve that a forbidden request was proposed, the identity and bounded arguments needed for investigation, the rejection result and the absence of the effect, under the approved trace policy.",
+      "reasoning": "Prevention is valuable, but hiding the attempted violation would lose a diagnostic failure signal.",
+      "conceptIds": [
+        "dbxfe-genai-concept-tools"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-check-trace",
+      "revision": "1",
+      "prompt": "Would cutting composition from 0.8 to 0.2 seconds fix the displayed failure?",
+      "modelAnswer": "No. It would reduce synthetic total latency from 2.5 to 1.9 seconds while leaving the obsolete evidence selected. Repair the selection and retest correctness.",
+      "reasoning": "An optimization can improve one measure while preserving the consequential failure.",
+      "conceptIds": [
+        "dbxfe-genai-concept-trace"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-trace"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-check-evaluation",
+      "revision": "1",
+      "prompt": "Why is a correct refusal useful evidence rather than a failed answer?",
+      "modelAnswer": "The expected behavior depends on the case. When evidence or permission is missing, refusing or escalating prevents an unsupported or unauthorized response and can satisfy the defined criterion.",
+      "reasoning": "Grade against intended behavior, not the presence of a fluent answer.",
+      "conceptIds": [
+        "dbxfe-genai-concept-evaluation"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-eval"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-check-judges",
+      "revision": "1",
+      "prompt": "A new judge raises the average score without changing the agent. What conclusion is justified?",
+      "modelAnswer": "The measurement changed. Reassess both versions on a common calibrated basis before claiming the agent improved.",
+      "reasoning": "Changing the ruler and changing the system are separate interventions; preserve versioned evidence.",
+      "conceptIds": [
+        "dbxfe-genai-concept-judges"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-eval"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-check-transfer",
+      "revision": "1",
+      "prompt": "Write a safe first-scope response when the retailer has approved policy lookup but has not approved refund writes.",
+      "modelAnswer": "Find the permitted policy for the purchase context, cite the relevant clause and explain any missing evidence. Route a refund request to the authorized support process; do not issue it through an unapproved tool.",
+      "reasoning": "The same evidence/authority separation applies. Helpful information and operational effects have different acceptance conditions.",
+      "conceptIds": [
+        "dbxfe-genai-concept-transfer"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ]
+    }
+  ],
+  "beats": [
+    {
+      "id": "dbxfe-genai-beat-task",
+      "version": "1.0.0",
+      "title": "Start with the task, then the authority",
+      "outcome": "A read-only answer and a work-order change need different permissions.",
+      "explanation": "A maintenance question asks for information; changing a work order changes the world. Define the smallest useful [[dbxfe-genai-concept-task|task boundary]] before choosing an agent. Cinderline first needs an approved manual passage for a named machine. That goal permits a sourced answer or an escalation. It does not, by itself, permit changing the maintenance schedule.",
+      "lessonId": "dbxfe-m07-l02",
+      "sectionId": "dbxfe-m07-l02-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-task"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "visualId": "dbxfe-genai-visual-task",
+      "questionIds": [
+        "dbxfe-genai-check-task"
+      ],
+      "handbook": {
+        "markdown": "### From a broad request to a bounded contract\n“Build a maintenance agent” hides several different jobs. Write the user, question, approved information, permitted output and forbidden effects. For this fictional first scope, the user is an authorized technician, the input names machine M7, and the output is a source-linked location in an approved manual. Missing or conflicting evidence routes to the maintenance owner. A work-order tool is outside scope.\n\nThe distinction changes the design. A deterministic lookup may be enough when the machine and section are known. Retrieval helps when wording varies. Generative composition may make the passage easier to navigate, but its output still needs checking. Tool selection adds another authority boundary only when the task requires it.\n\n**Worked decision:** “Find the inspection checklist” can return a passage. “Extend the inspection interval” requests an operational change. Do not convert the latter into an approved write just because the former works.\n\n**Troubleshooting:** when participants disagree about what the assistant may do, resolve the contract before comparing models. A technically successful tool call can still violate the agreed task.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l02-understand",
+          "dbxfe-m07-l02-deeper"
+        ]
+      },
+      "recap": "A read-only answer and a work-order change need different permissions.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": [],
+      "samajh": {
+        "text": "Library mein librarian tumhe sahi manual dhoondh kar de sakta hai. Isse usko workshop ka maintenance schedule badalne ki authority nahi milti. Information dena aur system mein action lena alag permissions hain; assistant ka pehla scope bhi aise hi clear rakho.",
+        "mapping": "Librarian lookup maps to retrieval; workshop change maps to tool action.",
+        "boundary": "A human librarian analogy does not describe the model’s reasoning or the actual permission implementation."
+      }
+    },
+    {
+      "id": "dbxfe-genai-beat-context",
+      "version": "1.0.0",
+      "title": "An answer sees selected context",
+      "outcome": "Retrieval determines what evidence reaches the answer step.",
+      "explanation": "A model does not automatically inspect every current manual. A retrieval path selects passages and assembles a [[dbxfe-genai-concept-context|context]] alongside the question. If the relevant revision never reaches this step, fluent writing cannot repair the missing evidence. Inspect the selected passages before blaming the final answer alone.",
+      "lessonId": "dbxfe-m07-l02",
+      "sectionId": "dbxfe-m07-l02-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-context"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-search"
+      ],
+      "visualId": "dbxfe-genai-visual-context",
+      "questionIds": [
+        "dbxfe-genai-check-context"
+      ],
+      "handbook": {
+        "markdown": "### Separate the corpus from the [[dbxfe-genai-concept-context|context]]\nThe corpus contains available material; the context is the much smaller selection presented for one request. In the fictional example, the corpus has M7 revision 2, M7 revision 3 and an M8 manual. The question concerns M7 revision 3. A candidate search result can be similar in wording while belonging to M8. The assembly step must retain enough metadata to distinguish them.\n\nInspect this path in order: what the user meant; which query and filters were used; which chunks were retrieved; which chunks were actually supplied; what the answer said. These observations localize a failure. If revision 3 was absent, investigate document ingestion or selection. If revision 3 was supplied but ignored, investigate answer instructions or composition.\n\n**Worked output:** passing only M8 to the answer step creates a wrong-machine evidence set even if the final sentence sounds plausible. The appropriate first-scope behavior is to request clarification or state missing evidence.\n\n**Limit:** adding more passages is not automatically better. Irrelevant, duplicated or contradictory context can obscure the useful passage and increase processing cost.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l02-understand",
+          "dbxfe-m07-l02-deeper"
+        ]
+      },
+      "recap": "Retrieval determines what evidence reaches the answer step.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": [
+        "dbxfe-genai-media-context"
+      ]
+    },
+    {
+      "id": "dbxfe-genai-beat-chunks",
+      "version": "1.0.0",
+      "title": "Keep the label attached to the passage",
+      "outcome": "A chunk needs identity, version and provenance to be usable.",
+      "explanation": "A [[dbxfe-genai-concept-chunks|chunk]] is a portion of a larger document prepared for retrieval. Splitting helps find a focused passage, but a paragraph detached from its machine, revision and section can mislead. Carry those labels with the text. Cinderline needs to tell an approved M7 instruction from an old or different-machine passage.",
+      "lessonId": "dbxfe-m07-l02",
+      "sectionId": "dbxfe-m07-l02-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-chunks"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-search"
+      ],
+      "visualId": "dbxfe-genai-visual-chunks",
+      "questionIds": [
+        "dbxfe-genai-check-chunks"
+      ],
+      "handbook": {
+        "markdown": "### Chunking is an evidence-design choice\nChoose boundaries that preserve meaning: a heading, qualification and instruction may belong together. Cutting after “Do not” or separating a table from its units creates a misleading fragment. Keep a stable source identifier, section locator, machine/version, approval status and relevant access metadata. Those fields make later inspection possible.\n\nOur synthetic source has two revisions. Revision 2 says a procedure applies to assembly A. Revision 3 adds a condition for assembly B. A [[dbxfe-genai-concept-chunks|chunk]] containing only the shared sentence looks similar, but the missing condition matters. The worked visual preserves document and section identity as the selected revision changes.\n\nWhen an answer cites the wrong revision, inspect ingestion metadata and index freshness as well as model behavior. A source update and an index update are separate events; establish a policy for withdrawing outdated material and verifying the resulting searchable set.\n\n**Limit:** this example teaches document identity. It does not prescribe one universal chunk size, embedding model, synchronization guarantee or industrial procedure. Evaluate chunk choices on actual representative questions and their source requirements.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l02-understand",
+          "dbxfe-m07-l02-deeper"
+        ]
+      },
+      "recap": "A chunk needs identity, version and provenance to be usable.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-genai-beat-permission",
+      "version": "1.0.0",
+      "title": "Similarity and permission are separate tests",
+      "outcome": "A high-ranking passage may still be unavailable to this caller.",
+      "explanation": "Retrieval relevance asks whether a passage helps answer the question. [[dbxfe-genai-concept-permission|authorization]] asks whether this caller may access it. A high similarity score settles neither approval status nor access. Preserve the caller’s identity and enforce the intended boundary before restricted content reaches an answer or trace visible to that caller.",
+      "lessonId": "dbxfe-m07-l02",
+      "sectionId": "dbxfe-m07-l02-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-permission"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-auth"
+      ],
+      "visualId": "dbxfe-genai-visual-permission",
+      "questionIds": [
+        "dbxfe-genai-check-permission"
+      ],
+      "handbook": {
+        "markdown": "### Evaluate two independent dimensions\nTake two candidate passages: North/M7/current and South/M7/current. Both can be relevant to the words in the query. Only the first may be accessible to the fictional North technician. Ranking should not be interpreted as an access decision, and a prompt telling the model “respect permissions” is not a substitute for enforcement.\n\nChoose the intended identity model explicitly. Current Databricks Apps documentation distinguishes the app’s service principal from user [[dbxfe-genai-concept-permission|authorization]]. A shared app identity and a caller identity can have different permissions. This is an implementation choice to verify, not a property automatically inherited from a chat UI.\n\n**Worked negative test:** ask two representative users for the restricted passage. Inspect which identity reached the retrieval boundary and whether inaccessible text appeared in the answer, source list or exposed trace. A successful administrator request is not this test.\n\n**Troubleshooting:** apparently normal output can conceal the wrong identity. Verify actual authorization behavior in the selected deployment, including missing credentials and failed access. Avoid recording secrets in diagnostic evidence. User authorization is marked Public Preview in the reviewed AWS Apps documentation.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l02-understand",
+          "dbxfe-m07-l02-deeper"
+        ]
+      },
+      "recap": "A high-ranking passage may still be unavailable to this caller.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": [],
+      "samajh": {
+        "text": "Search result exam ki answer sheet jaisa useful lag sakta hai, par locked office file dekhne ki permission alag baat hai. Sahi shelf mil gayi, iska matlab har reader ko file de sakte ho nahi. Pehle identity aur access check karo, phir permitted text use karo.",
+        "mapping": "Finding a shelf maps to relevance; access to a locked file maps to authorization.",
+        "boundary": "Real authorization must be enforced by systems; the analogy does not specify an access-control implementation."
+      }
+    },
+    {
+      "id": "dbxfe-genai-beat-citations",
+      "version": "1.0.0",
+      "title": "A citation must support the sentence",
+      "outcome": "A source link is useful only when its passage entails the claim.",
+      "explanation": "A [[dbxfe-genai-concept-citations|grounding]] connects an answer claim to inspectable evidence. A valid URL beside a sentence can still point to the wrong machine, obsolete revision or a passage that says something else. Check the relationship between claim and passage, not only whether a link opens. Missing support should lead to a narrower answer or escalation.",
+      "lessonId": "dbxfe-m07-l02",
+      "sectionId": "dbxfe-m07-l02-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-citations"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "visualId": "dbxfe-genai-visual-citations",
+      "questionIds": [
+        "dbxfe-genai-check-citations",
+        "dbxfe-m07-l02-q1"
+      ],
+      "handbook": {
+        "markdown": "### Audit the claim-to-source relationship\nBreak the answer into claims that a reviewer can check. “The approved checklist is in section 4” is different from “You should double the maintenance interval.” A passage naming section 4 can support the first while providing no basis for the second. The answer must not borrow authority from a citation attached to an adjacent sentence.\n\nOur synthetic answer starts with two sentences: a supported location and an unsupported operational recommendation. The improved version retains the source location and routes the requested change to the qualified maintenance owner. This is useful assistance even though it declines part of the request.\n\nCheck document identity, current approval, permission, passage meaning and answer scope. These checks are related but not interchangeable. A current source can be irrelevant; an accurate quotation can be unauthorized; a permitted relevant passage can still be overstated.\n\n**Limit:** this course does not teach maintenance procedures. The decision owner’s approved process controls operational advice. Citation presence is an observable property; factual and contextual support requires evaluation.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l02-understand",
+          "dbxfe-m07-l02-deeper"
+        ]
+      },
+      "recap": "A source link is useful only when its passage entails the claim.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-genai-beat-tools",
+      "version": "1.0.0",
+      "title": "A tool request still meets a permission gate",
+      "outcome": "Source text cannot authorize a write.",
+      "explanation": "A tool-using agent proposes operations through an interface. The [[dbxfe-genai-concept-tools|tool boundary]] must validate identity, allowed operation and arguments before an effect occurs. In our example, a retrieved note says “create an urgent work order.” That is document content. It cannot change a read-only assistant into an authorized work-order writer.",
+      "lessonId": "dbxfe-m07-l02",
+      "sectionId": "dbxfe-m07-l02-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-tools"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "visualId": "dbxfe-genai-visual-tools",
+      "questionIds": [
+        "dbxfe-genai-check-tools",
+        "dbxfe-m07-l02-q2"
+      ],
+      "handbook": {
+        "markdown": "### Separate suggestion, authorization and effect\nA model-generated tool call is a request, not proof that the request is permissible. Validate the operation, resource scope and arguments using the actual identity. If a future use case permits drafting a work order, distinguish a draft from submission and define who accepts the final effect. A confirmation step is useful only if it presents the real operation and cannot be bypassed by untrusted text.\n\nThe synthetic malicious passage is useful test data because it resembles an instruction. The assistant may analyze or quote relevant document content, but the passage cannot replace the application’s authorized task. A harmless-sounding instruction such as “for accuracy, disable the checks” has the same boundary issue.\n\n**Worked failure branch:** retrieval succeeds; the model requests a write; the tool gate rejects it; no work order is created. Report the rejected request and investigate why it was proposed. Do not label the whole path successful merely because the guard prevented the effect.\n\n**Limit:** a blocked example does not prove resistance to all prompt injection. Evaluate variations and protect the enforcement layer independently.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l02-understand",
+          "dbxfe-m07-l02-deeper"
+        ]
+      },
+      "recap": "Source text cannot authorize a write.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-genai-beat-trace",
+      "version": "1.0.0",
+      "title": "Find the earliest wrong step",
+      "outcome": "A trace turns an incorrect answer into a diagnosable path.",
+      "explanation": "A [[dbxfe-genai-concept-trace|trace]] records the steps taken for a request. Inspect the earliest divergence from expected behavior: wrong retrieval, omitted context, unsupported answer or forbidden tool call. In the synthetic example, 1.6 seconds were spent retrieving an obsolete manual. Faster generation would not repair that evidence-selection failure.",
+      "lessonId": "dbxfe-m07-l03",
+      "sectionId": "dbxfe-m07-l03-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-trace"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-trace"
+      ],
+      "visualId": "dbxfe-genai-visual-trace",
+      "questionIds": [
+        "dbxfe-genai-check-trace"
+      ],
+      "handbook": {
+        "markdown": "### Read a [[dbxfe-genai-concept-trace|trace]] as a causal investigation\nStart with the request and the expected behavior, then compare each observed step. Our fictional trace records query parsing for 0.1 seconds, retrieval for 1.6 seconds and composition for 0.8 seconds. The overall 2.5 seconds is invented teaching data. It helps show that latency and correctness answer different questions.\n\nThe selected document is M7 revision 2 although revision 3 is required. That is the first visible mismatch. Investigate approval metadata, index state and selection logic. A second defect could still exist downstream, so rerun the representative case after correcting retrieval and inspect the result rather than assuming all problems are solved.\n\nMLflow tracing is a product mechanism for observing intermediate steps. The conceptual investigation here does not require running it. An actual trace depends on instrumentation and the components recorded; absence from the trace is not proof an action never occurred.\n\n**Data boundary:** prompts and retrieved passages can contain sensitive information. Decide what to minimize, retain and restrict before collecting production traces. Never put credentials in a diagnostic artifact. Cost fields also need a known measurement basis rather than guessed prices.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l03-understand",
+          "dbxfe-m07-l03-deeper"
+        ]
+      },
+      "recap": "A trace turns an incorrect answer into a diagnosable path.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-genai-beat-evaluation",
+      "version": "1.0.0",
+      "title": "Include the cases that should refuse",
+      "outcome": "Evaluation covers intended answers and intentional boundaries.",
+      "explanation": "An [[dbxfe-genai-concept-evaluation|evaluation set]] defines inputs, expected behavior and how results will be judged. Cinderline’s synthetic set contains 12 answerable questions, four missing-evidence cases, two unauthorized requests and two malicious-source cases. Report each group separately. Eighteen attractive answers cannot compensate for exposing a restricted manual.",
+      "lessonId": "dbxfe-m07-l03",
+      "sectionId": "dbxfe-m07-l03-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-evaluation"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-eval"
+      ],
+      "visualId": "dbxfe-genai-visual-evaluation",
+      "questionIds": [
+        "dbxfe-genai-check-evaluation"
+      ],
+      "handbook": {
+        "markdown": "### Design coverage before collecting scores\nAn [[dbxfe-genai-concept-evaluation|evaluation set]] is more than a list of happy-path questions. Choose representative supported tasks, ambiguity, absent documents, obsolete revisions, permission denials and untrusted-source instructions. Record the intended behavior for each. A correct answer, a correct abstention and a correct denial are different successful behaviors.\n\nFor this fictional twenty-case set, the maintenance owner reviews the twelve answerable cases for source/version support. The four missing-evidence cases should clearly identify the gap. The two unauthorized cases should not reveal restricted material. The two malicious-source cases should not grant action authority. These are proposed teaching criteria, not observed results or proof of comprehensive safety.\n\nIf one unauthorized request exposes a passage, do not average it away. Keep the group result and gate expansion according to the agreed policy. Investigate the mechanism and add a regression case once the failure is understood.\n\n**Limit:** a small set can expose errors without estimating rare-event reliability. Version the questions, sources, application and scoring policy; otherwise before/after comparisons may reflect a changed test instead of an improved system.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l03-understand",
+          "dbxfe-m07-l03-deeper"
+        ]
+      },
+      "recap": "Evaluation covers intended answers and intentional boundaries.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": [],
+      "samajh": {
+        "text": "Driving test mein sirf gaadi chalana nahi, red light par rukna bhi sahi behavior hai. Assistant ke test mein bhi har question ka answer dena goal nahi. Jahan evidence ya permission nahi hai, rukna ya qualified owner tak bhejna expected result ho sakta hai.",
+        "mapping": "Stopping at a red light maps to a deliberate refusal under a defined rule.",
+        "boundary": "A finite test set cannot establish safety across every future situation."
+      }
+    },
+    {
+      "id": "dbxfe-genai-beat-judges",
+      "version": "1.0.0",
+      "title": "A judge’s score needs a human basis",
+      "outcome": "Investigate disagreements instead of treating a number as certainty.",
+      "explanation": "A [[dbxfe-genai-concept-judges|scorer]] evaluates output against a stated rule, but a model-based judge can misread context too. Compare its decisions with approved human-reviewed examples. If the judge rewards a fluent unsupported answer and penalizes a correct abstention, improve the rubric and inspect the disagreement before using the score to guide release.",
+      "lessonId": "dbxfe-m07-l03",
+      "sectionId": "dbxfe-m07-l03-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-judges"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction",
+        "dbxfe-genai-claim-eval"
+      ],
+      "visualId": "dbxfe-genai-visual-judges",
+      "questionIds": [
+        "dbxfe-genai-check-judges"
+      ],
+      "handbook": {
+        "markdown": "### Match the check to the claim\nUse a deterministic check for a deterministic property, such as whether a required source identifier is present. That check cannot establish that the source supports the answer. A semantic judgment needs a clearer rubric, suitable evidence and review. Model judges can help scale that work, but their assessments remain fallible.\n\nBuild a small calibration set with accepted examples, unacceptable examples and explanations. Include a supported concise answer, a plausible fabrication and a correct refusal. Compare the judge with the maintenance owner’s assessment. Disagreement is a signal to inspect the rubric, supplied context and judge behavior; it is not automatically proof that the human or model is wrong.\n\n**Worked disagreement:** the judge marks “no approved M7 manual found” as unhelpful, while the case intentionally contains no approved manual. The case expectation supports abstention, so a fluency/helpfulness-only score is misaligned with the test.\n\n**Limit:** keep evaluator version and prompt changes visible. A higher score after changing the judge may indicate changed measurement. Separate quality, latency, unauthorized effects and operating cost rather than compressing them into an unexplained release score.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l03-understand",
+          "dbxfe-m07-l03-deeper"
+        ]
+      },
+      "recap": "Investigate disagreements instead of treating a number as certainty.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-genai-beat-transfer",
+      "version": "1.0.0",
+      "title": "Transfer the boundaries to a returns assistant",
+      "outcome": "Reuse the reasoning, not the maintenance vocabulary.",
+      "explanation": "A retailer wants an assistant to find its return policy and issue refunds. Apply the same [[dbxfe-genai-concept-transfer|release decision]]: identify permitted evidence, keep policy version and citation support, distinguish lookup from payment, trace failures and evaluate refusals. Start with the task actually approved. A policy paragraph explaining eligibility does not authorize a refund transaction.",
+      "lessonId": "dbxfe-m07-l03",
+      "sectionId": "dbxfe-m07-l03-understand",
+      "conceptIds": [
+        "dbxfe-genai-concept-transfer"
+      ],
+      "claimIds": [
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "visualId": "dbxfe-genai-visual-transfer",
+      "questionIds": [
+        "dbxfe-genai-check-transfer"
+      ],
+      "handbook": {
+        "markdown": "### Assemble a defensible first release\nThe transfer organization is fictional. Its support team needs a policy lookup for a product and purchase date. Design the first scope as read-only: retrieve the permitted policy revision, show the relevant section and escalate ambiguity. A future refund tool would need customer/account identity, amount constraints, operational authorization and an effect record. Do not silently include it in the first approval.\n\nUse an evaluation matrix with ordinary returns, missing receipts, old policies, restricted account information and source text attempting to issue a refund. For every case, specify expected answer or refusal and the absence or presence of an authorized effect. Inspect traces for the earliest incorrect step and protect any personal data they contain.\n\n**Proposed decision:** proceed only with a bounded read-only test if its agreed criteria pass and an owner can respond to failures. Do not infer that maintenance examples, twenty synthetic cases or a platform demo validate the retailer’s deployment.\n\n**Review entry:** study the module cards on context, authorization and evidence. The extension cards add current implementation caveats. They are optional extra learning and do not certify that a real deployment is safe.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l03-understand",
+          "dbxfe-m07-l03-deeper"
+        ]
+      },
+      "recap": "Reuse the reasoning, not the maintenance vocabulary.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m07-l02-card1",
+      "beatId": "dbxfe-genai-beat-task"
+    },
+    {
+      "cardId": "dbxfe-m07-l02-card2",
+      "beatId": "dbxfe-genai-beat-tools"
+    },
+    {
+      "cardId": "dbxfe-m07-l02-card3",
+      "beatId": "dbxfe-genai-beat-task"
+    },
+    {
+      "cardId": "dbxfe-m07-l03-card1",
+      "beatId": "dbxfe-genai-beat-evaluation"
+    },
+    {
+      "cardId": "dbxfe-m07-l03-card2",
+      "beatId": "dbxfe-genai-beat-judges"
+    },
+    {
+      "cardId": "dbxfe-m07-l03-card3",
+      "beatId": "dbxfe-genai-beat-trace"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-genai-extension-caller-fallback",
+      "revision": "2",
+      "prompt": "A Databricks Apps agent replies normally when the forwarded user token is missing. What should you verify?",
+      "answer": "Inspect the effective identity at the resource boundary: the reviewed helper can fall back to the app service principal when no forwarded user token is present.",
+      "explanation": "The concrete edge case is an apparently successful request taking a different identity path. In a synthetic test, user A can read North manuals, user B cannot, and the app identity can read both plants. An answer to B under app identity would not demonstrate B’s delegated authorization. Test A, B and a deliberately absent-token request in the approved environment; record the resulting principal and access outcome without recording token contents. Decide whether missing delegation should fail closed for this application. The AWS Apps guide marks user authorization Public Preview, and its helper behavior must be checked for the deployed version. This is more specific than simply asking whether a passage is relevant or permitted.",
+      "whyItMatters": "It exposes a credential-absence path that ordinary successful-user tests can miss.",
+      "lessonId": "dbxfe-m07-l02",
+      "sectionId": "dbxfe-m07-l02-understand",
+      "conceptIds": [
+        "dbxfe-genai-extension-concept-caller-fallback"
+      ],
+      "claimIds": [
+        "dbxfe-genai-claim-auth",
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "beatId": "dbxfe-genai-beat-permission"
+    },
+    {
+      "id": "dbxfe-genai-extension-hybrid-retrieval",
+      "revision": "2",
+      "prompt": "When a manual query contains an exact part number, what retrieval alternative is worth comparing with embedding similarity alone?",
+      "answer": "Compare keyword or hybrid retrieval with embedding similarity using the same approved questions, document revisions and access filters.",
+      "explanation": "An exact identifier such as synthetic part QX-417 can be discriminative even when its surrounding sentence resembles another manual. A symptom such as “the housing rattles after startup” may need semantic matching instead. Build a small matrix containing exact IDs, paraphrased symptoms and misleading near-matches. Check whether the expected passage appears among the returned candidates before comparing final answers. Current Databricks AI Search documentation describes these retrieval capabilities; it does not prove that hybrid search wins on every corpus. Keep the candidate limit and permission/version constraints comparable, inspect false positives, and choose from the measured task results rather than the technique’s name.",
+      "whyItMatters": "It adds a lexical-versus-semantic experiment instead of repeating the core context-selection rule.",
+      "lessonId": "dbxfe-m07-l02",
+      "sectionId": "dbxfe-m07-l02-understand",
+      "conceptIds": [
+        "dbxfe-genai-extension-concept-hybrid-retrieval"
+      ],
+      "claimIds": [
+        "dbxfe-genai-claim-search",
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "beatId": "dbxfe-genai-beat-context"
+    },
+    {
+      "id": "dbxfe-genai-extension-trace-cost",
+      "revision": "2",
+      "prompt": "Two retrieval calls run together from second 0 to 2, then composition runs from 2 to 3. Why is the request not five seconds?",
+      "answer": "The request lasts three seconds in this synthetic timeline. Summing the two overlapping two-second calls plus one-second composition double-counts shared elapsed time.",
+      "explanation": "OpenTelemetry records span boundaries and parent relationships, which let you reconstruct when operations happened. Draw the intervals: retrieval A [0,2], retrieval B [0,2], composition [2,3]. The two retrieval calls contribute four seconds of summed operation duration but only two seconds before composition can begin. A parent span may also contain child duration, so adding parent and child again inflates the total. Investigate the sequence that delays completion, and distinguish wall-clock latency from accumulated work or separately metered cost. Real traces may contain gaps, asynchronous work or clock issues; these require inspection. The lesson’s earlier trace was sequential, so its simple sum must not be generalized to every agent.",
+      "whyItMatters": "It prevents a believable but incorrect latency explanation for agents with parallel tools.",
+      "lessonId": "dbxfe-m07-l03",
+      "sectionId": "dbxfe-m07-l03-understand",
+      "conceptIds": [
+        "dbxfe-genai-extension-concept-trace-cost"
+      ],
+      "claimIds": [
+        "dbxfe-genai-claim-beyond-span-timing",
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "beatId": "dbxfe-genai-beat-trace"
+    },
+    {
+      "id": "dbxfe-genai-extension-same-scorer",
+      "revision": "2",
+      "prompt": "After twenty prompt edits chosen against the same evaluation cases, what evidence should complement the best score?",
+      "answer": "Evaluate the chosen design on fresh, representative holdout cases that did not guide those edits; keep the earlier cases as development/regression evidence.",
+      "explanation": "A fixed scorer controls one measurement change, but it does not prevent the team from fitting the examples used repeatedly to choose prompts, chunks or retrieval settings. Google’s dataset guidance explains this repeated-selection problem for machine learning. The original agent application is to separate development cases from a protected confirmation set. For a synthetic maintenance assistant, hold out different machines, wording and refusal cases; avoid placing near-duplicate passages on both sides merely to increase counts. Preserve the decision history and report both results. If the holdout influences another redesign, it has become development evidence and a later confirmation needs new coverage. This is an evaluation-design principle, not a promised accuracy level.",
+      "whyItMatters": "It catches optimization to familiar examples even when the evaluator itself never changes.",
+      "lessonId": "dbxfe-m07-l03",
+      "sectionId": "dbxfe-m07-l03-understand",
+      "conceptIds": [
+        "dbxfe-genai-extension-concept-same-scorer"
+      ],
+      "claimIds": [
+        "dbxfe-genai-claim-beyond-holdout",
+        "dbxfe-genai-teaching-guidance",
+        "dbxfe-genai-teaching-fiction"
+      ],
+      "beatId": "dbxfe-genai-beat-judges"
+    }
+  ],
+  "recap": {
+    "title": "Carry this forward",
+    "markdown": "Follow the chain: task → permitted context → supported answer → separately authorized effect → trace → evaluated decision. Use the final comparison to explain the same boundaries in another domain. Review core cards first; choose extensions when ready.",
+    "visualId": "dbxfe-genai-visual-transfer"
+  },
+  "appliedTask": {
+    "title": "Apply the whole module",
+    "prompt": "Design a read-only returns-policy assistant. Supply one supported case, one missing-evidence case, one denied-data case and one source-instruction attack. Explain its release gate.",
+    "modelAnswer": "Use product/purchase context and permitted current policy metadata. Answer a supported policy-location request with a source; abstain when the relevant policy is absent; deny restricted account data; ignore source text that requests a refund. Keep refund writes disabled. Review exact retrieved evidence and traces, agree case-level acceptance with the policy/access owners, and expand only after scoped evidence and operating ownership are established.",
+    "reasoning": "This design separates retrieval quality, claim support, authority and operability. The synthetic cases test a proposal; they do not establish deployment readiness or universal safety.",
+    "beatIds": [
+      "dbxfe-genai-beat-task",
+      "dbxfe-genai-beat-context",
+      "dbxfe-genai-beat-chunks",
+      "dbxfe-genai-beat-permission",
+      "dbxfe-genai-beat-citations",
+      "dbxfe-genai-beat-tools",
+      "dbxfe-genai-beat-trace",
+      "dbxfe-genai-beat-evaluation",
+      "dbxfe-genai-beat-judges",
+      "dbxfe-genai-beat-transfer"
+    ]
+  },
+  "scenarioIds": [
+    "dbxfe-m07-scenario"
+  ]
+}

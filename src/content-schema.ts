@@ -359,8 +359,8 @@ export function validateCourses(input: unknown[]): Course[] {
       if (!c.scenarios.some((s) => s.id === m.scenarioId && !s.isCapstone))
         fail(`Missing module scenario: ${m.id}`);
     }
-    if (new Set(c.modules.map((m) => m.scenarioId)).size !== c.modules.length)
-      fail("Module scenarios must be distinct");
+    // A canonical applied scenario may support several instructional modules.
+    // Its ID and learner draft stay singular; references must still resolve above.
     if (
       c.capstoneId &&
       !c.scenarios.some((s) => s.id === c.capstoneId && s.isCapstone)

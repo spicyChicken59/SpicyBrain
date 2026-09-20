@@ -1,0 +1,1601 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-m08",
+  "title": "Architecture and migration",
+  "summary": "Compare responsibilities, reconcile populations, and keep a usable recovery path.",
+  "outcomes": [
+    "Translate a requirement into owned responsibilities and conditional interfaces.",
+    "Defend meaningful alternatives using the same evidence basis.",
+    "Plan reconciliation, cutover and recovery with explicit data consequences."
+  ],
+  "startingAssumptions": [
+    "You can distinguish raw evidence, accepted records and a published report.",
+    "A design diagram is a proposal; no cloud resources are configured here."
+  ],
+  "lessonIds": [
+    "dbxfe-m08-l01",
+    "dbxfe-m08-l02",
+    "dbxfe-m08-l03"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "Each beat develops one mechanism or decision with inspectable inputs. The final changed case tests transfer; preserved canonical lessons provide their original depth and historical anchors.",
+  "sources": [
+    {
+      "id": "dbxfe-m08-source-architecture",
+      "title": "Databricks well-architected framework",
+      "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS architectural guidance.",
+      "caveat": "A conceptual sketch is not a configured or validated deployment.",
+      "reviewedEvidence": "The introduction connects platform design to reliability, efficiency, cost, security and interoperability through reference and deployment guidance."
+    },
+    {
+      "id": "dbxfe-m08-source-federation",
+      "title": "Connect to external databases and catalogs",
+      "url": "https://docs.databricks.com/aws/en/query-federation/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS; query and catalog federation.",
+      "caveat": "Check the exact source connector, runtime and permissions. No workload benchmark is inferred.",
+      "reviewedEvidence": "Query federation can push work to the remote database; catalog federation reads external object storage with Databricks compute. Both described federation approaches are read-only."
+    },
+    {
+      "id": "dbxfe-m08-source-cutover",
+      "title": "Pre-cutover stage",
+      "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/best-practices-migration-cutover/pre-cutover-stage.html",
+      "publisher": "Amazon Web Services",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS migration guidance; adapted to an original read-path example.",
+      "caveat": "The Cinderline runbook is an illustrative proposal, not an AWS migration result.",
+      "reviewedEvidence": "Planning passages identify dependencies, rehearsal, rollback, testing and ordered runbook tasks with owners and times."
+    },
+    {
+      "id": "dbxfe-m08-source-waves",
+      "title": "Wave planning",
+      "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/application-portfolio-assessment-guide/wave-planning.html",
+      "publisher": "Amazon Web Services",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "Application migration portfolio guidance.",
+      "caveat": "Do not reuse example migration durations as commitments.",
+      "reviewedEvidence": "Wave planning groups dependencies, confirms target design and ownership, rehearses cutover, and includes validation and operational readiness."
+    },
+    {
+      "id": "dbxfe-m08-source-beyond-federation-performance",
+      "title": "Lakehouse Federation performance recommendations",
+      "url": "https://docs.databricks.com/aws/en/query-federation/performance-recommendations",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "reviewedEvidence": "Some predicates remain local while others push down; EXPLAIN FORMATTED exposes the remote query with an adaptive-execution caveat. JDBC fetchSize controls rows per batch, not parallelism.",
+      "context": "AWS; supported connectors and runtime/warehouse requirements listed on the page.",
+      "caveat": "Do not assume a predicate or tuning option behaves identically on every connector/version."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-m08-teaching-guidance",
+      "description": "Original SpicyBrain professional guidance, worked reasoning and teaching design.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent curriculum; not an employer process or official leveling rubric."
+    },
+    {
+      "id": "dbxfe-m08-teaching-fiction",
+      "description": "Cinderline, transfer organizations, people, records, timings and financial figures are synthetic teaching examples.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "No customer execution, measured benchmark, authorized spending or realized business benefit is claimed."
+    },
+    {
+      "id": "dbxfe-m08-claim-architecture",
+      "description": "The introduction connects platform design to reliability, efficiency, cost, security and interoperability through reference and deployment guidance.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m08-source-architecture"
+      ],
+      "context": "AWS architectural guidance. A conceptual sketch is not a configured or validated deployment."
+    },
+    {
+      "id": "dbxfe-m08-claim-federation",
+      "description": "Query federation can push work to the remote database; catalog federation reads external object storage with Databricks compute. Both described federation approaches are read-only.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m08-source-federation"
+      ],
+      "context": "AWS; query and catalog federation. Check the exact source connector, runtime and permissions. No workload benchmark is inferred."
+    },
+    {
+      "id": "dbxfe-m08-claim-cutover",
+      "description": "Planning passages identify dependencies, rehearsal, rollback, testing and ordered runbook tasks with owners and times.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m08-source-cutover"
+      ],
+      "context": "AWS migration guidance; adapted to an original read-path example. The Cinderline runbook is an illustrative proposal, not an AWS migration result."
+    },
+    {
+      "id": "dbxfe-m08-claim-waves",
+      "description": "Wave planning groups dependencies, confirms target design and ownership, rehearses cutover, and includes validation and operational readiness.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m08-source-waves"
+      ],
+      "context": "Application migration portfolio guidance. Do not reuse example migration durations as commitments."
+    },
+    {
+      "id": "dbxfe-m08-claim-beyond-federation-performance",
+      "description": "Some predicates remain local while others push down; EXPLAIN FORMATTED exposes the remote query with an adaptive-execution caveat. JDBC fetchSize controls rows per batch, not parallelism.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m08-source-beyond-federation-performance"
+      ],
+      "context": "AWS; supported connectors and runtime/warehouse requirements listed on the page. Do not assume a predicate or tuning option behaves identically on every connector/version."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-m08-concept-responsibilities",
+      "term": "system of record",
+      "aliases": [],
+      "definition": "The authoritative system for a defined business fact or operation.",
+      "example": "The ERP owns inspection entry; a reporting table is an analytical copy.",
+      "sourceIds": [
+        "dbxfe-m08-source-architecture"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-concept-constraints",
+      "term": "constraint",
+      "aliases": [],
+      "definition": "A condition that limits acceptable design choices.",
+      "example": "Only approved fields may leave the source boundary.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m08-concept-alternatives",
+      "term": "tradeoff",
+      "aliases": [],
+      "definition": "A choice in which improving one desired outcome creates cost or limits elsewhere.",
+      "example": "Lower latency may require more continuous monitoring and recovery work.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m08-concept-query-copy",
+      "term": "query federation",
+      "aliases": [],
+      "definition": "Governed querying of external data through an interface that may execute work in the source system.",
+      "example": "A reporting query pushes supported work to an external relational database.",
+      "sourceIds": [
+        "dbxfe-m08-source-federation"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-concept-assumptions",
+      "term": "assumption ledger",
+      "aliases": [],
+      "definition": "A record of unverified premises, their owners, consequences and validation steps.",
+      "example": "If CDC is unavailable, test an approved scheduled extract.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m08-concept-population",
+      "term": "reconciliation",
+      "aliases": [],
+      "definition": "Comparison of records and derived results to identify unexplained differences under a common rule.",
+      "example": "Compare the same plant/day keys, accepted revisions and inspected-unit totals.",
+      "sourceIds": [
+        "dbxfe-m08-source-cutover"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-concept-offsetting",
+      "term": "offsetting error",
+      "aliases": [],
+      "definition": "Different errors whose numeric effects cancel in an aggregate.",
+      "example": "Missing C=8 and extra D=8 leave a total unchanged.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m08-concept-cutover",
+      "term": "cutover",
+      "aliases": [],
+      "definition": "An approved change from the current operational or read path to the intended replacement.",
+      "example": "Switch the report’s read path after accepted dual-run evidence.",
+      "sourceIds": [
+        "dbxfe-m08-source-cutover"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-concept-rollback",
+      "term": "rollback plan",
+      "aliases": [],
+      "definition": "An owned procedure for restoring an acceptable prior path while handling data and effects created since the switch.",
+      "example": "Revert the read path and reconcile corrections received during the target interval.",
+      "sourceIds": [
+        "dbxfe-m08-source-cutover"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-concept-transfer",
+      "term": "decision record",
+      "aliases": [],
+      "definition": "A dated explanation of a choice, its evidence, alternatives, assumptions and reconsideration conditions.",
+      "example": "Keep a report in parallel mode until item/location mismatches are resolved.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m08-extension-concept-federation-write",
+      "term": "partial predicate pushdown",
+      "aliases": [],
+      "definition": "Execution in which a supported part of a filter runs remotely while a residual condition remains local.",
+      "example": "Not necessarily: a supported date predicate can reduce the remote result before the remaining name condition is evaluated locally.",
+      "sourceIds": [
+        "dbxfe-m08-source-beyond-federation-performance"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-extension-concept-catalog-location",
+      "term": "JDBC fetch batch",
+      "aliases": [],
+      "definition": "A bounded group of rows fetched per round trip, distinct from the number of concurrent readers.",
+      "example": "No. The reviewed option controls rows per fetch batch; parallel reading is a separate configuration and capability.",
+      "sourceIds": [
+        "dbxfe-m08-source-beyond-federation-performance"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-extension-concept-dependency-wave",
+      "term": "migration dependency group",
+      "aliases": [],
+      "definition": "Systems or interfaces whose required availability must be considered together when planning a migration wave.",
+      "example": "Applications can depend on a shared interface, identity service or data feed; splitting that group without a compatible bridge can break the business flow.",
+      "sourceIds": [
+        "dbxfe-m08-source-waves"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-extension-concept-runbook-times",
+      "term": "latest safe rollback start",
+      "aliases": [],
+      "definition": "The last decision time that still leaves enough agreed window for rollback and verification.",
+      "example": "The latest planned rollback start is 01:30, before adding any extra contingency margin; a team cannot spend the entire window trying to make the new path work.",
+      "sourceIds": [
+        "dbxfe-m08-source-cutover"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-m08-visual-responsibilities",
+      "kind": "nodes",
+      "title": "Draw responsibilities before product boxes",
+      "alt": "Worked visual: Draw responsibilities before product boxes. ERP keeps operational entry authority; the proposed new path serves analytics.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Proposed analytical responsibilities: ERP keeps operational entry authority; the proposed new path serves analytics.. ERP: Inspection entry; Business system of record; status context. Raw: Deliveries; Retain evidence; data lead; status selected. Accepted: Approved revisions; Resolve semantics; quality owner; status selected. Published: Verified metric; Serving contract; operations; status selected. node-erp → node-raw: permitted extract. node-raw → node-accepted: identity + revision rules. node-accepted → node-served: publication gate",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-architecture"
+      ],
+      "states": [
+        {
+          "title": "Proposed analytical responsibilities",
+          "explanation": "ERP keeps operational entry authority; the proposed new path serves analytics.",
+          "nodes": [
+            {
+              "id": "node-erp",
+              "label": "ERP",
+              "value": "Inspection entry",
+              "detail": "Business system of record",
+              "status": "context"
+            },
+            {
+              "id": "node-raw",
+              "label": "Raw",
+              "value": "Deliveries",
+              "detail": "Retain evidence; data lead",
+              "status": "selected"
+            },
+            {
+              "id": "node-accepted",
+              "label": "Accepted",
+              "value": "Approved revisions",
+              "detail": "Resolve semantics; quality owner",
+              "status": "selected"
+            },
+            {
+              "id": "node-served",
+              "label": "Published",
+              "value": "Verified metric",
+              "detail": "Serving contract; operations",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "to": "node-raw",
+              "label": "permitted extract",
+              "from": "node-erp"
+            },
+            {
+              "to": "node-accepted",
+              "label": "identity + revision rules",
+              "from": "node-raw"
+            },
+            {
+              "to": "node-served",
+              "label": "publication gate",
+              "from": "node-accepted"
+            }
+          ],
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m08-visual-constraints",
+      "kind": "table",
+      "title": "Turn “must” into a design constraint",
+      "alt": "Worked visual: Turn “must” into a design constraint. Each condition changes a concrete design or test.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Requirement → consequence: Each condition changes a concrete design or test.. Stated condition: Approved fields only; Design consequence: Reviewed extract schema; Acceptor: Security/data owner. Stated condition: Decision at 08:00; Design consequence: Availability before decision; Acceptor: Operations. Stated condition: No overnight operator; Design consequence: Bounded recovery/support model; Acceptor: Delivery/operations\n\nConflicting timing: A downstream system cannot manufacture an earlier approved source change.. Step: Source approvals; Availability: Every 4 hours; Implication: No approved change between releases. Step: Requested freshness; Availability: Every 1 hour; Implication: Target needs clarification",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Requirement → consequence",
+          "explanation": "Each condition changes a concrete design or test.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Stated condition",
+              "Design consequence",
+              "Acceptor"
+            ],
+            "rows": [
+              [
+                "Approved fields only",
+                "Reviewed extract schema",
+                "Security/data owner"
+              ],
+              [
+                "Decision at 08:00",
+                "Availability before decision",
+                "Operations"
+              ],
+              [
+                "No overnight operator",
+                "Bounded recovery/support model",
+                "Delivery/operations"
+              ]
+            ]
+          },
+          "id": "start"
+        },
+        {
+          "title": "Conflicting timing",
+          "explanation": "A downstream system cannot manufacture an earlier approved source change.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Step",
+              "Availability",
+              "Implication"
+            ],
+            "rows": [
+              [
+                "Source approvals",
+                "Every 4 hours",
+                "No approved change between releases"
+              ],
+              [
+                "Requested freshness",
+                "Every 1 hour",
+                "Target needs clarification"
+              ]
+            ]
+          },
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m08-visual-alternatives",
+      "kind": "table",
+      "title": "Compare consequences, not logo positions",
+      "alt": "Worked visual: Compare consequences, not logo positions. No option receives a measured-cost win without a measurement.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Synthetic decision matrix: No option receives a measured-cost win without a measurement.. Criterion: Daily decision; Improve current: Candidate; Shared scheduled: Candidate; Incremental: May exceed need. Criterion: Reusable accepted metric; Improve current: Must assess; Shared scheduled: Explicit responsibility; Incremental: Explicit responsibility. Criterion: Continuous support; Improve current: Lower proposed burden; Shared scheduled: Bounded runs; Incremental: Must establish. Criterion: Actual cost; Improve current: Unmeasured; Shared scheduled: Unmeasured; Incremental: Unmeasured\n\nChange one condition: Changing constraints can legitimately change the recommendation.. Before: Daily action; New requirement: Action within shift; Reconsideration: Compare latency distribution. Before: Periodic approval; New requirement: Timely approved changes; Reconsideration: Incremental source now plausible. Before: No operator; New requirement: Staffed response established; Reconsideration: Continuous operation can be evaluated",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Synthetic decision matrix",
+          "explanation": "No option receives a measured-cost win without a measurement.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Criterion",
+              "Improve current",
+              "Shared scheduled",
+              "Incremental"
+            ],
+            "rows": [
+              [
+                "Daily decision",
+                "Candidate",
+                "Candidate",
+                "May exceed need"
+              ],
+              [
+                "Reusable accepted metric",
+                "Must assess",
+                "Explicit responsibility",
+                "Explicit responsibility"
+              ],
+              [
+                "Continuous support",
+                "Lower proposed burden",
+                "Bounded runs",
+                "Must establish"
+              ],
+              [
+                "Actual cost",
+                "Unmeasured",
+                "Unmeasured",
+                "Unmeasured"
+              ]
+            ]
+          },
+          "id": "start"
+        },
+        {
+          "title": "Change one condition",
+          "explanation": "Changing constraints can legitimately change the recommendation.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Before",
+              "New requirement",
+              "Reconsideration"
+            ],
+            "rows": [
+              [
+                "Daily action",
+                "Action within shift",
+                "Compare latency distribution"
+              ],
+              [
+                "Periodic approval",
+                "Timely approved changes",
+                "Incremental source now plausible"
+              ],
+              [
+                "No operator",
+                "Staffed response established",
+                "Continuous operation can be evaluated"
+              ]
+            ]
+          },
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m08-visual-query-copy",
+      "kind": "nodes",
+      "title": "Query in place and copy data have different costs",
+      "alt": "Worked visual: Query in place and copy data have different costs. Source compute remains part of the query path.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Query-in-place proposal: Source compute remains part of the query path.. Report: Query; Asks for selected data; status context. Query layer: Plan; Local processing and governance; status selected. Source database: Remote work; Availability/load dependency; status warning. node-consumer → node-platform: submit. node-platform → node-source: supported pushdown. node-source → node-platform: results\n\nAnalytical-copy proposal: The source dependency moves into ingestion; it does not vanish.. Report: Query; Uses analytical copy; status context. Analytical copy: Stored data; Own freshness and access; status selected. Source database: Deliveries; Approved extraction remains required; status context. node-source → node-platform: ingest + reconcile. node-platform → node-consumer: serve",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-federation"
+      ],
+      "states": [
+        {
+          "title": "Query-in-place proposal",
+          "explanation": "Source compute remains part of the query path.",
+          "nodes": [
+            {
+              "id": "node-consumer",
+              "label": "Report",
+              "value": "Query",
+              "detail": "Asks for selected data",
+              "status": "context"
+            },
+            {
+              "id": "node-platform",
+              "label": "Query layer",
+              "value": "Plan",
+              "detail": "Local processing and governance",
+              "status": "selected"
+            },
+            {
+              "id": "node-source",
+              "label": "Source database",
+              "value": "Remote work",
+              "detail": "Availability/load dependency",
+              "status": "warning"
+            }
+          ],
+          "connections": [
+            {
+              "to": "node-platform",
+              "label": "submit",
+              "from": "node-consumer"
+            },
+            {
+              "to": "node-source",
+              "label": "supported pushdown",
+              "from": "node-platform"
+            },
+            {
+              "to": "node-platform",
+              "label": "results",
+              "from": "node-source"
+            }
+          ],
+          "id": "start"
+        },
+        {
+          "title": "Analytical-copy proposal",
+          "explanation": "The source dependency moves into ingestion; it does not vanish.",
+          "nodes": [
+            {
+              "id": "node-consumer",
+              "label": "Report",
+              "value": "Query",
+              "detail": "Uses analytical copy",
+              "status": "context"
+            },
+            {
+              "id": "node-platform",
+              "label": "Analytical copy",
+              "value": "Stored data",
+              "detail": "Own freshness and access",
+              "status": "selected"
+            },
+            {
+              "id": "node-source",
+              "label": "Source database",
+              "value": "Deliveries",
+              "detail": "Approved extraction remains required",
+              "status": "context"
+            }
+          ],
+          "connections": [
+            {
+              "to": "node-platform",
+              "label": "ingest + reconcile",
+              "from": "node-source"
+            },
+            {
+              "to": "node-consumer",
+              "label": "serve",
+              "from": "node-platform"
+            }
+          ],
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m08-visual-assumptions",
+      "kind": "table",
+      "title": "Give an assumption an owner and a test",
+      "alt": "Worked visual: Give an assumption an owner and a test. Each missing fact can change the proposed path.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Conditional architecture ledger: Each missing fact can change the proposed path.. Premise: CDC is permitted; Owner / next evidence: DBA: version/topology/privileges; If false: Test approved extract. Premise: Revision order is authoritative; Owner / next evidence: Quality: representative corrections; If false: Define reconciliation rule. Premise: Failures have an operator; Owner / next evidence: Delivery: accepted runbook owner; If false: Pause reliance on new report",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Conditional architecture ledger",
+          "explanation": "Each missing fact can change the proposed path.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Premise",
+              "Owner / next evidence",
+              "If false"
+            ],
+            "rows": [
+              [
+                "CDC is permitted",
+                "DBA: version/topology/privileges",
+                "Test approved extract"
+              ],
+              [
+                "Revision order is authoritative",
+                "Quality: representative corrections",
+                "Define reconciliation rule"
+              ],
+              [
+                "Failures have an operator",
+                "Delivery: accepted runbook owner",
+                "Pause reliance on new report"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m08-visual-population",
+      "kind": "table",
+      "title": "Align the population before comparing results",
+      "alt": "Worked visual: Align the population before comparing results. D arrives at 07:45, so the populations differ.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Misaligned comparison: D arrives at 07:45, so the populations differ.. Path: Old; Approval cutoff: 07:30; Included keys: A,C. Path: New; Approval cutoff: 08:00; Included keys: A,C,D\n\nAligned comparison: Only now compare the accepted revisions and totals on a common basis.. Path: Old; Approval cutoff: 07:30; Included keys: A,C. Path: New; Approval cutoff: 07:30; Included keys: A,C",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-cutover"
+      ],
+      "states": [
+        {
+          "title": "Misaligned comparison",
+          "explanation": "D arrives at 07:45, so the populations differ.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Path",
+              "Approval cutoff",
+              "Included keys"
+            ],
+            "rows": [
+              [
+                "Old",
+                "07:30",
+                "A,C"
+              ],
+              [
+                "New",
+                "08:00",
+                "A,C,D"
+              ]
+            ]
+          },
+          "id": "start"
+        },
+        {
+          "title": "Aligned comparison",
+          "explanation": "Only now compare the accepted revisions and totals on a common basis.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Path",
+              "Approval cutoff",
+              "Included keys"
+            ],
+            "rows": [
+              [
+                "Old",
+                "07:30",
+                "A,C"
+              ],
+              [
+                "New",
+                "07:30",
+                "A,C"
+              ]
+            ]
+          },
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m08-visual-offsetting",
+      "kind": "table",
+      "title": "Matching totals can hide wrong records",
+      "alt": "Worked visual: Matching totals can hide wrong records. C is missing and D is extra even though 20 equals 20.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Synthetic equal totals: C is missing and D is extra even though 20 equals 20.. Key: A; Old units: 12; New units: 12. Key: C; Old units: 8; New units: Missing. Key: D; Old units: Absent; New units: 8. Key: Total; Old units: 20; New units: 20\n\nSeparate reconciliation results: Passing one check does not cancel another required failure.. Check: Total equality; Result: Pass; Cutover implication: Insufficient alone. Check: Key membership; Result: Fail; Cutover implication: Pause under agreed contract",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Synthetic equal totals",
+          "explanation": "C is missing and D is extra even though 20 equals 20.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Key",
+              "Old units",
+              "New units"
+            ],
+            "rows": [
+              [
+                "A",
+                "12",
+                "12"
+              ],
+              [
+                "C",
+                "8",
+                "Missing"
+              ],
+              [
+                "D",
+                "Absent",
+                "8"
+              ],
+              [
+                "Total",
+                "20",
+                "20"
+              ]
+            ]
+          },
+          "id": "start"
+        },
+        {
+          "title": "Separate reconciliation results",
+          "explanation": "Passing one check does not cancel another required failure.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Check",
+              "Result",
+              "Cutover implication"
+            ],
+            "rows": [
+              [
+                "Total equality",
+                "Pass",
+                "Insufficient alone"
+              ],
+              [
+                "Key membership",
+                "Fail",
+                "Pause under agreed contract"
+              ]
+            ]
+          },
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m08-visual-cutover",
+      "kind": "nodes",
+      "title": "Cutover is a decision state",
+      "alt": "Worked visual: Cutover is a decision state. Matching records alone does not open the gate.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Parallel evaluation: Matching records alone does not open the gate.. Current report: Active; Continues serving consumers; status selected. Target report: Compare only; Candidate output; status pending. Cutover decision: Recovery blocked; Operator rehearsal missing; status warning. node-old → node-gate: comparison evidence. node-new → node-gate: comparison evidence\n\nAfter all agreed checks: A deliberate decision changes which report consumers use.. Current report: Fallback maintained; Recovery window remains; status context. Target report: Active read path; Accepted scoped evidence; status selected. Cutover decision: Approved; Named acceptor and operator; status selected. node-gate → node-new: switch read path. node-new → node-old: approved rollback returns consumers to fallback",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-cutover"
+      ],
+      "states": [
+        {
+          "title": "Parallel evaluation",
+          "explanation": "Matching records alone does not open the gate.",
+          "nodes": [
+            {
+              "id": "node-old",
+              "label": "Current report",
+              "value": "Active",
+              "detail": "Continues serving consumers",
+              "status": "selected"
+            },
+            {
+              "id": "node-new",
+              "label": "Target report",
+              "value": "Compare only",
+              "detail": "Candidate output",
+              "status": "pending"
+            },
+            {
+              "id": "node-gate",
+              "label": "Cutover decision",
+              "value": "Recovery blocked",
+              "detail": "Operator rehearsal missing",
+              "status": "warning"
+            }
+          ],
+          "connections": [
+            {
+              "to": "node-gate",
+              "label": "comparison evidence",
+              "from": "node-old"
+            },
+            {
+              "to": "node-gate",
+              "label": "comparison evidence",
+              "from": "node-new"
+            }
+          ],
+          "id": "start"
+        },
+        {
+          "title": "After all agreed checks",
+          "explanation": "A deliberate decision changes which report consumers use.",
+          "nodes": [
+            {
+              "id": "node-old",
+              "label": "Current report",
+              "value": "Fallback maintained",
+              "detail": "Recovery window remains",
+              "status": "context"
+            },
+            {
+              "id": "node-new",
+              "label": "Target report",
+              "value": "Active read path",
+              "detail": "Accepted scoped evidence",
+              "status": "selected"
+            },
+            {
+              "id": "node-gate",
+              "label": "Cutover decision",
+              "value": "Approved",
+              "detail": "Named acceptor and operator",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "to": "node-new",
+              "label": "switch read path",
+              "from": "node-gate"
+            },
+            {
+              "to": "node-old",
+              "label": "approved rollback returns consumers to fallback",
+              "from": "node-new"
+            }
+          ],
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m08-visual-rollback",
+      "kind": "table",
+      "title": "Recovery must account for changes after the switch",
+      "alt": "Worked visual: Recovery must account for changes after the switch. The correction persists as a data responsibility after the interface is reverted.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Synthetic recovery timeline: The correction persists as a data responsibility after the interface is reverted.. Time: 08:00; Event: Target becomes active; Recovery evidence needed: Version served. Time: 08:10; Event: Approved correction arrives; Recovery evidence needed: Which paths incorporated it?. Time: 08:20; Event: Fault; revert considered; Recovery evidence needed: Fallback freshness and user impact",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-cutover"
+      ],
+      "states": [
+        {
+          "title": "Synthetic recovery timeline",
+          "explanation": "The correction persists as a data responsibility after the interface is reverted.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Time",
+              "Event",
+              "Recovery evidence needed"
+            ],
+            "rows": [
+              [
+                "08:00",
+                "Target becomes active",
+                "Version served"
+              ],
+              [
+                "08:10",
+                "Approved correction arrives",
+                "Which paths incorporated it?"
+              ],
+              [
+                "08:20",
+                "Fault; revert considered",
+                "Fallback freshness and user impact"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m08-visual-transfer",
+      "kind": "table",
+      "title": "Migrate one inventory slice with the same discipline",
+      "alt": "Worked visual: Migrate one inventory slice with the same discipline. Equal company totals hide a material location error; preserve the gate.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Inventory transfer recap: Equal company totals hide a material location error; preserve the gate.. Responsibility: Authority; Required decision/evidence: Stock-entry system remains owner. Responsibility: Grain; Required decision/evidence: Item × warehouse × agreed cutoff. Responsibility: Reconciliation; Required decision/evidence: East 80/60, West 20/40: company total 100/100. Responsibility: Switch; Required decision/evidence: Pause for location mismatch. Responsibility: Recovery; Required decision/evidence: Fed fallback and named operator",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Inventory transfer recap",
+          "explanation": "Equal company totals hide a material location error; preserve the gate.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Responsibility",
+              "Required decision/evidence"
+            ],
+            "rows": [
+              [
+                "Authority",
+                "Stock-entry system remains owner"
+              ],
+              [
+                "Grain",
+                "Item × warehouse × agreed cutoff"
+              ],
+              [
+                "Reconciliation",
+                "East 80/60, West 20/40: company total 100/100"
+              ],
+              [
+                "Switch",
+                "Pause for location mismatch"
+              ],
+              [
+                "Recovery",
+                "Fed fallback and named operator"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    }
+  ],
+  "questions": [],
+  "selfQuestions": [
+    {
+      "id": "dbxfe-m08-check-responsibilities",
+      "revision": "1",
+      "prompt": "The reporting team wants to correct an inspection by editing the analytical table. What must be clarified first?",
+      "modelAnswer": "Clarify the authoritative correction process and ownership. An analytical edit must not silently replace ERP authority or bypass the approved revision contract.",
+      "reasoning": "The diagram separates business authority from convenient access to a copy.",
+      "conceptIds": [
+        "dbxfe-m08-concept-responsibilities"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-architecture"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-check-constraints",
+      "revision": "1",
+      "prompt": "Why is “we run every minute” insufficient evidence that approved data can be hourly fresh?",
+      "modelAnswer": "The source may release approved changes less frequently. Measure the complete source-availability-to-serving path and clarify what freshness means.",
+      "reasoning": "Processing cadence and source availability are different constraints.",
+      "conceptIds": [
+        "dbxfe-m08-concept-constraints"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-check-alternatives",
+      "revision": "1",
+      "prompt": "If only the desired refresh label changes from “daily” to “real time,” is that enough to select incremental processing?",
+      "modelAnswer": "No. Establish the decision that needs fresher data, actual approved source timing, correction semantics and operating capacity first.",
+      "reasoning": "A label does not remove the dependencies that make an option useful and feasible.",
+      "conceptIds": [
+        "dbxfe-m08-concept-alternatives"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-check-query-copy",
+      "revision": "1",
+      "prompt": "Does read-only federation mean it cannot affect source workload?",
+      "modelAnswer": "No. Read-only describes write authority. A permitted query can still consume source resources and depend on source availability.",
+      "reasoning": "Authority, execution location and performance are distinct dimensions.",
+      "conceptIds": [
+        "dbxfe-m08-concept-query-copy"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-federation"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-check-assumptions",
+      "revision": "1",
+      "prompt": "Which is more actionable: “source unknown” or an owned version/privilege check with a batch fallback? Why?",
+      "modelAnswer": "The owned check is actionable because it identifies the specific missing evidence, the decision it blocks and a consequence if the assumption is false.",
+      "reasoning": "Precision reduces uncertainty; confident wording does not.",
+      "conceptIds": [
+        "dbxfe-m08-concept-assumptions"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-check-population",
+      "revision": "1",
+      "prompt": "The totals differ before the cutoffs are aligned. Can you yet label the new aggregation wrong?",
+      "modelAnswer": "No. First align the agreed population and timing basis, then compare exact records and calculations. A basis difference can explain the mismatch without proving arithmetic correctness either.",
+      "reasoning": "Investigation should distinguish measurement mismatch from transformation defect.",
+      "conceptIds": [
+        "dbxfe-m08-concept-population"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-cutover"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-check-offsetting",
+      "revision": "1",
+      "prompt": "A=12,C=8 becomes A=12,D=8. What exact differences should the report show?",
+      "modelAnswer": "Missing key C, extra key D and an unchanged aggregate total of 20. The required key-level reconciliation fails.",
+      "reasoning": "The arithmetic is intentionally equal so the identity defect remains the deciding evidence.",
+      "conceptIds": [
+        "dbxfe-m08-concept-offsetting"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-check-cutover",
+      "revision": "1",
+      "prompt": "Correctness passes but the operator rehearsal is blocked. Which state should the plan enter?",
+      "modelAnswer": "Keep the current report active and the target in comparison mode. Preserve the correctness pass, record the recovery blocker, and assign the missing rehearsal before the agreed gate can pass.",
+      "reasoning": "Evidence states stay separate; one favorable result does not erase a required dependency.",
+      "conceptIds": [
+        "dbxfe-m08-concept-cutover"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-cutover"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-check-rollback",
+      "revision": "1",
+      "prompt": "Why might restoring yesterday’s report UI fail to restore an acceptable service?",
+      "modelAnswer": "The UI may point to stale data or omit corrections and decisions from the transition. Recovery must restore an acceptable data basis and communicate any consequences, not merely old presentation files.",
+      "reasoning": "Recovery includes state and effects as well as code.",
+      "conceptIds": [
+        "dbxfe-m08-concept-rollback"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-cutover"
+      ]
+    },
+    {
+      "id": "dbxfe-m08-check-transfer",
+      "revision": "1",
+      "prompt": "Both inventory paths total 100. East differs by 20 and West differs by 20 the other way. Recommend the next step.",
+      "modelAnswer": "Pause the read-path switch, retain the current report, compare item/location keys and adjustment rules, repair the mapping with the data owner, and rerun the agreed comparison before reconsidering cutover.",
+      "reasoning": "The business decision depends on warehouse identity; a company-total match does not satisfy it.",
+      "conceptIds": [
+        "dbxfe-m08-concept-transfer"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ]
+    }
+  ],
+  "beats": [
+    {
+      "id": "dbxfe-m08-beat-responsibilities",
+      "version": "1.0.0",
+      "title": "Draw responsibilities before product boxes",
+      "outcome": "The analytical copy does not become the source of operational authority.",
+      "explanation": "An architecture explains who owns each [[dbxfe-m08-concept-responsibilities|system of record]] and how responsibilities interact. Cinderline keeps inspection entry in its ERP, retains deliveries as raw evidence, resolves approved revisions, and serves a shared quality metric. Drawing those responsibilities exposes missing owners and interfaces before a product name makes an unfinished design look settled.",
+      "lessonId": "dbxfe-m08-l01",
+      "sectionId": "dbxfe-m08-l01-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-responsibilities"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-architecture"
+      ],
+      "visualId": "dbxfe-m08-visual-responsibilities",
+      "questionIds": [
+        "dbxfe-m08-check-responsibilities"
+      ],
+      "handbook": {
+        "markdown": "### Make each arrow answer a question\nStart from the business decision and trace the current input path. In Cinderline, an analyst interprets ERP records and correction files for a morning meeting. The target changes interpretation and publication, while inspection entry stays with the ERP. The analytical copy must not silently become an operational write path.\n\nFor every responsibility, name its input, output, rule and owner. For every arrow, state how data moves, which identity acts, when it runs and what happens when it fails. “ERP → cloud” leaves all four unresolved. A scheduled approved extract into retained raw deliveries is a more reviewable proposed interface.\n\n**Worked design:** raw keeps delivery history; accepted resolves identity and revisions; published exposes a verified metric; operations handles freshness, quarantine and replay. One team may own several responsibilities, but the work does not disappear.\n\n**Troubleshooting:** a diagram full of logos but lacking input contracts is not ready for implementation estimation. Mark unknowns visibly and omit irrelevant features. The well-architected framework is useful design guidance, not evidence that these fictional components are configured.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l01-understand",
+          "dbxfe-m08-l01-deeper"
+        ]
+      },
+      "recap": "The analytical copy does not become the source of operational authority.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": [],
+      "samajh": {
+        "text": "City ka map roads dikhata hai, lekin har building ki responsibility bhi samajhni padti hai. School attendance register aur city dashboard mein number same ho sakta hai; correction ka owner school hi rahega. Copy bana dene se original responsibility automatically transfer nahi hoti.",
+        "mapping": "Attendance register maps to operational authority; city dashboard maps to an analytical copy.",
+        "boundary": "Real system-of-record decisions are contractual and domain-specific, not determined by a drawing."
+      }
+    },
+    {
+      "id": "dbxfe-m08-beat-constraints",
+      "version": "1.0.0",
+      "title": "Turn “must” into a design constraint",
+      "outcome": "A requirement should eliminate or qualify a design choice.",
+      "explanation": "A [[dbxfe-m08-concept-constraints|constraint]] is a condition the design must respect. “Approved data only” changes the extraction scope. “Morning decisions” changes the useful freshness target. “No overnight operator” changes recovery expectations. Separate these constraints from preferences, and ask who accepts them. An unknown constraint is a design risk with an owner, not a convenient assumption.",
+      "lessonId": "dbxfe-m08-l01",
+      "sectionId": "dbxfe-m08-l01-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-constraints"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "visualId": "dbxfe-m08-visual-constraints",
+      "questionIds": [
+        "dbxfe-m08-check-constraints"
+      ],
+      "handbook": {
+        "markdown": "### Connect requirements to consequences\nA requirement earns its place when it changes a decision or acceptance test. “Secure and fast” is too broad. State who may read which data, the timing endpoints and the operating responsibility. Keep the source and date of the requirement so later changes can be attributed.\n\nThe fictional three-row example links a concern to a consequence. Approved fields require a reviewed extract schema. Morning use suggests measuring availability before the decision rather than assuming continuous streaming is necessary. Limited support capacity requires a recovery plan the actual team can perform.\n\n**Worked disagreement:** operations requests hourly availability while the source owner approves corrections once every four hours. Faster downstream processing cannot produce an approved change before the source makes it available. Present the incompatibility and ask whether the source process or target should change.\n\n**Troubleshooting:** if every requirement receives a green check without evidence, distinguish proposed fit from tested fit. The purpose is to expose choices, including retain-current and reduced-scope alternatives. Never infer a contractual security commitment from a conceptual architecture review.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l01-understand",
+          "dbxfe-m08-l01-deeper"
+        ]
+      },
+      "recap": "A requirement should eliminate or qualify a design choice.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m08-beat-alternatives",
+      "version": "1.0.0",
+      "title": "Compare consequences, not logo positions",
+      "outcome": "The preferred design depends on timing, semantics and operating capacity.",
+      "explanation": "A meaningful [[dbxfe-m08-concept-alternatives|tradeoff]] changes consequences. Compare improving the current scheduled report, adding a shared scheduled path, and processing incremental changes. For a daily decision with periodic source approval and limited support, scheduled processing is a plausible starting point. Keep the condition that would change that recommendation visible.",
+      "lessonId": "dbxfe-m08-l02",
+      "sectionId": "dbxfe-m08-l02-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-alternatives"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "visualId": "dbxfe-m08-visual-alternatives",
+      "questionIds": [
+        "dbxfe-m08-check-alternatives"
+      ],
+      "handbook": {
+        "markdown": "### Build a fair option set\nWrite the evaluation criteria before scoring options. For this fictional workload, correctness of approved revisions, completion before the meeting, access feasibility, recovery effort and full cost matter. “Most modern architecture” is not a business acceptance condition.\n\nCompare three real alternatives. Improving the existing SQL path may reduce change effort. A shared scheduled analytical path may improve reuse while adding operating responsibilities. Incremental processing may help within-shift decisions if source semantics and support are available. Do not assign unknown capability or cost a favorable score.\n\n**Worked provisional choice:** corrections are approved every four hours, decisions occur daily, and the team has no continuous-support rotation. Start by testing a scheduled path that finishes before the decision and reconciles corrections. Reconsider if timely approved changes and an operational need for within-shift action are established.\n\n**Limit:** this is not a universal claim that batch is cheaper or safer. Measure workload cost and recovery in the intended environment. A credible architecture recommendation includes its assumptions and a plausible condition under which another option becomes better.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l02-understand",
+          "dbxfe-m08-l02-deeper"
+        ]
+      },
+      "recap": "The preferred design depends on timing, semantics and operating capacity.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": [
+        "dbxfe-m08-media-alternatives"
+      ],
+      "samajh": {
+        "text": "Travel plan mein fastest route hamesha best nahi hota. Agar meeting kal subah hai, costly overnight transfer ka benefit shayad zero ho. Pehle arrival time, budget aur who-will-drive clear karo; phir route compare karo. Requirement badlegi toh choice bhi badal sakti hai.",
+        "mapping": "Arrival need maps to decision timing; travel effort maps to operations and cost.",
+        "boundary": "Data processing options have additional correctness, access and recovery constraints beyond travel planning."
+      }
+    },
+    {
+      "id": "dbxfe-m08-beat-query-copy",
+      "version": "1.0.0",
+      "title": "Query in place and copy data have different costs",
+      "outcome": "Locate the work and the dependency before choosing an access pattern.",
+      "explanation": "With [[dbxfe-m08-concept-query-copy|query federation]], a request can reach an external system without first creating the intended analytical copy. That can simplify an exploratory path, while keeping a dependency on source availability and query behavior. Copying data introduces ingestion, freshness and reconciliation work. Compare those responsibilities against the workload rather than calling either option universally simpler.",
+      "lessonId": "dbxfe-m08-l02",
+      "sectionId": "dbxfe-m08-l02-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-query-copy"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-federation"
+      ],
+      "visualId": "dbxfe-m08-visual-query-copy",
+      "questionIds": [
+        "dbxfe-m08-check-query-copy"
+      ],
+      "handbook": {
+        "markdown": "### Follow the execution path\nThe reviewed AWS Databricks documentation distinguishes [[dbxfe-m08-concept-query-copy|query federation]] from catalog federation. Query federation uses an external database path and can push work to remote compute. Catalog federation accesses data in external object storage with Databricks compute. The described federation approaches are read-only; they do not grant a general write-back capability.\n\nUse the distinction to ask better architecture questions. Which system performs the expensive operation? Who permits the query load? Which network path must stay available? What happens during source maintenance? For an analytical copy, ask who owns extraction, freshness, corrections, retention and reconciliation instead.\n\n**Worked comparison:** a small exploratory query may justify testing an approved federated path. A recurring heavy report may warrant a copy if source load, isolation or performance evidence supports it. These are hypotheses, not measured rankings.\n\n**Troubleshooting:** unexpected latency can come from source execution, limited pushdown or movement of results. Inspect the exact connector and plan before recommending bigger compute. Verify runtime, source version and permissions in the current documentation; a generic federation capability does not validate Cinderline’s unknown setup.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l02-understand",
+          "dbxfe-m08-l02-deeper"
+        ]
+      },
+      "recap": "Locate the work and the dependency before choosing an access pattern.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m08-beat-assumptions",
+      "version": "1.0.0",
+      "title": "Give an assumption an owner and a test",
+      "outcome": "An unresolved premise should have a visible decision consequence.",
+      "explanation": "An [[dbxfe-m08-concept-assumptions|assumption ledger]] records what the design currently relies on but has not verified. “CDC permitted” needs a source owner’s answer, not a connector logo. Add the impact if false and the next evidence. This makes the architecture revisable without pretending every arrow is already feasible.",
+      "lessonId": "dbxfe-m08-l01",
+      "sectionId": "dbxfe-m08-l01-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-assumptions"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "visualId": "dbxfe-m08-visual-assumptions",
+      "questionIds": [
+        "dbxfe-m08-check-assumptions"
+      ],
+      "handbook": {
+        "markdown": "### Make uncertainty actionable\nAn assumption is useful only if the team can test or revise it. Record the statement, its evidence status, proposed owner, due decision and consequence if false. Avoid filling the ledger with harmless details while omitting source authority or operational ownership.\n\nCinderline’s proposed CDC path depends on source version, topology and privileges. Until those are confirmed, it is a candidate path. The quality rule depends on stable inspection identity and an authoritative revision order. That uncertainty can change the accepted-record design even when extraction succeeds.\n\n**Worked ledger action:** “DBA to verify supported source configuration and permitted privileges before charter approval; if unavailable, compare approved periodic extracts.” This says what is needed and why. An absent DBA has not accepted a deadline, so label the owner proposed until acknowledged.\n\n**Troubleshooting:** when a late discovery changes the design, retain the earlier assumption and its resolution rather than deleting the history. The goal is a reviewable reasoning trail, not an artificially flawless first diagram. A resolved source constraint may still leave data semantics or operations unresolved.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l01-understand",
+          "dbxfe-m08-l01-deeper"
+        ]
+      },
+      "recap": "An unresolved premise should have a visible decision consequence.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m08-beat-population",
+      "version": "1.0.0",
+      "title": "Align the population before comparing results",
+      "outcome": "Reconciliation needs the same keys, time basis and rule.",
+      "explanation": "A [[dbxfe-m08-concept-population|reconciliation]] compares two paths against an agreed expected state. First align the population, cutoff, revision rule and metric definition. Comparing yesterday’s approved records with today’s corrections can produce a mismatch even when both calculations follow their own rules. Preserve input versions so a reviewer can reproduce the difference.",
+      "lessonId": "dbxfe-m08-l03",
+      "sectionId": "dbxfe-m08-l03-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-population"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-cutover"
+      ],
+      "visualId": "dbxfe-m08-visual-population",
+      "questionIds": [
+        "dbxfe-m08-check-population"
+      ],
+      "handbook": {
+        "markdown": "### Define the comparison contract\nWrite which records belong, which timestamp defines the window, when corrections are included, and how invalid or conflicting records are handled. Then compare key sets, accepted revisions, totals and exceptions. A total alone is a weak summary because it loses the identities that produced it.\n\nFor the synthetic example, the old report uses North inspections approved by 07:30; the new report uses approvals through 08:00. An additional approved inspection arrives at 07:45. The discrepancy is initially a measurement-basis difference, not proven arithmetic failure. Rerun both on the same cutoff before classifying the defect.\n\nAfter alignment, unresolved differences need investigation. Preserve source delivery references and transformation versions, identify missing and extra keys, and inspect the earliest divergence. Do not “fix” the comparison by excluding inconvenient records after observing the result.\n\n**Limit:** agreed exclusions must remain disclosed. Nonconflicting invalid rows can be excluded under the preserved teaching policy, but globally conflicting event provenance blocks publication even without a usable inspection key. [[dbxfe-m08-concept-population|Reconciliation]] should test that policy as well as arithmetic.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l03-understand",
+          "dbxfe-m08-l03-deeper"
+        ]
+      },
+      "recap": "Reconciliation needs the same keys, time basis and rule.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m08-beat-offsetting",
+      "version": "1.0.0",
+      "title": "Matching totals can hide wrong records",
+      "outcome": "An aggregate match does not establish population equality.",
+      "explanation": "Two wrong changes can cancel in a total. This is an [[dbxfe-m08-concept-offsetting|offsetting error]]: an omitted record’s quantity is replaced by an unrelated record with the same quantity. Cinderline’s new path totals 20, just like the old one, but substitutes inspection D for C. The key-level mismatch blocks cutover under the agreed contract.",
+      "lessonId": "dbxfe-m08-l03",
+      "sectionId": "dbxfe-m08-l03-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-offsetting"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "visualId": "dbxfe-m08-visual-offsetting",
+      "questionIds": [
+        "dbxfe-m08-check-offsetting"
+      ],
+      "handbook": {
+        "markdown": "### Inspect membership, not just the headline\nThe synthetic old output contains A=12 and C=8, totaling 20. The new output contains A=12 and D=8, also totaling 20. A sum comparison passes, but a key comparison finds missing C and extra D. If C and D belong to different inspections, the populations are not interchangeable.\n\nA practical reconciliation report includes missing keys, extra keys, duplicate keys, mismatched accepted revisions and mismatched values. Grouped totals by plant/day can reveal other problems, but they still complement identity checks rather than replace them. Decide the required dimensions before the dual run.\n\n**Expected decision:** preserve both outputs, pause cutover, and assign the mapping or filtering investigation. After correction, rerun the same comparison and record its evidence. Do not change the criterion to aggregate-only just because it makes this run pass.\n\n**Transfer:** a finance report can have the same revenue while assigning transactions to the wrong customer. An inventory report can have the same units while substituting locations. The mechanism is the same even though the downstream harm differs.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l03-understand",
+          "dbxfe-m08-l03-deeper"
+        ]
+      },
+      "recap": "An aggregate match does not establish population equality.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": [],
+      "samajh": {
+        "text": "Class mein attendance count 30 hai, par ek absent student ki jagah visitor count ho gaya. Total sahi dikh raha hai, list galat hai. Data reconciliation mein bhi sirf total nahi; kaunse records aaye aur kaunse miss hue, woh compare karna zaroori hai.",
+        "mapping": "Attendance names map to record keys; headcount maps to an aggregate.",
+        "boundary": "The analogy does not define which reconciliation dimensions a real business requires."
+      }
+    },
+    {
+      "id": "dbxfe-m08-beat-cutover",
+      "version": "1.0.1",
+      "title": "Cutover is a decision state",
+      "outcome": "Move from parallel evidence to a bounded switch only after the gate.",
+      "explanation": "A [[dbxfe-m08-concept-cutover|cutover]] changes which path consumers rely on. During a read-path migration, keep the current report usable while comparing the target. Before switching, confirm reconciliation, access, timing and an operator’s recovery rehearsal. “New pipeline completed” is one observation; it does not establish that consumers should rely on it.",
+      "lessonId": "dbxfe-m08-l03",
+      "sectionId": "dbxfe-m08-l03-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-cutover"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-cutover"
+      ],
+      "visualId": "dbxfe-m08-visual-cutover",
+      "questionIds": [
+        "dbxfe-m08-check-cutover"
+      ],
+      "handbook": {
+        "markdown": "### Use named states and explicit exit evidence\nThe migration starts in preparation, enters a parallel comparison, reaches a go/no-go decision and only then changes the consumer path. Each state has a distinct meaning. A target can exist without being relied upon. A successful synthetic test can precede, but not substitute for, a permitted representative test.\n\nFor Cinderline, the proposed gate includes five agreed reporting days, aligned key/total reconciliation, accepted exceptions, appropriate access and a demonstrated alert/replay procedure. These are hypothetical criteria for stakeholder agreement, not observed successes. The operator and business acceptor must understand what they are accepting.\n\n**Worked failure:** the target totals reconcile but no operator is available for the rehearsal. Record reconciliation as passed and recovery as blocked. Remain in parallel mode rather than disguising the mixed result as either complete success or total failure.\n\n**Troubleshooting:** record who can pause the switch, what evidence they inspect and how consumers are informed. Keep the old path current through an agreed recovery window. A runbook supports execution only when the required people, data and permissions are actually available.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l03-understand",
+          "dbxfe-m08-l03-deeper"
+        ]
+      },
+      "recap": "Move from parallel evidence to a bounded switch only after the gate.",
+      "changeNote": "Corrected the rollback arrow to return from the new report to the retained fallback; existing study evidence remains separate.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m08-beat-rollback",
+      "version": "1.0.0",
+      "title": "Recovery must account for changes after the switch",
+      "outcome": "Returning to old files is not enough if the old data path fell behind.",
+      "explanation": "A [[dbxfe-m08-concept-rollback|rollback plan]] defines triggers, decision owner, actions and data consequences. If the target served new corrections while the old report stopped updating, switching the page back exposes stale information. Preserve which versions users saw, keep a viable fallback, and decide how changes made during the transition will be reconciled.",
+      "lessonId": "dbxfe-m08-l03",
+      "sectionId": "dbxfe-m08-l03-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-rollback"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction",
+        "dbxfe-m08-claim-cutover"
+      ],
+      "visualId": "dbxfe-m08-visual-rollback",
+      "questionIds": [
+        "dbxfe-m08-check-rollback"
+      ],
+      "handbook": {
+        "markdown": "### Rehearse the data consequence\nA read-path rollback differs from transferring operational writes. In our fictional plan, the ERP remains authoritative and both reporting paths can be kept fed. That makes the fallback simpler, but its viability still needs checking. If the old ingestion job was disabled, its displayed report may be older than the one users just relied on.\n\nWrite a trigger such as an unapproved key discrepancy, identify the decision owner, state the switching steps and describe what happens to reports already consumed. Retain versions and communicate any correction to affected users. Do not claim rollback reverses decisions people already made.\n\n**Worked rehearsal:** target active at 08:00; correction arrives 08:10; fault detected 08:20. The fallback must either contain the approved correction or clearly disclose its earlier basis while reconciliation proceeds. Restoring the old dashboard code alone answers neither question.\n\n**Limit:** a write-path migration adds conflicting-write and reverse-synchronization risks. This course’s bounded reporting example does not solve those automatically. Avoid destructive cleanup until the recovery window closes and the owner accepts the consequences.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l03-understand",
+          "dbxfe-m08-l03-deeper"
+        ]
+      },
+      "recap": "Returning to old files is not enough if the old data path fell behind.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m08-beat-transfer",
+      "version": "1.0.0",
+      "title": "Migrate one inventory slice with the same discipline",
+      "outcome": "A changed domain still needs identity, reconciliation and an owned switch.",
+      "explanation": "A fictional distributor wants to move its inventory report. Apply the architecture [[dbxfe-m08-concept-transfer|decision record]]: retain stock-entry authority, define item/location identity, compare current and target on the same cutoff, and keep a fed fallback. A total of 100 units is insufficient if 20 units moved to the wrong warehouse. Recommend the smallest defensible next decision.",
+      "lessonId": "dbxfe-m08-l02",
+      "sectionId": "dbxfe-m08-l02-understand",
+      "conceptIds": [
+        "dbxfe-m08-concept-transfer"
+      ],
+      "claimIds": [
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "visualId": "dbxfe-m08-visual-transfer",
+      "questionIds": [
+        "dbxfe-m08-check-transfer"
+      ],
+      "handbook": {
+        "markdown": "### Transfer the complete chain\nThe distributor’s operational stock system remains the authority for inventory movement. The target report is an analytical read path. Define the grain as item plus warehouse and establish how late adjustments are ordered. Compare the same closing cutoff and approved movements in both paths.\n\nThe worked evidence shows equal company totals but a location mismatch: East is 80 versus 60, West 20 versus 40. That matters if replenishment decisions depend on warehouse stock. Keep the current path active, preserve the mismatched records and investigate allocation before switching. A smaller discrepancy is not automatically acceptable; the contract determines the tolerance.\n\nPropose a bounded retest with the stock owner accepting meaning, the data lead owning the mapping repair and the operator demonstrating recovery. Keep current-state improvement a credible alternative if the new path offers no justified benefit.\n\n**Review entry:** revisit the module cards on tradeoffs, reconciliation and rollback. The researched extensions add federation and migration-planning limits. The diagram is a finite teaching simulation; it is not an executed migration or evidence that any vendor meets this workload.",
+        "sourceSectionIds": [
+          "dbxfe-m08-l02-understand",
+          "dbxfe-m08-l02-deeper"
+        ]
+      },
+      "recap": "A changed domain still needs identity, reconciliation and an owned switch.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m08-l01-card1",
+      "beatId": "dbxfe-m08-beat-responsibilities"
+    },
+    {
+      "cardId": "dbxfe-m08-l01-card2",
+      "beatId": "dbxfe-m08-beat-assumptions"
+    },
+    {
+      "cardId": "dbxfe-m08-l01-card3",
+      "beatId": "dbxfe-m08-beat-query-copy"
+    },
+    {
+      "cardId": "dbxfe-m08-l02-card1",
+      "beatId": "dbxfe-m08-beat-alternatives"
+    },
+    {
+      "cardId": "dbxfe-m08-l02-card2",
+      "beatId": "dbxfe-m08-beat-alternatives"
+    },
+    {
+      "cardId": "dbxfe-m08-l02-card3",
+      "beatId": "dbxfe-m08-beat-rollback"
+    },
+    {
+      "cardId": "dbxfe-m08-l03-card1",
+      "beatId": "dbxfe-m08-beat-rollback"
+    },
+    {
+      "cardId": "dbxfe-m08-l03-card2",
+      "beatId": "dbxfe-m08-beat-population"
+    },
+    {
+      "cardId": "dbxfe-m08-l03-card3",
+      "beatId": "dbxfe-m08-beat-cutover"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-m08-extension-federation-write",
+      "revision": "2",
+      "prompt": "A federated query combines a date condition with a name predicate that the connector cannot push down. Must it fetch every source row?",
+      "answer": "Not necessarily: a supported date predicate can reduce the remote result before the remaining name condition is evaluated locally.",
+      "explanation": "The reviewed performance guide illustrates this split with a pushable date comparison and a nonpushable name expression. In our synthetic example, a million-row source has ten thousand rows in the required date window. If the date restriction is pushed down, the local step need not receive all million rows merely because the second predicate remains local. Inspect the planned remote query and actual execution evidence before asserting a transfer reduction; the documentation warns that adaptive execution can differ from the displayed plan. Do not rewrite a condition only for pushdown if that changes its business meaning, such as case sensitivity. This adds a partial-execution mechanism beyond the main query-versus-copy comparison.",
+      "whyItMatters": "It replaces an all-or-nothing mental model of federation with an inspectable boundary.",
+      "lessonId": "dbxfe-m08-l02",
+      "sectionId": "dbxfe-m08-l02-understand",
+      "conceptIds": [
+        "dbxfe-m08-extension-concept-federation-write"
+      ],
+      "claimIds": [
+        "dbxfe-m08-claim-beyond-federation-performance",
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "beatId": "dbxfe-m08-beat-query-copy"
+    },
+    {
+      "id": "dbxfe-m08-extension-catalog-location",
+      "revision": "2",
+      "prompt": "Does a larger JDBC fetchSize automatically make a federated read use more parallel workers?",
+      "answer": "No. The reviewed option controls rows per fetch batch; parallel reading is a separate configuration and capability.",
+      "explanation": "Imagine a synthetic result of 12,000 rows. A maximum batch of 1,000 needs roughly twelve data batches; a maximum of 4,000 needs roughly three, ignoring protocol details. Larger batches can reduce round-trip overhead while increasing the memory needed per batch. Wide rows matter: row count alone does not tell you memory use. The AWS Databricks guide lists supported connectors and compute requirements for fetchSize and separately documents parallel-read options. Check those prerequisites and the actual bottleneck before tuning. These example counts explain the tradeoff, not an optimal production setting or a measured speedup. Batching changes transport behavior without deciding whether a new analytical copy is warranted.",
+      "whyItMatters": "It separates transport batching, memory pressure and parallelism during architecture diagnosis.",
+      "lessonId": "dbxfe-m08-l02",
+      "sectionId": "dbxfe-m08-l02-understand",
+      "conceptIds": [
+        "dbxfe-m08-extension-concept-catalog-location"
+      ],
+      "claimIds": [
+        "dbxfe-m08-claim-beyond-federation-performance",
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "beatId": "dbxfe-m08-beat-query-copy"
+    },
+    {
+      "id": "dbxfe-m08-extension-dependency-wave",
+      "revision": "2",
+      "prompt": "Why should a migration wave consider dependency groups rather than just equal numbers of applications?",
+      "answer": "Applications can depend on a shared interface, identity service or data feed; splitting that group without a compatible bridge can break the business flow.",
+      "explanation": "AWS wave-planning guidance considers dependencies and readiness. Our synthetic portfolio has six applications: two use one shared batch interface, while four are independent. Dividing them into two equal groups of three is not automatically workable. Map the shared interface, identify whether old and new versions can coexist, and decide whether its dependents must move together or use an explicitly tested transition. Confirm owners and capacity for that group before assigning a date. A dependency is not an automatic instruction to migrate everything at once: an adapter or backward-compatible interface may allow smaller waves. Record that bridge as part of the design and test it rather than assuming it exists.",
+      "whyItMatters": "It adds portfolio grouping and transition-interface reasoning beyond a single report migration.",
+      "lessonId": "dbxfe-m08-l01",
+      "sectionId": "dbxfe-m08-l01-understand",
+      "conceptIds": [
+        "dbxfe-m08-extension-concept-dependency-wave"
+      ],
+      "claimIds": [
+        "dbxfe-m08-claim-waves",
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "beatId": "dbxfe-m08-beat-assumptions"
+    },
+    {
+      "id": "dbxfe-m08-extension-runbook-times",
+      "revision": "2",
+      "prompt": "A synthetic cutover window ends at 02:00; rollback needs 20 minutes and verification 10. What does that imply for the stop decision?",
+      "answer": "The latest planned rollback start is 01:30, before adding any extra contingency margin; a team cannot spend the entire window trying to make the new path work.",
+      "explanation": "AWS pre-cutover guidance calls for timed tasks, owners, rehearsal and recovery planning. The backward calculation here is original: 02:00 minus 20 minutes minus 10 minutes gives 01:30. If rehearsal shows variable rollback duration, add an agreed buffer or revise the window. Put that decision point in the runbook with a named authority and observable criteria. The calculation does not prove rollback is feasible; dependencies, data accumulated since the switch and consumer verification still need testing. A read-path switch and write-path migration can require different recovery work. The extension teaches time budgeting for a recoverable attempt, beyond the core states of prepare, compare and switch.",
+      "whyItMatters": "It makes recovery time a constraint on the go/no-go decision instead of an afterthought.",
+      "lessonId": "dbxfe-m08-l03",
+      "sectionId": "dbxfe-m08-l03-understand",
+      "conceptIds": [
+        "dbxfe-m08-extension-concept-runbook-times"
+      ],
+      "claimIds": [
+        "dbxfe-m08-claim-cutover",
+        "dbxfe-m08-teaching-guidance",
+        "dbxfe-m08-teaching-fiction"
+      ],
+      "beatId": "dbxfe-m08-beat-cutover"
+    }
+  ],
+  "recap": {
+    "title": "Carry this forward",
+    "markdown": "Keep the chain visible: requirement → responsibility → alternative → assumption → aligned comparison → owned switch → viable recovery. A matching headline total is only one piece of evidence. Review the canonical cards and choose extension practice for federation and cutover details.",
+    "visualId": "dbxfe-m08-visual-transfer"
+  },
+  "appliedTask": {
+    "title": "Apply the whole module",
+    "prompt": "A distributor has a daily stock decision, periodic source adjustments, no overnight support and equal old/new company totals with differing warehouse totals. Write a provisional design and next decision.",
+    "modelAnswer": "Retain operational stock authority and provisionally test a bounded scheduled analytical path. Define item/warehouse grain and approved adjustment order. Compare the same population/cutoff; pause the switch while warehouse totals differ. Assign the data owner to reconcile missing/extra/misallocated keys, then retest. Require an accepted operator rehearsal and a fed fallback before cutover. Reconsider incremental processing only if the business needs within-shift action and source/operating conditions support it.",
+    "reasoning": "The recommendation follows the workload and preserves the failed acceptance condition. It neither assumes a new platform is necessary nor lets an aggregate match hide identity errors.",
+    "beatIds": [
+      "dbxfe-m08-beat-responsibilities",
+      "dbxfe-m08-beat-constraints",
+      "dbxfe-m08-beat-alternatives",
+      "dbxfe-m08-beat-query-copy",
+      "dbxfe-m08-beat-assumptions",
+      "dbxfe-m08-beat-population",
+      "dbxfe-m08-beat-offsetting",
+      "dbxfe-m08-beat-cutover",
+      "dbxfe-m08-beat-rollback",
+      "dbxfe-m08-beat-transfer"
+    ]
+  },
+  "scenarioIds": [
+    "dbxfe-m08-scenario"
+  ]
+}

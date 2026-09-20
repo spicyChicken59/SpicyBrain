@@ -1,10 +1,12 @@
 # Deployment preparation — not authorization
 
-## Current checkpoint — 19 September 2026
+## Current attributed checkpoint — 20 September 2026
 
-The approved study-hub assignment supplies this existing public hosting checkpoint: [SpicyBrain](https://spicybrain.motahir-official.chatgpt.site), Sites project `appgprj_6aaeb1f97b9c8191b7ec8bf746c483c7`, recorded hosting source `8a80f1df37358797c9cec04f66d852294d395c60`. The handoff describes that source as the merged application plus the Sites manifest. This is attributed handoff evidence, not a new verification of the deployed version. GitHub remains the application repository; merging a PR does not publish it to Sites.
+The supplied publishing-session record identifies the existing public [SpicyBrain Site](https://spicybrain.motahir-official.chatgpt.site), project `appgprj_6aaeb1f97b9c8191b7ec8bf746c483c7`, published **version 2**, version ID `appgprj_6aaeb1f97b9c8191b7ec8bf746c483c7~appgver_6754ac42328c819184b64047b0de68fb`, source main `e3bfb97414026e223696312e987879608cc34416`, and hosting snapshot `b8a53637079caae4dba7d1e3438da5d831c9a235`. That session reported live same-origin migration, desktop/mobile/export/import checks and 73 exact non-HTML file hashes; inspected Cloudflare JavaScript Detections injection caused an HTML CSP warning. These remain **attributed historical publication evidence**, not a new live-origin verification by this teacher-first milestone. No CSP script policy was weakened. GitHub remains the application repository; merging does not publish to Sites.
 
 This milestone authorizes one implementation PR, with no merge or deployment. Do not create another Site, change repository/hosting settings, enable Pages, change origin, or deploy this PR. Later authorized publication must reverify this same Site identity, source/build hashes, access model, and live learner-state continuity. Local native-storage tests are not a production-origin migration test.
+
+The existing version-2 Site and its recovery materials remain unchanged. Version1 was already incompatible with version2's migrated data. This PR introduces root record schema4 while retaining native database version2: after any future migration, the version2 website's schema3 client must refuse writes. A later release needs a tested schema4-compatible recovery artifact and exported backup; rolling back website files alone cannot undo or safely read that migration. No destructive downgrade is included.
 
 The initial record below is historical and describes the pre-publication state; it does not imply that the recorded Site is now absent.
 
