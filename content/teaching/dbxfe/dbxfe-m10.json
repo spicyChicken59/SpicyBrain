@@ -1,0 +1,1255 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-m10",
+  "title": "Proof of value",
+  "summary": "Design a bounded experiment whose mixed results can support a real decision.",
+  "outcomes": [
+    "Connect a testable hypothesis to a comparable baseline and accepted criteria.",
+    "Write a scoped charter with owners, prerequisites, stop conditions and change control.",
+    "Read out pass, fail, blocked and not-tested results without averaging away a gate."
+  ],
+  "startingAssumptions": [
+    "You can distinguish target, baseline and observed result.",
+    "No real customer data, spending or cloud execution is authorized by these fictional exercises."
+  ],
+  "lessonIds": [
+    "dbxfe-m10-l01",
+    "dbxfe-m10-l02",
+    "dbxfe-m10-l03"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "Each beat develops one mechanism or decision with inspectable inputs. The final changed case tests transfer; preserved canonical lessons provide their original depth and historical anchors.",
+  "sources": [
+    {
+      "id": "dbxfe-m10-source-pov",
+      "title": "Proof of Value",
+      "url": "https://handbook.gitlab.com/handbook/solutions-architects/playbooks/pov/",
+      "publisher": "GitLab",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "Public page explicitly marked working draft, reviewed September 19, 2026.",
+      "caveat": "A separate employer’s draft example, not a mandatory methodology or a Databricks process.",
+      "reviewedEvidence": "The draft frames a PoV as outcome-led evaluation supporting a decision and provides explicit scope, lifecycle and evidence records."
+    },
+    {
+      "id": "dbxfe-m10-source-profile",
+      "title": "Query profile",
+      "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS; Databricks SQL query execution evidence.",
+      "caveat": "A query profile does not measure the complete upstream source-to-report freshness path.",
+      "reviewedEvidence": "The query profile shows execution operators and metrics, separates wall-clock from aggregated task time, and is unavailable for queries served from query cache."
+    },
+    {
+      "id": "dbxfe-m10-source-billing",
+      "title": "Billable usage system table reference",
+      "url": "https://docs.databricks.com/aws/en/admin/system-tables/billing",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS documentation; system.billing.usage schema.",
+      "caveat": "Usage quantities are not a complete customer cost invoice; record delivery and corrections affect interpretation.",
+      "reviewedEvidence": "The schema includes usage unit, quantity, time basis, SKU and original/retraction/restatement record types. Original records are typically available within twelve hours, not guaranteed instantly."
+    },
+    {
+      "id": "dbxfe-m10-source-free",
+      "title": "Databricks Free Edition limitations",
+      "url": "https://docs.databricks.com/aws/en/getting-started/free-edition-limitations",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "Free Edition; non-commercial learning context.",
+      "caveat": "Not an enterprise security, capacity or service-level validation environment.",
+      "reviewedEvidence": "The limitations describe restricted compute/features, no guaranteed SLA or support, and no enterprise private-networking configuration."
+    },
+    {
+      "id": "dbxfe-m10-source-cutover",
+      "title": "Pre-cutover stage",
+      "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/best-practices-migration-cutover/pre-cutover-stage.html",
+      "publisher": "Amazon Web Services",
+      "reviewedAt": "2026-09-19",
+      "publishedAt": null,
+      "context": "AWS migration guidance; adapted to an original read-path example.",
+      "caveat": "The Cinderline runbook is an illustrative proposal, not an AWS migration result.",
+      "reviewedEvidence": "Planning passages identify dependencies, rehearsal, rollback, testing and ordered runbook tasks with owners and times."
+    },
+    {
+      "id": "dbxfe-m10-source-beyond-blocked-experiment",
+      "title": "Randomized block designs",
+      "url": "https://www.itl.nist.gov/div898/handbook/pri/section3/pri332.htm",
+      "publisher": "NIST/SEMATECH",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "reviewedEvidence": "Blocking groups comparable experimental conditions to account for nuisance factors; randomization addresses remaining uncontrolled variation.",
+      "context": "Engineering statistics guidance, used for an original workload-comparison illustration.",
+      "caveat": "A simple pilot plan is not a complete statistical analysis or proof of significance."
+    },
+    {
+      "id": "dbxfe-m10-source-beyond-measurement-check",
+      "title": "What are the steps of DOE?",
+      "url": "https://www.itl.nist.gov/div898/handbook/pri/section1/pri14.htm",
+      "publisher": "NIST/SEMATECH",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "reviewedEvidence": "Experimental planning should check measurement devices, preserve raw observations and avoid unplanned process changes.",
+      "context": "General design-of-experiments guidance.",
+      "caveat": "The software timing example is original; no physical instrument calibration is claimed."
+    },
+    {
+      "id": "dbxfe-m10-source-beyond-fault-scope",
+      "title": "REL12-BP04 Test resiliency using chaos engineering",
+      "url": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_testing_resiliency_failure_injection_resiliency.html",
+      "publisher": "Amazon Web Services",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "reviewedEvidence": "Fault experiments need monitored guardrails, stop conditions and limited scope; non-production testing can verify stop thresholds before riskier environments.",
+      "context": "AWS reliability guidance applied to a hypothetical pilot design.",
+      "caveat": "This curriculum does not authorize or execute fault injection in any customer system."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-m10-teaching-guidance",
+      "description": "Original SpicyBrain professional guidance, worked reasoning and teaching design.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent curriculum; not an employer process or official leveling rubric."
+    },
+    {
+      "id": "dbxfe-m10-teaching-fiction",
+      "description": "Cinderline, transfer organizations, people, records, timings and financial figures are synthetic teaching examples.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "No customer execution, measured benchmark, authorized spending or realized business benefit is claimed."
+    },
+    {
+      "id": "dbxfe-m10-claim-pov",
+      "description": "The draft frames a PoV as outcome-led evaluation supporting a decision and provides explicit scope, lifecycle and evidence records.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m10-source-pov"
+      ],
+      "context": "Public page explicitly marked working draft, reviewed September 19, 2026. A separate employer’s draft example, not a mandatory methodology or a Databricks process."
+    },
+    {
+      "id": "dbxfe-m10-claim-profile",
+      "description": "The query profile shows execution operators and metrics, separates wall-clock from aggregated task time, and is unavailable for queries served from query cache.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m10-source-profile"
+      ],
+      "context": "AWS; Databricks SQL query execution evidence. A query profile does not measure the complete upstream source-to-report freshness path."
+    },
+    {
+      "id": "dbxfe-m10-claim-billing",
+      "description": "The schema includes usage unit, quantity, time basis, SKU and original/retraction/restatement record types. Original records are typically available within twelve hours, not guaranteed instantly.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m10-source-billing"
+      ],
+      "context": "AWS documentation; system.billing.usage schema. Usage quantities are not a complete customer cost invoice; record delivery and corrections affect interpretation."
+    },
+    {
+      "id": "dbxfe-m10-claim-free",
+      "description": "The limitations describe restricted compute/features, no guaranteed SLA or support, and no enterprise private-networking configuration.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m10-source-free"
+      ],
+      "context": "Free Edition; non-commercial learning context. Not an enterprise security, capacity or service-level validation environment."
+    },
+    {
+      "id": "dbxfe-m10-claim-cutover",
+      "description": "Planning passages identify dependencies, rehearsal, rollback, testing and ordered runbook tasks with owners and times.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m10-source-cutover"
+      ],
+      "context": "AWS migration guidance; adapted to an original read-path example. The Cinderline runbook is an illustrative proposal, not an AWS migration result."
+    },
+    {
+      "id": "dbxfe-m10-claim-beyond-blocked-experiment",
+      "description": "Blocking groups comparable experimental conditions to account for nuisance factors; randomization addresses remaining uncontrolled variation.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m10-source-beyond-blocked-experiment"
+      ],
+      "context": "Engineering statistics guidance, used for an original workload-comparison illustration. A simple pilot plan is not a complete statistical analysis or proof of significance."
+    },
+    {
+      "id": "dbxfe-m10-claim-beyond-measurement-check",
+      "description": "Experimental planning should check measurement devices, preserve raw observations and avoid unplanned process changes.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m10-source-beyond-measurement-check"
+      ],
+      "context": "General design-of-experiments guidance. The software timing example is original; no physical instrument calibration is claimed."
+    },
+    {
+      "id": "dbxfe-m10-claim-beyond-fault-scope",
+      "description": "Fault experiments need monitored guardrails, stop conditions and limited scope; non-production testing can verify stop thresholds before riskier environments.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m10-source-beyond-fault-scope"
+      ],
+      "context": "AWS reliability guidance applied to a hypothetical pilot design. This curriculum does not authorize or execute fault injection in any customer system."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-m10-concept-hypothesis",
+      "term": "testable hypothesis",
+      "aliases": [],
+      "definition": "A prediction with conditions and observations that can support or contradict it.",
+      "example": "The approved one-plant population can reconcile and be served before the agreed decision time.",
+      "sourceIds": [
+        "dbxfe-m10-source-pov"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-concept-baseline",
+      "term": "baseline",
+      "aliases": [],
+      "definition": "A documented measurement of current behavior used as a comparison reference.",
+      "example": "Current source-available-to-serving delay on the agreed one-plant population.",
+      "sourceIds": [
+        "dbxfe-m10-source-profile"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-concept-criteria",
+      "term": "acceptance matrix",
+      "aliases": [],
+      "definition": "A set of separately evaluated criteria with thresholds, methods and accepting owners.",
+      "example": "Correctness passes; freshness fails; recovery remains blocked.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m10-concept-charter",
+      "term": "pilot charter",
+      "aliases": [],
+      "definition": "An agreed description of why a test exists, what it includes, how it runs and how the result is judged.",
+      "example": "One plant, defined inspection records, accepted criteria and named owners.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m10-concept-cases",
+      "term": "test-data basis",
+      "aliases": [],
+      "definition": "The origin, selection and representativeness of inputs used by a test.",
+      "example": "Synthetic conflict fixtures plus a separately approved one-plant population.",
+      "sourceIds": [
+        "dbxfe-m10-source-free"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-concept-execution",
+      "term": "execution record",
+      "aliases": [],
+      "definition": "A versioned account of test conditions, actions, observed results and exceptions.",
+      "example": "Run 2 changes one filter and reruns the same agreed population after Run 1 failed.",
+      "sourceIds": [
+        "dbxfe-m10-source-billing"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-concept-readout",
+      "term": "decision readout",
+      "aliases": [],
+      "definition": "A comparison of test evidence with agreed criteria, followed by a scoped recommendation.",
+      "example": "Correctness passed, freshness failed, recovery blocked; repair and retest before expansion.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m10-concept-transfer",
+      "term": "scope boundary",
+      "aliases": [],
+      "definition": "The population, claims and conditions included in an evaluation, with exclusions explicit.",
+      "example": "One region’s shipment report; no company-wide penalty-reduction claim.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m10-extension-concept-cache-control",
+      "term": "matched comparison block",
+      "aliases": [],
+      "definition": "A group of comparable workload conditions in which both alternatives are evaluated before comparing their outcomes.",
+      "example": "Day, background load or source state can explain the difference; compare both alternatives within matched workload conditions and plan run order.",
+      "sourceIds": [
+        "dbxfe-m10-source-beyond-blocked-experiment"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-extension-concept-billing-lag",
+      "term": "usage restatement reconciliation",
+      "aliases": [],
+      "definition": "Combining original, retracting and replacement usage records according to the documented correction model.",
+      "example": "The retraction cancels the original quantity, so +10 − 10 +12 =12 units on the same unit and attribution basis.",
+      "sourceIds": [
+        "dbxfe-m10-source-billing"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-extension-concept-draft-method",
+      "term": "measurement-path validation",
+      "aliases": [],
+      "definition": "Checking that the mechanism collecting a metric measures the intended interval and records it reliably.",
+      "example": "Validate and repair the measurement path, then rerun the comparison; the present sample cannot support the intended timing claim.",
+      "sourceIds": [
+        "dbxfe-m10-source-beyond-measurement-check"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-extension-concept-recovery-window",
+      "term": "fault-experiment guardrail",
+      "aliases": [],
+      "definition": "An observed boundary that stops a deliberately induced fault when its effects exceed the approved experiment scope.",
+      "example": "Use an approved limited scope, monitor relevant service guardrails and define a stop action whose activation is itself verified beforehand.",
+      "sourceIds": [
+        "dbxfe-m10-source-beyond-fault-scope"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-m10-visual-hypothesis",
+      "kind": "table",
+      "title": "Write a claim that could fail",
+      "alt": "Worked visual: Write a claim that could fail. A claim is testable because each component can fail visibly.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "One claim, several tests: A claim is testable because each component can fail visibly.. Claim component: Correct; Observation needed: Keys/revisions/totals reconcile; Possible contrary result: Missing inspection. Claim component: Timely; Observation needed: Agreed timing population; Possible contrary result: Late records. Claim component: Recoverable; Observation needed: Failure/replay rehearsal; Possible contrary result: Duplicate effect. Claim component: Operable; Observation needed: Owned effort and response; Possible contrary result: No operator",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-pov"
+      ],
+      "states": [
+        {
+          "title": "One claim, several tests",
+          "explanation": "A claim is testable because each component can fail visibly.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Claim component",
+              "Observation needed",
+              "Possible contrary result"
+            ],
+            "rows": [
+              [
+                "Correct",
+                "Keys/revisions/totals reconcile",
+                "Missing inspection"
+              ],
+              [
+                "Timely",
+                "Agreed timing population",
+                "Late records"
+              ],
+              [
+                "Recoverable",
+                "Failure/replay rehearsal",
+                "Duplicate effect"
+              ],
+              [
+                "Operable",
+                "Owned effort and response",
+                "No operator"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m10-visual-baseline",
+      "kind": "table",
+      "title": "Use the same ruler on both paths",
+      "alt": "Worked visual: Use the same ruler on both paths. The candidate measure starts later and cannot support the same claim.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Misleading comparison: The candidate measure starts later and cannot support the same claim.. Path: Current; Measured interval: Approval → served; Excluded time: None within stated path. Path: Candidate; Measured interval: Job start → served; Excluded time: Waiting after approval\n\nAligned comparison: Now remaining environment and workload differences can be assessed honestly.. Path: Current; Measured interval: Approval → served; Population: Same approved records. Path: Candidate; Measured interval: Approval → served; Population: Same approved records",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-profile"
+      ],
+      "states": [
+        {
+          "title": "Misleading comparison",
+          "explanation": "The candidate measure starts later and cannot support the same claim.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Path",
+              "Measured interval",
+              "Excluded time"
+            ],
+            "rows": [
+              [
+                "Current",
+                "Approval → served",
+                "None within stated path"
+              ],
+              [
+                "Candidate",
+                "Job start → served",
+                "Waiting after approval"
+              ]
+            ]
+          },
+          "id": "start"
+        },
+        {
+          "title": "Aligned comparison",
+          "explanation": "Now remaining environment and workload differences can be assessed honestly.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Path",
+              "Measured interval",
+              "Population"
+            ],
+            "rows": [
+              [
+                "Current",
+                "Approval → served",
+                "Same approved records"
+              ],
+              [
+                "Candidate",
+                "Approval → served",
+                "Same approved records"
+              ]
+            ]
+          },
+          "id": "change"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m10-visual-criteria",
+      "kind": "table",
+      "title": "Keep blocking conditions separate",
+      "alt": "Worked visual: Keep blocking conditions separate. Rows remain independent; the actual policy decides which block expansion.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Fictional acceptance matrix: Rows remain independent; the actual policy decides which block expansion.. Criterion: Correct revisions and totals; Method: Exact comparison plus exceptions; Acceptor: Quality + data lead. Criterion: Useful freshness; Method: Agreed endpoints/population; Acceptor: Operations. Criterion: Permitted access; Method: Representative allow/deny tests; Acceptor: Security. Criterion: Recovery; Method: Failure/replay rehearsal; Acceptor: Operating owner",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Fictional acceptance matrix",
+          "explanation": "Rows remain independent; the actual policy decides which block expansion.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Criterion",
+              "Method",
+              "Acceptor"
+            ],
+            "rows": [
+              [
+                "Correct revisions and totals",
+                "Exact comparison plus exceptions",
+                "Quality + data lead"
+              ],
+              [
+                "Useful freshness",
+                "Agreed endpoints/population",
+                "Operations"
+              ],
+              [
+                "Permitted access",
+                "Representative allow/deny tests",
+                "Security"
+              ],
+              [
+                "Recovery",
+                "Failure/replay rehearsal",
+                "Operating owner"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m10-visual-charter",
+      "kind": "table",
+      "title": "Write scope before work expands",
+      "alt": "Worked visual: Write scope before work expands. The scope is a proposal until actual owners accept it.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Fictional scope boundary: The scope is a proposal until actual owners accept it.. Included: One approved plant; Excluded or prerequisite: Other plants excluded. Included: Quality metric and corrections; Excluded or prerequisite: Maintenance assistant separate. Included: Five staffed days; Excluded or prerequisite: No all-year reliability claim. Included: Approved data/environment; Excluded or prerequisite: Real access and budget still prerequisite",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Fictional scope boundary",
+          "explanation": "The scope is a proposal until actual owners accept it.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Included",
+              "Excluded or prerequisite"
+            ],
+            "rows": [
+              [
+                "One approved plant",
+                "Other plants excluded"
+              ],
+              [
+                "Quality metric and corrections",
+                "Maintenance assistant separate"
+              ],
+              [
+                "Five staffed days",
+                "No all-year reliability claim"
+              ],
+              [
+                "Approved data/environment",
+                "Real access and budget still prerequisite"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m10-visual-cases",
+      "kind": "table",
+      "title": "Use representative data and deliberate edge cases",
+      "alt": "Worked visual: Use representative data and deliberate edge cases. The evidence types complement each other; none is universal proof.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Evidence coverage: The evidence types complement each other; none is universal proof.. Input/test type: Synthetic fixtures; Good at testing: Exact logic and edge cases; Still cannot establish alone: Real source access/load. Input/test type: Approved representative sample; Good at testing: Distribution and source behavior; Still cannot establish alone: Rare failures not present. Input/test type: Configured failure rehearsal; Good at testing: Actual recovery procedure; Still cannot establish alone: All future incidents",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-free"
+      ],
+      "states": [
+        {
+          "title": "Evidence coverage",
+          "explanation": "The evidence types complement each other; none is universal proof.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Input/test type",
+              "Good at testing",
+              "Still cannot establish alone"
+            ],
+            "rows": [
+              [
+                "Synthetic fixtures",
+                "Exact logic and edge cases",
+                "Real source access/load"
+              ],
+              [
+                "Approved representative sample",
+                "Distribution and source behavior",
+                "Rare failures not present"
+              ],
+              [
+                "Configured failure rehearsal",
+                "Actual recovery procedure",
+                "All future incidents"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m10-visual-execution",
+      "kind": "table",
+      "title": "Record changes while the test runs",
+      "alt": "Worked visual: Record changes while the test runs. The system changes while the input and criterion remain comparable.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Two-run evidence trail: The system changes while the input and criterion remain comparable.. Record: Population; Run 1: Agreed samplev 1; Run 2: Same samplev 1. Record: System; Run 1: Transformv 1; Run 2: Transformv 2:filter repaired. Record: Criterion; Run 1: Accepted contractv 1; Run 2: Same contractv 1. Record: Result; Run 1: Failed key comparison; Run 2: Retest observation recorded",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-billing"
+      ],
+      "states": [
+        {
+          "title": "Two-run evidence trail",
+          "explanation": "The system changes while the input and criterion remain comparable.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Record",
+              "Run 1",
+              "Run 2"
+            ],
+            "rows": [
+              [
+                "Population",
+                "Agreed samplev 1",
+                "Same samplev 1"
+              ],
+              [
+                "System",
+                "Transformv 1",
+                "Transformv 2:filter repaired"
+              ],
+              [
+                "Criterion",
+                "Accepted contractv 1",
+                "Same contractv 1"
+              ],
+              [
+                "Result",
+                "Failed key comparison",
+                "Retest observation recorded"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m10-visual-readout",
+      "kind": "table",
+      "title": "Keep pass, fail, blocked and not tested distinct",
+      "alt": "Worked visual: Keep pass, fail, blocked and not tested distinct. No overall score erases the required missing or failed evidence.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Hypothetical mixed readout: No overall score erases the required missing or failed evidence.. Criterion: Correctness; State: Pass on agreed sample; Owner / next evidence: Retain exact comparison. Criterion: Freshness; State: Fail; Owner / next evidence: Data engineer:trace timing. Criterion: Recovery; State: Blocked; Owner / next evidence: Data lead:operator + rehearsal. Criterion: Expansion; State: Not justified yet; Owner / next evidence: Acceptors review bounded retest",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Hypothetical mixed readout",
+          "explanation": "No overall score erases the required missing or failed evidence.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Criterion",
+              "State",
+              "Owner / next evidence"
+            ],
+            "rows": [
+              [
+                "Correctness",
+                "Pass on agreed sample",
+                "Retain exact comparison"
+              ],
+              [
+                "Freshness",
+                "Fail",
+                "Data engineer:trace timing"
+              ],
+              [
+                "Recovery",
+                "Blocked",
+                "Data lead:operator + rehearsal"
+              ],
+              [
+                "Expansion",
+                "Not justified yet",
+                "Acceptors review bounded retest"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m10-visual-transfer",
+      "kind": "table",
+      "title": "Design a shipment pilot that can say no",
+      "alt": "Worked visual: Design a shipment pilot that can say no. The whole method transfers without assuming the same business metric.",
+      "caption": "Original teaching visual. Cinderline and all example values are synthetic.",
+      "textEquivalent": "Shipment pilot recap: The whole method transfers without assuming the same business metric.. Contract part: Decision; Worked proposal: Useful regional delay report?. Contract part: Population; Worked proposal: Approved orders, one region. Contract part: Comparison; Worked proposal: Same statuses, cutoffs and timing basis. Contract part: Edge cases; Worked proposal: Late, missing, repeated, conflicting. Contract part: Readout; Worked proposal: Separate pass/fail/blocked/not tested. Contract part: Next step; Worked proposal: Bounded retest if timing misses",
+      "provenance": "Original SpicyBrain diagram and synthetic worked inputs; no vendor screenshot or measured customer result.",
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "states": [
+        {
+          "title": "Shipment pilot recap",
+          "explanation": "The whole method transfers without assuming the same business metric.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Contract part",
+              "Worked proposal"
+            ],
+            "rows": [
+              [
+                "Decision",
+                "Useful regional delay report?"
+              ],
+              [
+                "Population",
+                "Approved orders, one region"
+              ],
+              [
+                "Comparison",
+                "Same statuses, cutoffs and timing basis"
+              ],
+              [
+                "Edge cases",
+                "Late, missing, repeated, conflicting"
+              ],
+              [
+                "Readout",
+                "Separate pass/fail/blocked/not tested"
+              ],
+              [
+                "Next step",
+                "Bounded retest if timing misses"
+              ]
+            ]
+          },
+          "id": "start"
+        }
+      ]
+    }
+  ],
+  "questions": [],
+  "selfQuestions": [
+    {
+      "id": "dbxfe-m10-check-hypothesis",
+      "revision": "1",
+      "prompt": "Why exclude realized scrap savings from this five-day technical pilot’s primary claim?",
+      "modelAnswer": "A short correctness/freshness test does not establish the downstream causal change in scrap or its realization. Keep savings as a hypothesis requiring separate evidence.",
+      "reasoning": "The scope should match what the experiment can actually observe.",
+      "conceptIds": [
+        "dbxfe-m10-concept-hypothesis"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-pov"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-check-baseline",
+      "revision": "1",
+      "prompt": "The candidate interval excludes 30 minutes of waiting that the baseline includes. Can its lower number establish an end-to-end improvement?",
+      "modelAnswer": "No. Align the measurement endpoints and compare the same population before making that claim.",
+      "reasoning": "A different start point can create an apparent improvement without changing the user’s experience.",
+      "conceptIds": [
+        "dbxfe-m10-concept-baseline"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-profile"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-check-criteria",
+      "revision": "1",
+      "prompt": "Can passing three criteria compensate for a failed mandatory access condition?",
+      "modelAnswer": "No. Preserve the access failure as blocking under the agreed policy; report the other results separately.",
+      "reasoning": "An average is not a substitute for the explicit acceptance contract.",
+      "conceptIds": [
+        "dbxfe-m10-concept-criteria"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-check-charter",
+      "revision": "1",
+      "prompt": "How should the team respond to adding the assistant halfway through the quality pilot?",
+      "modelAnswer": "Acknowledge the use case, then either keep it as a separate scoped next step or explicitly revise the charter and evidence interpretation before adding work.",
+      "reasoning": "Different tasks require different data, authority and acceptance tests; silent expansion makes the result hard to interpret.",
+      "conceptIds": [
+        "dbxfe-m10-concept-charter"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-check-cases",
+      "revision": "1",
+      "prompt": "Why add a synthetic unkeyed provenance conflict if the representative sample has none?",
+      "modelAnswer": "It deliberately tests a consequential policy boundary that ordinary sampling may miss: conflict evidence must block publication even when no usable key is attributable.",
+      "reasoning": "Representative frequency and targeted failure coverage are different reasons to choose test inputs.",
+      "conceptIds": [
+        "dbxfe-m10-concept-cases"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-free"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-check-execution",
+      "revision": "1",
+      "prompt": "The billing table is empty immediately after the test. What cost claim is justified?",
+      "modelAnswer": "Only that no usage record is visible yet in that view. Check documented delivery timing, record scope and later corrections before concluding cost.",
+      "reasoning": "Observation latency and actual resource consumption are different facts.",
+      "conceptIds": [
+        "dbxfe-m10-concept-execution"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-billing"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-check-readout",
+      "revision": "1",
+      "prompt": "Write the recommendation when correctness passes, freshness fails and recovery is blocked.",
+      "modelAnswer": "Retain the current path; preserve the correctness pass; investigate timing and establish the operator for the recovery rehearsal; review a bounded retest before expansion.",
+      "reasoning": "The recommendation follows the specific evidence states rather than an average.",
+      "conceptIds": [
+        "dbxfe-m10-concept-readout"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m10-check-transfer",
+      "revision": "1",
+      "prompt": "Which excluded claim should be explicit if this pilot only tests report correctness and timing?",
+      "modelAnswer": "Realized carrier-penalty reduction or company-wide operational reliability. Those require broader outcome and operating evidence.",
+      "reasoning": "A useful technical prerequisite is not the downstream business outcome itself.",
+      "conceptIds": [
+        "dbxfe-m10-concept-transfer"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ]
+    }
+  ],
+  "beats": [
+    {
+      "id": "dbxfe-m10-beat-hypothesis",
+      "version": "1.0.0",
+      "title": "Write a claim that could fail",
+      "outcome": "A useful pilot can recommend revising or stopping.",
+      "explanation": "A [[dbxfe-m10-concept-hypothesis|testable hypothesis]] predicts an outcome under conditions that a test can challenge. Cinderline proposes a reconciled one-plant report before the morning decision with manageable operation. Split that claim into correctness, freshness, recovery and effort. If the evidence misses an agreed condition, a useful readout can recommend a smaller design or no expansion.",
+      "lessonId": "dbxfe-m10-l01",
+      "sectionId": "dbxfe-m10-l01-understand",
+      "conceptIds": [
+        "dbxfe-m10-concept-hypothesis"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-pov"
+      ],
+      "visualId": "dbxfe-m10-visual-hypothesis",
+      "questionIds": [
+        "dbxfe-m10-check-hypothesis"
+      ],
+      "handbook": {
+        "markdown": "### Define the decision before the experiment\nA proof of value should answer a bounded investment or implementation question. The name alone does not determine scope: teams use proof of concept, pilot and trial differently. Agree what this test will establish and which decisions it can inform.\n\nCinderline’s proposed claim connects correct data and useful timing to an operating model. It does not claim all three plants are production-ready or that scrap savings have already been realized. Those are wider claims requiring different evidence and often more time.\n\n**Worked decomposition:** correctness needs key/revision/total comparisons; freshness needs defined timestamps; recovery needs an induced failure and observed response; effort needs recorded operating work. Passing the arithmetic test cannot substitute for the other components.\n\n**Limit:** the public GitLab PoV page is explicitly a working draft from another employer. It is a useful primary example of outcome-led evaluation, not a mandatory method for this course. Our charter and acceptance rules are original guidance to be adapted and accepted by the actual stakeholders.",
+        "sourceSectionIds": [
+          "dbxfe-m10-l01-understand",
+          "dbxfe-m10-l01-deeper"
+        ]
+      },
+      "recap": "A useful pilot can recommend revising or stopping.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": [
+        "dbxfe-m10-media-hypothesis"
+      ],
+      "samajh": {
+        "text": "Naye route ko test karte waqt pehle bolo: same destination, same time window, aur delay kaise measure karenge. Agar result bura aaye toh route badal sakte hain. Pilot bhi tab useful hai jab usse sirf “go” nahi, revise ya stop ka decision bhi honestly nikal sake.",
+        "mapping": "A route trial maps to a bounded hypothesis with comparable conditions.",
+        "boundary": "Business pilots also need correctness, permissions and operating evidence, not only travel time."
+      }
+    },
+    {
+      "id": "dbxfe-m10-beat-baseline",
+      "version": "1.0.0",
+      "title": "Use the same ruler on both paths",
+      "outcome": "A before/after comparison is only useful on a comparable basis.",
+      "explanation": "A [[dbxfe-m10-concept-baseline|baseline]] records current behavior with a stated method. Compare the same business definition, population, timing endpoints and workload conditions. A candidate query on cached synthetic data and an old report under morning load do not form a fair speed comparison. If current behavior is unmeasured, collect it before claiming improvement.",
+      "lessonId": "dbxfe-m10-l01",
+      "sectionId": "dbxfe-m10-l01-understand",
+      "conceptIds": [
+        "dbxfe-m10-concept-baseline"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-profile"
+      ],
+      "visualId": "dbxfe-m10-visual-baseline",
+      "questionIds": [
+        "dbxfe-m10-check-baseline"
+      ],
+      "handbook": {
+        "markdown": "### Hold the comparison basis steady\nRecord input version, population, definition, environment, concurrency and relevant cache state. Decide what changes between [[dbxfe-m10-concept-baseline|baseline]] and candidate and why. If several factors change together, the result may show the combined effect but cannot cleanly attribute it to one feature.\n\nThe synthetic example compares an old path measured from source approval with a new path measured only from job start. The new number excludes the waiting time before execution. It can appear faster while measuring a different interval. Align endpoints before interpreting the difference.\n\n**Worked repair:** measure both from approved source availability to the first usable served result, on the same records and time window. Report missing timestamps and failed runs. For query performance, record whether results came from cache and whether queue time is included.\n\n**Troubleshooting:** a missing baseline is an explicit first task, not a license to invent a convenient number. Query profiles provide execution details, but the entire source-to-report interval requires other observations. Keep comparable evidence and disclose any remaining differences in the readout.",
+        "sourceSectionIds": [
+          "dbxfe-m10-l01-understand",
+          "dbxfe-m10-l01-deeper"
+        ]
+      },
+      "recap": "A before/after comparison is only useful on a comparable basis.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m10-beat-criteria",
+      "version": "1.0.0",
+      "title": "Keep blocking conditions separate",
+      "outcome": "An average success score can conceal the reason not to expand.",
+      "explanation": "An [[dbxfe-m10-concept-criteria|acceptance matrix]] lists each criterion, how it is measured and who accepts it. Correctness, timing, permission and recovery can have different pass rules. A fast wrong report is not an acceptable quality feed. Decide which conditions block expansion before the run, then preserve them when the result is inconvenient.",
+      "lessonId": "dbxfe-m10-l01",
+      "sectionId": "dbxfe-m10-l01-understand",
+      "conceptIds": [
+        "dbxfe-m10-concept-criteria"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "visualId": "dbxfe-m10-visual-criteria",
+      "questionIds": [
+        "dbxfe-m10-check-criteria"
+      ],
+      "handbook": {
+        "markdown": "### Define success in rows that cannot cancel each other\nA single weighted score can hide a material failure. A proposed policy may require exact key reconciliation, valid timestamps for every included record, a timing threshold and demonstrated recovery. If unauthorized access occurs, a good latency result should not neutralize it.\n\nFor the fictional one-plant test, specify the expected output and measurement for each row. The quality owner accepts the metric, the data lead accepts the reconciliation method, operations accepts timing/usefulness, and security accepts access. Owners can revise proposed thresholds before the test; after execution, keep any change visible and state whether a retest is needed.\n\n**Worked readout:** correctness passes, freshness misses, recovery cannot run because the operator is absent. This is useful mixed evidence. It supports diagnosing timing and establishing the operator, not a broad readiness statement.\n\n**Limit:** not every criterion needs a numeric score. An acknowledged operating owner or approved data scope can be a clear condition. The important property is that another reviewer can tell what was required, what happened and what remains unresolved.",
+        "sourceSectionIds": [
+          "dbxfe-m10-l01-understand",
+          "dbxfe-m10-l01-deeper"
+        ]
+      },
+      "recap": "An average success score can conceal the reason not to expand.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m10-beat-charter",
+      "version": "1.0.0",
+      "title": "Write scope before work expands",
+      "outcome": "A compact charter makes the result interpretable.",
+      "explanation": "A [[dbxfe-m10-concept-charter|pilot charter]] states purpose, population, environment, owners, criteria, limits and readout. Cinderline’s proposal covers one approved plant and five staffed days. The maintenance assistant remains separate. Source permission, budget and operating ownership are prerequisites; a hypothetical planning ceiling is not authorization to spend or use real data.",
+      "lessonId": "dbxfe-m10-l02",
+      "sectionId": "dbxfe-m10-l02-understand",
+      "conceptIds": [
+        "dbxfe-m10-concept-charter"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "visualId": "dbxfe-m10-visual-charter",
+      "questionIds": [
+        "dbxfe-m10-check-charter"
+      ],
+      "handbook": {
+        "markdown": "### Eliminate the ambiguities that change the test\nWrite the business decision, in-scope data, exact metric, source/revision rules, workload, environment, duration and acceptance owners. State excluded use cases explicitly. Then record prerequisites: approved fields and access, supported configuration, an operating owner and an actually authorized spending limit.\n\nThe fictional sponsor mentions a 1,500-dollar planning ceiling in the capstone. It is an invented planning input, not permission to create resources. A real test would need the authorized owner to accept scope and limits in the actual environment. This course requires no such execution.\n\n**Worked scope change:** halfway through a quality pilot, someone requests a maintenance assistant. Its documents, permissions, evaluation and operational risks differ. Record it as a separate next decision or explicitly revise the charter, ownership, effort and interpretation of results before starting.\n\n**Troubleshooting:** if teams use the same word “pilot” for different populations, resolve that before execution. A short written agreement is often more useful than a long plan with ambiguous acceptance. Preserve the version that governed the observed run.",
+        "sourceSectionIds": [
+          "dbxfe-m10-l02-understand",
+          "dbxfe-m10-l02-deeper"
+        ]
+      },
+      "recap": "A compact charter makes the result interpretable.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m10-beat-cases",
+      "version": "1.0.0",
+      "title": "Use representative data and deliberate edge cases",
+      "outcome": "Synthetic logic evidence and customer-path evidence complement each other.",
+      "explanation": "A [[dbxfe-m10-concept-cases|test-data basis]] states what each input set represents. Synthetic corrections isolate identity and replay logic. Approved representative data can expose actual volume, skew, timing and schema variation. Neither automatically replaces the other. Label them separately and include deliberate invalid, late, conflicting and failure cases that ordinary samples might miss.",
+      "lessonId": "dbxfe-m10-l02",
+      "sectionId": "dbxfe-m10-l02-understand",
+      "conceptIds": [
+        "dbxfe-m10-concept-cases"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-free"
+      ],
+      "visualId": "dbxfe-m10-visual-cases",
+      "questionIds": [
+        "dbxfe-m10-check-cases"
+      ],
+      "handbook": {
+        "markdown": "### Choose cases for the claim being tested\nA small synthetic fixture is excellent when the expected result must be independently obvious. A=12/1 and C=8/0 yield 20/1. Replaying identical evidence should not add another inspection. Conflicting provenance should block publication even without an attributable key. These cases isolate rules that a typical customer sample might not exercise.\n\nRepresentative permitted inputs answer other questions: real source timing, key distribution, schema changes, data volumes and workload behavior. Document how the sample was selected and what it excludes. A convenient quiet-hour sample may underrepresent the morning peak; a clean sample may underrepresent correction failures.\n\n**Worked matrix:** use synthetic fixtures for exact boundary assertions, a representative sample for source and workload behavior, and an actual configured failure rehearsal for deployed recovery. Keep each evidence type and version separate.\n\n**Limit:** a Free Edition or local learning run does not validate enterprise network configuration or support guarantees. Do not call a finite diagram state a run. The preserved downloadable exercise has its own actual local execution evidence and does not imply a Databricks workspace test.",
+        "sourceSectionIds": [
+          "dbxfe-m10-l02-understand",
+          "dbxfe-m10-l02-deeper"
+        ]
+      },
+      "recap": "Synthetic logic evidence and customer-path evidence complement each other.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m10-beat-execution",
+      "version": "1.0.0",
+      "title": "Record changes while the test runs",
+      "outcome": "A result needs the conditions that produced it.",
+      "explanation": "An [[dbxfe-m10-concept-execution|execution record]] captures inputs, configuration, run time, outcomes, exceptions and cost basis. Keep failed attempts and scope changes. If a setting changes after a failure, record what changed and why before the retest. Otherwise a later pass cannot be compared with the original criterion or reproduced by another reviewer.",
+      "lessonId": "dbxfe-m10-l02",
+      "sectionId": "dbxfe-m10-l02-understand",
+      "conceptIds": [
+        "dbxfe-m10-concept-execution"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction",
+        "dbxfe-m10-claim-billing"
+      ],
+      "visualId": "dbxfe-m10-visual-execution",
+      "questionIds": [
+        "dbxfe-m10-check-execution"
+      ],
+      "handbook": {
+        "markdown": "### Make a rerun interpretable\nBefore a run, save the expected outputs and criteria independently of the implementation under test. During execution, record the actual population, application/configuration version and environment. Afterward, preserve outputs, failures and any excluded cases with reasons. A green summary without those details is not sufficient evidence for the customer decision.\n\nIf a failure requires a change, identify whether it changes the system, the measurement or the contract. Changing the system and rerunning the same test can demonstrate a repair. Changing the threshold only changes what counts as success unless owners explicitly accept the new requirement and its consequences.\n\n**Worked cost note:** recorded usage quantities need units, time basis and applicable rates before they become an estimate. Billing records can arrive later and may be corrected; an empty table immediately after a run is not proof of zero cost.\n\n**Troubleshooting:** keep sensitive source data and credentials out of public evidence. Use approved access-controlled evidence locations in real work. This course’s artifacts remain synthetic and its exercise evidence reports only the actual local execution context.\n\nA stop condition is agreed before execution: for example, unauthorized data exposure, an exhausted test budget or an unresolved correctness failure. Stop the affected activity, preserve evidence and ask the named owner to decide whether to revise or end the test. Quietly changing the threshold after a failure destroys comparability.",
+        "sourceSectionIds": [
+          "dbxfe-m10-l02-understand",
+          "dbxfe-m10-l02-deeper"
+        ]
+      },
+      "recap": "A result needs the conditions that produced it.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m10-beat-readout",
+      "version": "1.0.0",
+      "title": "Keep pass, fail, blocked and not tested distinct",
+      "outcome": "A mixed result should lead to a specific next decision.",
+      "explanation": "A [[dbxfe-m10-concept-readout|decision readout]] compares each observed result with its agreed criterion. Pass means the condition was met on the stated scope; fail means it was not; blocked means a dependency prevented the test; not tested means no observation was collected. A blocked recovery rehearsal cannot be turned into a pass because correctness succeeded.",
+      "lessonId": "dbxfe-m10-l03",
+      "sectionId": "dbxfe-m10-l03-understand",
+      "conceptIds": [
+        "dbxfe-m10-concept-readout"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "visualId": "dbxfe-m10-visual-readout",
+      "questionIds": [
+        "dbxfe-m10-check-readout"
+      ],
+      "handbook": {
+        "markdown": "### Interpret the result without smoothing it\nReport the target, result, population/window, version, evidence reference, exceptions, state and owner for each criterion. Avoid one impressive score that hides an access or recovery condition. State exactly what conclusion follows from the evidence and what remains a hypothesis.\n\nThe fictional pilot reconciles but misses freshness. Recovery is blocked by an unavailable operator. Recommend a bounded timing investigation and operator rehearsal while retaining the current report. Preserve the correctness result; a missing operational test does not make the arithmetic observation disappear.\n\n**Worked next actions:** the data engineer traces the timing distribution, the data lead nominates an operator, and the operator performs the accepted failure/replay test. Then the acceptors review the unchanged criteria or explicitly revise the scope with a reason.\n\n**Limit:** a synthetic sample’s lack of production skew is a scope limitation, a wrong aggregation is a defect, and missing approval is a blocker. They all constrain the conclusion but require different responses. A useful readout can recommend retain, revise, expand a bounded slice or stop.",
+        "sourceSectionIds": [
+          "dbxfe-m10-l03-understand",
+          "dbxfe-m10-l03-deeper"
+        ]
+      },
+      "recap": "A mixed result should lead to a specific next decision.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": [],
+      "samajh": {
+        "text": "Project ke teen doors hain: data sahi, time useful, recovery ready. Do doors khulne se teesra locked door automatically open nahi hota. Readout mein har door ka status alag dikhao, phir batao kaunsi key missing hai aur uska owner kaun hai.",
+        "mapping": "Separate doors map to independently required acceptance conditions.",
+        "boundary": "Real criteria can interact; the analogy does not imply every pilot has exactly three gates."
+      }
+    },
+    {
+      "id": "dbxfe-m10-beat-transfer",
+      "version": "1.0.0",
+      "title": "Design a shipment pilot that can say no",
+      "outcome": "Carry the contract into a new population and decision.",
+      "explanation": "A fictional distributor wants a shipment-delay report. Build a [[dbxfe-m10-concept-transfer|scope boundary]] around one region, approved orders and a comparable timing basis. Include correctness, missing timestamps, late events, replay and recovery. Keep lower carrier penalties as a future hypothesis unless the test observes that causal outcome. The experiment should inform a decision, not guarantee expansion.",
+      "lessonId": "dbxfe-m10-l03",
+      "sectionId": "dbxfe-m10-l03-understand",
+      "conceptIds": [
+        "dbxfe-m10-concept-transfer"
+      ],
+      "claimIds": [
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "visualId": "dbxfe-m10-visual-transfer",
+      "questionIds": [
+        "dbxfe-m10-check-transfer"
+      ],
+      "handbook": {
+        "markdown": "### Assemble a changed-case charter\nStart with the dispatch decision and the stakeholder who accepts usefulness. Define which orders count, the meaning of shipped/delayed status, the authoritative event order and the report’s timing endpoint. Collect a comparable current-path baseline before claiming improvement.\n\nUse a permitted representative region sample plus synthetic duplicate, late-status, missing-timestamp and conflicting-event cases. Define expected behavior independently. Assign data and operations owners, approve access and real spending outside this learning exercise, and specify when to pause for invalid measurement or unauthorized input.\n\n**Worked mixed result:** order totals reconcile, the timing condition misses, and the recovery test is not executed. The next decision is a bounded repair/retest, not immediate regional expansion. Retain the old report during the agreed comparison and recovery window.\n\n**Review entry:** practice core cards on hypothesis, charter and readout. The extension cards add cache, billing and recovery-planning caveats. A completed charter is a planning artifact; it is not customer consent, observed production success or proof that the platform caused a financial benefit.",
+        "sourceSectionIds": [
+          "dbxfe-m10-l03-understand",
+          "dbxfe-m10-l03-deeper"
+        ]
+      },
+      "recap": "Carry the contract into a new population and decision.",
+      "changeNote": "New teaching beat; visiting it does not inherit historical lesson completion.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m10-l01-card1",
+      "beatId": "dbxfe-m10-beat-hypothesis"
+    },
+    {
+      "cardId": "dbxfe-m10-l01-card2",
+      "beatId": "dbxfe-m10-beat-charter"
+    },
+    {
+      "cardId": "dbxfe-m10-l01-card3",
+      "beatId": "dbxfe-m10-beat-baseline"
+    },
+    {
+      "cardId": "dbxfe-m10-l02-card1",
+      "beatId": "dbxfe-m10-beat-charter"
+    },
+    {
+      "cardId": "dbxfe-m10-l02-card2",
+      "beatId": "dbxfe-m10-beat-cases"
+    },
+    {
+      "cardId": "dbxfe-m10-l02-card3",
+      "beatId": "dbxfe-m10-beat-execution"
+    },
+    {
+      "cardId": "dbxfe-m10-l03-card1",
+      "beatId": "dbxfe-m10-beat-readout"
+    },
+    {
+      "cardId": "dbxfe-m10-l03-card2",
+      "beatId": "dbxfe-m10-beat-readout"
+    },
+    {
+      "cardId": "dbxfe-m10-l03-card3",
+      "beatId": "dbxfe-m10-beat-readout"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-m10-extension-cache-control",
+      "revision": "2",
+      "prompt": "Why is “old path on Monday morning, new path on Friday night” a weak comparison even when both use the same query?",
+      "answer": "Day, background load or source state can explain the difference; compare both alternatives within matched workload conditions and plan run order.",
+      "explanation": "NIST’s blocking guidance addresses factors that affect results without being the treatment of interest. Our synthetic pilot groups tests by workload size and concurrency window. Within each agreed group, measure both paths with the same population and time endpoints, and vary or randomize run order where operationally appropriate. If one path is always second, warm caches or changed background load can favor it. Preserve each observation and the group labels rather than keeping only a global mean. A matched design improves interpretability but does not eliminate every confounder or establish significance by itself. This is a concrete experimental-design step beyond merely recording cache status.",
+      "whyItMatters": "It makes time-of-day and workload variation visible before attributing a difference to the platform.",
+      "lessonId": "dbxfe-m10-l01",
+      "sectionId": "dbxfe-m10-l01-understand",
+      "conceptIds": [
+        "dbxfe-m10-extension-concept-cache-control"
+      ],
+      "claimIds": [
+        "dbxfe-m10-claim-beyond-blocked-experiment",
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "beatId": "dbxfe-m10-beat-baseline"
+    },
+    {
+      "id": "dbxfe-m10-extension-billing-lag",
+      "revision": "2",
+      "prompt": "Synthetic usage records show +10 original units, −10 retraction and +12 restatement for one correction. Why is the corrected quantity twelve, not twenty-two?",
+      "answer": "The retraction cancels the original quantity, so +10 − 10 +12 =12 units on the same unit and attribution basis.",
+      "explanation": "The Databricks billable-usage reference describes original, retraction and restatement records as well as delivery delay. Filtering out negative rows would leave an inflated 22 units; discarding the restatement would preserve an outdated ten. Preserve the correction linkage and apply the documented aggregation rules over the intended period and dimensions. The signs and quantities here are synthetic teaching inputs, not a customer invoice. Usage units still require applicable pricing and cost scope before becoming a financial estimate. An initially empty view can also be incomplete because records arrive later, so state the observation cutoff and reconcile again when the expected records are available.",
+      "whyItMatters": "It adds correction arithmetic and evidence timing to cost measurement rather than treating a usage table as immutable totals.",
+      "lessonId": "dbxfe-m10-l02",
+      "sectionId": "dbxfe-m10-l02-understand",
+      "conceptIds": [
+        "dbxfe-m10-extension-concept-billing-lag"
+      ],
+      "claimIds": [
+        "dbxfe-m10-claim-billing",
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "beatId": "dbxfe-m10-beat-execution"
+    },
+    {
+      "id": "dbxfe-m10-extension-draft-method",
+      "revision": "2",
+      "prompt": "Both pilot paths appear to meet a thirty-second target, but one timestamp collector drops slow responses. What must be fixed before interpreting the result?",
+      "answer": "Validate and repair the measurement path, then rerun the comparison; the present sample cannot support the intended timing claim.",
+      "explanation": "NIST’s experimental-planning guidance puts measurement checks before interpreting an experiment. Our original software application uses a known synthetic delay and an explicit failed response to test the timing collector. Confirm that both appear in raw observations, the start/end definitions are applied consistently and the units are correct. A collector that records only successful fast responses produces a biased result even if the workload code is unchanged. Keep the earlier evidence with its defect explained rather than relabeling it a valid pass. This adds a second system to test: the instrument that produces the pilot evidence. It does not require a formal statistical model to recognize missing observations.",
+      "whyItMatters": "It prevents a green pilot from being an artifact of broken measurement.",
+      "lessonId": "dbxfe-m10-l01",
+      "sectionId": "dbxfe-m10-l01-understand",
+      "conceptIds": [
+        "dbxfe-m10-extension-concept-draft-method"
+      ],
+      "claimIds": [
+        "dbxfe-m10-claim-beyond-measurement-check",
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "beatId": "dbxfe-m10-beat-hypothesis"
+    },
+    {
+      "id": "dbxfe-m10-extension-recovery-window",
+      "revision": "2",
+      "prompt": "Before a pilot deliberately interrupts a dependency, how should the team bound the experiment’s possible effects?",
+      "answer": "Use an approved limited scope, monitor relevant service guardrails and define a stop action whose activation is itself verified beforehand.",
+      "explanation": "AWS reliability guidance recommends limiting experiment impact and testing stop conditions in a non-production environment first. For a fictional report pilot, propose an isolated input path, an observed freshness/error boundary and a named operator who can restore the approved state. Verify that the monitor detects the boundary and that the stop mechanism actually works; writing “stop if unsafe” in a charter is not that verification. Notify the responsible participants and preserve the event sequence. No customer fault is authorized by this course, and a synthetic illustration is not a resilience test result. The adjacent mechanism concerns controlling the experiment, beyond whether the system can recover afterward.",
+      "whyItMatters": "It distinguishes testing recovery from creating an uncontrolled outage in order to obtain evidence.",
+      "lessonId": "dbxfe-m10-l03",
+      "sectionId": "dbxfe-m10-l03-understand",
+      "conceptIds": [
+        "dbxfe-m10-extension-concept-recovery-window"
+      ],
+      "claimIds": [
+        "dbxfe-m10-claim-beyond-fault-scope",
+        "dbxfe-m10-teaching-guidance",
+        "dbxfe-m10-teaching-fiction"
+      ],
+      "beatId": "dbxfe-m10-beat-readout"
+    }
+  ],
+  "recap": {
+    "title": "Carry this forward",
+    "markdown": "Hypothesis → comparable baseline → separate criteria → accepted charter → purposeful cases → recorded run → decision readout. Preserve failed and missing evidence. Review core cards, then use extensions to check a specific measurement or operating assumption.",
+    "visualId": "dbxfe-m10-visual-transfer"
+  },
+  "appliedTask": {
+    "title": "Apply the whole module",
+    "prompt": "Draft a one-region shipment-report PoV with baseline, data basis, criteria, stop conditions and a mixed-result recommendation.",
+    "modelAnswer": "Test whether approved regional orders can produce a correct, timely and operable delay report. Establish current-path timing on the same statuses/population and endpoints. Combine permitted representative input with synthetic late, missing, replay and conflict cases. Agree correctness, timing, access and recovery criteria with their owners; require approved scope and spending before real execution. Pause for unauthorized input, invalid measurement or material scope change. If correctness passes but timing fails and recovery is untested, retain the current path and run a bounded repair/rehearsal before expansion.",
+    "reasoning": "The charter keeps each claim within its evidence basis and lets an unfavorable result change the recommendation.",
+    "beatIds": [
+      "dbxfe-m10-beat-hypothesis",
+      "dbxfe-m10-beat-baseline",
+      "dbxfe-m10-beat-criteria",
+      "dbxfe-m10-beat-charter",
+      "dbxfe-m10-beat-cases",
+      "dbxfe-m10-beat-execution",
+      "dbxfe-m10-beat-readout",
+      "dbxfe-m10-beat-transfer"
+    ]
+  },
+  "scenarioIds": [
+    "dbxfe-m10-scenario"
+  ]
+}

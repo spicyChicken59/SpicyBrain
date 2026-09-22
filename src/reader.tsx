@@ -6,6 +6,8 @@ import {
   lessonEntries,
   lessonHref,
   paths,
+  teachingIndex,
+  beatHref,
 } from "./catalog";
 import { pathForLesson, pathNeighbors } from "./paths";
 import type { Course, Lesson, Question, Section } from "./content-schema";
@@ -378,7 +380,9 @@ export function Reader({
       void store.change((s) => ({
         ...s,
         resume: from ? s.resume : position,
-        positions: originDetour ? s.positions : { ...s.positions, [id]: position },
+        positions: originDetour
+          ? s.positions
+          : { ...s.positions, [id]: position },
       }));
     };
     const scroll = () => {
@@ -474,6 +478,25 @@ export function Reader({
   };
   return (
     <div className={`reader ${data.settings.focus ? "focus-mode" : ""}`}>
+      {teachingIndex.some((m) => m.lessonIds.includes(id)) && (
+        <p className="legacy-reference-note">
+          Original lesson reference · your earlier notes and history stay here.{" "}
+          <a
+            href={beatHref(
+              teachingIndex.find((m) => m.lessonIds.includes(id))!.moduleId,
+              teachingIndex
+                .find((m) => m.lessonIds.includes(id))!
+                .beats.find(
+                  (b) =>
+                    b.lessonId === id &&
+                    (b.sectionId === sectionId || !sectionId),
+                )?.id,
+            )}
+          >
+            Open the linked visual teaching module →
+          </a>
+        </p>
+      )}
       <div className="reader-top">
         <a
           className="sc-link--quiet"
@@ -665,7 +688,14 @@ export function Reader({
                   </summary>
                   <MD
                     pathId={path?.id}
-                    from={from ?? lessonHref(id, data.positions[id]?.sectionId ?? sectionId, path?.id)}
+                    from={
+                      from ??
+                      lessonHref(
+                        id,
+                        data.positions[id]?.sectionId ?? sectionId,
+                        path?.id,
+                      )
+                    }
                   >
                     {s.markdown}
                   </MD>
@@ -673,7 +703,14 @@ export function Reader({
               ) : (
                 <MD
                   pathId={path?.id}
-                  from={from ?? lessonHref(id, data.positions[id]?.sectionId ?? sectionId, path?.id)}
+                  from={
+                    from ??
+                    lessonHref(
+                      id,
+                      data.positions[id]?.sectionId ?? sectionId,
+                      path?.id,
+                    )
+                  }
                 >
                   {s.markdown}
                 </MD>

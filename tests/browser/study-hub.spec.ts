@@ -19,10 +19,10 @@ test("Study hub: fresh learner, optional bridge, worked topic, solution, downloa
   await ready(page);
   await expect(
     page.getByRole("navigation", { name: "Main navigation" }).getByRole("link"),
-  ).toHaveText(["Today", "Learn", "Review", "Notebook"]);
-  await expect(page.getByRole("heading", { name: path.title })).toBeVisible();
+  ).toHaveText(["Today", "Courses", "Review", "Notebook"]);
+  await expect(page.getByRole("heading", { name: "One idea. A little clearer." })).toBeVisible();
   await shot(page, "hub-today-desktop");
-  await page.getByRole("link", { name: "Explore this path" }).click();
+  await nav(page,`#/path/${path.id}`);
   await expect(
     page.getByRole("heading", { name: "Starting assumptions" }),
   ).toBeVisible();
@@ -212,10 +212,10 @@ test("Native baseline v2 and actual v2-format backup migrate without losing any 
   }, old);
   await page.reload();
   await expect(
-    page.getByRole("link", { name: "Resume learning" }),
+    page.getByRole("link", { name: "Resume saved lesson" }),
   ).toBeVisible();
   expect(await stored(page)).toEqual(migrateState(old));
-  await page.getByRole("link", { name: "Resume learning" }).click();
+  await page.getByRole("link", { name: "Resume saved lesson" }).click();
   await expect(
     page.getByText("You completed version 1.0.0.", { exact: false }),
   ).toBeVisible();

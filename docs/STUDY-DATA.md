@@ -1,6 +1,20 @@
 # Study data and review
 
-## Study-hub schema 3 — 19 September 2026
+## Teacher-first schema 4 — 20 September 2026
+
+The database remains `spicybrain-study-v2`, native IndexedDB version **2**. The root record is **schema 4**. Strict schema-1/2/3 inputs migrate inside the same read/write transaction; existing notes, drafts, completion, question snapshots, reviews, schedules, extra practice, self-assessments, bookmarks, legacy positions/path context and timestamps are preserved. New maps start empty; old completion never completes a new beat.
+
+`beatPositions` and `beatResume` record course/module/beat/version, visual stage, Deck/Handbook/Cards view, handbook panel/anchor, scroll offset and separate view offsets. `beatChecks` records open/reveal state, selected option and question revision. Existing drafts hold self-comparison reasoning and module tasks. `settings.showSamajh` is exported with the other preferences. Objective attempts additionally carry optional beat ID/version while preserving canonical lesson version and the immutable complete answer snapshot. Explicit beat completion is separate from answers and visits.
+
+Every new field participates in strict backup validation, import preview, timestamp-based merge and the serialized latest-root transaction queue. A handbook/source detour can save its own position without replacing the main learning resume. Optional extension cards are not eligible merely because their source beat was opened: the learner must deliberately select/introduction-review them. The review algorithm below is unchanged.
+
+An older schema-3 client rejects root 4 and cannot commit over it. On a failed migration or unsupported future root, the stored root is untouched. **Download original saved collection** exports that original root losslessly (including the existing framed transport for large backups); a separate recovery download contains any current unsaved draft work. Do not confuse an IndexedDB save with an off-device backup. Storage denial/eviction and closing a tab with unsaved work remain possible loss conditions.
+
+The 16,000,000-byte active UTF-8 budget, grandfathering, 20,000,000-byte ordinary-JSON boundary, larger framed transport, older large monolithic imports, changed-preview guard, divergent text preservation, immutable event conflicts and protected replace/reset remain unchanged. See `tests/teaching-state.test.ts`, native browser migration journeys and the retained boundary/concurrency regressions. No localStorage preference or remote study service was introduced.
+
+Before any later publication, export schema-3 learner state and retain the current application artifact. After migration, recovery requires a build that understands schema 4 or a reviewed lossless forward-compatible recovery tool; restoring the old website alone is not a safe data rollback. This PR does not perform a production-origin migration.
+
+## Historical study-hub schema 3 — 19 September 2026
 
 The study-hub build keeps the existing `spicybrain-study-v2` database name and native database version 2. Its root **record schema is now 3**. Positions and resume can carry an optional stable `pathId`; it is exported, validated, merged with the whole position by the existing timestamp/tie-break rule, and included in import unknown-reference reporting. Nothing is stored in a hidden local-storage preference. Route query parameters identify explicit path context and a temporary return link; they contain no note/search text.
 

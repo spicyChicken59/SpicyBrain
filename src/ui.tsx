@@ -97,7 +97,7 @@ export function MD({
       return lessonHref(target[1], target[2], pathId);
     if (
       from &&
-      /^#\/lesson\/[a-z0-9-]+(?:\/[a-z0-9-]+)?(?:\?path=[a-z0-9-]+)?$/.test(
+      /^#\/(?:lesson|module)\/[a-z0-9-]+(?:\/[a-z0-9-]+)?(?:\?(?:path|view)=[a-z0-9-]+(?:&detour=1)?)?$/.test(
         from,
       )
     )
@@ -199,6 +199,7 @@ export function SaveStatus() {
 }
 export function StorageNotice() {
   const { data, error, status, store } = useStudy();
+  const [originalError, setOriginalError] = useState("");
   return (
     <>
       {error && (
@@ -208,6 +209,30 @@ export function StorageNotice() {
             <StudyDownload name="SpicyBrain-recovery.json">
               Download recovery data
             </StudyDownload>
+            {store.hasOriginalRecovery() && (
+              <button
+                className="sc-btn sc-btn--secondary"
+                onClick={() => {
+                  try {
+                    const raw = store.exportOriginalRecovery();
+                    if (raw)
+                      download(
+                        raw.startsWith('{"format":"SpicyBrain framed backup')
+                          ? "SpicyBrain-original-saved.jsonl"
+                          : "SpicyBrain-original-saved.json",
+                        raw,
+                      );
+                  } catch {
+                    setOriginalError(
+                      "The original collection could not be encoded. Keep this tab and browser data intact for recovery.",
+                    );
+                  }
+                }}
+              >
+                Download original saved collection
+              </button>
+            )}
+            {originalError && <p role="alert">{originalError}</p>}
             <button
               className="sc-btn sc-btn--ghost"
               onClick={() => void store.change((s) => s)}

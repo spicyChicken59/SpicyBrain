@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   courses,
   findLesson,
   knownIds,
   lessonHref,
-  publicIndex,
+  loadSearch,
+  type SearchEntry,
+  findBeat,
+  beatHref,
+  teachingTarget,
   scenarios,
 } from "./catalog";
 import { NoteEditor } from "./reader";
@@ -26,6 +30,21 @@ export function Search({ from }: { from?: string }) {
   const { data } = useStudy(),
     [query, setQuery] = useState("");
   const q = query.trim().toLocaleLowerCase();
+  const [publicIndex, setIndex] = useState<SearchEntry[]>([]),
+    [searchError, setSearchError] = useState("");
+  useEffect(() => {
+    let active = true;
+    void loadSearch()
+      .then((rows) => {
+        if (active) setIndex(rows);
+      })
+      .catch((e) => {
+        if (active) setSearchError(String(e.message));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
   const index = [
     ...publicIndex,
     ...Object.values(data.notes).map((n) => ({
@@ -48,6 +67,7 @@ export function Search({ from }: { from?: string }) {
           this device.
         </p>
       </PageTitle>
+      {searchError && <p role="alert">{searchError}</p>}
       <label className="sc-field search-field">
         Search courses, concepts, or notes
         <input
@@ -189,7 +209,18 @@ export function Notebook({ id }: { id?: string }) {
                 sectionId={n.sectionId}
                 noteId={n.id}
               />
-              <a href={lessonHref(n.lessonId, n.sectionId)}>
+              <a
+                href={
+                  findBeat(n.id.replace(/^note-/, ""))
+                    ? beatHref(
+                        findBeat(n.id.replace(/^note-/, ""))!.module.moduleId,
+                        n.id.replace(/^note-/, ""),
+                        "deck",
+                        true,
+                      )
+                    : lessonHref(n.lessonId, n.sectionId)
+                }
+              >
                 Return to source →
               </a>
             </section>
@@ -222,14 +253,16 @@ export function Notebook({ id }: { id?: string }) {
             <p className="sc-empty">No practice drafts yet.</p>
           ) : (
             drafts.map((d) => {
-              const s = scenarios.find((s) => s.scenario.id === d.targetId),
+              const teaching = teachingTarget(d.targetId),
+                s = scenarios.find((s) => s.scenario.id === d.targetId),
                 entry = courses
                   .flatMap((c) => c.modules.flatMap((m) => m.lessons))
                   .find((l) => l.sections.some((s) => s.id === d.targetId));
               return (
                 <details key={d.id} className="sc-details draft-details">
                   <summary>
-                    {s?.scenario.title ??
+                    {teaching?.title ??
+                      s?.scenario.title ??
                       entry?.title ??
                       "Removed content · draft preserved"}
                     {d.id.includes("-conflict-") ? " · import conflict" : ""}
@@ -255,7 +288,9 @@ export function Notebook({ id }: { id?: string }) {
                     />
                   </label>
                   <SaveStatus />
-                  {s ? (
+                  {teaching ? (
+                    <a href={teaching.href}>Return to the teaching beat →</a>
+                  ) : s ? (
                     <a href={`#/practice/${d.targetId}`}>
                       Return to practice →
                     </a>

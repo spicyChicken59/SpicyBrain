@@ -181,7 +181,12 @@ test("P2 former 5 MB valid state exports and restores exactly, using file reader
   const state = noteState();
   validateState(state);
   const raw = exportText(state, fixtureAt);
-  assert.equal(utf8Bytes(raw), 5118056);
+  const {beatPositions:_positions,beatResume:_resume,beatChecks:_checks,...legacy}=state;
+  const {showSamajh:_samajh,...oldSettings}=legacy.settings;
+  const oldRaw=JSON.stringify({format:"SpicyBrain study data",exportedAt:fixtureAt,state:{...legacy,schemaVersion:3,settings:oldSettings}},null,2);
+  assert.equal(utf8Bytes(oldRaw), 5118056);
+  assert.deepEqual(parseImport(oldRaw),state);
+  assert.equal(utf8Bytes(raw), 5118153);
   assert.deepEqual(parseImport(raw), state);
   assert.deepEqual(await parseImportFile(new Blob([raw])), state);
 });

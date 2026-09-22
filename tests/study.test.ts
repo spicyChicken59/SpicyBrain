@@ -122,9 +122,11 @@ function completeState() {
   s.disclosureAccepted = true;
   return validateState(s);
 }
-test("baseline schema 2 migrates every record unchanged, persists schema 3, and round-trips path context", async () => {
+test("baseline schema 2 migrates every record unchanged, persists schema 4, and round-trips path context", async () => {
   const current = completeState();
-  const old = { ...current, schemaVersion: 2 };
+  const {beatPositions:_positions,beatResume:_resume,beatChecks:_checks,...legacy}=current;
+  const {showSamajh:_samajh,...oldSettings}=legacy.settings;
+  const old = { ...legacy, settings:oldSettings, schemaVersion: 2 };
   const migrated = migrateState(old);
   assert.deepEqual(migrated, current);
   const name = `baseline-v2-${crypto.randomUUID()}`;
@@ -308,7 +310,7 @@ test("invalid/future/oversize/schedule corruption rejected without mutating stat
   const bad = structuredClone(s);
   bad.schedules[card.id].intervalDays = 100;
   assert.throws(() => validateState(bad));
-  assert.equal(s.schemaVersion, 3);
+  assert.equal(s.schemaVersion, 4);
 });
 test("synthetic v1 fixture migrates both export and actual IndexedDB version and survives reopen", async () => {
   const old = JSON.parse(
@@ -341,7 +343,7 @@ test("synthetic v1 fixture migrates both export and actual IndexedDB version and
   );
   store.close();
   const check = await openDB(name, 2);
-  assert.equal((await check.get("study", "root")).schemaVersion, 3);
+  assert.equal((await check.get("study", "root")).schemaVersion, 4);
   assert.equal(
     (await check.get("study", "root")).notes["synthetic-note"].text,
     old.notes["synthetic-note"].text,

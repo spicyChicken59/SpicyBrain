@@ -1,0 +1,2007 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-m07",
+  "title": "ML foundations and evaluation",
+  "summary": "Define a useful prediction, keep future information out, and connect model scores to operational decisions.",
+  "outcomes": [
+    "Specify target, horizon, available features and a deployment-matching evaluation split.",
+    "Calculate baseline, confusion-matrix, precision and recall results from synthetic observations.",
+    "Distinguish fitting, threshold choice, inference and monitoring evidence."
+  ],
+  "startingAssumptions": [
+    "A row represents one prediction opportunity, not an arbitrary sensor message.",
+    "All cohorts, scores and outcomes in this module are synthetic; no model is trained or deployed here."
+  ],
+  "lessonIds": [
+    "dbxfe-m07-l01"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "The original leakage lesson becomes a worked prediction-to-decision sequence with actual calculations and visible error tradeoffs. This is foundational evaluation competence, not advanced ML expertise.",
+  "sources": [
+    {
+      "id": "dbxfe-m07-source-ml",
+      "title": "Machine learning on Databricks",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Platform capabilities do not establish a valid target, enough representative labels or useful customer outcomes.",
+      "reviewedEvidence": "The overview covers preparation, training, tracking, deployment and monitoring as distinct lifecycle responsibilities."
+    },
+    {
+      "id": "dbxfe-m07-source-leakage",
+      "title": "Common pitfalls and recommended practices",
+      "url": "https://scikit-learn.org/stable/common_pitfalls.html#data-leakage",
+      "publisher": "scikit-learn developers",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "scikit-learn primary user guide.",
+      "caveat": "scikit-learn 1.9.1 documentation reviewed 2026-09-20; principles are general ML reasoning, not a Databricks execution.",
+      "reviewedEvidence": "Leakage section separates information available at prediction from later information; preprocessing must be fitted only on training data and consistently applied."
+    },
+    {
+      "id": "dbxfe-m07-source-split",
+      "title": "Cross-validation: evaluating estimator performance",
+      "url": "https://scikit-learn.org/stable/modules/cross_validation.html",
+      "publisher": "scikit-learn developers",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "scikit-learn 1.9.1 primary user guide.",
+      "caveat": "No single split guarantees useful deployment; label timing, entity overlap and representation still need review.",
+      "reviewedEvidence": "Holdout discussion separates fitting, tuning and final evaluation; time-dependent and grouped data require split strategies reflecting those dependencies."
+    },
+    {
+      "id": "dbxfe-m07-source-metrics",
+      "title": "Metrics and scoring: quantifying prediction quality",
+      "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
+      "publisher": "scikit-learn developers",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "scikit-learn 1.9.1 primary user guide.",
+      "caveat": "The course uses exact small synthetic counts; no confidence, benchmark or clinical claim is made.",
+      "reviewedEvidence": "Binary classification section defines confusion-matrix counts, precision TP/(TP+FP), recall TP/(TP+FN) and threshold-dependent measures."
+    },
+    {
+      "id": "dbxfe-m07-source-threshold",
+      "title": "Tuning the decision threshold for class prediction",
+      "url": "https://scikit-learn.org/stable/modules/classification_threshold.html",
+      "publisher": "scikit-learn developers",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "scikit-learn 1.9.1 primary user guide.",
+      "caveat": "A probability threshold is an operational choice; default 0.5 is not a universal business optimum.",
+      "reviewedEvidence": "Decision-threshold discussion separates score estimation from the action threshold and warns against fitting/tuning on the same data."
+    },
+    {
+      "id": "dbxfe-m07-source-tracking",
+      "title": "ML Experiment Tracking",
+      "url": "https://mlflow.org/docs/latest/ml/tracking/",
+      "publisher": "MLflow",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "MLflow current primary tracking documentation.",
+      "caveat": "A logged metric can still come from a flawed evaluation; tracking is not a correctness certificate.",
+      "reviewedEvidence": "Tracking records run parameters, metrics, artifacts and metadata so experiments can be compared and reproduced."
+    },
+    {
+      "id": "dbxfe-m07-source-inference",
+      "title": "MLflow Serving: concepts and how it works",
+      "url": "https://mlflow.org/docs/latest/ml/deployment/",
+      "publisher": "MLflow",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Current primary MLflow deployment documentation, reviewed 2026-09-20; no particular hosting target is executed.",
+      "caveat": "Packaging and inference deployment do not establish valid evaluation or a universal serving/freshness guarantee.",
+      "reviewedEvidence": "Concepts describes a model artifact with dependencies and inference schema; How it works describes loading that packaged model into an inference server."
+    },
+    {
+      "id": "dbxfe-m07-source-monitor",
+      "title": "Data profiling",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-quality-monitoring/data-profiling",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Data drift is not identical to predictive failure; outcome labels and workflow measurements may arrive later.",
+      "reviewedEvidence": "Profiling supports data and inference-table quality/drift observations over time."
+    },
+    {
+      "id": "dbxfe-m07-source-calibration",
+      "title": "Probability calibration: calibration curves",
+      "url": "https://scikit-learn.org/stable/modules/calibration.html",
+      "publisher": "scikit-learn developers",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Primary documentation reviewed 2026-09-20; scikit-learn pages identify version 1.9.1.",
+      "caveat": "A small observed bin is uncertain; calibration evidence is population-dependent and is not causal benefit.",
+      "reviewedEvidence": "Calibration curves compare a bin’s mean predicted probability with its observed positive fraction; bin sample counts matter."
+    },
+    {
+      "id": "dbxfe-m07-source-precision-api",
+      "title": "precision_score",
+      "url": "https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_score.html",
+      "publisher": "scikit-learn developers",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Primary documentation reviewed 2026-09-20; scikit-learn pages identify version 1.9.1.",
+      "caveat": "The prevalence experiment is original synthetic arithmetic holding recall and false-positive rate fixed; real population changes need fresh evidence.",
+      "reviewedEvidence": "Precision is true positives divided by true plus false positives."
+    },
+    {
+      "id": "dbxfe-m07-source-recall-api",
+      "title": "recall_score: averaging and support",
+      "url": "https://scikit-learn.org/stable/modules/generated/sklearn.metrics.recall_score.html",
+      "publisher": "scikit-learn developers",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Primary documentation reviewed 2026-09-20; scikit-learn pages identify version 1.9.1.",
+      "caveat": "A chosen averaging rule does not encode every operational consequence; report class-level counts too.",
+      "reviewedEvidence": "Macro averaging weights class recalls equally; weighted averaging weights each class by its true sample count, called support."
+    },
+    {
+      "id": "dbxfe-m07-source-registry",
+      "title": "MLflow Model Registry: versions and aliases",
+      "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+      "publisher": "MLflow",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Current primary MLflow model-registry documentation; deployment integrations differ.",
+      "caveat": "Alias reassignment does not prove that an already loaded process or independently configured endpoint has switched models.",
+      "reviewedEvidence": "A registered model contains numbered versions; a model alias is a mutable named reference to a particular version."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-m07-guidance",
+      "description": "Original educational reasoning, diagnostic choices and worked decisions; not a vendor runbook.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent SpicyBrain curriculum."
+    },
+    {
+      "id": "dbxfe-m07-fiction",
+      "description": "Cinderline examples, quantities, states, outcomes and alternatives are synthetic.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "Original teaching examples; no Databricks or customer execution claim."
+    },
+    {
+      "id": "dbxfe-m07-claim-ml",
+      "description": "The overview covers preparation, training, tracking, deployment and monitoring as distinct lifecycle responsibilities.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-ml"
+      ],
+      "context": "Platform capabilities do not establish a valid target, enough representative labels or useful customer outcomes."
+    },
+    {
+      "id": "dbxfe-m07-claim-leakage",
+      "description": "Leakage section separates information available at prediction from later information; preprocessing must be fitted only on training data and consistently applied.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-leakage"
+      ],
+      "context": "scikit-learn 1.9.1 documentation reviewed 2026-09-20; principles are general ML reasoning, not a Databricks execution."
+    },
+    {
+      "id": "dbxfe-m07-claim-split",
+      "description": "Holdout discussion separates fitting, tuning and final evaluation; time-dependent and grouped data require split strategies reflecting those dependencies.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-split"
+      ],
+      "context": "No single split guarantees useful deployment; label timing, entity overlap and representation still need review."
+    },
+    {
+      "id": "dbxfe-m07-claim-metrics",
+      "description": "Binary classification section defines confusion-matrix counts, precision TP/(TP+FP), recall TP/(TP+FN) and threshold-dependent measures.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-metrics"
+      ],
+      "context": "The course uses exact small synthetic counts; no confidence, benchmark or clinical claim is made."
+    },
+    {
+      "id": "dbxfe-m07-claim-threshold",
+      "description": "Decision-threshold discussion separates score estimation from the action threshold and warns against fitting/tuning on the same data.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-threshold"
+      ],
+      "context": "A probability threshold is an operational choice; default 0.5 is not a universal business optimum."
+    },
+    {
+      "id": "dbxfe-m07-claim-tracking",
+      "description": "Tracking records run parameters, metrics, artifacts and metadata so experiments can be compared and reproduced.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-tracking"
+      ],
+      "context": "A logged metric can still come from a flawed evaluation; tracking is not a correctness certificate."
+    },
+    {
+      "id": "dbxfe-m07-claim-inference",
+      "description": "Concepts describes a model artifact with dependencies and inference schema; How it works describes loading that packaged model into an inference server.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-inference"
+      ],
+      "context": "Packaging and inference deployment do not establish valid evaluation or a universal serving/freshness guarantee."
+    },
+    {
+      "id": "dbxfe-m07-claim-monitor",
+      "description": "Profiling supports data and inference-table quality/drift observations over time.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-monitor"
+      ],
+      "context": "Data drift is not identical to predictive failure; outcome labels and workflow measurements may arrive later."
+    },
+    {
+      "id": "dbxfe-m07-claim-calibration",
+      "description": "Calibration curves compare a bin’s mean predicted probability with its observed positive fraction; bin sample counts matter.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-calibration"
+      ],
+      "context": "A small observed bin is uncertain; calibration evidence is population-dependent and is not causal benefit."
+    },
+    {
+      "id": "dbxfe-m07-claim-precision-api",
+      "description": "Precision is true positives divided by true plus false positives.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-precision-api"
+      ],
+      "context": "The prevalence experiment is original synthetic arithmetic holding recall and false-positive rate fixed; real population changes need fresh evidence."
+    },
+    {
+      "id": "dbxfe-m07-claim-recall-api",
+      "description": "Macro averaging weights class recalls equally; weighted averaging weights each class by its true sample count, called support.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-recall-api"
+      ],
+      "context": "A chosen averaging rule does not encode every operational consequence; report class-level counts too."
+    },
+    {
+      "id": "dbxfe-m07-claim-registry",
+      "description": "A registered model contains numbered versions; a model alias is a mutable named reference to a particular version.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m07-source-registry"
+      ],
+      "context": "Alias reassignment does not prove that an already loaded process or independently configured endpoint has switched models."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-m07-target-concept",
+      "term": "prediction horizon",
+      "aliases": [],
+      "definition": "The future interval whose outcome a prediction is intended to describe.",
+      "example": "At 09:00, predict whether the machine fails in the next 24 hours.",
+      "sourceIds": [
+        "dbxfe-m07-source-ml"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-features-concept",
+      "term": "data leakage",
+      "aliases": [],
+      "definition": "Using information during development or evaluation that would not be available for the intended prediction.",
+      "example": "A16:00 repair diagnosis cannot inform the 09:00 warning.",
+      "sourceIds": [
+        "dbxfe-m07-source-leakage"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-split-concept",
+      "term": "evaluation split",
+      "aliases": [],
+      "definition": "A partition of examples used to separate learning/tuning from an independent assessment.",
+      "example": "Train on earlier months and test on a later period for future machine warnings.",
+      "sourceIds": [
+        "dbxfe-m07-source-split",
+        "dbxfe-m07-source-leakage"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-fit-concept",
+      "term": "model fitting",
+      "aliases": [],
+      "definition": "Choosing a prediction rule’s parameters using training examples and a specified objective.",
+      "example": "Among three temperature cutpoints, the training set favors 75 degrees, but unseen data is still needed.",
+      "sourceIds": [
+        "dbxfe-m07-source-split"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-baseline-concept",
+      "term": "baseline",
+      "aliases": [],
+      "definition": "A simple, explicit comparison evaluated on the same task and data basis as a candidate model.",
+      "example": "Predicting no failure on 20 examples with 4 failures achieves 80% accuracy but misses all 4.",
+      "sourceIds": [
+        "dbxfe-m07-source-metrics",
+        "dbxfe-m07-source-split"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-metrics-concept",
+      "term": "confusion matrix",
+      "aliases": [],
+      "definition": "Counts comparing predicted classes with observed classes, including true/false positives and negatives.",
+      "example": "TP 3, FP 2, FN 1, TN 14 gives precision 60%, recall 75%, accuracy 85%.",
+      "sourceIds": [
+        "dbxfe-m07-source-metrics"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-threshold-concept",
+      "term": "decision threshold",
+      "aliases": [],
+      "definition": "A cutoff that converts a model score into an operational class or action.",
+      "example": "Lowering the warning cutoff from 0.60 to 0.35 includes two additional opportunities.",
+      "sourceIds": [
+        "dbxfe-m07-source-threshold",
+        "dbxfe-m07-source-metrics"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-lifecycle-concept",
+      "term": "inference",
+      "aliases": [],
+      "definition": "Applying a trained model to new input to obtain a prediction.",
+      "example": "A nightly batch can score machines and store predictions that a dashboard later retrieves.",
+      "sourceIds": [
+        "dbxfe-m07-source-ml",
+        "dbxfe-m07-source-inference",
+        "dbxfe-m07-source-tracking"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-monitor-concept",
+      "term": "data drift",
+      "aliases": [],
+      "definition": "A change in the distribution or characteristics of incoming data relative to a reference population.",
+      "example": "A new sensor produces a different temperature distribution; predictive quality still requires outcome evidence.",
+      "sourceIds": [
+        "dbxfe-m07-source-monitor",
+        "dbxfe-m07-source-ml"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-transfer-concept",
+      "term": "evaluation evidence",
+      "aliases": [],
+      "definition": "A documented result tied to a target, cohort, split, model/threshold basis and limitations.",
+      "example": "TP 4, FP 6, FN 1, TN 9 means 40% precision and 80% recall on this new 20-row cohort.",
+      "sourceIds": [
+        "dbxfe-m07-source-metrics",
+        "dbxfe-m07-source-split",
+        "dbxfe-m07-source-tracking"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-extension-calibration-concept",
+      "term": "probability calibration",
+      "aliases": [],
+      "definition": "Agreement between predicted probabilities and observed outcome frequencies for comparable predictions.",
+      "example": "Among 100 synthetic predictions near 0.80, only 50 failures gives an observed fraction of 0.50.",
+      "sourceIds": [
+        "dbxfe-m07-source-calibration"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-extension-prevalence-concept",
+      "term": "failure prevalence",
+      "aliases": [],
+      "definition": "The fraction of prediction opportunities with the defined failure outcome in a population.",
+      "example": "A 1,000-opportunity cohort with 100 failures has 10% failure prevalence.",
+      "sourceIds": [
+        "dbxfe-m07-source-precision-api"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-extension-averaging-concept",
+      "term": "macro recall",
+      "aliases": [],
+      "definition": "The unweighted mean of recall calculated separately for each class.",
+      "example": "Class recalls 90%, 50% and 0% have macro recall 46.7%, regardless of class counts.",
+      "sourceIds": [
+        "dbxfe-m07-source-recall-api"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-extension-registry-alias-concept",
+      "term": "model alias",
+      "aliases": [],
+      "definition": "A mutable name that points to a particular numbered version of a registered model.",
+      "example": "The alias champion can move from version 7 to version 8 without becoming either artifact itself.",
+      "sourceIds": [
+        "dbxfe-m07-source-registry"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-m07-target-visual",
+      "kind": "timeline",
+      "title": "A warning needs a decision time",
+      "alt": "A warning needs a decision time. Only information available by 09:00 may inform this warning.",
+      "caption": "A target includes the prediction opportunity, horizon and action it supports. Synthetic teaching example.",
+      "textEquivalent": "One prediction opportunity: Only information available by 09:00 may inform this warning. Nodes: Before 09:00: Past sensors. Candidate inputs if available. (selected); 09:00: Issue warning?. Decision time. (selected); 14:00: Failure occurs. Later outcome label. (context); 16:00: Repair diagnosis. Later evidence, not an earlier feature. (excluded). Relationships: Before 09:00 → 09:00: available features; 09:00 → 14:00: within the next 24 hours; 14:00 → 16:00: later investigation.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-ml",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "timeline",
+          "title": "One prediction opportunity",
+          "explanation": "Only information available by 09:00 may inform this warning.",
+          "nodes": [
+            {
+              "id": "before",
+              "label": "Before 09:00",
+              "value": "Past sensors",
+              "detail": "Candidate inputs if available.",
+              "status": "selected"
+            },
+            {
+              "id": "decision",
+              "label": "09:00",
+              "value": "Issue warning?",
+              "detail": "Decision time.",
+              "status": "selected"
+            },
+            {
+              "id": "failure",
+              "label": "14:00",
+              "value": "Failure occurs",
+              "detail": "Later outcome label.",
+              "status": "context"
+            },
+            {
+              "id": "repair",
+              "label": "16:00",
+              "value": "Repair diagnosis",
+              "detail": "Later evidence, not an earlier feature.",
+              "status": "excluded"
+            }
+          ],
+          "connections": [
+            {
+              "from": "before",
+              "to": "decision",
+              "label": "available features"
+            },
+            {
+              "from": "decision",
+              "to": "failure",
+              "label": "within the next 24 hours"
+            },
+            {
+              "from": "failure",
+              "to": "repair",
+              "label": "later investigation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m07-features-visual",
+      "kind": "table",
+      "title": "Keep tomorrow’s answer out of today’s inputs",
+      "alt": "Keep tomorrow’s answer out of today’s inputs. Later labels are necessary for evaluation but unavailable for prediction. A lower honest score is more useful than leaked certainty.",
+      "caption": "Availability at the decision time determines whether a feature is valid. Synthetic teaching example.",
+      "textEquivalent": "Assign each field a role: Later labels are necessary for evaluation but unavailable for prediction. Columns: Field; Available by 09:00?; Role. Rows: Prior temperature trend — Yes, if ingested by then — Candidate feature; 14:00 verified failure — No — Outcome label; 16:00 repair category — No — Exclude from 09:00 features.\n\nA misleading score: A lower honest score is more useful than leaked certainty. Columns: Design; Apparent result; Interpretation. Rows: Uses repair category — Looks excellent — Invalid earlier-warning evaluation; Uses only available fields — May score lower — A more honest test of the actual task.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-leakage",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "roles",
+          "title": "Assign each field a role",
+          "explanation": "Later labels are necessary for evaluation but unavailable for prediction.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Field",
+              "Available by 09:00?",
+              "Role"
+            ],
+            "rows": [
+              [
+                "Prior temperature trend",
+                "Yes, if ingested by then",
+                "Candidate feature"
+              ],
+              [
+                "14:00 verified failure",
+                "No",
+                "Outcome label"
+              ],
+              [
+                "16:00 repair category",
+                "No",
+                "Exclude from 09:00 features"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "trap",
+          "title": "A misleading score",
+          "explanation": "A lower honest score is more useful than leaked certainty.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Design",
+              "Apparent result",
+              "Interpretation"
+            ],
+            "rows": [
+              [
+                "Uses repair category",
+                "Looks excellent",
+                "Invalid earlier-warning evaluation"
+              ],
+              [
+                "Uses only available fields",
+                "May score lower",
+                "A more honest test of the actual task"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m07-split-visual",
+      "kind": "timeline",
+      "title": "The held-out data should resemble the future job",
+      "alt": "The held-out data should resemble the future job. Illustrative split; actual windows require sufficient representative labels. Time and entity generalization are distinct questions.",
+      "caption": "The split must test the kind of future use you intend to claim. Synthetic teaching example.",
+      "textEquivalent": "Future-period design: Illustrative split; actual windows require sufficient representative labels. Columns: Period; Role; Permitted use. Rows: Jan–Feb — Training — Fit model and preprocessing; March — Validation — Choose model/settings/threshold; April — Final test — Assess frozen choices.\n\nDeployment to new machines: Time and entity generalization are distinct questions. Columns: Machine group; Role; Question. Rows: Known machines — Development — Can we predict later periods?; Held-out machines — Additional evaluation — Can the model generalize to unseen equipment?.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-claim-leakage",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "time",
+          "title": "Future-period design",
+          "explanation": "Illustrative split; actual windows require sufficient representative labels.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Period",
+              "Role",
+              "Permitted use"
+            ],
+            "rows": [
+              [
+                "Jan–Feb",
+                "Training",
+                "Fit model and preprocessing"
+              ],
+              [
+                "March",
+                "Validation",
+                "Choose model/settings/threshold"
+              ],
+              [
+                "April",
+                "Final test",
+                "Assess frozen choices"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "entity",
+          "title": "Deployment to new machines",
+          "explanation": "Time and entity generalization are distinct questions.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Machine group",
+              "Role",
+              "Question"
+            ],
+            "rows": [
+              [
+                "Known machines",
+                "Development",
+                "Can we predict later periods?"
+              ],
+              [
+                "Held-out machines",
+                "Additional evaluation",
+                "Can the model generalize to unseen equipment?"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m07-fit-visual",
+      "kind": "table",
+      "title": "Fitting chooses a rule from examples",
+      "alt": "Fitting chooses a rule from examples. Tiny invented values, not a real sensor study. Training fit is not held-out evidence.",
+      "caption": "Fitting explains the training examples; evaluation asks whether the rule transfers. Synthetic teaching example.",
+      "textEquivalent": "Synthetic training examples: Tiny invented values, not a real sensor study. Columns: Temperature; Observed next-horizon failure. Rows: 60 — No; 70 — No; 80 — Yes; 90 — Yes.\n\nFit this limited rule family: Training fit is not held-out evidence. Columns: Cutpoint: predict yes if≥; Training mistakes; Selection. Rows: 65 — 1: false alarm at 70 — Not selected; 75 — 0 — Best on these four rows; 85 — 1: missed failure at 80 — Not selected.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "train",
+          "title": "Synthetic training examples",
+          "explanation": "Tiny invented values, not a real sensor study.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Temperature",
+              "Observed next-horizon failure"
+            ],
+            "rows": [
+              [
+                "60",
+                "No"
+              ],
+              [
+                "70",
+                "No"
+              ],
+              [
+                "80",
+                "Yes"
+              ],
+              [
+                "90",
+                "Yes"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "candidates",
+          "title": "Fit this limited rule family",
+          "explanation": "Training fit is not held-out evidence.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Cutpoint: predict yes if≥",
+              "Training mistakes",
+              "Selection"
+            ],
+            "rows": [
+              [
+                "65",
+                "1: false alarm at 70",
+                "Not selected"
+              ],
+              [
+                "75",
+                "0",
+                "Best on these four rows"
+              ],
+              [
+                "85",
+                "1: missed failure at 80",
+                "Not selected"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m07-baseline-visual",
+      "kind": "table",
+      "title": "80% accuracy can mean no warnings",
+      "alt": "80% accuracy can mean no warnings. The class distribution is part of the evidence. High accuracy can coexist with no useful warnings.",
+      "caption": "Compare against a simple rule and inspect which errors the accuracy hides. Synthetic teaching example.",
+      "textEquivalent": "Evaluation population: The class distribution is part of the evidence. Columns: Observed outcome; Count. Rows: Failure — 4; No failure — 16; Total — 20.\n\nAlways no failure: High accuracy can coexist with no useful warnings. Columns: Result; Count. Rows: Correct no-failure predictions — 16; Missed failures — 4; Warnings issued — 0; Accuracy — 16/20=80%; Failure recall — 0/4=0%.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "population",
+          "title": "Evaluation population",
+          "explanation": "The class distribution is part of the evidence.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Observed outcome",
+              "Count"
+            ],
+            "rows": [
+              [
+                "Failure",
+                "4"
+              ],
+              [
+                "No failure",
+                "16"
+              ],
+              [
+                "Total",
+                "20"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "no-alert",
+          "title": "Always no failure",
+          "explanation": "High accuracy can coexist with no useful warnings.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Result",
+              "Count"
+            ],
+            "rows": [
+              [
+                "Correct no-failure predictions",
+                "16"
+              ],
+              [
+                "Missed failures",
+                "4"
+              ],
+              [
+                "Warnings issued",
+                "0"
+              ],
+              [
+                "Accuracy",
+                "16/20=80%"
+              ],
+              [
+                "Failure recall",
+                "0/4=0%"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m07-metrics-visual",
+      "kind": "table",
+      "title": "Count the four outcomes before naming a score",
+      "alt": "Count the four outcomes before naming a score. All 20 prediction opportunities are represented. The denominator determines the question.",
+      "caption": "Precision conditions on warnings; recall conditions on actual failures. Synthetic teaching example.",
+      "textEquivalent": "Observed versus predicted: All 20 prediction opportunities are represented. Columns: Prediction; Observed failure; Observed no failure. Rows: Warn — 3 true positives — 2 false positives; No warning — 1 false negative — 14 true negatives.\n\nDifferent denominators: The denominator determines the question. Columns: Metric; Calculation; Meaning. Rows: Precision — 3/(3+2)=60% — Of warnings, how many corresponded to failure?; Recall — 3/(3+1)=75% — Of actual failures, how many were warned?; Accuracy — (3+14)/20=85% — Of all opportunities, how many classes matched?.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "matrix",
+          "title": "Observed versus predicted",
+          "explanation": "All 20 prediction opportunities are represented.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Prediction",
+              "Observed failure",
+              "Observed no failure"
+            ],
+            "rows": [
+              [
+                "Warn",
+                "3 true positives",
+                "2 false positives"
+              ],
+              [
+                "No warning",
+                "1 false negative",
+                "14 true negatives"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "scores",
+          "title": "Different denominators",
+          "explanation": "The denominator determines the question.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Metric",
+              "Calculation",
+              "Meaning"
+            ],
+            "rows": [
+              [
+                "Precision",
+                "3/(3+2)=60%",
+                "Of warnings, how many corresponded to failure?"
+              ],
+              [
+                "Recall",
+                "3/(3+1)=75%",
+                "Of actual failures, how many were warned?"
+              ],
+              [
+                "Accuracy",
+                "(3+14)/20=85%",
+                "Of all opportunities, how many classes matched?"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m07-threshold-visual",
+      "kind": "table",
+      "title": "A score is not the action",
+      "alt": "A score is not the action. Scores are invented model outputs, not calibrated probabilities. A higher cutoff leaves the 0.40 failure unflagged. The additional two warnings include one true and one false alert.",
+      "caption": "Threshold choice changes the action population and its error tradeoff. Synthetic teaching example.",
+      "textEquivalent": "Same six synthetic scores: Scores are invented model outputs, not calibrated probabilities. Columns: Score; Observed outcome. Rows: 0.90 — Failure; 0.80 — No failure; 0.70 — Failure; 0.55 — No failure; 0.40 — Failure; 0.20 — No failure.\n\nWarn if score≥0.60: A higher cutoff leaves the 0.40 failure unflagged. Columns: Warnings; TP; FP; FN; Precision; Recall. Rows: 3 — 2 — 1 — 1 — 2/3≈66.7% — 2/3≈66.7%.\n\nWarn if score≥0.35: The additional two warnings include one true and one false alert. Columns: Warnings; TP; FP; FN; Precision; Recall. Rows: 5 — 3 — 2 — 0 — 3/5=60% — 3/3=100%.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-threshold",
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "scores",
+          "title": "Same six synthetic scores",
+          "explanation": "Scores are invented model outputs, not calibrated probabilities.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Score",
+              "Observed outcome"
+            ],
+            "rows": [
+              [
+                "0.90",
+                "Failure"
+              ],
+              [
+                "0.80",
+                "No failure"
+              ],
+              [
+                "0.70",
+                "Failure"
+              ],
+              [
+                "0.55",
+                "No failure"
+              ],
+              [
+                "0.40",
+                "Failure"
+              ],
+              [
+                "0.20",
+                "No failure"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "high",
+          "title": "Warn if score≥0.60",
+          "explanation": "A higher cutoff leaves the 0.40 failure unflagged.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Warnings",
+              "TP",
+              "FP",
+              "FN",
+              "Precision",
+              "Recall"
+            ],
+            "rows": [
+              [
+                "3",
+                "2",
+                "1",
+                "1",
+                "2/3≈66.7%",
+                "2/3≈66.7%"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "low",
+          "title": "Warn if score≥0.35",
+          "explanation": "The additional two warnings include one true and one false alert.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Warnings",
+              "TP",
+              "FP",
+              "FN",
+              "Precision",
+              "Recall"
+            ],
+            "rows": [
+              [
+                "5",
+                "3",
+                "2",
+                "0",
+                "3/5=60%",
+                "3/3=100%"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m07-lifecycle-visual",
+      "kind": "nodes",
+      "title": "Training creates an artifact; inference uses it",
+      "alt": "Training creates an artifact; inference uses it. The model runs before the user asks to see the result. The request supplies current input to a deployed model path.",
+      "caption": "Artifact, scoring time and display time are distinct pieces of prediction provenance. Synthetic teaching example.",
+      "textEquivalent": "Batch prediction and later lookup: The model runs before the user asks to see the result. Nodes: Training: Historical labeled examples. Fits parameters. (context); Model artifact: Version M1. Saved model/preprocessing basis. (selected); Batch inference: Nightly feature population. Produces prediction rows. (selected); User request: Read stored warning. Does not necessarily run the model now. (selected). Relationships: Training → Model artifact: save; Model artifact → Batch inference: apply; Batch inference → User request: stored predictions.\n\nRequest-time inference: The request supplies current input to a deployed model path. Nodes: Training: Earlier process. Not repeated for each request. (context); Model artifact: Version M1. Chosen deployment. (selected); Request-time inference: New input now. Computes a score. (selected); User request: Receive decision. Latency/access/failure path matter. (selected). Relationships: Model artifact → Request-time inference: apply; User request → Request-time inference: request; Request-time inference → User request: result.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-ml",
+        "dbxfe-m07-claim-inference",
+        "dbxfe-m07-claim-tracking",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "batch",
+          "title": "Batch prediction and later lookup",
+          "explanation": "The model runs before the user asks to see the result.",
+          "nodes": [
+            {
+              "id": "train",
+              "label": "Training",
+              "value": "Historical labeled examples",
+              "detail": "Fits parameters.",
+              "status": "context"
+            },
+            {
+              "id": "artifact",
+              "label": "Model artifact",
+              "value": "Version M1",
+              "detail": "Saved model/preprocessing basis.",
+              "status": "selected"
+            },
+            {
+              "id": "predict",
+              "label": "Batch inference",
+              "value": "Nightly feature population",
+              "detail": "Produces prediction rows.",
+              "status": "selected"
+            },
+            {
+              "id": "lookup",
+              "label": "User request",
+              "value": "Read stored warning",
+              "detail": "Does not necessarily run the model now.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "train",
+              "to": "artifact",
+              "label": "save"
+            },
+            {
+              "from": "artifact",
+              "to": "predict",
+              "label": "apply"
+            },
+            {
+              "from": "predict",
+              "to": "lookup",
+              "label": "stored predictions"
+            }
+          ]
+        },
+        {
+          "id": "online",
+          "title": "Request-time inference",
+          "explanation": "The request supplies current input to a deployed model path.",
+          "nodes": [
+            {
+              "id": "train",
+              "label": "Training",
+              "value": "Earlier process",
+              "detail": "Not repeated for each request.",
+              "status": "context"
+            },
+            {
+              "id": "artifact",
+              "label": "Model artifact",
+              "value": "Version M1",
+              "detail": "Chosen deployment.",
+              "status": "selected"
+            },
+            {
+              "id": "predict",
+              "label": "Request-time inference",
+              "value": "New input now",
+              "detail": "Computes a score.",
+              "status": "selected"
+            },
+            {
+              "id": "lookup",
+              "label": "User request",
+              "value": "Receive decision",
+              "detail": "Latency/access/failure path matter.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "artifact",
+              "to": "predict",
+              "label": "apply"
+            },
+            {
+              "from": "lookup",
+              "to": "predict",
+              "label": "request"
+            },
+            {
+              "from": "predict",
+              "to": "lookup",
+              "label": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m07-monitor-visual",
+      "kind": "table",
+      "title": "Changed data is a signal to investigate",
+      "alt": "Changed data is a signal to investigate. One signal does not prove every other layer failed. Do not report final predictive quality before outcomes mature.",
+      "caption": "Monitor data, service, predictions and actions separately; investigate before prescribing retraining. Synthetic teaching example.",
+      "textEquivalent": "Different monitoring questions: One signal does not prove every other layer failed. Columns: Layer; Example signal; What it establishes. Rows: Input — Missing temperature rises — Feature-quality change; Service — Prediction requests time out — Operating availability problem; Prediction — Recall falls on mature labels — Measured detection change; Workflow — Alerts ignored — Action process issue.\n\nLabels arrive later: Do not report final predictive quality before outcomes mature. Columns: Time; Available evidence. Rows: At prediction — Input checks, score, latency, model version; After horizon and verification — Failure label and prediction error; After operational review — Action taken and consequence.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-monitor",
+        "dbxfe-m07-claim-ml",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "signals",
+          "title": "Different monitoring questions",
+          "explanation": "One signal does not prove every other layer failed.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Layer",
+              "Example signal",
+              "What it establishes"
+            ],
+            "rows": [
+              [
+                "Input",
+                "Missing temperature rises",
+                "Feature-quality change"
+              ],
+              [
+                "Service",
+                "Prediction requests time out",
+                "Operating availability problem"
+              ],
+              [
+                "Prediction",
+                "Recall falls on mature labels",
+                "Measured detection change"
+              ],
+              [
+                "Workflow",
+                "Alerts ignored",
+                "Action process issue"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "delay",
+          "title": "Labels arrive later",
+          "explanation": "Do not report final predictive quality before outcomes mature.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Time",
+              "Available evidence"
+            ],
+            "rows": [
+              [
+                "At prediction",
+                "Input checks, score, latency, model version"
+              ],
+              [
+                "After horizon and verification",
+                "Failure label and prediction error"
+              ],
+              [
+                "After operational review",
+                "Action taken and consequence"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m07-transfer-visual",
+      "kind": "table",
+      "title": "Read the errors before recommending rollout",
+      "alt": "Read the errors before recommending rollout. Ten warnings, 5 actual failures, 20 opportunities. No real maintenance cost or benefit is assumed.",
+      "caption": "Metrics support a decision only when the cohort, action and limits are explicit. Synthetic teaching example.",
+      "textEquivalent": "New synthetic cohort: Ten warnings, 5 actual failures, 20 opportunities. Columns: Prediction; Failure; No failure. Rows: Warn — 4 — 6; No warning — 1 — 9.\n\nCompute and interpret: No real maintenance cost or benefit is assumed. Columns: Measure; Result; Question for owner. Rows: Precision — 4/10=40% — Can the workflow handle 6 false alerts?; Recall — 4/5=80% — Is 1 miss acceptable under this scope?; Accuracy — 13/20=65% — How does the agreed baseline compare?.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-claim-tracking",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "states": [
+        {
+          "id": "new-cohort",
+          "title": "New synthetic cohort",
+          "explanation": "Ten warnings, 5 actual failures, 20 opportunities.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Prediction",
+              "Failure",
+              "No failure"
+            ],
+            "rows": [
+              [
+                "Warn",
+                "4",
+                "6"
+              ],
+              [
+                "No warning",
+                "1",
+                "9"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "interpret",
+          "title": "Compute and interpret",
+          "explanation": "No real maintenance cost or benefit is assumed.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Measure",
+              "Result",
+              "Question for owner"
+            ],
+            "rows": [
+              [
+                "Precision",
+                "4/10=40%",
+                "Can the workflow handle 6 false alerts?"
+              ],
+              [
+                "Recall",
+                "4/5=80%",
+                "Is 1 miss acceptable under this scope?"
+              ],
+              [
+                "Accuracy",
+                "13/20=65%",
+                "How does the agreed baseline compare?"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-m07-target-question",
+      "revision": "1",
+      "prompt": "What must be specified beyond the phrase “predict failure”?",
+      "options": [
+        {
+          "id": "dbxfe-m07-target-question-a",
+          "text": "Decision time, outcome definition, horizon and action",
+          "rationale": "These establish what the prediction is for and which evidence is valid."
+        },
+        {
+          "id": "dbxfe-m07-target-question-b",
+          "text": "Only the most complex algorithm",
+          "rationale": "An algorithm cannot define an ambiguous target."
+        },
+        {
+          "id": "dbxfe-m07-target-question-c",
+          "text": "Only the eventual repair text",
+          "rationale": "That is later evidence, not necessarily an available predictor."
+        }
+      ],
+      "correctOptionId": "dbxfe-m07-target-question-a",
+      "conceptIds": [
+        "dbxfe-m07-target-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-ml",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-features-question",
+      "revision": "1",
+      "prompt": "Why is the 16:00 repair category invalid for the 09:00 warning?",
+      "options": [
+        {
+          "id": "dbxfe-m07-features-question-b",
+          "text": "Text fields can never be features",
+          "rationale": "The issue is timing, not the data type alone."
+        },
+        {
+          "id": "dbxfe-m07-features-question-c",
+          "text": "Labels may never be recorded after prediction",
+          "rationale": "Later outcomes are needed as labels; they must not become earlier inputs."
+        },
+        {
+          "id": "dbxfe-m07-features-question-a",
+          "text": "It was unavailable at prediction time",
+          "rationale": "Its later availability leaks outcome information."
+        }
+      ],
+      "correctOptionId": "dbxfe-m07-features-question-a",
+      "conceptIds": [
+        "dbxfe-m07-features-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-leakage",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-split-question",
+      "revision": "1",
+      "prompt": "The system must predict future months. Why can a random row split be misleading?",
+      "options": [
+        {
+          "id": "dbxfe-m07-split-question-c",
+          "text": "Training data should contain all final-test labels",
+          "rationale": "That would undermine independence."
+        },
+        {
+          "id": "dbxfe-m07-split-question-a",
+          "text": "Related or future information can appear on both sides",
+          "rationale": "The evaluation may not reflect the intended temporal separation."
+        },
+        {
+          "id": "dbxfe-m07-split-question-b",
+          "text": "Randomness always makes models fail",
+          "rationale": "Random splits can be appropriate for other data assumptions."
+        }
+      ],
+      "correctOptionId": "dbxfe-m07-split-question-a",
+      "conceptIds": [
+        "dbxfe-m07-split-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-claim-leakage",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-fit-question",
+      "revision": "1",
+      "prompt": "What does the zero-error 75 cutpoint establish?",
+      "options": [
+        {
+          "id": "dbxfe-m07-fit-question-a",
+          "text": "It matches these four training labels in this rule family",
+          "rationale": "Unseen performance still needs independent evaluation."
+        },
+        {
+          "id": "dbxfe-m07-fit-question-b",
+          "text": "It will never miss a future failure",
+          "rationale": "Four fitted examples cannot prove that."
+        },
+        {
+          "id": "dbxfe-m07-fit-question-c",
+          "text": "It is a calibrated 75% probability",
+          "rationale": "A temperature cutpoint is not a probability score."
+        }
+      ],
+      "correctOptionId": "dbxfe-m07-fit-question-a",
+      "conceptIds": [
+        "dbxfe-m07-fit-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-baseline-question",
+      "revision": "1",
+      "prompt": "What is the always-no-failure baseline’s recall for failures?",
+      "options": [
+        {
+          "id": "dbxfe-m07-baseline-question-b",
+          "text": "80%",
+          "rationale": "That is its overall accuracy."
+        },
+        {
+          "id": "dbxfe-m07-baseline-question-c",
+          "text": "100%",
+          "rationale": "It detects none, not all."
+        },
+        {
+          "id": "dbxfe-m07-baseline-question-a",
+          "text": "0%",
+          "rationale": "It detects 0 of 4 actual failures."
+        }
+      ],
+      "correctOptionId": "dbxfe-m07-baseline-question-a",
+      "conceptIds": [
+        "dbxfe-m07-baseline-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-metrics-question",
+      "revision": "1",
+      "prompt": "WithTP3, FP 2, FN 1, TN 14, what is precision?",
+      "options": [
+        {
+          "id": "dbxfe-m07-metrics-question-c",
+          "text": "85%",
+          "rationale": "That is overall accuracy: 17 of 20."
+        },
+        {
+          "id": "dbxfe-m07-metrics-question-a",
+          "text": "60%",
+          "rationale": "3 true warnings out of 5 total warnings."
+        },
+        {
+          "id": "dbxfe-m07-metrics-question-b",
+          "text": "75%",
+          "rationale": "That is recall: 3 of 4 actual failures."
+        }
+      ],
+      "correctOptionId": "dbxfe-m07-metrics-question-a",
+      "conceptIds": [
+        "dbxfe-m07-metrics-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-threshold-question",
+      "revision": "1",
+      "prompt": "In this fixture, what changes when the cutoff drops to 0.35?",
+      "options": [
+        {
+          "id": "dbxfe-m07-threshold-question-a",
+          "text": "One extra failure is detected and one extra false alarm occurs",
+          "rationale": "The 0.40 failure and 0.55 nonfailure join the warning population."
+        },
+        {
+          "id": "dbxfe-m07-threshold-question-b",
+          "text": "The model was retrained automatically",
+          "rationale": "Changing the action cutoff does not retrain these fixed scores."
+        },
+        {
+          "id": "dbxfe-m07-threshold-question-c",
+          "text": "Every lower threshold always improves precision",
+          "rationale": "Here precision decreases from 2/3 to 3/5."
+        }
+      ],
+      "correctOptionId": "dbxfe-m07-threshold-question-a",
+      "conceptIds": [
+        "dbxfe-m07-threshold-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-threshold",
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-lifecycle-question",
+      "revision": "1",
+      "prompt": "A dashboard retrieves last night’s stored score. Did that request necessarily perform new model inference?",
+      "options": [
+        {
+          "id": "dbxfe-m07-lifecycle-question-b",
+          "text": "Yes; every model-related page retrains",
+          "rationale": "Training and serving are separate stages."
+        },
+        {
+          "id": "dbxfe-m07-lifecycle-question-c",
+          "text": "No prediction ever occurred",
+          "rationale": "Batch inference produced the stored score earlier."
+        },
+        {
+          "id": "dbxfe-m07-lifecycle-question-a",
+          "text": "No; it can be a lookup of earlier batch predictions",
+          "rationale": "The time of display differs from the time of feature scoring."
+        }
+      ],
+      "correctOptionId": "dbxfe-m07-lifecycle-question-a",
+      "conceptIds": [
+        "dbxfe-m07-lifecycle-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-ml",
+        "dbxfe-m07-claim-inference",
+        "dbxfe-m07-claim-tracking",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-monitor-question",
+      "revision": "1",
+      "prompt": "A feature distribution shifts. Which conclusion is justified immediately?",
+      "options": [
+        {
+          "id": "dbxfe-m07-monitor-question-c",
+          "text": "Retraining automatically fixes the cause",
+          "rationale": "A broken sensor or changed labeling may require a different response."
+        },
+        {
+          "id": "dbxfe-m07-monitor-question-a",
+          "text": "Investigate data/population change and its implications",
+          "rationale": "Drift alone does not prove a specific loss of predictive quality."
+        },
+        {
+          "id": "dbxfe-m07-monitor-question-b",
+          "text": "The model has definitely become useless",
+          "rationale": "Outcome-based evaluation is still needed."
+        }
+      ],
+      "correctOptionId": "dbxfe-m07-monitor-question-a",
+      "conceptIds": [
+        "dbxfe-m07-monitor-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-monitor",
+        "dbxfe-m07-claim-ml",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    }
+  ],
+  "selfQuestions": [
+    {
+      "id": "dbxfe-m07-transfer-question",
+      "revision": "1",
+      "prompt": "Calculate precision and recall, then name one reason this matrix does not alone justify rollout.",
+      "modelAnswer": "Precision=4/(4+6)=40%; recall=4/(4+1)=80%. The owner must assess alert capacity and error consequences, and the evaluation still needs a valid deployment-matching split, feature timing and representative cohort.",
+      "reasoning": "Different denominators describe different risks. Small synthetic offline counts cannot establish operational benefit or production reliability.",
+      "conceptIds": [
+        "dbxfe-m07-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-claim-tracking",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ]
+    }
+  ],
+  "beats": [
+    {
+      "id": "dbxfe-m07-target",
+      "version": "1.0.0",
+      "title": "A warning needs a decision time",
+      "outcome": "Define a prediction target and horizon that support an action.",
+      "explanation": "Cinderline wants an early maintenance warning. Define one prediction opportunity: at 09:00, will this machine fail in the next 24 hours? The [[dbxfe-m07-target-concept|prediction horizon]] links an outcome to a decision time. A useful warning also needs an available action and enough lead time. “Predict failure” alone leaves the target, labels and evaluation ambiguous.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-target-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-ml",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-target-visual",
+      "questionIds": [
+        "dbxfe-m07-target-question"
+      ],
+      "handbook": {
+        "markdown": "Define the unit of prediction before assembling features. One row here represents one machine at a particular decision time. Its label asks whether a verified failure occurs during the following 24 hours. Multiple sensor messages do not automatically become independent prediction examples. Overlapping horizons can create correlated rows and require care in evaluation.\n\nAsk the maintenance owner what action a warning enables: inspect, order a part, adjust a schedule or seek further evidence. A prediction arriving after the needed lead time can be statistically accurate yet operationally useless. Confirm what counts as a failure and how late or incomplete maintenance records affect label quality.\n\nThe platform can support data preparation and model workflows, but it cannot supply a valid target by itself. This example does not establish that Cinderline has enough failures or representative history to build a useful predictor. State those as evidence questions. The next beat shows why a highly predictive-looking field can still be invalid when it was unavailable at the decision time.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-understand"
+        ]
+      },
+      "recap": "A target includes the prediction opportunity, horizon and action it supports.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m07-features",
+      "version": "1.0.0",
+      "title": "Keep tomorrow’s answer out of today’s inputs",
+      "outcome": "Classify fields by actual availability rather than predictive correlation.",
+      "explanation": "A repair diagnosis may strongly identify which machine failed, because it was written afterward. Using it in the 09:00 predictor is [[dbxfe-m07-features-concept|data leakage]]. Feature validity depends on availability at decision time, not just column type or correlation. The later failure can be a label for evaluation; it must not sneak into the earlier input.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-see",
+      "conceptIds": [
+        "dbxfe-m07-features-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-leakage",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-features-visual",
+      "samajh": {
+        "text": "Exam ka answer key dekh kar answer likh diya toh marks achhe aayenge, par unseen question solve karna prove nahi hua. Repair diagnosis future ka clue hai.09:00 warning ko sirf us waqt available information deni hai; baad ki failure record evaluation ka label ho sakti hai.",
+        "mapping": "The answer key illustrates unavailable outcome information.",
+        "boundary": "Leakage can also occur indirectly through preprocessing, time overlap or data joins."
+      },
+      "questionIds": [
+        "dbxfe-m07-features-question"
+      ],
+      "handbook": {
+        "markdown": "Audit each candidate field with event time, recording time and availability time. A sensor reading may describe 08:55 but arrive at 09:10; it was not available to the 09:00 system. A table joined retrospectively can therefore leak information even when the column’s name sounds historical. Reconstruct the feature view as it could actually exist at the decision point.\n\nSeparate features from labels. The verified failure later in the horizon defines the target. A repair category can help adjudicate that label but is not a valid earlier feature. Excluding it is not throwing away all maintenance information; earlier maintenance history available by 09:00 may still be a candidate.\n\nLeakage also arises when preprocessing learns from evaluation data. For example, filling missing values with a mean computed over all future rows transfers information across the split. Fit preprocessing only on training data and apply the learned transformation to held-out data. A pipeline can help maintain this discipline, but correct timing and joins still require design. Do not report the leaked high score as a valid forecast result; preserve it as a diagnostic finding.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-see"
+        ]
+      },
+      "recap": "Availability at the decision time determines whether a feature is valid.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m07-split",
+      "version": "1.0.0",
+      "title": "The held-out data should resemble the future job",
+      "outcome": "Choose time and entity separation for the intended deployment.",
+      "explanation": "Randomly mixing nearby readings from the same machine can make evaluation easier than deployment. Choose an [[dbxfe-m07-split-concept|evaluation split]] that reflects the job: future periods for future warnings; held-out machines when generalizing to new machines. Fit transformations on training data, choose settings without repeatedly consulting the final test, and inspect label/feature overlap at the boundaries.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-deeper",
+      "conceptIds": [
+        "dbxfe-m07-split-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-claim-leakage",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-split-visual",
+      "questionIds": [
+        "dbxfe-m07-split-question"
+      ],
+      "handbook": {
+        "markdown": "A split is an argument about what generalization means. For Cinderline’s existing machines, next-month warnings require a later-period test. If the rollout includes machines absent from development, also inspect held-out-machine performance. A time split alone may not establish that second claim.\n\nLeave a final assessment population untouched while choosing features, models and thresholds. Repeatedly changing the design to improve the final-test result turns that set into development data. Use validation or an appropriate cross-validation strategy for those choices, and report the final evaluation on frozen choices. Group and time constraints can require a custom design rather than a generic random splitter.\n\nCheck overlapping prediction horizons, duplicates, late labels and preprocessing fit. A training example near a boundary can contain outcome information extending into the evaluation period. The illustrated calendar is a teaching design, not a universally sufficient sample size or an executed experiment. Record cohort counts and failure prevalence; a split with almost no positive outcomes provides little evidence about recall. The next beat makes fitting itself concrete with a tiny rule family.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-deeper"
+        ]
+      },
+      "recap": "The split must test the kind of future use you intend to claim.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m07-fit",
+      "version": "1.0.0",
+      "title": "Fitting chooses a rule from examples",
+      "outcome": "Explain model fitting and why zero training error does not prove future performance.",
+      "explanation": "Here a tiny rule predicts failure when temperature is at least a chosen cutpoint. Training examples are 60→no, 70→no, 80→yes, 90→yes. [[dbxfe-m07-fit-concept|model fitting]] compares candidate cutpoints: 65 makes one mistake, 75 makes none, 85 makes one. The chosen 75 fits these examples; it has not yet proved anything about new machines or future periods.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-fit-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-fit-visual",
+      "questionIds": [
+        "dbxfe-m07-fit-question"
+      ],
+      "handbook": {
+        "markdown": "Machine learning is not merely storing vocabulary about models. It selects a rule from examples according to an objective. In this deliberately simple family, the parameter is a temperature cutpoint and the objective is the count of training mistakes. Evaluate each candidate on the same four labeled rows to reproduce the table.\n\nAt 65, the 70-degree nonfailure is a false alarm. At 75, all four rows match. At 85, the 80-degree failure is missed. This makes 75 the best candidate among these three on this training set. A more complex family might fit even irregular labels, which increases the need for held-out evidence rather than eliminating it.\n\nThis cutpoint is a learned feature threshold in a toy rule, distinct from the later decision threshold applied to a model score. Neither number is a physical safety limit or maintenance recommendation. Noise, additional features, measurement timing and changed populations can alter outcomes. No estimator is trained by the application; the visual is exact hand-worked arithmetic. Compare a meaningful baseline and evaluate on data excluded from fitting before claiming practical value.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-understand"
+        ]
+      },
+      "recap": "Fitting explains the training examples; evaluation asks whether the rule transfers.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m07-baseline",
+      "version": "1.0.0",
+      "title": "80% accuracy can mean no warnings",
+      "outcome": "Use a simple baseline to interpret an imbalanced prediction problem.",
+      "explanation": "In a synthetic evaluation cohort, 16 of 20 opportunities have no failure. A model that always says “no failure” is 80% accurate and catches none of the 4 failures. This [[dbxfe-m07-baseline-concept|baseline]] exposes why accuracy alone can flatter an unhelpful system. Compare the existing maintenance rule and candidate on the same split, with errors tied to the real action.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-baseline-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-baseline-visual",
+      "questionIds": [
+        "dbxfe-m07-baseline-question"
+      ],
+      "handbook": {
+        "markdown": "A baseline creates context for complexity. The majority-class predictor is easy to compute and demonstrates the imbalance trap. It is not necessarily the best operational baseline; Cinderline may already use a temperature rule or scheduled inspection policy that should be compared under the same evaluation conditions.\n\nFor the 20-row cohort, always-no-failure gets 16 negative outcomes correct and misses 4 positive outcomes. Accuracy is 16/20=80%. Recall for failure is 0/4=0%. Precision for warnings has a zero denominator because there are no warnings; state the handling convention rather than inventing a meaningful positive predictive rate.\n\nA candidate’s improvement needs practical interpretation. A rise from 80% to 85% accuracy may hide additional alerts and a remaining missed failure. Compute the confusion matrix and discuss the consequence of each error with the owner. Do not invent real maintenance costs or claim that catching a failure prevents it. A warning must be actionable, reviewed and delivered in time. The next beat compares the candidate using explicit counts rather than a single flattering metric.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-understand"
+        ]
+      },
+      "recap": "Compare against a simple rule and inspect which errors the accuracy hides.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m07-metrics",
+      "version": "1.0.0",
+      "title": "Count the four outcomes before naming a score",
+      "outcome": "Calculate precision, recall and accuracy from one confusion matrix.",
+      "explanation": "The candidate warns on 5 opportunities: 3 later fail and 2 do not. It misses 1 failure and correctly stays quiet 14 times. The [[dbxfe-m07-metrics-concept|confusion matrix]] makes the tradeoff visible. Precision is 3/5=60%; recall is 3/4=75%; accuracy is 17/20=85%. Each score answers a different question about the same predictions.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-metrics-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-metrics-visual",
+      "samajh": {
+        "text": "Alarm bajne par kitni baar sach mein failure tha—yeh precision hai. Jo failures hue, unmein kitno ko alarm mila—yeh recall hai. Dono mein numerator 3 same hai, par denominator 5 aur 4 alag. Naam yaad karne se pehle bolo kis population se question pooch rahe ho.",
+        "mapping": "Warnings and actual failures define two different denominator populations.",
+        "boundary": "These counts describe prediction labels, not whether an intervention actually prevented damage."
+      },
+      "questionIds": [
+        "dbxfe-m07-metrics-question"
+      ],
+      "handbook": {
+        "markdown": "Use the operational language first. True positive: a warning followed by the defined failure outcome. False positive: a warning without that outcome. False negative: a failure without a warning. True negative: neither warning nor failure. “Positive” means the selected class, not morally good or bad.\n\nFor this cohort, the five warnings include three failures, so precision=3/5. The four actual failures include three warned cases, so recall=3/4. Seventeen of 20 classifications match, so accuracy=85%. The baseline had 80% accuracy but no detected failures. The candidate adds useful detection in this synthetic cohort while creating two false alarms and leaving one miss.\n\nDo not infer financial benefit from those counts without an agreed consequence model and evidence about the action. Also do not treat a small cohort percentage as a precise long-run estimate. Report counts, split, target, horizon, threshold and limitations alongside scores. If labels arrive late, the final matrix may not be known at prediction time. The next beat changes the action threshold while holding the score ordering fixed.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-understand"
+        ]
+      },
+      "recap": "Precision conditions on warnings; recall conditions on actual failures.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m07-threshold",
+      "version": "1.0.0",
+      "title": "A score is not the action",
+      "outcome": "Predict how an explicit threshold changes alerts and errors.",
+      "explanation": "A model score and a warning decision are separate. In this six-row illustration, a [[dbxfe-m07-threshold-concept|decision threshold]] of 0.60 warns on 3 rows; 0.35 warns on 5. The lower cutoff catches the third failure but adds another false alarm. Choose the tradeoff with the workflow owner using validation evidence, then assess frozen choices on held-out data.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-threshold-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-threshold",
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-threshold-visual",
+      "questionIds": [
+        "dbxfe-m07-threshold-question"
+      ],
+      "handbook": {
+        "markdown": "The score orders opportunities according to the model’s output. The threshold translates that output into an action. A default cutoff is a software convention, not a universally correct maintenance decision. Choose it with an agreed objective and the practical ability to handle alerts.\n\nAt 0.60, the warnings are 0.90, 0.80 and 0.70: two true positives and one false positive. One failure at 0.40 is missed. At 0.35, the 0.55 nonfailure and 0.40 failure are added. Recall becomes 3/3 while precision becomes 3/5. This explicit six-row calculation shows a tradeoff without assuming that every threshold change behaves identically in every sample.\n\nTune using validation data or an appropriate cross-validation procedure, not by repeatedly optimizing the final test. A score labeled 0.80 is not automatically an 80% well-calibrated failure probability; calibration needs separate evidence. Alert thresholds also depend on workload capacity, lead time and error consequences. The final evaluation should freeze the chosen model, preprocessing and threshold so the reported result represents the intended operating decision.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-understand"
+        ]
+      },
+      "recap": "Threshold choice changes the action population and its error tradeoff.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m07-lifecycle",
+      "version": "1.0.0",
+      "title": "Training creates an artifact; inference uses it",
+      "outcome": "Separate fitting, tracked model artifacts, batch predictions and request-time lookup.",
+      "explanation": "Training fits a model artifact; [[dbxfe-m07-lifecycle-concept|inference]] applies that artifact to new features. A nightly batch may calculate predictions and store them for later lookup. A request-time endpoint instead calculates when asked. These are different latency and freshness choices. Track the artifact, feature basis and decision threshold so a displayed warning can be traced to the version that produced it.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-lifecycle-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-ml",
+        "dbxfe-m07-claim-inference",
+        "dbxfe-m07-claim-tracking",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-lifecycle-visual",
+      "questionIds": [
+        "dbxfe-m07-lifecycle-question"
+      ],
+      "handbook": {
+        "markdown": "A model artifact contains the learned predictor and relevant serialization/runtime requirements. It is not the same as a table of prediction outputs. Training creates or updates the artifact. Inference applies it. Serving presents or exposes a result through a chosen workflow. Keeping those concepts distinct makes freshness and operating requirements understandable.\n\nFor a nightly warning process, features are prepared at a cut-off, batch inference scores the population, and predictions are stored with model version, feature time and threshold. A dashboard request can simply retrieve those rows. If a new machine reading arrives afterward, the displayed score may remain unchanged until the next batch. A request-time model path has different availability, latency and access requirements.\n\nMLflow tracking can record parameters, metrics and artifacts so experiments remain traceable. A tracked high score is still invalid if its data leaked future information. Preserve dataset/split identity and evaluation code alongside the model basis. The platform offers lifecycle capabilities, but this module trains or deploys no model. The practitioner media segment illustrates the artifact/batch/lookup distinction; its architecture choices are examples rather than Databricks requirements.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-understand"
+        ]
+      },
+      "recap": "Artifact, scoring time and display time are distinct pieces of prediction provenance.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": [
+        "dbxfe-m07-media-inference"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-monitor",
+      "version": "1.0.0",
+      "title": "Changed data is a signal to investigate",
+      "outcome": "Separate data drift, model performance and workflow outcomes after deployment.",
+      "explanation": "After deployment, the input population can change. A new sensor, missing feature or different machine mix may create [[dbxfe-m07-monitor-concept|data drift]]. That observation is not automatically proof the model is wrong. Monitor data quality and service behavior promptly, then evaluate predictive errors when labels arrive. Also check whether warnings led to the intended review or action.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-deeper",
+      "conceptIds": [
+        "dbxfe-m07-monitor-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-monitor",
+        "dbxfe-m07-claim-ml",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-monitor-visual",
+      "questionIds": [
+        "dbxfe-m07-monitor-question"
+      ],
+      "handbook": {
+        "markdown": "Design monitoring around the same target and decision contract used in evaluation. Record feature availability, missingness and range; prediction/service errors and latency; score/action distribution; and, when mature labels arrive, confusion-matrix measures by relevant subgroup. A single overall average can hide a failing machine type.\n\nInput drift can be caused by a real population change, a new sensor, a parsing defect or a different operating regime. Those causes require different responses. Retraining on corrupted measurements can preserve the defect rather than fix it. Compare the input pipeline and labeling process before assuming the model weights are the only issue.\n\nPredictive performance also differs from workflow value. A correct warning ignored by operators does not produce the intended maintenance outcome. Conversely, an intervention can alter whether the predicted failure occurs, complicating later labels. Work with the domain owner to interpret these effects. Current platform profiling/monitoring capabilities provide observations, not an automatic acceptance or retraining decision. These monitoring examples remain synthetic; no production monitor runs in this course.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-deeper"
+        ]
+      },
+      "recap": "Monitor data, service, predictions and actions separately; investigate before prescribing retraining.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m07-transfer",
+      "version": "1.0.0",
+      "title": "Read the errors before recommending rollout",
+      "outcome": "Calculate changed metrics and write an honest next-step recommendation.",
+      "explanation": "In a new 20-opportunity cohort, the frozen candidate produces 4 true warnings, 6 false warnings, 1 miss and 9 true negatives. Precision is 40%; recall is 80%; accuracy is 65%. Useful [[dbxfe-m07-transfer-concept|evaluation evidence]] includes these counts and the split/threshold basis. Whether ten alerts are acceptable needs the maintenance owner’s action capacity and error priorities; the score alone does not authorize rollout.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-try",
+      "conceptIds": [
+        "dbxfe-m07-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-metrics",
+        "dbxfe-m07-claim-split",
+        "dbxfe-m07-claim-tracking",
+        "dbxfe-m07-guidance",
+        "dbxfe-m07-fiction"
+      ],
+      "visualId": "dbxfe-m07-transfer-visual",
+      "questionIds": [
+        "dbxfe-m07-transfer-question"
+      ],
+      "handbook": {
+        "markdown": "Check the arithmetic from the matrix, not from memory of the earlier cohort. There are 10 warnings, of which 4 correspond to failure: 40% precision. There are 5 actual failures, of which 4 received warning: 80% recall. Correct classifications are 4+9=13 of 20:65% accuracy. The cohort and counts changed, so reusing the previous 60% precision would be wrong.\n\nA defensible recommendation states the benefits and costs of the action population. The candidate detects 4 failures but creates 6 false alerts and misses 1. Ask how alerts are reviewed, what lead time is useful, and which errors matter. Compare the current baseline on the same cohort before recommending more complexity.\n\nAlso verify the evidence chain: target/horizon, feature availability, training/validation/test split, model and preprocessing version, decision threshold, label maturity and excluded examples. A tracking record helps retain that chain but does not make it valid automatically. This is a self-comparison task with an explained answer, not an automated judgment of maintenance expertise. Review the original leakage, horizon and offline-score cards, then deliberately choose the researched extensions.",
+        "sourceSectionIds": [
+          "dbxfe-m07-l01-try"
+        ]
+      },
+      "recap": "Metrics support a decision only when the cohort, action and limits are explicit.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m07-l01-card1",
+      "beatId": "dbxfe-m07-features"
+    },
+    {
+      "cardId": "dbxfe-m07-l01-card2",
+      "beatId": "dbxfe-m07-target"
+    },
+    {
+      "cardId": "dbxfe-m07-l01-card3",
+      "beatId": "dbxfe-m07-metrics"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-m07-extension-calibration",
+      "revision": "1",
+      "prompt": "One hundred predictions average 0.80, but 50 cases fail. What does a reliability diagram show?",
+      "answer": "A point at predicted 0.80 and observed 0.50, below perfect-calibration agreement; the model is overconfident in this bin.",
+      "explanation": "[[dbxfe-m07-extension-calibration-concept|probability calibration]] asks whether probability language matches observed frequencies. Put mean predicted probability on the horizontal axis and the fraction of positive outcomes on the vertical axis. In this invented bin, 50/100=0.50, compared with mean prediction 0.80. The diagonal would mean agreement. A model can rank cases usefully while overstating their probabilities. Inspect other bins, their counts and the evaluation population before drawing a global conclusion; one bin does not establish every probability is wrong. Calibration is also distinct from choosing a warning threshold: the threshold decides what action follows a score.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-extension-calibration-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-calibration",
+        "dbxfe-m07-fiction",
+        "dbxfe-m07-guidance"
+      ],
+      "beatId": "dbxfe-m07-threshold",
+      "whyItMatters": "Prevents presenting an arbitrary score as a trustworthy percentage likelihood."
+    },
+    {
+      "id": "dbxfe-m07-extension-prevalence",
+      "revision": "1",
+      "prompt": "If recall stays 80% and the false-positive rate stays 10%, does precision stay fixed when failures become rarer?",
+      "answer": "No. In the worked cohorts it falls from 80/170≈47.1% to 8/107≈7.5% because false warnings dominate a rarer-failure population.",
+      "explanation": "Hold two rates fixed for a thought experiment; this is not a forecast about actual drift. [[dbxfe-m07-extension-prevalence-concept|failure prevalence]] of 10% among 1,000 opportunities gives 100 failures and 900 nonfailures. Recall 80% produces 80 true warnings; a 10% false-positive rate produces 90 false warnings. Precision is 80/(80+90)≈47.1%. With only 10 failures and 990 nonfailures, the same conditional rates produce 8 true and 99 false warnings: 8/107≈7.5%. The model’s alert workload changes even though those two rates were held constant. Re-evaluate on the deployment population instead of transporting a validation precision unchanged.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-extension-prevalence-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-precision-api",
+        "dbxfe-m07-fiction",
+        "dbxfe-m07-guidance"
+      ],
+      "beatId": "dbxfe-m07-metrics",
+      "whyItMatters": "Connects a changed population to alert burden without assuming the model itself was retrained."
+    },
+    {
+      "id": "dbxfe-m07-extension-averaging",
+      "revision": "1",
+      "prompt": "Classes A, B and C have support 80, 10 and 10, with recalls 90%, 50% and 0%. Compare macro and support-weighted recall.",
+      "answer": "Macro recall is (90+50+0)/3≈46.7%; support-weighted recall is (80×0.90+10×0.50+10×0)/100=77%.",
+      "explanation": "Extend the binary lesson to three mutually exclusive labels. [[dbxfe-m07-extension-averaging-concept|macro recall]] gives each class equal influence; support-weighted recall gives each class influence proportional to how often it occurs in the true cohort. Here the model correctly identifies 72 A cases, 5 B cases and no C cases. The weighted 77% summary can conceal complete failure on C, while macro 46.7% makes that weakness more prominent. Neither automatically captures business costs. State which labels are included, show per-class support and errors, and choose the summary to match the decision rather than whichever score looks larger.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-extension-averaging-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-recall-api",
+        "dbxfe-m07-fiction",
+        "dbxfe-m07-guidance"
+      ],
+      "beatId": "dbxfe-m07-metrics",
+      "whyItMatters": "Makes a multiclass dashboard’s averaging choice explicit and exposes rare-class failures."
+    },
+    {
+      "id": "dbxfe-m07-extension-registry-alias",
+      "revision": "1",
+      "prompt": "A run records only models:/Maintenance@champion. Why may that be insufficient to reproduce its predictions later?",
+      "answer": "The alias can be reassigned. Record the concrete version resolved for that run, plus its data, preprocessing and threshold basis.",
+      "explanation": "A registered model groups versions; a [[dbxfe-m07-extension-registry-alias-concept|model alias]] provides an address that can move. Suppose champion resolves to version 7 at 09:00 and is reassigned to version 8 at noon. The same alias text can then resolve to a different artifact. Reproducible prediction records should retain the actual resolved version and relevant input/runtime context. Reassignment also does not prove a long-running service reloaded its already cached model. Verify the consumer’s loading and rollout behavior separately. The example is a registry-reference thought experiment, not a deployment performed by this course.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-extension-registry-alias-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m07-claim-registry",
+        "dbxfe-m07-fiction",
+        "dbxfe-m07-guidance"
+      ],
+      "beatId": "dbxfe-m07-lifecycle",
+      "whyItMatters": "Separates a convenient deployment pointer from the concrete model that produced a historical result."
+    }
+  ],
+  "recap": {
+    "title": "From available inputs to an accountable action",
+    "markdown": "**Target/horizon → available features → faithful split → fit and baseline → error counts → threshold → inference → monitoring.** These are synthetic worked examples, no trained/deployed model. Review the preserved core cards; extension cards deepen the boundary questions.",
+    "visualId": "dbxfe-m07-lifecycle-visual"
+  },
+  "appliedTask": {
+    "title": "Repair a misleading maintenance proposal",
+    "prompt": "A proposal uses 16:00 repair codes to predict 09:00 failures and claims 95% accuracy. After removing leakage, a new 20-row cohort has TP 4, FP 6, FN 1, TN 9. Give the correct precision/recall and propose the evidence needed before rollout.",
+    "modelAnswer": "Reject the original 95% as a valid earlier-warning result because its feature was unavailable. The new cohort has 40% precision and 80% recall. Compare a defined baseline on a deployment-matching held-out split, record target/horizon and feature timing, freeze model/threshold choices, and review alert capacity, error consequences and monitoring with the maintenance owner.",
+    "reasoning": "The answer first fixes validity, then calculates different denominators, and finally connects offline evidence to an operational decision without promising benefit.",
+    "beatIds": [
+      "dbxfe-m07-target",
+      "dbxfe-m07-features",
+      "dbxfe-m07-split",
+      "dbxfe-m07-baseline",
+      "dbxfe-m07-metrics",
+      "dbxfe-m07-threshold",
+      "dbxfe-m07-monitor",
+      "dbxfe-m07-transfer"
+    ]
+  },
+  "scenarioIds": [
+    "dbxfe-m07-scenario"
+  ]
+}

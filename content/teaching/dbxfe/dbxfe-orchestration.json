@@ -1,0 +1,1631 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-orchestration",
+  "title": "Orchestration and recovery",
+  "summary": "Find the last trustworthy boundary, retry deliberately, and reconcile the result and its effects.",
+  "outcomes": [
+    "Explain dependency conditions separately from business correctness.",
+    "Predict retained, resolved, published and simulated-effect state after failures.",
+    "Transfer replay reasoning to order-line cancellations and totals."
+  ],
+  "startingAssumptions": [
+    "Ingestion’s corrected publication gate is required: conflict evidence can block without a usable key.",
+    "The previous verified report can remain visible as stale_previous."
+  ],
+  "lessonIds": [
+    "dbxfe-m04-l03"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "Failure locations drive the narrative. The existing executed local exercise is preserved exactly and is not relabeled a Databricks job.",
+  "sources": [
+    {
+      "id": "dbxfe-orchestration-source-jobs",
+      "title": "Lakeflow Jobs",
+      "url": "https://docs.databricks.com/aws/en/jobs/",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Task status alone is not evidence of reconciled business state or exactly-once external effects.",
+      "reviewedEvidence": "Jobs coordinates tasks and triggers, represents workflow dependencies and exposes task/run monitoring."
+    },
+    {
+      "id": "dbxfe-orchestration-source-dependencies",
+      "title": "Configure task dependencies",
+      "url": "https://docs.databricks.com/aws/en/jobs/run-if",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "A completion condition is not the same as all prerequisites succeeding.",
+      "reviewedEvidence": "Run-if conditions depend on upstream success, failure or completion; independent upstream work can execute in parallel."
+    },
+    {
+      "id": "dbxfe-orchestration-source-repair",
+      "title": "Troubleshoot and repair job failures",
+      "url": "https://docs.databricks.com/aws/en/jobs/repair-job-failures",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Review partial outputs and changed settings before repair. No cloud repair is executed in this course.",
+      "reviewedEvidence": "Repair reruns unsuccessful/dependent tasks from their beginning using current settings; the documentation explicitly says Jobs does not make tasks idempotent."
+    },
+    {
+      "id": "dbxfe-orchestration-source-checkpoint",
+      "title": "Structured Streaming checkpoints",
+      "url": "https://docs.databricks.com/aws/en/structured-streaming/checkpoints",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Restart compatibility depends on query/source/state changes and runtime; not all changes support an old checkpoint.",
+      "reviewedEvidence": "Checkpoints record per-query offsets, commits and state; deleting/changing location starts fresh, and each query needs its own location."
+    },
+    {
+      "id": "dbxfe-orchestration-source-foreach",
+      "title": "Use foreachBatch to write to arbitrary data sinks",
+      "url": "https://docs.databricks.com/aws/en/structured-streaming/foreach",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Custom external effects are not automatically exactly-once because upstream processing has checkpoints.",
+      "reviewedEvidence": "foreachBatch supplies micro-batch output and batch identity; custom sink logic must address duplicate writes and failure handling."
+    },
+    {
+      "id": "dbxfe-orchestration-source-excluded-chain",
+      "title": "Configure task dependencies",
+      "url": "https://docs.databricks.com/aws/en/jobs/run-if",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks Lakeflow Jobs on AWS; product behavior, not a configured customer job.",
+      "caveat": "Original hypothetical workflow or arithmetic, not an executed product test. Databricks Lakeflow Jobs on AWS; product behavior, not a configured customer job.",
+      "reviewedEvidence": "Run if condition options, notes: when every dependency is Excluded, the dependent task is also Excluded regardless of condition; exclusion cascades."
+    },
+    {
+      "id": "dbxfe-orchestration-source-task-values",
+      "title": "Use task values to pass information between tasks",
+      "url": "https://docs.databricks.com/aws/en/jobs/task-values",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Lakeflow Jobs task metadata; dynamic references are supported by tasks accepting parameters.",
+      "caveat": "Original hypothetical workflow or arithmetic, not an executed product test. Lakeflow Jobs task metadata; dynamic references are supported by tasks accepting parameters.",
+      "reviewedEvidence": "Set task values: JSON representation at most 48 KiB; set/get are Python notebook functions. Get notes discourage defaults that hide missing keys or wrong task names."
+    },
+    {
+      "id": "dbxfe-orchestration-source-full-consumption",
+      "title": "Use foreachBatch to write to arbitrary data sinks",
+      "url": "https://docs.databricks.com/aws/en/structured-streaming/foreach",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Structured Streaming with stateful operators and foreachBatch on Databricks; this is not a rule that every bounded batch query must collect all data.",
+      "caveat": "Original hypothetical workflow or arithmetic, not an executed product test. Structured Streaming with stateful operators and foreachBatch on Databricks; this is not a rule that every bounded batch query must collect all data.",
+      "reviewedEvidence": "Completely consume each batch DataFrame: stateful queries must consume the full batch or restart; partial consumption can fail the next batch. The example contrasts show(2) with complete consumption."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-orchestration-guidance",
+      "description": "Original educational reasoning, diagnostic choices and worked decisions; not a vendor runbook.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent SpicyBrain curriculum."
+    },
+    {
+      "id": "dbxfe-orchestration-fiction",
+      "description": "Cinderline examples, quantities, states, outcomes and alternatives are synthetic.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "Original teaching examples; no Databricks or customer execution claim."
+    },
+    {
+      "id": "dbxfe-orchestration-claim-jobs",
+      "description": "Jobs coordinates tasks and triggers, represents workflow dependencies and exposes task/run monitoring.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-orchestration-source-jobs"
+      ],
+      "context": "Task status alone is not evidence of reconciled business state or exactly-once external effects."
+    },
+    {
+      "id": "dbxfe-orchestration-claim-dependencies",
+      "description": "Run-if conditions depend on upstream success, failure or completion; independent upstream work can execute in parallel.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-orchestration-source-dependencies"
+      ],
+      "context": "A completion condition is not the same as all prerequisites succeeding."
+    },
+    {
+      "id": "dbxfe-orchestration-claim-repair",
+      "description": "Repair reruns unsuccessful/dependent tasks from their beginning using current settings; the documentation explicitly says Jobs does not make tasks idempotent.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-orchestration-source-repair"
+      ],
+      "context": "Review partial outputs and changed settings before repair. No cloud repair is executed in this course."
+    },
+    {
+      "id": "dbxfe-orchestration-claim-checkpoint",
+      "description": "Checkpoints record per-query offsets, commits and state; deleting/changing location starts fresh, and each query needs its own location.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-orchestration-source-checkpoint"
+      ],
+      "context": "Restart compatibility depends on query/source/state changes and runtime; not all changes support an old checkpoint."
+    },
+    {
+      "id": "dbxfe-orchestration-claim-foreach",
+      "description": "foreachBatch supplies micro-batch output and batch identity; custom sink logic must address duplicate writes and failure handling.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-orchestration-source-foreach"
+      ],
+      "context": "Custom external effects are not automatically exactly-once because upstream processing has checkpoints."
+    },
+    {
+      "id": "dbxfe-orchestration-claim-excluded-chain",
+      "description": "Run if condition options, notes: when every dependency is Excluded, the dependent task is also Excluded regardless of condition; exclusion cascades.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-orchestration-source-excluded-chain"
+      ],
+      "context": "Original hypothetical workflow or arithmetic, not an executed product test. Databricks Lakeflow Jobs on AWS; product behavior, not a configured customer job."
+    },
+    {
+      "id": "dbxfe-orchestration-claim-task-values",
+      "description": "Set task values: JSON representation at most 48 KiB; set/get are Python notebook functions. Get notes discourage defaults that hide missing keys or wrong task names.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-orchestration-source-task-values"
+      ],
+      "context": "Original hypothetical workflow or arithmetic, not an executed product test. Lakeflow Jobs task metadata; dynamic references are supported by tasks accepting parameters."
+    },
+    {
+      "id": "dbxfe-orchestration-claim-full-consumption",
+      "description": "Completely consume each batch DataFrame: stateful queries must consume the full batch or restart; partial consumption can fail the next batch. The example contrasts show(2) with complete consumption.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-orchestration-source-full-consumption"
+      ],
+      "context": "Original hypothetical workflow or arithmetic, not an executed product test. Structured Streaming with stateful operators and foreachBatch on Databricks; this is not a rule that every bounded batch query must collect all data."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-orchestration-dependencies-concept",
+      "term": "dependency",
+      "aliases": [],
+      "definition": "A relationship requiring specified upstream conditions before downstream work may run.",
+      "example": "Publish waits for both source resolution and metric reconciliation, not merely raw ingestion finishing.",
+      "sourceIds": [
+        "dbxfe-orchestration-source-jobs",
+        "dbxfe-orchestration-source-dependencies"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-boundaries-concept",
+      "term": "failure boundary",
+      "aliases": [],
+      "definition": "The point after a particular effect has happened and before the next one is guaranteed.",
+      "example": "Raw retained but report not published requires a different recovery explanation from published but unnotified.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-raw-failure-concept",
+      "term": "idempotency",
+      "aliases": [],
+      "definition": "Preserving a stated business effect when the same operation is repeated under its contract.",
+      "example": "Replaying the same correction leaves one A3 state and one snapshot-keyed effect.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-published-failure-concept",
+      "term": "snapshot identity",
+      "aliases": [],
+      "definition": "A stable identifier for the report content and policy-relevant coverage represented by a published snapshot.",
+      "example": "Recomputing the same 22/1 snapshot yields the same effect key in the local simulation.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-effects-concept",
+      "term": "outbox",
+      "aliases": [],
+      "definition": "A record of intended downstream effects linked to a business result, to support deliberate dispatch and retry.",
+      "example": "One notification intent keyed by the 22/1 snapshot is not proof an email was delivered once.",
+      "sourceIds": [
+        "dbxfe-orchestration-source-foreach",
+        "dbxfe-orchestration-source-repair"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-checkpoint-concept",
+      "term": "streaming checkpoint",
+      "aliases": [],
+      "definition": "Persisted progress and state belonging to a particular Structured Streaming query.",
+      "example": "A query’s offsets and state support its restart; another query should not share its location.",
+      "sourceIds": [
+        "dbxfe-orchestration-source-checkpoint"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-reconcile-concept",
+      "term": "recovery reconciliation",
+      "aliases": [],
+      "definition": "Checking recovered identities, values, coverage and effects against the intended business state.",
+      "example": "A green run returning duplicate A rows fails the expected one-current-row-per-inspection contract.",
+      "sourceIds": [
+        "dbxfe-orchestration-source-repair",
+        "dbxfe-orchestration-source-jobs"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-transfer-concept",
+      "term": "composite key",
+      "aliases": [],
+      "definition": "An identity formed from more than one field.",
+      "example": "(order_id, line_id) identifies a line; order_id alone merges different products incorrectly.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-extension-excluded-chain-concept",
+      "term": "Excluded dependency",
+      "aliases": [],
+      "definition": "A skipped upstream task whose exclusion can propagate through dependent tasks.",
+      "example": "No. The documented all-dependencies-excluded rule excludes the cleanup task too.",
+      "sourceIds": [
+        "dbxfe-orchestration-source-excluded-chain"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-extension-task-values-concept",
+      "term": "Task value",
+      "aliases": [],
+      "definition": "A small JSON-compatible value passed from one job task to another by task name and key.",
+      "example": "The default can turn a missing or misnamed validation output into apparent permission to publish.",
+      "sourceIds": [
+        "dbxfe-orchestration-source-task-values"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-extension-full-consumption-concept",
+      "term": "Batch consumption",
+      "aliases": [],
+      "definition": "Evaluating the full micro-batch output required by a stateful streaming callback's processing contract.",
+      "example": "It may leave the batch unconsumed; the documented stateful-query contract requires complete consumption or a restart.",
+      "sourceIds": [
+        "dbxfe-orchestration-source-full-consumption"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-orchestration-dependencies-visual",
+      "kind": "nodes",
+      "title": "A dependency is a reason to wait",
+      "alt": "A dependency is a reason to wait. Inputs can arrive independently; publication requires resolved and reconciled evidence. The workflow can retain diagnostics while refusing a new report.",
+      "caption": "The graph must encode business prerequisites, not merely a sequence of boxes. Synthetic teaching example.",
+      "textEquivalent": "Dependencies: Inputs can arrive independently; publication requires resolved and reconciled evidence. Nodes: Inspection input: Ready. Retain evidence. (selected); Correction input: Ready. Retain evidence. (selected); Resolve: Waiting. Cross-input identity and order. (pending); Reconcile: Waiting. Expected rows and totals. (pending); Publish: Waiting. Requires true gate and checks. (pending). Relationships: Inspection input → Resolve: retained; Correction input → Resolve: retained; Resolve → Reconcile: candidate + gate; Reconcile → Publish: checks pass AND gate true.\n\nQuality blocks publication: The workflow can retain diagnostics while refusing a new report. Nodes: Inspection input: Retained. Evidence remains. (selected); Correction input: Retained. Evidence remains. (selected); Resolve: Conflict found. Publication gate false. (warning); Reconcile: Diagnostic only. Do not call candidate current. (context); Publish: Blocked. Previous snapshot may remain stale. (excluded). Relationships: Resolve → Publish: gate false: do not publish.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-orchestration-claim-jobs",
+        "dbxfe-orchestration-claim-dependencies",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "states": [
+        {
+          "id": "ready",
+          "title": "Dependencies",
+          "explanation": "Inputs can arrive independently; publication requires resolved and reconciled evidence.",
+          "nodes": [
+            {
+              "id": "feed-a",
+              "label": "Inspection input",
+              "value": "Ready",
+              "detail": "Retain evidence.",
+              "status": "selected"
+            },
+            {
+              "id": "feed-b",
+              "label": "Correction input",
+              "value": "Ready",
+              "detail": "Retain evidence.",
+              "status": "selected"
+            },
+            {
+              "id": "resolve",
+              "label": "Resolve",
+              "value": "Waiting",
+              "detail": "Cross-input identity and order.",
+              "status": "pending"
+            },
+            {
+              "id": "check",
+              "label": "Reconcile",
+              "value": "Waiting",
+              "detail": "Expected rows and totals.",
+              "status": "pending"
+            },
+            {
+              "id": "publish",
+              "label": "Publish",
+              "value": "Waiting",
+              "detail": "Requires true gate and checks.",
+              "status": "pending"
+            }
+          ],
+          "connections": [
+            {
+              "from": "feed-a",
+              "to": "resolve",
+              "label": "retained"
+            },
+            {
+              "from": "feed-b",
+              "to": "resolve",
+              "label": "retained"
+            },
+            {
+              "from": "resolve",
+              "to": "check",
+              "label": "candidate + gate"
+            },
+            {
+              "from": "check",
+              "to": "publish",
+              "label": "checks pass AND gate true"
+            }
+          ]
+        },
+        {
+          "id": "blocked",
+          "title": "Quality blocks publication",
+          "explanation": "The workflow can retain diagnostics while refusing a new report.",
+          "nodes": [
+            {
+              "id": "feed-a",
+              "label": "Inspection input",
+              "value": "Retained",
+              "detail": "Evidence remains.",
+              "status": "selected"
+            },
+            {
+              "id": "feed-b",
+              "label": "Correction input",
+              "value": "Retained",
+              "detail": "Evidence remains.",
+              "status": "selected"
+            },
+            {
+              "id": "resolve",
+              "label": "Resolve",
+              "value": "Conflict found",
+              "detail": "Publication gate false.",
+              "status": "warning"
+            },
+            {
+              "id": "check",
+              "label": "Reconcile",
+              "value": "Diagnostic only",
+              "detail": "Do not call candidate current.",
+              "status": "context"
+            },
+            {
+              "id": "publish",
+              "label": "Publish",
+              "value": "Blocked",
+              "detail": "Previous snapshot may remain stale.",
+              "status": "excluded"
+            }
+          ],
+          "connections": [
+            {
+              "from": "resolve",
+              "to": "publish",
+              "label": "gate false: do not publish"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-boundaries-visual",
+      "kind": "nodes",
+      "title": "Four boundaries leave four kinds of evidence",
+      "alt": "Four boundaries leave four kinds of evidence. Inspect each boundary rather than assuming global rollback. The next step depends on the last committed/recorded effect.",
+      "caption": "A failed process can have successful earlier effects; inspect the boundary ledger. Synthetic teaching example.",
+      "textEquivalent": "Boundary ledger: Inspect each boundary rather than assuming global rollback. Columns: Boundary; Evidence; Question on recovery. Rows: Retained raw — Exact arrived payloads — Can resolution be repeated?; Resolved state — Candidates, conflicts, gate — Is publication allowed?; Published snapshot — Verified identity and totals — Which report is visible?; Simulated outbox — Snapshot-keyed effect record — Was this effect already recorded?.\n\nSame failure label, different state: The next step depends on the last committed/recorded effect. Columns: Failure after; New report exists?; Effect exists?. Rows: Raw retention — No — No new effect; Publication — Yes, if gate passed — Not necessarily; Effect recording — Yes — Yes; retry must not duplicate.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "states": [
+        {
+          "id": "ledger",
+          "title": "Boundary ledger",
+          "explanation": "Inspect each boundary rather than assuming global rollback.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Boundary",
+              "Evidence",
+              "Question on recovery"
+            ],
+            "rows": [
+              [
+                "Retained raw",
+                "Exact arrived payloads",
+                "Can resolution be repeated?"
+              ],
+              [
+                "Resolved state",
+                "Candidates, conflicts, gate",
+                "Is publication allowed?"
+              ],
+              [
+                "Published snapshot",
+                "Verified identity and totals",
+                "Which report is visible?"
+              ],
+              [
+                "Simulated outbox",
+                "Snapshot-keyed effect record",
+                "Was this effect already recorded?"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "contrast",
+          "title": "Same failure label, different state",
+          "explanation": "The next step depends on the last committed/recorded effect.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Failure after",
+              "New report exists?",
+              "Effect exists?"
+            ],
+            "rows": [
+              [
+                "Raw retention",
+                "No",
+                "No new effect"
+              ],
+              [
+                "Publication",
+                "Yes, if gate passed",
+                "Not necessarily"
+              ],
+              [
+                "Effect recording",
+                "Yes",
+                "Yes; retry must not duplicate"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-raw-failure-visual",
+      "kind": "timeline",
+      "title": "Recover after retaining the correction",
+      "alt": "Recover after retaining the correction. The correction is not lost, but a new report is not yet available. Recovery uses retained evidence; repeat recovery must not add another key.",
+      "caption": "Retained input supports recovery; the gate still decides whether 22/1 may publish. Synthetic teaching example.",
+      "textEquivalent": "After retained_raw failure: The correction is not lost, but a new report is not yet available. Columns: Layer; Expected state. Rows: Raw — Includes A3 correction; Published — Previous 20/1; Status — stale_previous; Outbox — Only prior baseline entry.\n\nAfter recovery: Recovery uses retained evidence; repeat recovery must not add another key. Columns: Layer; Expected state. Rows: Accepted — A3=14/1, C1=8/0; Published — 22/1 with new snapshot identity; Status — current_with_exclusions; Outbox — Baseline entry + new snapshot entry.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "states": [
+        {
+          "id": "failed",
+          "title": "After retained_raw failure",
+          "explanation": "The correction is not lost, but a new report is not yet available.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Layer",
+              "Expected state"
+            ],
+            "rows": [
+              [
+                "Raw",
+                "Includes A3 correction"
+              ],
+              [
+                "Published",
+                "Previous 20/1"
+              ],
+              [
+                "Status",
+                "stale_previous"
+              ],
+              [
+                "Outbox",
+                "Only prior baseline entry"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "recovered",
+          "title": "After recovery",
+          "explanation": "Recovery uses retained evidence; repeat recovery must not add another key.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Layer",
+              "Expected state"
+            ],
+            "rows": [
+              [
+                "Accepted",
+                "A3=14/1, C1=8/0"
+              ],
+              [
+                "Published",
+                "22/1 with new snapshot identity"
+              ],
+              [
+                "Status",
+                "current_with_exclusions"
+              ],
+              [
+                "Outbox",
+                "Baseline entry + new snapshot entry"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-published-failure-visual",
+      "kind": "table",
+      "title": "A published report is not undone by a later failure",
+      "alt": "A published report is not undone by a later failure. Publication already crossed its boundary. The stable key makes this local effect record idempotent.",
+      "caption": "Recover the missing boundary; do not pretend a completed publication never happened. Synthetic teaching example.",
+      "textEquivalent": "Failure after published_snapshot: Publication already crossed its boundary. Columns: Layer; Expected state. Rows: Published report — 22/1 exists; Status — current_with_exclusions; New effect key — Not yet recorded.\n\nRecover twice: The stable key makes this local effect record idempotent. Columns: Action; Published result; New effect entries. Rows: First recover — Same 22/1 snapshot — One; Second recover — Same 22/1 snapshot — Zero additional.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "states": [
+        {
+          "id": "gap",
+          "title": "Failure after published_snapshot",
+          "explanation": "Publication already crossed its boundary.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Layer",
+              "Expected state"
+            ],
+            "rows": [
+              [
+                "Published report",
+                "22/1 exists"
+              ],
+              [
+                "Status",
+                "current_with_exclusions"
+              ],
+              [
+                "New effect key",
+                "Not yet recorded"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "recovery",
+          "title": "Recover twice",
+          "explanation": "The stable key makes this local effect record idempotent.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Action",
+              "Published result",
+              "New effect entries"
+            ],
+            "rows": [
+              [
+                "First recover",
+                "Same 22/1 snapshot",
+                "One"
+              ],
+              [
+                "Second recover",
+                "Same 22/1 snapshot",
+                "Zero additional"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-effects-visual",
+      "kind": "nodes",
+      "title": "A retry is not exactly-once delivery",
+      "alt": "A retry is not exactly-once delivery. The business result and its intended effect have identities. A hypothetical receiver may already have received the effect when the sender loses its acknowledgment.",
+      "caption": "A stable intent key helps, but external acknowledgment is a separate reliability problem. Synthetic teaching example.",
+      "textEquivalent": "Record intent: The business result and its intended effect have identities. Nodes: Snapshot: 22/1. Verified business content. (selected); Outbox key: snapshot ID. Intent recorded once. (selected); Receiver: Not contacted. No real message in local exercise. (context). Relationships: Snapshot → Outbox key: one intent per ID; Outbox key → Receiver: dispatch would be separate.\n\nReal-system acknowledgment gap: A hypothetical receiver may already have received the effect when the sender loses its acknowledgment. Nodes: Snapshot: 22/1. Unchanged. (selected); Sender state: Acknowledgment unknown. Retry decision required. (warning); Receiver: Possibly delivered. Needs duplicate handling/verification. (pending). Relationships: Sender state → Receiver: retry may repeat.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-orchestration-claim-foreach",
+        "dbxfe-orchestration-claim-repair",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "states": [
+        {
+          "id": "intent",
+          "title": "Record intent",
+          "explanation": "The business result and its intended effect have identities.",
+          "nodes": [
+            {
+              "id": "snapshot",
+              "label": "Snapshot",
+              "value": "22/1",
+              "detail": "Verified business content.",
+              "status": "selected"
+            },
+            {
+              "id": "outbox",
+              "label": "Outbox key",
+              "value": "snapshot ID",
+              "detail": "Intent recorded once.",
+              "status": "selected"
+            },
+            {
+              "id": "receiver",
+              "label": "Receiver",
+              "value": "Not contacted",
+              "detail": "No real message in local exercise.",
+              "status": "context"
+            }
+          ],
+          "connections": [
+            {
+              "from": "snapshot",
+              "to": "outbox",
+              "label": "one intent per ID"
+            },
+            {
+              "from": "outbox",
+              "to": "receiver",
+              "label": "dispatch would be separate"
+            }
+          ]
+        },
+        {
+          "id": "gap",
+          "title": "Real-system acknowledgment gap",
+          "explanation": "A hypothetical receiver may already have received the effect when the sender loses its acknowledgment.",
+          "nodes": [
+            {
+              "id": "snapshot",
+              "label": "Snapshot",
+              "value": "22/1",
+              "detail": "Unchanged.",
+              "status": "selected"
+            },
+            {
+              "id": "outbox",
+              "label": "Sender state",
+              "value": "Acknowledgment unknown",
+              "detail": "Retry decision required.",
+              "status": "warning"
+            },
+            {
+              "id": "receiver",
+              "label": "Receiver",
+              "value": "Possibly delivered",
+              "detail": "Needs duplicate handling/verification.",
+              "status": "pending"
+            }
+          ],
+          "connections": [
+            {
+              "from": "outbox",
+              "to": "receiver",
+              "label": "retry may repeat"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-checkpoint-visual",
+      "kind": "comparison",
+      "title": "A checkpoint belongs to a query",
+      "alt": "A checkpoint belongs to a query. Each query has its own progress and state. A checkpoint is recovery evidence, not disposable scratch.",
+      "caption": "Query progress/state is a named recovery artifact with compatibility constraints. Synthetic teaching example.",
+      "textEquivalent": "Separate query state: Each query has its own progress and state. Nodes: Query A: Inspection flow. Its source and state contract. (selected); Checkpoint A: Offsets + state. Belongs to A. (selected); Query B: Event flow. Different query. (selected); Checkpoint B: Offsets + state. Belongs to B. (selected). Relationships: Query A → Checkpoint A: resume own state; Query B → Checkpoint B: resume own state.\n\nRestart decisions: A checkpoint is recovery evidence, not disposable scratch. Columns: Change; Why review is needed. Rows: Delete/change checkpoint location — Next run starts fresh; Change state schema — Prior state may be incompatible; Reuse one location for two queries — Query identities/state collide.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-orchestration-claim-checkpoint",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "states": [
+        {
+          "id": "separate",
+          "title": "Separate query state",
+          "explanation": "Each query has its own progress and state.",
+          "nodes": [
+            {
+              "id": "query-a",
+              "label": "Query A",
+              "value": "Inspection flow",
+              "detail": "Its source and state contract.",
+              "status": "selected"
+            },
+            {
+              "id": "check-a",
+              "label": "Checkpoint A",
+              "value": "Offsets + state",
+              "detail": "Belongs to A.",
+              "status": "selected"
+            },
+            {
+              "id": "query-b",
+              "label": "Query B",
+              "value": "Event flow",
+              "detail": "Different query.",
+              "status": "selected"
+            },
+            {
+              "id": "check-b",
+              "label": "Checkpoint B",
+              "value": "Offsets + state",
+              "detail": "Belongs to B.",
+              "status": "selected"
+            }
+          ],
+          "connections": [
+            {
+              "from": "query-a",
+              "to": "check-a",
+              "label": "resume own state"
+            },
+            {
+              "from": "query-b",
+              "to": "check-b",
+              "label": "resume own state"
+            }
+          ]
+        },
+        {
+          "id": "changes",
+          "title": "Restart decisions",
+          "explanation": "A checkpoint is recovery evidence, not disposable scratch.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Change",
+              "Why review is needed"
+            ],
+            "rows": [
+              [
+                "Delete/change checkpoint location",
+                "Next run starts fresh"
+              ],
+              [
+                "Change state schema",
+                "Prior state may be incompatible"
+              ],
+              [
+                "Reuse one location for two queries",
+                "Query identities/state collide"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-reconcile-visual",
+      "kind": "table",
+      "title": "Green is a task result, not a business conclusion",
+      "alt": "Green is a task result, not a business conclusion. Passing only the total is insufficient. The report acceptance decision uses business evidence.",
+      "caption": "Accept a recovery only after the intended business ledger reconciles. Synthetic teaching example.",
+      "textEquivalent": "Expected correction ledger: Passing only the total is insufficient. Columns: Check; Expected; Why it matters. Rows: Current keys/revisions — A3, C1 — No duplicate or stale overwrite; Totals — 22 inspected, 1 defective — Reconciled quantities; Coverage — B exclusion disclosed — Accepted-only meaning; Publication — Allowed; current_with_exclusions — No unresolved contradiction; Effects — One new snapshot key — No duplicate simulated intent.\n\nA green run with wrong state: The report acceptance decision uses business evidence. Columns: Observation; Decision. Rows: Task succeeded — Execution condition passed; A3 appears twice — Business grain failed; Total 36/2 instead of 22/1 — Do not accept report; Action — Retain evidence and repair the cause.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-orchestration-claim-repair",
+        "dbxfe-orchestration-claim-jobs",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "states": [
+        {
+          "id": "ledger",
+          "title": "Expected correction ledger",
+          "explanation": "Passing only the total is insufficient.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Check",
+              "Expected",
+              "Why it matters"
+            ],
+            "rows": [
+              [
+                "Current keys/revisions",
+                "A3, C1",
+                "No duplicate or stale overwrite"
+              ],
+              [
+                "Totals",
+                "22 inspected, 1 defective",
+                "Reconciled quantities"
+              ],
+              [
+                "Coverage",
+                "B exclusion disclosed",
+                "Accepted-only meaning"
+              ],
+              [
+                "Publication",
+                "Allowed; current_with_exclusions",
+                "No unresolved contradiction"
+              ],
+              [
+                "Effects",
+                "One new snapshot key",
+                "No duplicate simulated intent"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "failure",
+          "title": "A green run with wrong state",
+          "explanation": "The report acceptance decision uses business evidence.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Observation",
+              "Decision"
+            ],
+            "rows": [
+              [
+                "Task succeeded",
+                "Execution condition passed"
+              ],
+              [
+                "A3 appears twice",
+                "Business grain failed"
+              ],
+              [
+                "Total 36/2 instead of 22/1",
+                "Do not accept report"
+              ],
+              [
+                "Action",
+                "Retain evidence and repair the cause"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-transfer-visual",
+      "kind": "table",
+      "title": "An order line changes the grain",
+      "alt": "An order line changes the grain. Three current rows, one cancellation, two active lines. Replay preserves these business values; missing batch membership does not cancel a line.",
+      "caption": "Recovery principles transfer only after the new grain, ordering and operation rules are explicit. Synthetic teaching example.",
+      "textEquivalent": "Current line states: Three current rows, one cancellation, two active lines. Columns: Order/line; State; Contribution. Rows: O7/L1 — 3 ×300 cents — 900 cents; O7/L2 — Cancelled, quantity 0 — 0 cents; O8/L1 — 2 ×200 cents — 400 cents.\n\nReconciled order totals: Replay preserves these business values; missing batch membership does not cancel a line. Columns: Order; Current active value. Rows: O7 — 900 cents; O8 — 400 cents; All — 1300 cents.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "states": [
+        {
+          "id": "current",
+          "title": "Current line states",
+          "explanation": "Three current rows, one cancellation, two active lines.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Order/line",
+              "State",
+              "Contribution"
+            ],
+            "rows": [
+              [
+                "O7/L1",
+                "3 ×300 cents",
+                "900 cents"
+              ],
+              [
+                "O7/L2",
+                "Cancelled, quantity 0",
+                "0 cents"
+              ],
+              [
+                "O8/L1",
+                "2 ×200 cents",
+                "400 cents"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "totals",
+          "title": "Reconciled order totals",
+          "explanation": "Replay preserves these business values; missing batch membership does not cancel a line.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Order",
+              "Current active value"
+            ],
+            "rows": [
+              [
+                "O7",
+                "900 cents"
+              ],
+              [
+                "O8",
+                "400 cents"
+              ],
+              [
+                "All",
+                "1300 cents"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-orchestration-dependencies-question",
+      "revision": "1",
+      "prompt": "Which dependency condition protects the intended report?",
+      "options": [
+        {
+          "id": "dbxfe-orchestration-dependencies-question-a",
+          "text": "Reconciliation succeeds and publication gate is true",
+          "rationale": "Completion alone can include failed or blocked work."
+        },
+        {
+          "id": "dbxfe-orchestration-dependencies-question-b",
+          "text": "Any input task finished",
+          "rationale": "Other inputs or quality checks may remain unresolved."
+        },
+        {
+          "id": "dbxfe-orchestration-dependencies-question-c",
+          "text": "A scheduled start time was reached",
+          "rationale": "A trigger is not evidence about output correctness."
+        }
+      ],
+      "correctOptionId": "dbxfe-orchestration-dependencies-question-a",
+      "conceptIds": [
+        "dbxfe-orchestration-dependencies-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-jobs",
+        "dbxfe-orchestration-claim-dependencies",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-boundaries-question",
+      "revision": "1",
+      "prompt": "A task fails after publication and before notification. Which assumption is unsafe?",
+      "options": [
+        {
+          "id": "dbxfe-orchestration-boundaries-question-b",
+          "text": "Inspecting the published snapshot identity",
+          "rationale": "That is necessary recovery evidence."
+        },
+        {
+          "id": "dbxfe-orchestration-boundaries-question-c",
+          "text": "Checking whether the effect was already recorded",
+          "rationale": "Effects require their own reconciliation."
+        },
+        {
+          "id": "dbxfe-orchestration-boundaries-question-a",
+          "text": "Assuming no new report exists because the task failed",
+          "rationale": "The publication boundary already happened."
+        }
+      ],
+      "correctOptionId": "dbxfe-orchestration-boundaries-question-a",
+      "conceptIds": [
+        "dbxfe-orchestration-boundaries-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-raw-failure-question",
+      "revision": "1",
+      "prompt": "After raw retention failure, what should recovery use?",
+      "options": [
+        {
+          "id": "dbxfe-orchestration-raw-failure-question-c",
+          "text": "Only the most recently arrived row",
+          "rationale": "That loses other keys and cross-batch conflict evidence."
+        },
+        {
+          "id": "dbxfe-orchestration-raw-failure-question-a",
+          "text": "Retained evidence and the same identity/order policy",
+          "rationale": "The valid correction can be resolved without inventing new authority."
+        },
+        {
+          "id": "dbxfe-orchestration-raw-failure-question-b",
+          "text": "The previous total plus 14",
+          "rationale": "14 replaces A’s 12; it is not an additive delta."
+        }
+      ],
+      "correctOptionId": "dbxfe-orchestration-raw-failure-question-a",
+      "conceptIds": [
+        "dbxfe-orchestration-raw-failure-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-published-failure-question",
+      "revision": "1",
+      "prompt": "What must recovery avoid after the new snapshot is already published?",
+      "options": [
+        {
+          "id": "dbxfe-orchestration-published-failure-question-a",
+          "text": "Creating duplicate effects for that same snapshot",
+          "rationale": "The effect boundary needs its own idempotency check."
+        },
+        {
+          "id": "dbxfe-orchestration-published-failure-question-b",
+          "text": "Reading the published identity",
+          "rationale": "That identifies the already completed business result."
+        },
+        {
+          "id": "dbxfe-orchestration-published-failure-question-c",
+          "text": "Reconciling the totals",
+          "rationale": "That checks whether the intended result actually exists."
+        }
+      ],
+      "correctOptionId": "dbxfe-orchestration-published-failure-question-a",
+      "conceptIds": [
+        "dbxfe-orchestration-published-failure-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-effects-question",
+      "revision": "1",
+      "prompt": "What does the local one-entry outbox prove?",
+      "options": [
+        {
+          "id": "dbxfe-orchestration-effects-question-b",
+          "text": "A real email arrived exactly once",
+          "rationale": "No email is sent by the exercise."
+        },
+        {
+          "id": "dbxfe-orchestration-effects-question-c",
+          "text": "Every downstream system shares the table transaction",
+          "rationale": "External boundaries require separate mechanisms."
+        },
+        {
+          "id": "dbxfe-orchestration-effects-question-a",
+          "text": "The simulation records one intent for that snapshot identity",
+          "rationale": "It does not send or verify external delivery."
+        }
+      ],
+      "correctOptionId": "dbxfe-orchestration-effects-question-a",
+      "conceptIds": [
+        "dbxfe-orchestration-effects-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-foreach",
+        "dbxfe-orchestration-claim-repair",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-checkpoint-question",
+      "revision": "1",
+      "prompt": "Two independent streaming queries should use which checkpoint arrangement?",
+      "options": [
+        {
+          "id": "dbxfe-orchestration-checkpoint-question-c",
+          "text": "No state because table history exists",
+          "rationale": "Table history and query progress serve different purposes."
+        },
+        {
+          "id": "dbxfe-orchestration-checkpoint-question-a",
+          "text": "Different locations",
+          "rationale": "Each query has its own identity, progress and state."
+        },
+        {
+          "id": "dbxfe-orchestration-checkpoint-question-b",
+          "text": "The same location for convenience",
+          "rationale": "The documentation warns against sharing."
+        }
+      ],
+      "correctOptionId": "dbxfe-orchestration-checkpoint-question-a",
+      "conceptIds": [
+        "dbxfe-orchestration-checkpoint-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-checkpoint",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-reconcile-question",
+      "revision": "1",
+      "prompt": "Which recovery evidence is strongest?",
+      "options": [
+        {
+          "id": "dbxfe-orchestration-reconcile-question-a",
+          "text": "Expected keys, revisions, quantities, coverage, publication and effects all reconcile",
+          "rationale": "It checks the named boundaries."
+        },
+        {
+          "id": "dbxfe-orchestration-reconcile-question-b",
+          "text": "The task status is green",
+          "rationale": "That alone does not establish data correctness."
+        },
+        {
+          "id": "dbxfe-orchestration-reconcile-question-c",
+          "text": "The final percentage looks familiar",
+          "rationale": "A ratio can conceal duplicated components."
+        }
+      ],
+      "correctOptionId": "dbxfe-orchestration-reconcile-question-a",
+      "conceptIds": [
+        "dbxfe-orchestration-reconcile-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-repair",
+        "dbxfe-orchestration-claim-jobs",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-transfer-question",
+      "revision": "1",
+      "prompt": "Why is order_id alone insufficient for this fixture?",
+      "options": [
+        {
+          "id": "dbxfe-orchestration-transfer-question-b",
+          "text": "Every order needs a random new ID on replay",
+          "rationale": "Changing identity defeats replay recognition."
+        },
+        {
+          "id": "dbxfe-orchestration-transfer-question-c",
+          "text": "Cancellation must delete all evidence",
+          "rationale": "The contract retains an explicit current tombstone state."
+        },
+        {
+          "id": "dbxfe-orchestration-transfer-question-a",
+          "text": "One order has multiple distinct lines",
+          "rationale": "The line component prevents unrelated items from overwriting each other."
+        }
+      ],
+      "correctOptionId": "dbxfe-orchestration-transfer-question-a",
+      "conceptIds": [
+        "dbxfe-orchestration-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ]
+    }
+  ],
+  "selfQuestions": [],
+  "beats": [
+    {
+      "id": "dbxfe-orchestration-dependencies",
+      "version": "1.0.0",
+      "title": "A dependency is a reason to wait",
+      "outcome": "Construct a task graph whose publication requires the right evidence.",
+      "explanation": "An orchestrator coordinates work; it does not invent its correctness rules. A [[dbxfe-orchestration-dependencies-concept|dependency]] tells Publish to wait for resolution and reconciliation. Independent inputs may run in parallel, but “finished” is not always “succeeded.” Write the condition next to the edge so a quality failure cannot accidentally flow into a current report.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-understand",
+      "conceptIds": [
+        "dbxfe-orchestration-dependencies-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-jobs",
+        "dbxfe-orchestration-claim-dependencies",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "visualId": "dbxfe-orchestration-dependencies-visual",
+      "questionIds": [
+        "dbxfe-orchestration-dependencies-question"
+      ],
+      "handbook": {
+        "markdown": "Draw the smallest graph that exposes business dependencies. A trigger starts work. A task performs a unit of work. An edge states when a dependent task can run. In our quality flow, raw retention precedes source resolution; publication also needs reconciliation and a true policy gate. Diagnostic recording may run on a failure branch.\n\nConsider a flow configured to run Publish when upstream tasks are merely complete. That can include a failed quality check. The graph is syntactically valid but semantically unsafe for the intended report. Read run-if behavior deliberately and test the failure branch, not only the happy path.\n\nProduct Jobs orchestration is distinct from our local Python simulation. The simulation helps inspect state boundaries without a workspace. It does not validate a real job configuration, scheduler service or alert integration. In a real design record each task’s input contract, output location, idempotency behavior, timeout/retry owner and recovery evidence. A green task reports its configured success condition; the business check still needs to be meaningful.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l03-understand"
+        ]
+      },
+      "recap": "The graph must encode business prerequisites, not merely a sequence of boxes.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": [
+        "dbxfe-orchestration-media-dependencies"
+      ]
+    },
+    {
+      "id": "dbxfe-orchestration-boundaries",
+      "version": "1.0.0",
+      "title": "Four boundaries leave four kinds of evidence",
+      "outcome": "Locate what is durable or visible at an explicit failure point.",
+      "explanation": "Retained raw, resolved candidate, published snapshot and simulated effect are separate boundaries. A failure after one does not erase it automatically. Name the [[dbxfe-orchestration-boundaries-concept|failure boundary]] before choosing a retry. “The job failed” is insufficient: it does not tell you which input, report or effect already exists and which must be reconciled.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-foundation-mechanism",
+      "conceptIds": [
+        "dbxfe-orchestration-boundaries-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "visualId": "dbxfe-orchestration-boundaries-visual",
+      "questionIds": [
+        "dbxfe-orchestration-boundaries-question"
+      ],
+      "handbook": {
+        "markdown": "Failure messages summarize process execution, not a complete transaction across every system. A process may retain input before crashing. It may publish a report before losing the response. It may send an external effect before recording the acknowledgment. A useful runbook identifies those boundaries explicitly.\n\nOur local reference deliberately offers named failures after retained_raw, resolved_state and published_snapshot. It stores raw evidence, resolution state, the current/previous snapshot and a simulated outbox in one inspectable Python object. This lets the learner predict exactly what remains. It is not a durable distributed system: process loss, network retries and external recipients require additional design.\n\nBefore a recovery attempt record the last verified report identity, accepted row revisions, totals, coverage, conflict evidence and known effect keys. After recovery compare each against independent expected results. Do not call a candidate report current while the gate is false, and do not label an already published report absent merely because a later action failed. The next two beats move the same correction across different failure points.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l03-foundation-mechanism"
+        ]
+      },
+      "recap": "A failed process can have successful earlier effects; inspect the boundary ledger.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-raw-failure",
+      "version": "1.0.0",
+      "title": "Recover after retaining the correction",
+      "outcome": "Predict recovery from raw evidence without duplicating business state.",
+      "explanation": "The baseline report is 20/1. A valid A3=14/1 correction is retained, then the run fails before resolution. The old report becomes stale_previous. Recovery reads the retained evidence, resolves A3+C to 22/1, and publishes only if the gate permits it. [[dbxfe-orchestration-raw-failure-concept|idempotency]] is checked on rows, totals, snapshot identity and effects, not on the raw arrival count.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-foundation-example",
+      "conceptIds": [
+        "dbxfe-orchestration-raw-failure-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "visualId": "dbxfe-orchestration-raw-failure-visual",
+      "samajh": {
+        "text": "Parcel receive ho gaya, par register update se pehle kaam ruk gaya. Dobara start karte waqt parcel mangwane se pehle dekho received evidence kya hai. Same correction ko do baar business total mein jodna nahi. Recovery ka matlab bache hue kaam ko trustworthy state tak le jana hai.",
+        "mapping": "Received evidence survives before later bookkeeping completes.",
+        "boundary": "The toy object is not a durable multi-system transaction or delivery service."
+      },
+      "questionIds": [
+        "dbxfe-orchestration-raw-failure-question"
+      ],
+      "handbook": {
+        "markdown": "Compute the expected result before recovering. The accepted business keys are A and C. A’s replacement rises from 12 to 14; C remains 8. The new total is 22 inspected and 1 defective. B’s nonconflicting baseline exclusion remains disclosed. The old 20/1 report is visible only as previous evidence while recovery is incomplete.\n\nThe canonical example below imports the retained-history pipeline and deliberately injects the named failure. It asserts the stale previous snapshot, recovery totals and replay behavior. These exact statements belong to the preserved locally executed exercise; opening this page or stepping the visual does not execute them.\n\nIf a conflicting payload also arrived, the expected outcome would change: recovery would preserve stale_previous and withhold publication. A retry must re-evaluate the gate, not assume the valid correction guarantees permission. In a production runbook, retain durable input references and compare all boundary outputs. The toy’s in-memory object explains the logic but does not promise process-crash durability.\n\n~~~python\nimport json\nfrom solutions.reference import LocalPipeline\n\nwith open(\"fixtures/baseline.json\", encoding=\"utf-8\") as handle:\n    baseline = json.load(handle)\nwith open(\"fixtures/batches.json\", encoding=\"utf-8\") as handle:\n    correction = json.load(handle)[\"correction\"]\npipeline = LocalPipeline()\npipeline.ingest(baseline)\nold_id = pipeline.published[\"snapshot_id\"]\ntry:\n    pipeline.ingest(correction, fail_after=\"retained_raw\")\nexcept RuntimeError:\n    pass  # Expected injected failure only, not a general error suppression policy.\nassert pipeline.status == \"stale_previous\"\nassert pipeline.published[\"totals\"][\"inspected_units\"] == 20\npipeline.recover()\nassert pipeline.published[\"totals\"][\"inspected_units\"] == 22\nassert pipeline.published[\"totals\"][\"defective_units\"] == 1\nassert pipeline.published[\"snapshot_id\"] != old_id\npipeline.recover()\nassert len(pipeline.outbox) == 2  # One local effect per distinct published snapshot.\n~~~",
+        "sourceSectionIds": [
+          "dbxfe-m04-l03-foundation-example",
+          "dbxfe-m04-l03-pipeline-code"
+        ]
+      },
+      "recap": "Retained input supports recovery; the gate still decides whether 22/1 may publish.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-published-failure",
+      "version": "1.0.0",
+      "title": "A published report is not undone by a later failure",
+      "outcome": "Recover an effect gap without publishing a duplicate business result.",
+      "explanation": "Move the failure after published_snapshot. The 22/1 report now exists, but its simulated effect may not. Recovery must recognize the already published snapshot and fill the missing effect once. A [[dbxfe-orchestration-published-failure-concept|snapshot identity]] connects the result to its effect record. Do not roll the explanation back to 20/1 just because the enclosing task reports failure.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-foundation-task",
+      "conceptIds": [
+        "dbxfe-orchestration-published-failure-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "visualId": "dbxfe-orchestration-published-failure-visual",
+      "questionIds": [
+        "dbxfe-orchestration-published-failure-question"
+      ],
+      "handbook": {
+        "markdown": "Separate the report state from the execution envelope. A failure after publication says the task did not finish every step; it does not say the report transaction or local publication assignment disappeared. Inspect the snapshot identity and content before deciding what remains.\n\nIn the local model, the snapshot identifier is derived from canonical business content and coverage. Recovery of identical evidence produces the same identity. The simulated outbox uses that identity as a key, so recording the same notification intent again does not create another entry. An A3 correction legitimately creates a new identity relative to the A2 baseline.\n\nThis is deliberately narrower than exactly-once email or webhook delivery. A real dispatcher can fail after sending but before recording acknowledgment; the receiver may need idempotency support, and the system needs a durable outbox and a retry protocol. The exercise sends nothing. Keep this limit in a customer explanation: we have tested local business-state/effect-key behavior, while real transport acknowledgment remains a separate validation requirement. The next beat makes that gap explicit.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l03-foundation-solution",
+          "dbxfe-m04-l03-pipeline-code"
+        ]
+      },
+      "recap": "Recover the missing boundary; do not pretend a completed publication never happened.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-effects",
+      "version": "1.0.0",
+      "title": "A retry is not exactly-once delivery",
+      "outcome": "Explain the acknowledgment gap for an external side effect.",
+      "explanation": "An [[dbxfe-orchestration-effects-concept|outbox]] separates a business result from the intent to notify someone about it. The local exercise records one intent per snapshot; it sends no messages. A real sender could deliver, lose the acknowledgment, and retry. That gap needs a receiver/idempotency strategy and evidence. A successful data write alone cannot prove exactly-once external delivery.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-foundation-limits",
+      "conceptIds": [
+        "dbxfe-orchestration-effects-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-foreach",
+        "dbxfe-orchestration-claim-repair",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "visualId": "dbxfe-orchestration-effects-visual",
+      "questionIds": [
+        "dbxfe-orchestration-effects-question"
+      ],
+      "handbook": {
+        "markdown": "Name the effect before discussing reliability: a table update, report pointer, email, webhook or payment are different operations with different acknowledgment behavior. The local outbox is an educational dictionary of intent, not a real notification service. Its stable key demonstrates one useful part of retry design.\n\nImagine a sender contacts a receiver, the receiver accepts, and the response is lost. From the sender’s perspective the result is unknown. Retrying without a deduplication key can repeat the effect; refusing to retry can lose an effect that never arrived. A durable intent, delivery attempts, receiver behavior and reconciliation policy are needed to handle that uncertainty deliberately.\n\nLakeflow Jobs repair reruns task logic; it does not make that logic idempotent. Likewise custom foreachBatch sink code must account for its own duplicate-write behavior. Product processing guarantees need a clearly named boundary and supported sink context. Avoid saying “exactly once” without naming what happens once and under which assumptions. Our exercise only establishes local repeatability of business snapshots and simulated effect records.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l03-foundation-limits"
+        ]
+      },
+      "recap": "A stable intent key helps, but external acknowledgment is a separate reliability problem.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-checkpoint",
+      "version": "1.0.0",
+      "title": "A checkpoint belongs to a query",
+      "outcome": "Explain why deleting or sharing checkpoint state changes recovery semantics.",
+      "explanation": "A [[dbxfe-orchestration-checkpoint-concept|streaming checkpoint]] records progress and state for one query. It is different from a table-log checkpoint or a last-known dashboard total. Deleting it or switching locations starts fresh behavior; sharing it between queries is unsafe. Before restarting changed logic, check whether its sources, state and sink remain compatible with that checkpoint.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-deeper",
+      "conceptIds": [
+        "dbxfe-orchestration-checkpoint-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-checkpoint",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "visualId": "dbxfe-orchestration-checkpoint-visual",
+      "questionIds": [
+        "dbxfe-orchestration-checkpoint-question"
+      ],
+      "handbook": {
+        "markdown": "A streaming checkpoint can contain source offsets, committed micro-batch information, stateful operator data and query identity. Those records connect a restart to a particular query’s earlier execution. A table-log checkpoint instead summarizes table metadata. The word checkpoint does not make these interchangeable.\n\nWhen changing query logic, inspect the documented restart compatibility. A new filter may have different semantics even if technically restartable; a changed state schema or source/sink arrangement can require a different approach. Current runtimes include additional source-evolution mechanisms with specific requirements, so do not apply a universal “all changes are safe” or “all changes are impossible” rule.\n\nDeleting progress to get past an error can replay data or change coverage. Before any such real action, preserve evidence and establish the desired reprocessing policy, destination behavior and reconciliation test. The local retained-history exercise has no real Structured Streaming checkpoint and makes no source-offset guarantee. It recomputes tiny stored Python evidence to teach state boundaries. That distinction keeps the illustrative code from becoming an accidental production runbook.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l03-deeper"
+        ]
+      },
+      "recap": "Query progress/state is a named recovery artifact with compatibility constraints.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-reconcile",
+      "version": "1.0.0",
+      "title": "Green is a task result, not a business conclusion",
+      "outcome": "Compare post-recovery business outputs with an independent ledger.",
+      "explanation": "After recovery, compare accepted keys and revisions, totals, exclusions, conflicts, publication identity/status and simulated effects. A task can finish successfully while publishing the wrong population. [[dbxfe-orchestration-reconcile-concept|recovery reconciliation]] is the evidence that connects execution back to the customer’s decision. Keep a failed criterion visible even when other checks pass.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-foundation-runbook",
+      "conceptIds": [
+        "dbxfe-orchestration-reconcile-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-repair",
+        "dbxfe-orchestration-claim-jobs",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "visualId": "dbxfe-orchestration-reconcile-visual",
+      "questionIds": [
+        "dbxfe-orchestration-reconcile-question"
+      ],
+      "handbook": {
+        "markdown": "Build the recovery ledger before running a retry. It should be independent of the implementation under test: for A3=14/1 and C1=8/0, explicitly expect 22/1, not a total computed by the same resolver function and then compared with itself. Include absence of duplicate keys and the correct report status.\n\nIf conflict evidence exists, the expected result is a blocked new report and a preserved stale previous snapshot, not successful publication. If no prior snapshot exists, expect blocked_no_snapshot. If the failure occurred after publication, expect the new report to remain and only the missing simulated effect to be completed. The boundary changes the expectation.\n\nWhen a check fails, retain inputs, code/configuration version, relevant task errors and safe diagnostic output. Identify the responsible owner and smallest next test. A real Jobs repair uses current task settings, so record configuration changes that could affect comparison. Do not erase failed-run evidence after a green repair. This is an original runbook pattern, not an official incident procedure or proof of service availability.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l03-foundation-runbook"
+        ]
+      },
+      "recap": "Accept a recovery only after the intended business ledger reconciles.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-orchestration-transfer",
+      "version": "1.0.0",
+      "title": "An order line changes the grain",
+      "outcome": "Transfer ordering/replay policy to a composite key and explicit cancellation.",
+      "explanation": "The transfer fixture uses (order_id, line_id), integer cents and explicit cancellation. O7/L1 is corrected to 3×300=900; O7/L2 is cancelled; O8/L1 contributes 2×200=400. The total is 1300 cents. The [[dbxfe-orchestration-transfer-concept|composite key]] prevents different lines from overwriting each other, while the cancellation remains current evidence rather than disappearing silently.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-transfer-task",
+      "conceptIds": [
+        "dbxfe-orchestration-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "visualId": "dbxfe-orchestration-transfer-visual",
+      "questionIds": [
+        "dbxfe-orchestration-transfer-question"
+      ],
+      "handbook": {
+        "markdown": "Transfer the reasoning, not the inspection field names. First define the new grain: one current state per order line. The key has two fields, so O7/L1 and O7/L2 must coexist. Revisions still replace prior states within a key. Prices are integer cents to keep the worked arithmetic explicit; this is not a full currency/tax accounting system.\n\nThe current O7/L1 state has quantity 3 and unit price 300, contributing 900 cents. O7/L2 has an explicit cancellation tombstone with quantity 0, contributing zero while remaining traceable. O8/L1 contributes 400. Reconciliation expects three current rows, one cancelled, two active, order totals 900 and 400, and aggregate 1300. Omitting O7/L2 from a later incremental batch would not independently establish cancellation.\n\nThe preserved complete transfer solution and independent fixture exercise corrections, replay, composite identity and explicit deletion meaning. No order or payment is sent. A valid transfer answer names the changed key and operation contract, rather than blindly copying an inspection resolver and treating every absent line as deleted. Use the linked canonical cards to retrieve the boundary rules, then compare your own recovery ledger.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l03-transfer-task",
+          "dbxfe-m04-l03-transfer-solution",
+          "dbxfe-m04-l03-transfer-code"
+        ]
+      },
+      "recap": "Recovery principles transfer only after the new grain, ordering and operation rules are explicit.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m04-l03-card1",
+      "beatId": "dbxfe-orchestration-raw-failure"
+    },
+    {
+      "cardId": "dbxfe-m04-l03-card2",
+      "beatId": "dbxfe-orchestration-dependencies"
+    },
+    {
+      "cardId": "dbxfe-m04-l03-card3",
+      "beatId": "dbxfe-orchestration-boundaries"
+    },
+    {
+      "cardId": "dbxfe-m04-l03-foundation-card1",
+      "beatId": "dbxfe-orchestration-reconcile"
+    },
+    {
+      "cardId": "dbxfe-m04-l03-foundation-card2",
+      "beatId": "dbxfe-orchestration-published-failure"
+    },
+    {
+      "cardId": "dbxfe-m04-l03-foundation-card3",
+      "beatId": "dbxfe-orchestration-reconcile"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-orchestration-extension-repair-start",
+      "revision": "1",
+      "prompt": "Does repair resume a failed task at its last Python line?",
+      "answer": "No. The documented repair reruns the unsuccessful task from the beginning.",
+      "explanation": "Partial outputs can already exist. Review what the task wrote and make repeat execution safe for its intended effects; a repair feature does not itself make task code idempotent.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-foundation-runbook",
+      "conceptIds": [
+        "dbxfe-orchestration-reconcile-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-repair"
+      ],
+      "beatId": "dbxfe-orchestration-reconcile",
+      "whyItMatters": "Prevents duplicate output after an apparently convenient retry."
+    },
+    {
+      "id": "dbxfe-orchestration-extension-task-values",
+      "revision": "1",
+      "prompt": "A downstream publication task reads a missing validation key with a default of true. What risk does that create?",
+      "answer": "The default can turn a missing or misnamed validation output into apparent permission to publish.",
+      "explanation": "Suppose Validate intends to emit publication_allowed, but Publish requests publication_allow and supplies true as its default. A wiring error can look like an accepted gate. The documentation discourages defaults because they can conceal missing keys or incorrect task names. For this fictional gate, treat unavailable evidence as an explicit failure and investigate the task/key contract; that fail-closed policy is our design choice. [[dbxfe-orchestration-extension-task-values-concept|Task values]] are small metadata, not a replacement for a dataset: values must be valid JSON within 48 KiB. Pass a count, result status or approved output reference, while retaining substantive evidence in its proper destination. No job or data transfer is executed here.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-understand",
+      "conceptIds": [
+        "dbxfe-orchestration-extension-task-values-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-task-values",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "beatId": "dbxfe-orchestration-dependencies",
+      "whyItMatters": "A dependency finishing does not prove its validation evidence reached the consumer."
+    },
+    {
+      "id": "dbxfe-orchestration-extension-full-consumption",
+      "revision": "1",
+      "prompt": "A stateful foreachBatch callback only displays two rows and returns. Why might the next batch fail?",
+      "answer": "It may leave the batch unconsumed; the documented stateful-query contract requires complete consumption or a restart.",
+      "explanation": "A callback can return without having evaluated all of its DataFrame. In a hypothetical stream with watermark-based deduplication, displaying two rows is a preview, not evidence that the whole micro-batch completed. The documented stateful-query behavior requires [[dbxfe-orchestration-extension-full-consumption-concept|full consumption]] and can fail the next batch when it is missing. Design the callback so its intended work consumes the batch, and retain or propagate failures according to the recovery policy. Consuming rows is still different from verifying that the right business output was published. Do not introduce unbounded collect as a universal repair. This explanation adds a stateful streaming constraint; the course's in-memory recovery simulation does not exercise it.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-deeper",
+      "conceptIds": [
+        "dbxfe-orchestration-extension-full-consumption-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-full-consumption",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "beatId": "dbxfe-orchestration-checkpoint",
+      "whyItMatters": "A successful-looking preview can hide incomplete stateful processing."
+    },
+    {
+      "id": "dbxfe-orchestration-extension-excluded-chain",
+      "revision": "1",
+      "prompt": "A cleanup task uses All done, but every dependency is Excluded. Is cleanup guaranteed to run?",
+      "answer": "No. The documented all-dependencies-excluded rule excludes the cleanup task too.",
+      "explanation": "An [[dbxfe-orchestration-extension-excluded-chain-concept|excluded task]] did not perform its work. Imagine a conditional branch that skips both inspection and correction tasks because the branch is not selected. A downstream cleanup task depends only on those two and uses All done. The documented exclusion rule still skips cleanup; All done is not an unconditional finally block. Before relying on cleanup or diagnostic publication, test successful, failed, cancelled and excluded branches separately and identify which branch actually owns the required action. Do not equate a missing cleanup record with successful cleanup. This is an original hypothetical job graph, not an executed Jobs run; actual cancellation and disabled-task behavior needs its own documented review.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-understand",
+      "conceptIds": [
+        "dbxfe-orchestration-extension-excluded-chain-concept"
+      ],
+      "claimIds": [
+        "dbxfe-orchestration-claim-excluded-chain",
+        "dbxfe-orchestration-guidance",
+        "dbxfe-orchestration-fiction"
+      ],
+      "beatId": "dbxfe-orchestration-dependencies",
+      "whyItMatters": "A recovery plan can silently omit its cleanup when the branch never ran."
+    }
+  ],
+  "recap": {
+    "title": "Recover the boundary that remains",
+    "markdown": "**Inspect retained evidence → resolve again → check gate → reconcile publication → reconcile effects.** A checkpoint is query state; a green task is execution evidence. Use the current report label honestly and retain the previous snapshot when required.",
+    "visualId": "dbxfe-orchestration-boundaries-visual"
+  },
+  "appliedTask": {
+    "title": "Failure after publication, then replay",
+    "prompt": "A valid correction changes 20/1 to 22/1. Fail after published_snapshot and before the new simulated outbox entry, then recover twice. Predict the report, status and effect entries; explain why this proves no real notification guarantee.",
+    "modelAnswer": "The 22/1 snapshot already exists with current_with_exclusions status. First recovery records its one missing effect key; second recovery adds no duplicate. The baseline key remains. This proves local keyed intent behavior only; no external notification is sent or acknowledged.",
+    "reasoning": "The publication boundary succeeded before the failure. Recovery must complete the effect boundary without fabricating a rollback or a transport guarantee.",
+    "beatIds": [
+      "dbxfe-orchestration-boundaries",
+      "dbxfe-orchestration-published-failure",
+      "dbxfe-orchestration-effects",
+      "dbxfe-orchestration-reconcile"
+    ]
+  },
+  "scenarioIds": []
+}

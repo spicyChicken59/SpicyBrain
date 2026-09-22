@@ -1,0 +1,1417 @@
+{
+  "schemaVersion": 1,
+  "courseId": "dbxfe",
+  "moduleId": "dbxfe-m04",
+  "title": "Ingestion, quality and changing records",
+  "summary": "Retain what arrived, resolve identity and order, and publish only when the stated policy permits it.",
+  "outcomes": [
+    "Separate delivery identity, inspection identity and replacement revision.",
+    "Explain quarantine, cross-batch conflicts and invalid latest state.",
+    "Keep accepted diagnostic candidates separate from published reports."
+  ],
+  "startingAssumptions": [
+    "A committed table snapshot is different from a source business revision.",
+    "Read typed rows and the weighted unit defect rate."
+  ],
+  "lessonIds": [
+    "dbxfe-m04-l02",
+    "dbxfe-record-resolution",
+    "dbxfe-versioned-updates"
+  ],
+  "optionalBridgeLessonIds": [],
+  "editorialRationale": "The five-row baseline and corrected unkeyed conflict remain one canonical authored policy. Visual ledgers reveal population and publication separately.",
+  "sources": [
+    {
+      "id": "dbxfe-m04-source-ingestion",
+      "title": "What is Lakeflow Connect?",
+      "url": "https://docs.databricks.com/aws/en/ingestion/overview",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "A synthetic JSON batch is not a verified connector or a production CDC architecture.",
+      "reviewedEvidence": "Connector categories include CDC database ingestion, files, streaming and query-based ingestion; service model and source support differ."
+    },
+    {
+      "id": "dbxfe-m04-source-expectations",
+      "title": "Manage data quality with pipeline expectations",
+      "url": "https://docs.databricks.com/aws/en/ldp/expectations",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "These mechanics do not implement the course’s global retained-history conflict or publication policy.",
+      "reviewedEvidence": "Expectations evaluate record-level SQL Boolean constraints; retain/drop/fail actions differ, and constraints cannot query other tables."
+    },
+    {
+      "id": "dbxfe-m04-source-merge",
+      "title": "Upsert into a Delta Lake table using merge",
+      "url": "https://docs.databricks.com/aws/en/delta/merge",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "The illustrated target remains Runtime 16.4 LTS, unexecuted. Resolve business ambiguity before MERGE on either runtime.",
+      "reviewedEvidence": "MERGE can apply inserts/updates/deletes; duplicate-match handling differs between Runtime 16.0+ and 15.4 LTS and below."
+    },
+    {
+      "id": "dbxfe-m04-source-rescued-data",
+      "title": "Auto Loader schema inference: rescued data column",
+      "url": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-20",
+      "publishedAt": null,
+      "context": "Databricks on AWS; primary documentation reviewed 2026-09-20.",
+      "caveat": "Behavior depends on configured schema/evolution/parser options. Preserving a field does not validate or adjudicate it; no Auto Loader stream is executed.",
+      "reviewedEvidence": "The rescued-data column retains fields absent from the schema or mismatched by type/case, with source-file context; rescue evolution mode keeps new columns there without evolving the schema."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-m04-guidance",
+      "description": "Original educational reasoning, diagnostic choices and worked decisions; not a vendor runbook.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent SpicyBrain curriculum."
+    },
+    {
+      "id": "dbxfe-m04-fiction",
+      "description": "Cinderline examples, quantities, states, outcomes and alternatives are synthetic.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "Original teaching examples; no Databricks or customer execution claim."
+    },
+    {
+      "id": "dbxfe-m04-claim-ingestion",
+      "description": "Connector categories include CDC database ingestion, files, streaming and query-based ingestion; service model and source support differ.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m04-source-ingestion"
+      ],
+      "context": "A synthetic JSON batch is not a verified connector or a production CDC architecture."
+    },
+    {
+      "id": "dbxfe-m04-claim-expectations",
+      "description": "Expectations evaluate record-level SQL Boolean constraints; retain/drop/fail actions differ, and constraints cannot query other tables.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m04-source-expectations"
+      ],
+      "context": "These mechanics do not implement the course’s global retained-history conflict or publication policy."
+    },
+    {
+      "id": "dbxfe-m04-claim-merge",
+      "description": "MERGE can apply inserts/updates/deletes; duplicate-match handling differs between Runtime 16.0+ and 15.4 LTS and below.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m04-source-merge"
+      ],
+      "context": "The illustrated target remains Runtime 16.4 LTS, unexecuted. Resolve business ambiguity before MERGE on either runtime."
+    },
+    {
+      "id": "dbxfe-m04-claim-rescued-data",
+      "description": "The rescued-data column retains fields absent from the schema or mismatched by type/case, with source-file context; rescue evolution mode keeps new columns there without evolving the schema.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-m04-source-rescued-data"
+      ],
+      "context": "Behavior depends on configured schema/evolution/parser options. Preserving a field does not validate or adjudicate it; no Auto Loader stream is executed."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-m04-capture-concept",
+      "term": "change data capture",
+      "aliases": [
+        "CDC"
+      ],
+      "definition": "Representing source changes such as inserts, updates and deletes under a source-specific contract.",
+      "example": "A correction to inspection A can arrive after a prior report and must be interpreted as a replacement.",
+      "sourceIds": [
+        "dbxfe-m04-source-ingestion"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-identity-concept",
+      "term": "business key",
+      "aliases": [],
+      "definition": "The identity of one business entity across deliveries and revisions.",
+      "example": "inspection_id=A stays constant when version 2 replaces version 1.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m04-quality-concept",
+      "term": "quarantine",
+      "aliases": [],
+      "definition": "Retained invalid input with explicit reasons and provenance, separated from accepted reporting rows.",
+      "example": "B’s inspected=-3 remains inspectable but is excluded from the accepted-only baseline.",
+      "sourceIds": [
+        "dbxfe-m04-source-expectations"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-latest-concept",
+      "term": "unresolved key",
+      "aliases": [],
+      "definition": "A usable business identity whose current state cannot be accepted unambiguously under the policy.",
+      "example": "A valid revision 2 followed by invalid revision 3 makes A unresolved; revision 2 is not silently current again.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m04-conflict-concept",
+      "term": "provenance conflict",
+      "aliases": [],
+      "definition": "Contradictory evidence about an identity that is supposed to describe one immutable payload.",
+      "example": "event_id=unkeyed says both 2 and 3 inspected units while inspection_id is null.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m04-publication-concept",
+      "term": "publication gate",
+      "aliases": [],
+      "definition": "An explicit policy decision about whether resolved candidate data may become a current report.",
+      "example": "A candidate 22/1 remains unpublished while global conflict evidence keeps 20/1 stale_previous.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m04-update-concept",
+      "term": "upsert",
+      "aliases": [],
+      "definition": "Updating an existing target key or inserting a missing one from a prepared source relation.",
+      "example": "A valid newer A3 replaces A2; older A1 cannot overwrite A3.",
+      "sourceIds": [
+        "dbxfe-m04-source-merge"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-transfer-concept",
+      "term": "replay invariant",
+      "aliases": [],
+      "definition": "An explicitly named business result that remains unchanged when identical evidence is processed again.",
+      "example": "Replaying ev 3 increases raw deliveries but preserves accepted A2+C1 and the same publication identity.",
+      "sourceIds": []
+    },
+    {
+      "id": "dbxfe-m04-extension-rescued-data-concept",
+      "term": "rescued data",
+      "aliases": [],
+      "definition": "Input field content retained separately when it cannot be parsed into the selected schema.",
+      "example": "A new operator_note field can remain in rescued JSON when the configured schema has no such column.",
+      "sourceIds": [
+        "dbxfe-m04-source-rescued-data"
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "dbxfe-m04-capture-visual",
+      "kind": "timeline",
+      "title": "Incremental says what you revisit",
+      "alt": "Incremental says what you revisit. The latest arrival can describe the oldest business state. These descriptions do not establish the same guarantee.",
+      "caption": "Delivery progress does not define business identity, ordering or deletion. Synthetic teaching example.",
+      "textEquivalent": "Source history: The latest arrival can describe the oldest business state. Columns: Source event; Business meaning; Transport observation. Rows: A revision 1 — 10 inspected — Arrives Monday; A revision 2 — 12 replaces 10 — Arrives Tuesday; Replay of revision 1 — Old evidence — Arrives Wednesday.\n\nChoose the processing question: These descriptions do not establish the same guarantee. Columns: Term; Question it answers. Rows: Batch — Which bounded records are in this run?; Incremental — What progress/change boundary is used?; CDC — Which source changes and operations are represented?.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m04-claim-ingestion",
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "states": [
+        {
+          "id": "source",
+          "title": "Source history",
+          "explanation": "The latest arrival can describe the oldest business state.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Source event",
+              "Business meaning",
+              "Transport observation"
+            ],
+            "rows": [
+              [
+                "A revision 1",
+                "10 inspected",
+                "Arrives Monday"
+              ],
+              [
+                "A revision 2",
+                "12 replaces 10",
+                "Arrives Tuesday"
+              ],
+              [
+                "Replay of revision 1",
+                "Old evidence",
+                "Arrives Wednesday"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "scope",
+          "title": "Choose the processing question",
+          "explanation": "These descriptions do not establish the same guarantee.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Term",
+              "Question it answers"
+            ],
+            "rows": [
+              [
+                "Batch",
+                "Which bounded records are in this run?"
+              ],
+              [
+                "Incremental",
+                "What progress/change boundary is used?"
+              ],
+              [
+                "CDC",
+                "Which source changes and operations are represented?"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m04-identity-visual",
+      "kind": "table",
+      "title": "One event, one inspection, one revision",
+      "alt": "One event, one inspection, one revision. Do not choose by arrival order.",
+      "caption": "Event identity, business identity and replacement order solve different problems. Synthetic teaching example.",
+      "textEquivalent": "Compare identities: Do not choose by arrival order. Columns: Arrival; Compare with prior evidence; Classification. Rows: ev 3/A/v2/12/1 — Same event and payload — Identical replay; ev 8/A/v2/12/1 — Different event; same business state — Redundant evidence; ev 9/A/v1/10/1 — Lower revision for A — Older state; ev 3/A/v2/13/1 — Same event; different payload — Provenance conflict.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "states": [
+        {
+          "id": "cases",
+          "title": "Compare identities",
+          "explanation": "Do not choose by arrival order.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Arrival",
+              "Compare with prior evidence",
+              "Classification"
+            ],
+            "rows": [
+              [
+                "ev 3/A/v2/12/1",
+                "Same event and payload",
+                "Identical replay"
+              ],
+              [
+                "ev 8/A/v2/12/1",
+                "Different event; same business state",
+                "Redundant evidence"
+              ],
+              [
+                "ev 9/A/v1/10/1",
+                "Lower revision for A",
+                "Older state"
+              ],
+              [
+                "ev 3/A/v2/13/1",
+                "Same event; different payload",
+                "Provenance conflict"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m04-quality-visual",
+      "kind": "table",
+      "title": "Keep the rejected row visible",
+      "alt": "Keep the rejected row visible. Retain every arrival, including the repeat and invalid row. Superseded valid state is not the same as rejected input.",
+      "caption": "Raw, quarantined, superseded and accepted are different populations. Synthetic teaching example.",
+      "textEquivalent": "Retained raw: 5 deliveries: Retain every arrival, including the repeat and invalid row. Columns: Event; Inspection/version; Inspected/defective. Rows: ev1 — A/1 — 10/1; ev1 — A/1 — 10/1; ev2 — B/1 — -3/1; ev3 — A/2 — 12/1; ev4 — C/1 — 8/0.\n\nResolved evidence: Superseded valid state is not the same as rejected input. Columns: Evidence; Disposition; Reason. Rows: Repeated ev 1 — Count once in resolution — Identical delivery; B/1=-3/1 — Quarantine — Negative inspected quantity; A/1=10/1 — Superseded — A/2 is newer; A/2 and C/1 — Accepted current — 20/1; exclusions disclosed.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m04-claim-expectations",
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "states": [
+        {
+          "id": "raw",
+          "title": "Retained raw: 5 deliveries",
+          "explanation": "Retain every arrival, including the repeat and invalid row.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Event",
+              "Inspection/version",
+              "Inspected/defective"
+            ],
+            "rows": [
+              [
+                "ev1",
+                "A/1",
+                "10/1"
+              ],
+              [
+                "ev1",
+                "A/1",
+                "10/1"
+              ],
+              [
+                "ev2",
+                "B/1",
+                "-3/1"
+              ],
+              [
+                "ev3",
+                "A/2",
+                "12/1"
+              ],
+              [
+                "ev4",
+                "C/1",
+                "8/0"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "resolved",
+          "title": "Resolved evidence",
+          "explanation": "Superseded valid state is not the same as rejected input.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Evidence",
+              "Disposition",
+              "Reason"
+            ],
+            "rows": [
+              [
+                "Repeated ev 1",
+                "Count once in resolution",
+                "Identical delivery"
+              ],
+              [
+                "B/1=-3/1",
+                "Quarantine",
+                "Negative inspected quantity"
+              ],
+              [
+                "A/1=10/1",
+                "Superseded",
+                "A/2 is newer"
+              ],
+              [
+                "A/2 and C/1",
+                "Accepted current",
+                "20/1; exclusions disclosed"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m04-latest-visual",
+      "kind": "comparison",
+      "title": "Do not resurrect an older valid state",
+      "alt": "Do not resurrect an older valid state. The ordering evidence survives quantity validation. Latest valid is not necessarily valid latest.",
+      "caption": "Validate the newest observed state; do not hide it by selecting an older valid row. Synthetic teaching example.",
+      "textEquivalent": "Retained evidence: The ordering evidence survives quantity validation. Columns: Key/revision; Value; Meaning. Rows: A/2 — 12/1 — Previously verified; A/3 — NULL/1 — Newer but invalid; C/1 — 8/0 — Unchanged valid current.\n\nTwo algorithms: Latest valid is not necessarily valid latest. Columns: Approach; Candidate; Publication. Rows: Discard invalid then max — A/2 + C/1 — Wrongly resurrects old A; Max observed then validate — C/1; unresolved A — Block; previous 20/1 is stale.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "states": [
+        {
+          "id": "evidence",
+          "title": "Retained evidence",
+          "explanation": "The ordering evidence survives quantity validation.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Key/revision",
+              "Value",
+              "Meaning"
+            ],
+            "rows": [
+              [
+                "A/2",
+                "12/1",
+                "Previously verified"
+              ],
+              [
+                "A/3",
+                "NULL/1",
+                "Newer but invalid"
+              ],
+              [
+                "C/1",
+                "8/0",
+                "Unchanged valid current"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "outcomes",
+          "title": "Two algorithms",
+          "explanation": "Latest valid is not necessarily valid latest.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Approach",
+              "Candidate",
+              "Publication"
+            ],
+            "rows": [
+              [
+                "Discard invalid then max",
+                "A/2 + C/1",
+                "Wrongly resurrects old A"
+              ],
+              [
+                "Max observed then validate",
+                "C/1; unresolved A",
+                "Block; previous 20/1 is stale"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m04-conflict-visual",
+      "kind": "table",
+      "title": "A conflict can exist without a usable key",
+      "alt": "A conflict can exist without a usable key. Both rows lack a usable inspection identity, but they reuse a nonempty event identity. Empty unresolved keys does not mean safe provenance.",
+      "caption": "No attributable business key does not mean no provenance conflict. Synthetic teaching example.",
+      "textEquivalent": "Contradictory retained payloads: Both rows lack a usable inspection identity, but they reuse a nonempty event identity. Columns: Event; Inspection ID; Version; Inspected/defective. Rows: unkeyed — NULL — 1 — 2/0; unkeyed — NULL — 1 — 3/0.\n\nFirst run: no previous report: Empty unresolved keys does not mean safe provenance. Columns: Output; Required result; Why. Rows: conflicts — Nonempty — Immutable event payloads disagree; unresolved inspection keys — Empty — No real key can be attributed; publication_allowed — false — Global conflict evidence blocks; status / published / effects — blocked_no_snapshot / none /0 — No trustworthy report to promote.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "states": [
+        {
+          "id": "payloads",
+          "title": "Contradictory retained payloads",
+          "explanation": "Both rows lack a usable inspection identity, but they reuse a nonempty event identity.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Event",
+              "Inspection ID",
+              "Version",
+              "Inspected/defective"
+            ],
+            "rows": [
+              [
+                "unkeyed",
+                "NULL",
+                "1",
+                "2/0"
+              ],
+              [
+                "unkeyed",
+                "NULL",
+                "1",
+                "3/0"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "gate",
+          "title": "First run: no previous report",
+          "explanation": "Empty unresolved keys does not mean safe provenance.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Output",
+              "Required result",
+              "Why"
+            ],
+            "rows": [
+              [
+                "conflicts",
+                "Nonempty",
+                "Immutable event payloads disagree"
+              ],
+              [
+                "unresolved inspection keys",
+                "Empty",
+                "No real key can be attributed"
+              ],
+              [
+                "publication_allowed",
+                "false",
+                "Global conflict evidence blocks"
+              ],
+              [
+                "status / published / effects",
+                "blocked_no_snapshot / none /0",
+                "No trustworthy report to promote"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m04-publication-visual",
+      "kind": "comparison",
+      "title": "A candidate is not a published report",
+      "alt": "A candidate is not a published report. B’s isolated exclusion is disclosed. Never label 22/1 current while the gate is false.",
+      "caption": "Candidate 22/1 can exist while publication stays blocked and 20/1 is only previous evidence. Synthetic teaching example.",
+      "textEquivalent": "Verified baseline: B’s isolated exclusion is disclosed. Columns: Layer; Value; Status. Rows: Candidate — 20 inspected /1 defective — Resolved; Published report — 20/1 — current_with_exclusions; Simulated outbox — 1 entry — Baseline snapshot identity.\n\nCorrection plus global conflict: Never label 22/1 current while the gate is false. Columns: Layer; Value; Status. Rows: Candidate — 22 inspected /1 defective — Diagnostic accepted rows; Publication gate — false — Unkeyed contradiction remains; Published report — Exact prior 20/1 — stale_previous; Simulated outbox — Same 1 entry — No new publication effect.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "states": [
+        {
+          "id": "baseline",
+          "title": "Verified baseline",
+          "explanation": "B’s isolated exclusion is disclosed.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Layer",
+              "Value",
+              "Status"
+            ],
+            "rows": [
+              [
+                "Candidate",
+                "20 inspected /1 defective",
+                "Resolved"
+              ],
+              [
+                "Published report",
+                "20/1",
+                "current_with_exclusions"
+              ],
+              [
+                "Simulated outbox",
+                "1 entry",
+                "Baseline snapshot identity"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "blocked",
+          "title": "Correction plus global conflict",
+          "explanation": "Never label 22/1 current while the gate is false.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Layer",
+              "Value",
+              "Status"
+            ],
+            "rows": [
+              [
+                "Candidate",
+                "22 inspected /1 defective",
+                "Diagnostic accepted rows"
+              ],
+              [
+                "Publication gate",
+                "false",
+                "Unkeyed contradiction remains"
+              ],
+              [
+                "Published report",
+                "Exact prior 20/1",
+                "stale_previous"
+              ],
+              [
+                "Simulated outbox",
+                "Same 1 entry",
+                "No new publication effect"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m04-update-visual",
+      "kind": "table",
+      "title": "Resolve first, then guard replacement",
+      "alt": "Resolve first, then guard replacement. No-op is not a substitute for checking contradiction.",
+      "caption": "An upsert applies resolved evidence; a no-op does not prove evidence agrees. Synthetic teaching example.",
+      "textEquivalent": "Compare source with target A v2=12/1: No-op is not a substitute for checking contradiction. Columns: Source; Target result; Required interpretation. Rows: A v 3=14/1 — A v 3=14/1 — Newer valid replacement; A v2=12/1 — Unchanged — Identical replay; A v1=10/1 — Unchanged — Older evidence; A v2=13/1 — Do not publish — Equal-version conflict.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m04-claim-merge",
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "states": [
+        {
+          "id": "rules",
+          "title": "Compare source with target A v2=12/1",
+          "explanation": "No-op is not a substitute for checking contradiction.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Source",
+              "Target result",
+              "Required interpretation"
+            ],
+            "rows": [
+              [
+                "A v 3=14/1",
+                "A v 3=14/1",
+                "Newer valid replacement"
+              ],
+              [
+                "A v2=12/1",
+                "Unchanged",
+                "Identical replay"
+              ],
+              [
+                "A v1=10/1",
+                "Unchanged",
+                "Older evidence"
+              ],
+              [
+                "A v2=13/1",
+                "Do not publish",
+                "Equal-version conflict"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dbxfe-m04-transfer-visual",
+      "kind": "table",
+      "title": "Replay changes evidence counts, not authority",
+      "alt": "Replay changes evidence counts, not authority. Operational evidence grows while the business result stays stable. A contradiction is not an identical replay.",
+      "caption": "Replay preserves named business outputs; new contradiction changes the evidence and can block publication. Synthetic teaching example.",
+      "textEquivalent": "Identical replay after baseline: Operational evidence grows while the business result stays stable. Columns: Quantity; Before; After. Rows: Raw deliveries — 5 — 6; Accepted current rows — A2, C1 — A2, C1; Totals — 20/1 — 20/1; Publication identity — Baseline ID — Same ID.\n\nNew disagreeing A2 arrives: A contradiction is not an identical replay. Columns: Evidence; Candidate; Decision. Rows: New event A2=13/1 — C1 only; A unresolved — Block new report; Both A2 payloads retained — No chosen winner — Previous report is stale.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "states": [
+        {
+          "id": "replay",
+          "title": "Identical replay after baseline",
+          "explanation": "Operational evidence grows while the business result stays stable.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Quantity",
+              "Before",
+              "After"
+            ],
+            "rows": [
+              [
+                "Raw deliveries",
+                "5",
+                "6"
+              ],
+              [
+                "Accepted current rows",
+                "A2, C1",
+                "A2, C1"
+              ],
+              [
+                "Totals",
+                "20/1",
+                "20/1"
+              ],
+              [
+                "Publication identity",
+                "Baseline ID",
+                "Same ID"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "contradiction",
+          "title": "New disagreeing A2 arrives",
+          "explanation": "A contradiction is not an identical replay.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Evidence",
+              "Candidate",
+              "Decision"
+            ],
+            "rows": [
+              [
+                "New event A2=13/1",
+                "C1 only; A unresolved",
+                "Block new report"
+              ],
+              [
+                "Both A2 payloads retained",
+                "No chosen winner",
+                "Previous report is stale"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-m04-capture-question",
+      "revision": "1",
+      "prompt": "A revision 1 payload arrives after revision 2. Does last arrival establish current business state?",
+      "options": [
+        {
+          "id": "dbxfe-m04-capture-question-a",
+          "text": "No; apply the source ordering contract",
+          "rationale": "Transport order and business order are different."
+        },
+        {
+          "id": "dbxfe-m04-capture-question-b",
+          "text": "Yes; newer delivery always means newer data",
+          "rationale": "Late or replayed delivery is possible."
+        },
+        {
+          "id": "dbxfe-m04-capture-question-c",
+          "text": "Only if the job is called streaming",
+          "rationale": "A processing label does not define authority."
+        }
+      ],
+      "correctOptionId": "dbxfe-m04-capture-question-a",
+      "conceptIds": [
+        "dbxfe-m04-capture-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-ingestion",
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-identity-question",
+      "revision": "1",
+      "prompt": "ev 8/A/v2/12/1 arrives after ev 3/A/v2/12/1. How many current inspections does this establish?",
+      "options": [
+        {
+          "id": "dbxfe-m04-identity-question-b",
+          "text": "Two inspections because event IDs differ",
+          "rationale": "Event identity is not the inspection grain."
+        },
+        {
+          "id": "dbxfe-m04-identity-question-c",
+          "text": "A new revision 3 automatically",
+          "rationale": "Arrival does not create a source revision."
+        },
+        {
+          "id": "dbxfe-m04-identity-question-a",
+          "text": "One A inspection at revision 2",
+          "rationale": "The second event is redundant business evidence."
+        }
+      ],
+      "correctOptionId": "dbxfe-m04-identity-question-a",
+      "conceptIds": [
+        "dbxfe-m04-identity-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-quality-question",
+      "revision": "1",
+      "prompt": "How many accepted current inspection rows are in the baseline?",
+      "options": [
+        {
+          "id": "dbxfe-m04-quality-question-c",
+          "text": "Three because A v1 is valid",
+          "rationale": "It is valid historical evidence but superseded for current reporting."
+        },
+        {
+          "id": "dbxfe-m04-quality-question-a",
+          "text": "Two: A v2 and C v1",
+          "rationale": "Replay, invalid B and superseded A v1 do not add current rows."
+        },
+        {
+          "id": "dbxfe-m04-quality-question-b",
+          "text": "Five because all deliveries arrived",
+          "rationale": "Raw delivery count is not business grain."
+        }
+      ],
+      "correctOptionId": "dbxfe-m04-quality-question-a",
+      "conceptIds": [
+        "dbxfe-m04-quality-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-expectations",
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-latest-question",
+      "revision": "1",
+      "prompt": "Which result follows the stated policy after invalid A v 3?",
+      "options": [
+        {
+          "id": "dbxfe-m04-latest-question-a",
+          "text": "A unresolved; block current publication",
+          "rationale": "A v2 remains historical evidence, not a silently restored current state."
+        },
+        {
+          "id": "dbxfe-m04-latest-question-b",
+          "text": "Publish A v2+C as current",
+          "rationale": "That hides evidence that a newer A exists."
+        },
+        {
+          "id": "dbxfe-m04-latest-question-c",
+          "text": "Publish C-only 8/0 as current",
+          "rationale": "The candidate omits unresolved current state."
+        }
+      ],
+      "correctOptionId": "dbxfe-m04-latest-question-a",
+      "conceptIds": [
+        "dbxfe-m04-latest-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-conflict-question",
+      "revision": "1",
+      "prompt": "conflicts is nonempty and unresolved keys is empty. May this resolver publish?",
+      "options": [
+        {
+          "id": "dbxfe-m04-conflict-question-b",
+          "text": "Yes, because no inspection key is blocked",
+          "rationale": "That was the corrected defect: unkeyed conflict evidence still blocks."
+        },
+        {
+          "id": "dbxfe-m04-conflict-question-c",
+          "text": "Only after inventing an inspection ID",
+          "rationale": "Fabricating identity would conceal uncertainty rather than resolve it."
+        },
+        {
+          "id": "dbxfe-m04-conflict-question-a",
+          "text": "No",
+          "rationale": "The gate checks both conflict evidence and unresolved keys."
+        }
+      ],
+      "correctOptionId": "dbxfe-m04-conflict-question-a",
+      "conceptIds": [
+        "dbxfe-m04-conflict-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-publication-question",
+      "revision": "1",
+      "prompt": "Which number should be presented as the new current report?",
+      "options": [
+        {
+          "id": "dbxfe-m04-publication-question-c",
+          "text": "20/1 without a warning",
+          "rationale": "That hides the newer blocking evidence."
+        },
+        {
+          "id": "dbxfe-m04-publication-question-a",
+          "text": "None; keep 20/1 explicitly stale/previous",
+          "rationale": "The 22/1 candidate is blocked, and 20/1 is no longer claimed current."
+        },
+        {
+          "id": "dbxfe-m04-publication-question-b",
+          "text": "22/1 because accepted rows are valid",
+          "rationale": "Global unresolved provenance still prevents publication."
+        }
+      ],
+      "correctOptionId": "dbxfe-m04-publication-question-a",
+      "conceptIds": [
+        "dbxfe-m04-publication-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-update-question",
+      "revision": "1",
+      "prompt": "A guarded update makes no change for equal revision but different quantities. Is that enough to report success?",
+      "options": [
+        {
+          "id": "dbxfe-m04-update-question-a",
+          "text": "No; detect and retain the equal-version conflict upstream",
+          "rationale": "A newer-only SQL guard can hide disagreement if reconciliation is skipped."
+        },
+        {
+          "id": "dbxfe-m04-update-question-b",
+          "text": "Yes; unchanged target means all evidence is consistent",
+          "rationale": "No change proves no such thing."
+        },
+        {
+          "id": "dbxfe-m04-update-question-c",
+          "text": "Yes; choose the last payload next time",
+          "rationale": "Arrival order is not authority."
+        }
+      ],
+      "correctOptionId": "dbxfe-m04-update-question-a",
+      "conceptIds": [
+        "dbxfe-m04-update-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-merge",
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ]
+    }
+  ],
+  "selfQuestions": [
+    {
+      "id": "dbxfe-m04-transfer-question",
+      "revision": "1",
+      "prompt": "Explain why raw_count is not invariant under replay but the accepted business state can be.",
+      "modelAnswer": "Raw records every delivery, so identical replay adds evidence rows. Resolution recognizes repeated immutable payloads and keeps the same current business records. A differing payload is conflict evidence and can change publication status.",
+      "reasoning": "The policy preserves transport history without counting every delivery as a new inspection. The invariant must name the business output rather than every internal counter.",
+      "conceptIds": [
+        "dbxfe-m04-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ]
+    }
+  ],
+  "beats": [
+    {
+      "id": "dbxfe-m04-capture",
+      "version": "1.0.0",
+      "title": "Incremental says what you revisit",
+      "outcome": "Distinguish a bounded batch from source change semantics.",
+      "explanation": "A batch is a bounded input set. Incremental processing handles changes relative to prior progress. [[dbxfe-m04-capture-concept|change data capture]] represents source changes, but the connector’s ordering, deletion and replay rules must be verified. A timestamp filter alone does not prove that late corrections or deletes are handled. Start with the actual source contract, not the scheduling label.",
+      "lessonId": "dbxfe-m04-l02",
+      "sectionId": "dbxfe-m04-l02-foundation-contract",
+      "conceptIds": [
+        "dbxfe-m04-capture-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-ingestion",
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "visualId": "dbxfe-m04-capture-visual",
+      "questionIds": [
+        "dbxfe-m04-capture-question"
+      ],
+      "handbook": {
+        "markdown": "Ask the source owner what identifies an immutable event, what identifies the business entity, what field establishes order within that entity, and which operations exist. Confirm whether an update is a full replacement or an additive change. Ask how deletions, snapshots, replays and missing ordering fields are represented. These questions precede a target SQL statement.\n\nOur local course contract deliberately uses full replacement inspection states. A newer revision supplies the complete inspected and defective quantities. The reference retains all synthetic history and recomputes resolution, so conflicts arriving in separate batches remain visible. It is an inspectable local model, not a scalable streaming connector.\n\nA checkpoint or watermark describes progress under an implementation; it does not independently prove every source record arrived. Similarly, a batch containing only A does not say C was deleted. A real connector must be reviewed for its specific source version, permissions, supported operations and recovery behavior. The current ingestion documentation supports the available categories; it does not certify this fictional policy as a Databricks default.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l02-foundation-contract"
+        ]
+      },
+      "recap": "Delivery progress does not define business identity, ordering or deletion.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m04-identity",
+      "version": "1.0.0",
+      "title": "One event, one inspection, one revision",
+      "outcome": "Classify replay, redundancy and conflict without arbitrary winners.",
+      "explanation": "event_id identifies an immutable delivered payload. inspection_id is the [[dbxfe-m04-identity-concept|business key]]. version orders complete replacement states within that inspection. Repeating the same payload is replay; a different event ID with the same key/version/value is redundant evidence. A disagreement at the same immutable identity is a conflict, not another inspection to add.",
+      "lessonId": "dbxfe-m04-l02",
+      "sectionId": "dbxfe-m04-l02-foundation-contract",
+      "conceptIds": [
+        "dbxfe-m04-identity-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "visualId": "dbxfe-m04-identity-visual",
+      "samajh": {
+        "text": "Courier do baar wahi document de de toh do transactions nahi ho jaate. Tracking number delivery ko identify karta hai; document par inspection ID business cheez ko. Revised copy ka version alag hai. Agar same tracking number do different documents bol raha hai, pehle disagreement resolve karo.",
+        "mapping": "Delivery label, document identity and revision map to three distinct fields.",
+        "boundary": "The exact immutable-event contract is fictional and must be agreed for a real source."
+      },
+      "questionIds": [
+        "dbxfe-m04-identity-question"
+      ],
+      "handbook": {
+        "markdown": "Identity fields answer separate questions. event_id lets this contract detect a repeated immutable delivery and contradictory reuse of an event identity. inspection_id groups replacement states for one inspection. version provides a positive integer ordering within that key. None of these fields is a table commit version, and versions from different inspection keys are not ranked against each other to choose one global row.\n\nEqual identity requires payload comparison. A new event ID can repeat the same A revision 2 state without creating another A. Conversely, two event IDs can disagree about A revision 2; the difference is still a business-revision conflict. Sorting by arrival merely chooses whichever message happened to arrive later, not the more trustworthy state.\n\nKeep all raw deliveries and their provenance. The accepted relation may deduplicate redundant evidence, while the raw count increases after replay. Missing or blank keys cannot be silently invented. Missing order for a known key leaves its current interpretation unresolved under our conservative policy. These are original choices for this exercise, not universal CDC rules. A real system needs a source owner and a documented adjudication process.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l02-foundation-contract"
+        ]
+      },
+      "recap": "Event identity, business identity and replacement order solve different problems.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m04-quality",
+      "version": "1.0.0",
+      "title": "Keep the rejected row visible",
+      "outcome": "Trace the baseline population through replay, quarantine and replacement.",
+      "explanation": "Five deliveries contain one exact repeat, one invalid B row, an old A revision, current A and C. [[dbxfe-m04-quality-concept|quarantine]] preserves B with its reason. The accepted current population is A v2=12/1 and C v1=8/0:20 inspected, 1 defective. This accepted-only report discloses B’s exclusion; it does not claim complete source coverage.",
+      "lessonId": "dbxfe-record-resolution",
+      "sectionId": "dbxfe-record-resolution-worked",
+      "conceptIds": [
+        "dbxfe-m04-quality-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-expectations",
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "visualId": "dbxfe-m04-quality-visual",
+      "questionIds": [
+        "dbxfe-m04-quality-question"
+      ],
+      "handbook": {
+        "markdown": "Trace counts with named meanings: raw deliveries 5; distinct immutable payloads 4; quarantined distinct rows 1; structurally valid revision rows 3; accepted current inspection rows 2. These are not interchangeable counters. A v1 is valid but no longer current; B is invalid; the repeated ev 1 is redundant transport evidence.\n\nThe baseline permits publication because B has no prior valid published state and its isolated invalid row creates no conflicting identity evidence. The report is explicitly accepted-only, with exclusions disclosed. That exception does not authorize dropping any inconvenient new evidence. The following beats show invalid latest state and global conflicts that must block publication.\n\nA product expectation can retain, drop or fail a record according to its configured Boolean constraint. It does not automatically compare all historical payloads for immutable identity agreement. Keep row validation, cross-record reconciliation and publication policy separate. When investigating a count mismatch, retain input references and every rejection reason rather than replacing a malformed quantity with zero. The complete canonical Python/Spark implementations and independent expected fixtures remain the source of executable detail; this teaching visual does not execute them.",
+        "sourceSectionIds": [
+          "dbxfe-record-resolution-stages",
+          "dbxfe-record-resolution-worked",
+          "dbxfe-record-resolution-reference-code"
+        ]
+      },
+      "recap": "Raw, quarantined, superseded and accepted are different populations.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": [
+        "dbxfe-m04-media-quality"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-latest",
+      "version": "1.0.0",
+      "title": "Do not resurrect an older valid state",
+      "outcome": "Select the highest observed revision before judging whether it is publishable.",
+      "explanation": "A previously valid A v2 has 12/1. A newer A v 3 arrives with an unknown inspected quantity. If you discard invalid rows first, v2 reappears as “latest valid.” Our policy instead treats A as an [[dbxfe-m04-latest-concept|unresolved key]]. The C-only candidate 8/0 is diagnostic; preserve the previous 20/1 report as stale and block a new current report.",
+      "lessonId": "dbxfe-record-resolution",
+      "sectionId": "dbxfe-record-resolution-stages",
+      "conceptIds": [
+        "dbxfe-m04-latest-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "visualId": "dbxfe-m04-latest-visual",
+      "questionIds": [
+        "dbxfe-m04-latest-question"
+      ],
+      "handbook": {
+        "markdown": "The order of operations encodes policy. Filtering invalid quantities before considering source order answers “what is the highest valid revision we can find?” The required question is “what is the highest observed ordered revision, and can we trust it?” Those questions differ precisely when the newest evidence is invalid.\n\nFor A2=12/1 then A3=NULL/1, keep both inputs. A3 establishes a newer state but cannot contribute a verified quantity. Mark A unresolved and do not fall back to A2 without a separately authorized business rule. C1 remains an accepted candidate row, so internal candidate totals can be 8/0. Publishing that candidate as the current report would silently change coverage.\n\nThe previous verified 20/1 snapshot can remain visible with stale_previous status. It is useful historical information, but its label must disclose that the latest evidence blocks a new report. If there is no prior snapshot, the status is blocked_no_snapshot. Correcting or adjudicating source evidence is a separate controlled process; arrival order, a green task, or a zero-update MERGE cannot resolve the uncertainty by itself.",
+        "sourceSectionIds": [
+          "dbxfe-record-resolution-stages"
+        ]
+      },
+      "recap": "Validate the newest observed state; do not hide it by selecting an older valid row.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m04-conflict",
+      "version": "1.0.0",
+      "title": "A conflict can exist without a usable key",
+      "outcome": "Apply the corrected global publication gate to unkeyed contradictory payloads.",
+      "explanation": "Two rows reuse event_id=unkeyed, have no usable inspection ID, and disagree: 2 versus 3 inspected units. They are quarantined, but their [[dbxfe-m04-conflict-concept|provenance conflict]] still exists. The unresolved-key list can be empty because there is no real key to add. Publication requires no unresolved keys and no conflict evidence; never invent a key to make that rule work.",
+      "lessonId": "dbxfe-record-resolution",
+      "sectionId": "dbxfe-record-resolution-worked",
+      "conceptIds": [
+        "dbxfe-m04-conflict-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "visualId": "dbxfe-m04-conflict-visual",
+      "samajh": {
+        "text": "Do slips par same receipt number hai, lekin amount 2 aur 3 likha hai. Customer ka naam missing hai toh disagreement khatam nahi hota. Naam guess karna bhi theek nahi. Humein pata hai evidence contradictory hai, chahe abhi usko kisi inspection se link na kar sakein.",
+        "mapping": "Receipt identity models immutable event provenance; missing name models unusable business identity.",
+        "boundary": "This conservative global block is the course policy, not a universal product rule."
+      },
+      "questionIds": [
+        "dbxfe-m04-conflict-question"
+      ],
+      "handbook": {
+        "markdown": "The corrected publication predicate is logically: no unresolved conflict evidence AND no unresolved current keys. Keep the outputs separate because they explain different kinds of uncertainty. A conflict cannot always be attributed to a usable inspection ID; missing, null, empty and whitespace-only IDs are invalid in this contract. A placeholder key would misrepresent what is known.\n\nOn a first run containing the two unkeyed contradictory payloads, there is no published snapshot and no simulated notification. The required status is blocked_no_snapshot. Reversing delivery order or replaying both rows cannot establish which payload is trustworthy. Filtering malformed rows away before conflict detection would discard the very evidence the gate needs.\n\nThis global block is intentionally conservative, including unresolved historical identity conflicts until adjudication. It does not mean every quarantined record blocks publication: the baseline B row is an isolated, nonconflicting invalid exclusion under a separate explicit rule. The preserved complete reference source and Spark publication relation implement this distinction. Spark reports event_conflict_count, revision_conflict_count, unresolved_key_count and publication_allowed; those are diagnostics, not a Spark simulation of report publication.",
+        "sourceSectionIds": [
+          "dbxfe-record-resolution-reference-code",
+          "dbxfe-record-resolution-spark-code",
+          "dbxfe-record-resolution-solution"
+        ]
+      },
+      "recap": "No attributable business key does not mean no provenance conflict.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m04-publication",
+      "version": "1.0.0",
+      "title": "A candidate is not a published report",
+      "outcome": "Keep diagnostic 22/1 separate from the last verified 20/1 report.",
+      "explanation": "Start with the verified 20/1 baseline. Add valid A v 3=14/1 while completing the unkeyed event conflict. Accepted candidate A3+C totals 22/1, yet the [[dbxfe-m04-publication-concept|publication gate]] is false. Keep the exact previous 20/1 snapshot labeled stale_previous and its existing simulated effect unchanged. A plausible new number is not permission to promote it.",
+      "lessonId": "dbxfe-record-resolution",
+      "sectionId": "dbxfe-record-resolution-solution",
+      "conceptIds": [
+        "dbxfe-m04-publication-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "visualId": "dbxfe-m04-publication-visual",
+      "questionIds": [
+        "dbxfe-m04-publication-question"
+      ],
+      "handbook": {
+        "markdown": "Treat the pipeline’s outputs as a ledger, not one success Boolean. Raw tells what arrived. Quarantine explains invalid rows. Accepted candidate rows are the current valid keys that can be resolved locally. Conflicts and unresolved keys explain uncertainty. Publication decides whether a candidate can replace the current report. A simulation of downstream effects is yet another boundary.\n\nIn this changed case, A3=14/1 and C1=8/0 are individually unambiguous, so their diagnostic total is 22/1. The contradictory unkeyed event still makes provenance unsafe globally. LocalPipeline therefore preserves its previous snapshot bytes and hash, marks it stale_previous, and does not add a notification key. With no previous snapshot, it would instead report blocked_no_snapshot.\n\nDo not conflate a Spark aggregate with a published dashboard. The preserved SQL/PySpark functions expose a one-row publication relation and diagnostic relations. The local Python pipeline demonstrates state and an in-memory outbox. Neither sends real notifications or establishes distributed atomicity. An honest report shows the freshness/coverage status beside the number, so the user can distinguish a prior verified result from a new candidate.",
+        "sourceSectionIds": [
+          "dbxfe-record-resolution-solution",
+          "dbxfe-record-resolution-reference-code",
+          "dbxfe-record-resolution-spark-code"
+        ]
+      },
+      "recap": "Candidate 22/1 can exist while publication stays blocked and 20/1 is only previous evidence.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m04-update",
+      "version": "1.0.0",
+      "title": "Resolve first, then guard replacement",
+      "outcome": "Apply version-aware update rules without treating a no-op as conflict resolution.",
+      "explanation": "An [[dbxfe-m04-update-concept|upsert]] applies a chosen source; it does not choose the trustworthy source row. First require one resolved row per key and a true publication gate. Then a newer revision can replace, an identical equal revision can be a no-op, and an older revision cannot overwrite. Equal revision with different quantities remains a conflict.",
+      "lessonId": "dbxfe-versioned-updates",
+      "sectionId": "dbxfe-versioned-updates-guard",
+      "conceptIds": [
+        "dbxfe-m04-update-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-merge",
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "visualId": "dbxfe-m04-update-visual",
+      "questionIds": [
+        "dbxfe-m04-update-question"
+      ],
+      "handbook": {
+        "markdown": "Prepare the source relation before matching target keys. Validate its quantity contract, uniqueness and retained-history identity agreement. Then check the publication gate. The guarded target operation has a narrow job: preserve newer accepted state against stale overwrites and make replay stable. It does not own conflict adjudication or source completeness.\n\nStarting from A2=12/1 and C1=8/0, applying only A3=14/1 changes the total to 22/1. Replaying that state changes nothing. Receiving A1 later leaves A3 current. C remains because absence from an incremental batch is not a deletion instruction. The source contract here contains no delete operation.\n\nThe preserved complete Python target example is locally tested. Its Delta MERGE counterpart is explicitly illustrative for Runtime 16.4 LTS and was not executed. Runtime duplicate-match semantics differ, but neither behavior justifies choosing an arbitrary business winner. Equal-version payload disagreement must be checked before a statement whose condition only updates newer rows. Exact supporting source sections retain code, expected states and runtime limits without duplicating the corrected resolver into a second divergent policy.",
+        "sourceSectionIds": [
+          "dbxfe-versioned-updates-worked",
+          "dbxfe-versioned-updates-delta-example",
+          "dbxfe-versioned-updates-solution"
+        ]
+      },
+      "recap": "An upsert applies resolved evidence; a no-op does not prove evidence agrees.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    },
+    {
+      "id": "dbxfe-m04-transfer",
+      "version": "1.0.0",
+      "title": "Replay changes evidence counts, not authority",
+      "outcome": "Predict business invariants and publication after changed cross-batch evidence.",
+      "explanation": "Replaying identical evidence can increase raw_count while accepted rows, totals and publication identity stay unchanged. A new contradictory payload is different: it changes what is known and can block publication. Name the [[dbxfe-m04-transfer-concept|replay invariant]] precisely. “Nothing changes” is too broad, and “the job succeeded twice” is too weak to establish correct replay.",
+      "lessonId": "dbxfe-m04-l02",
+      "sectionId": "dbxfe-m04-l02-foundation-task",
+      "conceptIds": [
+        "dbxfe-m04-transfer-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-guidance",
+        "dbxfe-m04-fiction"
+      ],
+      "visualId": "dbxfe-m04-transfer-visual",
+      "questionIds": [
+        "dbxfe-m04-transfer-question"
+      ],
+      "handbook": {
+        "markdown": "A replay test should begin with an independent expected ledger: accepted row identities and revisions, quantities, quarantine/conflict classifications, publication flag, published snapshot and effect keys. Execute the same input again and compare those meanings. Raw arrival count and row-location diagnostics may change; do not falsely demand that every operational detail remains identical.\n\nThen add a changed input that should change the answer. A valid A3 correction produces 22/1. A same-revision contradiction instead blocks publication. An older valid arrival cannot replace newer state. Missing ordering for a known key is unresolved rather than sorted by arrival. These cases distinguish a meaningful test from an implementation that merely returns the same result for everything.\n\nThe complete downloadable exercise includes retained cross-batch evidence and the unkeyed conflict case, so you can inspect how the rule is implemented. Use its complete source and expected fixtures when running locally; no browser execution or Databricks job is claimed here. The next module carries these exact publication decisions across failure boundaries and simulated effects.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l02-foundation-task"
+        ]
+      },
+      "recap": "Replay preserves named business outputs; new contradiction changes the evidence and can block publication.",
+      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "mediaIds": []
+    }
+  ],
+  "cardLinks": [
+    {
+      "cardId": "dbxfe-m04-l02-card1",
+      "beatId": "dbxfe-m04-capture"
+    },
+    {
+      "cardId": "dbxfe-m04-l02-card2",
+      "beatId": "dbxfe-m04-identity"
+    },
+    {
+      "cardId": "dbxfe-m04-l02-card3",
+      "beatId": "dbxfe-m04-update"
+    },
+    {
+      "cardId": "dbxfe-m04-l02-foundation-card1",
+      "beatId": "dbxfe-m04-identity"
+    },
+    {
+      "cardId": "dbxfe-m04-l02-foundation-card2",
+      "beatId": "dbxfe-m04-identity"
+    },
+    {
+      "cardId": "dbxfe-m04-l02-foundation-card3",
+      "beatId": "dbxfe-m04-update"
+    },
+    {
+      "cardId": "dbxfe-record-resolution-foundation-card1",
+      "beatId": "dbxfe-m04-conflict"
+    },
+    {
+      "cardId": "dbxfe-record-resolution-foundation-card2",
+      "beatId": "dbxfe-m04-identity"
+    },
+    {
+      "cardId": "dbxfe-record-resolution-foundation-card3",
+      "beatId": "dbxfe-m04-transfer"
+    },
+    {
+      "cardId": "dbxfe-versioned-updates-foundation-card1",
+      "beatId": "dbxfe-m04-update"
+    },
+    {
+      "cardId": "dbxfe-versioned-updates-foundation-card2",
+      "beatId": "dbxfe-m04-update"
+    },
+    {
+      "cardId": "dbxfe-versioned-updates-foundation-card3",
+      "beatId": "dbxfe-m04-update"
+    }
+  ],
+  "extensionCards": [
+    {
+      "id": "dbxfe-m04-extension-expectation",
+      "revision": "1",
+      "prompt": "Can one pipeline expectation compare a row with a separate historical table?",
+      "answer": "Not as an expectation constraint; the documented constraint excludes subqueries referencing other tables.",
+      "explanation": "Record-level Boolean quality rules are useful, but retained-history identity reconciliation needs additional transformations and policy. A passed quantity check does not prove immutable event agreement.",
+      "lessonId": "dbxfe-record-resolution",
+      "sectionId": "dbxfe-record-resolution-worked",
+      "conceptIds": [
+        "dbxfe-m04-quality-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-expectations"
+      ],
+      "beatId": "dbxfe-m04-quality",
+      "whyItMatters": "Prevents assigning cross-batch correctness to a row-check feature."
+    },
+    {
+      "id": "dbxfe-m04-extension-fail-flow",
+      "revision": "1",
+      "prompt": "Does one failing expectation always roll back every parallel flow in a triggered pipeline?",
+      "answer": "No. The documented triggered-pipeline behavior does not make parallel flows fail as one global transaction.",
+      "explanation": "The source distinguishes triggered and continuous pipeline behavior. Coordinate validation and downstream work explicitly when a business publication decision spans outputs; do not infer all-or-nothing workflow semantics from one table check.",
+      "lessonId": "dbxfe-record-resolution",
+      "sectionId": "dbxfe-record-resolution-worked",
+      "conceptIds": [
+        "dbxfe-m04-quality-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-expectations"
+      ],
+      "beatId": "dbxfe-m04-quality",
+      "whyItMatters": "A pipeline graph needs explicit publication boundaries."
+    },
+    {
+      "id": "dbxfe-m04-extension-merge-runtime",
+      "revision": "1",
+      "prompt": "Why record the Databricks Runtime when reviewing duplicate MERGE matches?",
+      "answer": "Duplicate-match detection considers different conditions in Runtime 16.0+ versus 15.4 LTS and below.",
+      "explanation": "The newer behavior considers ON and WHEN MATCHED conditions; the older behavior considers ON. Regardless of runtime, prepare one unambiguous business source row per target key rather than using engine ambiguity handling to choose a winner.",
+      "lessonId": "dbxfe-versioned-updates",
+      "sectionId": "dbxfe-versioned-updates-guard",
+      "conceptIds": [
+        "dbxfe-m04-update-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-merge"
+      ],
+      "beatId": "dbxfe-m04-update",
+      "whyItMatters": "A copied statement can behave differently across target runtimes."
+    },
+    {
+      "id": "dbxfe-m04-extension-rescued-data",
+      "revision": "1",
+      "prompt": "Auto Loader retains a new field in _rescued_data. Does that make the field part of the accepted business schema?",
+      "answer": "No. It preserves evidence for review; interpretation, schema changes and business validation remain explicit decisions.",
+      "explanation": "[[dbxfe-m04-extension-rescued-data-concept|rescued data]] helps keep unexpected input observable instead of silently dropping it. In an invented file, the known schema has inspection_id and quantities, but the sender adds operator_note. With rescue behavior configured, the extra field is retained separately; the selected schema need not automatically evolve. Type and case mismatches can also be rescued. Inspect the retained value and source file, decide whether the producer changed its contract, and validate a deliberate schema transition. A rescued quantity is not a zero, and a retained event is not automatically accepted. Keep this product parsing feature separate from Cinderline’s stricter identity/conflict publication policy.",
+      "lessonId": "dbxfe-m04-l02",
+      "sectionId": "dbxfe-m04-l02-foundation-contract",
+      "conceptIds": [
+        "dbxfe-m04-extension-rescued-data-concept"
+      ],
+      "claimIds": [
+        "dbxfe-m04-claim-rescued-data",
+        "dbxfe-m04-fiction",
+        "dbxfe-m04-guidance"
+      ],
+      "beatId": "dbxfe-m04-capture",
+      "whyItMatters": "Adds a concrete schema-drift mechanism while preserving the difference between retaining evidence and accepting data."
+    }
+  ],
+  "recap": {
+    "title": "Resolve the evidence before publishing the number",
+    "markdown": "**Retain → validate → reconcile identities/order → resolve current candidates → gate publication → guarded update.** Quarantine is not the same as a global conflict; an empty unresolved-key list is insufficient. Review the existing cards with the corrected revision meaning preserved.",
+    "visualId": "dbxfe-m04-publication-visual"
+  },
+  "appliedTask": {
+    "title": "The clean candidate with unsafe provenance",
+    "prompt": "The last verified report is 20/1. Two retained unkeyed payloads disagree, and valid A3=14/1 arrives. Predict candidate totals, conflict/key diagnostics, publication status, published totals and simulated effects. Then replay the batch.",
+    "modelAnswer": "Candidate A3+C1 totals 22/1. Global event conflict remains nonempty; no fabricated unresolved inspection key is added for the unkeyed rows. publication_allowed=false; status=stale_previous; published remains exact 20/1 with the same prior one-entry outbox. Replay increases raw evidence but does not clear conflict or create a new publication/effect.",
+    "reasoning": "Accepted candidate validity is not sufficient for the global provenance gate. Repeated evidence cannot adjudicate contradiction.",
+    "beatIds": [
+      "dbxfe-m04-conflict",
+      "dbxfe-m04-publication",
+      "dbxfe-m04-transfer"
+    ]
+  },
+  "scenarioIds": [
+    "dbxfe-m04-scenario"
+  ]
+}

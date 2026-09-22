@@ -47,6 +47,8 @@ const attempt = z
     ...ref,
     questionId: idSchema,
     questionRevision: text.min(1),
+    beatId: idSchema.optional(),
+    beatVersion: text.min(1).optional(),
     contentVersion: text.min(1),
     at: iso,
     optionId: idSchema,
@@ -108,6 +110,7 @@ const settings = z
     focus: z.boolean(),
     sessionSize: z.number().int().min(1).max(30),
     newLimit: z.number().int().min(1).max(10),
+    showSamajh: z.boolean(),
     updatedAt: iso,
   })
   .strict();
@@ -120,9 +123,46 @@ const position = z
     pathId: idSchema.optional(),
   })
   .strict();
+const beatPosition = z
+  .object({
+    courseId: idSchema,
+    moduleId: idSchema,
+    beatId: idSchema,
+    version: text.min(1),
+    visualStateId: idSchema,
+    view: z.enum(["deck", "handbook", "cards"]),
+    handbookOpen: z.boolean(),
+    handbookAnchor: idSchema,
+    offset: z.number().min(-5000).max(100000),
+    updatedAt: iso,
+    viewOffsets: z
+      .object({
+        deck: z.number().min(0).max(100000),
+        handbook: z.number().min(0).max(100000),
+        cards: z.number().min(0).max(100000),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+const beatCheck = z
+  .object({
+    id: uid,
+    courseId: idSchema,
+    moduleId: idSchema,
+    beatId: idSchema,
+    questionId: idSchema,
+    selectedOptionId: idSchema.optional(),
+    questionRevision: text.min(1).optional(),
+    opened: z.boolean(),
+    revealed: z.boolean(),
+    updatedAt: iso,
+  })
+  .strict();
+export type BeatPosition = z.infer<typeof beatPosition>;
 export const stateSchema = z
   .object({
-    schemaVersion: z.literal(3),
+    schemaVersion: z.literal(4),
     notes: record(note),
     drafts: record(draft),
     bookmarks: record(bookmark),
@@ -134,6 +174,9 @@ export const stateSchema = z
     assessments: record(assessment),
     positions: record(position),
     resume: position.nullable(),
+    beatPositions: record(beatPosition),
+    beatResume: beatPosition.nullable(),
+    beatChecks: record(beatCheck),
     settings,
     disclosureAccepted: z.boolean(),
   })
@@ -142,7 +185,7 @@ export type StudyState = z.infer<typeof stateSchema>;
 export type Note = z.infer<typeof note>;
 export function emptyState(at = "1970-01-01T00:00:00.000Z"): StudyState {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     notes: {},
     drafts: {},
     bookmarks: {},
@@ -154,11 +197,15 @@ export function emptyState(at = "1970-01-01T00:00:00.000Z"): StudyState {
     assessments: {},
     positions: {},
     resume: null,
+    beatPositions: {},
+    beatResume: null,
+    beatChecks: {},
     settings: {
       theme: "auto",
       focus: false,
       sessionSize: 10,
       newLimit: 3,
+      showSamajh: true,
       updatedAt: at,
     },
     disclosureAccepted: false,
@@ -251,6 +298,32 @@ export function reviewQueue(
     .slice(0, limit);
 }
 export function migrateState(value: unknown): StudyState {
+  const schema3 = stateSchema
+    .omit({ beatPositions: true, beatResume: true, beatChecks: true })
+    .extend({
+      schemaVersion: z.literal(3),
+      settings: settings.omit({ showSamajh: true }).strict(),
+      attempts: record(
+        attempt.omit({ beatId: true, beatVersion: true }).strict(),
+      ),
+    })
+    .strict();
+  if (
+    value &&
+    typeof value === "object" &&
+    "schemaVersion" in value &&
+    value.schemaVersion === 3
+  ) {
+    const old = schema3.parse(value);
+    return validateState({
+      ...old,
+      schemaVersion: 4,
+      beatPositions: {},
+      beatResume: null,
+      beatChecks: {},
+      settings: { ...old.settings, showSamajh: true },
+    });
+  }
   if (
     value &&
     typeof value === "object" &&
@@ -259,7 +332,7 @@ export function migrateState(value: unknown): StudyState {
   ) {
     // Synthetic predecessor: v1 had all records except extra practice, which was not recorded.
     const legacyPosition = position.omit({ pathId: true }).strict();
-    const legacy = stateSchema
+    const legacy = schema3
       .extend({
         schemaVersion: z.literal(2),
         positions: record(legacyPosition),
@@ -274,7 +347,7 @@ export function migrateState(value: unknown): StudyState {
             .strict()
             .parse(value)
         : legacy.parse(value);
-    return validateState({
+    return migrateState({
       ...old,
       schemaVersion: 3,
       extraPractice: "extraPractice" in old ? old.extraPractice : {},
@@ -294,12 +367,15 @@ export function validateState(value: unknown): StudyState {
     "schedules",
     "extraPractice",
     "assessments",
+    "beatChecks",
   ] as const) {
     for (const [k, v] of Object.entries(s[key]))
       if (k !== v.id) throw Error(`Record key mismatch: ${key}`);
   }
   for (const [key, v] of Object.entries(s.positions))
     if (key !== v.lessonId) throw Error("Position key mismatch");
+  for (const [key, v] of Object.entries(s.beatPositions))
+    if (key !== v.beatId) throw Error("Beat position key mismatch");
   for (const a of Object.values(s.attempts)) {
     if (
       !a.snapshot.options.some((o) => o.id === a.optionId) ||
@@ -364,6 +440,9 @@ const frameSchema = z
   })
   .strict();
 export function exportText(s: StudyState, at = nowISO()) {
+  return encodeBackup(s, at);
+}
+function encodeBackup(s: unknown, at = nowISO()) {
   // Oversized legacy states and unsaved recovery data are never truncated.
   const raw = JSON.stringify(
     { format: "SpicyBrain study data", exportedAt: at, state: s },
@@ -533,7 +612,13 @@ export function mergeStates(
       } else target[id] = newest(old, item);
     }
   }
-  for (const key of ["bookmarks", "completions", "positions"] as const) {
+  for (const key of [
+    "bookmarks",
+    "completions",
+    "positions",
+    "beatPositions",
+    "beatChecks",
+  ] as const) {
     const target = result[key] as Record<string, { updatedAt: string }>;
     for (const [id, item] of Object.entries(incoming[key]))
       target[id] = target[id] ? newest(target[id], item) : item;
@@ -543,6 +628,10 @@ export function mergeStates(
     local.resume && incoming.resume
       ? newest(local.resume, incoming.resume)
       : local.resume || incoming.resume;
+  result.beatResume =
+    local.beatResume && incoming.beatResume
+      ? newest(local.beatResume, incoming.beatResume)
+      : local.beatResume || incoming.beatResume;
   result.disclosureAccepted =
     local.disclosureAccepted || incoming.disclosureAccepted;
   // Reconstruct schedules from the latest immutable review; event ID breaks timestamp ties.
@@ -581,6 +670,8 @@ export function importPreview(
       "extraPractice",
       "assessments",
       "positions",
+      "beatPositions",
+      "beatChecks",
     ].map((k) => [
       k,
       Object.keys(incoming[k as keyof StudyState] as object).length,
@@ -603,6 +694,9 @@ export function importPreview(
     incoming.reviews,
     incoming.assessments,
     incoming.positions,
+    incoming.beatPositions,
+    incoming.beatChecks,
+    ...(incoming.beatResume ? [[incoming.beatResume]] : []),
     ...(incoming.resume ? [[incoming.resume]] : []),
   ])
     for (const value of Object.values(group)) {
@@ -614,6 +708,9 @@ export function importPreview(
         "cardId",
         "questionId",
         "pathId",
+        "moduleId",
+        "beatId",
+        "handbookAnchor",
       ] as const)
         if (key in value) {
           const id = (value as Record<string, unknown>)[key] as string;
@@ -636,6 +733,12 @@ export class ImportChangedError extends Error {
 }
 export class StudyStore {
   private db: IDBPDatabase | undefined;
+  private originalRecovery: unknown = undefined;
+  hasOriginalRecovery = () => this.originalRecovery !== undefined;
+  exportOriginalRecovery = () =>
+    this.originalRecovery === undefined
+      ? null
+      : encodeBackup(this.originalRecovery);
   private listeners = new Set<() => void>();
   private queue = Promise.resolve();
   private pending: {
@@ -655,6 +758,7 @@ export class StudyStore {
     return result;
   }
   private committed(data: StudyState, through: number) {
+    this.originalRecovery = undefined;
     this.pending = this.pending.filter((p) => p.sequence > through);
     this.emit({
       data: this.replay(data),
@@ -716,9 +820,11 @@ export class StudyStore {
       });
       const tx = this.db.transaction("study", "readwrite");
       const saved = await tx.store.get("root");
+      this.originalRecovery = saved;
       const data = saved ? migrateState(saved) : emptyState();
-      if (saved && saved.schemaVersion !== 3) await tx.store.put(data, "root");
+      if (saved && saved.schemaVersion !== 4) await tx.store.put(data, "root");
       await tx.done;
+      this.originalRecovery = undefined;
       // A blocked upgrade may have allowed edits in memory. Replay, never erase them.
       this.emit({
         data: this.replay(data),
@@ -730,8 +836,9 @@ export class StudyStore {
       this.emit({
         ...this.snap,
         status: "unsaved",
-        error:
-          "Browser storage is unavailable or unreadable. Your changes stay in this tab only. Download recovery data before leaving.",
+        error: this.hasOriginalRecovery()
+          ? "The saved collection could not be migrated or read. It remains unchanged. Download the original saved collection and any new recovery drafts before leaving."
+          : "Browser storage is unavailable or unreadable. Your changes stay in this tab only. Download recovery data before leaving.",
       });
     }
   }
@@ -772,7 +879,9 @@ export class StudyStore {
             error instanceof Error &&
             error.message.startsWith("Study data exceeds")
               ? error.message
-              : "Not saved in this browser. Your draft is still here. Download recovery data, or retry saving.",
+              : !this.db && this.snap.error
+                ? this.snap.error
+                : "Not saved in this browser. Your draft is still here. Download recovery data, or retry saving.",
         });
       }
     });

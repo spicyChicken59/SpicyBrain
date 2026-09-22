@@ -1,6 +1,9 @@
 import { useRef, useState } from "react";
 import {
   cards,
+  extensionCardIds,
+  cardTeaching,
+  plainTeaching,
   courses,
   findLesson,
   lessonHref,
@@ -247,9 +250,20 @@ export function Practice({ id }: { id?: string }) {
   );
 }
 
-export function Review({ lessonId }: { lessonId?: string }) {
+export function Review({
+  lessonId,
+  cardIds,
+}: {
+  lessonId?: string;
+  cardIds?: string[];
+}) {
   const { data, store } = useStudy();
-  const [selectedLesson, setSelectedLesson] = useState(lessonId ?? "studied");
+  const [selectedLesson, setSelectedLesson] = useState(
+    lessonId ?? (cardIds ? "all" : "studied"),
+  );
+  const selection = cardIds
+    ? cards.filter((c) => cardIds.includes(c.id))
+    : cards;
   const [session, setSession] = useState<{
       mode: "due" | "new" | "extra";
       ids: string[];
@@ -260,12 +274,18 @@ export function Review({ lessonId }: { lessonId?: string }) {
   const eventId = useRef(uuid()),
     guard = useRef(false);
   const clock = nowISO();
-  const due = reviewQueue(cards, data, clock, 100000);
-  const newCards = cards.filter(
+  const due = reviewQueue(selection, data, clock, 100000);
+  const openedCore = (c: (typeof cards)[number]) =>
+    !extensionCardIds.has(c.id) &&
+    (!!data.positions[c.lessonId] ||
+      Object.values(data.beatPositions).some(
+        (p) => cardTeaching(c.id)?.beatId === p.beatId,
+      ));
+  const newCards = selection.filter(
     (c) =>
       !data.schedules[c.id] &&
       (selectedLesson === "all" ||
-        (selectedLesson === "studied" && !!data.positions[c.lessonId]) ||
+        (selectedLesson === "studied" && openedCore(c)) ||
         selectedLesson === c.lessonId),
   );
   const start = (mode: "due" | "new" | "extra") => {
@@ -274,12 +294,11 @@ export function Review({ lessonId }: { lessonId?: string }) {
         ? due.slice(0, data.settings.sessionSize)
         : mode === "new"
           ? newCards.slice(0, data.settings.newLimit)
-          : cards
+          : selection
               .filter(
                 (c) =>
                   selectedLesson === "all" ||
-                  (selectedLesson === "studied" &&
-                    !!data.positions[c.lessonId]) ||
+                  (selectedLesson === "studied" && openedCore(c)) ||
                   selectedLesson === c.lessonId,
               )
               .slice(0, data.settings.sessionSize);
@@ -334,12 +353,17 @@ export function Review({ lessonId }: { lessonId?: string }) {
   };
   return (
     <>
-      <PageTitle eyebrow="remember it" title="A little review goes a long way">
-        <p>
-          Recall first. Reveal the answer. Choose how it felt. There is no
-          streak to protect.
-        </p>
-      </PageTitle>
+      {!cardIds && (
+        <PageTitle
+          eyebrow="remember it"
+          title="A little review goes a long way"
+        >
+          <p>
+            Recall first. Reveal the answer. Choose how it felt. There is no
+            streak to protect.
+          </p>
+        </PageTitle>
+      )}
       {session ? (
         card ? (
           <div className="review-workspace">
@@ -365,7 +389,7 @@ export function Review({ lessonId }: { lessonId?: string }) {
               <p className="sc-eyebrow">
                 {findLesson(card.lessonId)?.module.title}
               </p>
-              <h2>{card.prompt}</h2>
+              <h2>{plainTeaching(card.prompt)}</h2>
               {data.schedules[card.id]?.revision &&
                 data.schedules[card.id].revision !== card.revision && (
                   <p className="sc-chip sc-chip--info">
@@ -381,15 +405,27 @@ export function Review({ lessonId }: { lessonId?: string }) {
                 </button>
               ) : (
                 <div className="card-answer">
-                  <MD>{card.answer}</MD>
-                  <p>{card.explanation}</p>
-                  <a href={lessonHref(card.lessonId, card.sectionId)}>
+                  <MD>{plainTeaching(card.answer)}</MD>
+                  <p>{plainTeaching(card.explanation)}</p>
+                  <a
+                    href={
+                      cardTeaching(card.id)?.href ??
+                      lessonHref(card.lessonId, card.sectionId)
+                    }
+                  >
                     Return to the explanation →
                   </a>
-                  <Sources
-                    course={findLesson(card.lessonId)!.course}
-                    claimIds={card.claimIds}
-                  />
+                  {extensionCardIds.has(card.id) ? (
+                    <p className="sc-hint">
+                      Optional extension · source claims and teaching context
+                      are linked in the explanation.
+                    </p>
+                  ) : (
+                    <Sources
+                      course={findLesson(card.lessonId)!.course}
+                      claimIds={card.claimIds}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -468,22 +504,24 @@ export function Review({ lessonId }: { lessonId?: string }) {
           <section className="sc-card">
             <p className="sc-eyebrow">new & optional</p>
             <h2>Introduce one idea at a time.</h2>
-            <label className="sc-field">
-              Choose lessons
-              <select
-                className="sc-select"
-                value={selectedLesson}
-                onChange={(e) => setSelectedLesson(e.target.value)}
-              >
-                <option value="studied">Lessons I have opened</option>
-                <option value="all">All lessons · explicit selection</option>
-                {lessons.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {!cardIds && (
+              <label className="sc-field">
+                Choose lessons
+                <select
+                  className="sc-select"
+                  value={selectedLesson}
+                  onChange={(e) => setSelectedLesson(e.target.value)}
+                >
+                  <option value="studied">Lessons I have opened</option>
+                  <option value="all">All lessons · explicit selection</option>
+                  {lessons.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <p>
               {newCards.length} new cards in this selection. Introduce up to{" "}
               {data.settings.newLimit}.

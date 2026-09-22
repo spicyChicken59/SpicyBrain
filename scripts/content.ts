@@ -11,6 +11,10 @@ import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import {
+  validateTeaching,
+  type TeachingIndexEntry,
+} from "../src/teaching-schema.ts";
+import {
   validateCourses,
   safePath,
   type Course,
@@ -280,6 +284,7 @@ export async function buildContent(
   const courses = await loadCourses(contentRoot);
   const paths = await loadPaths(courses, contentRoot);
   const downloads = await loadDownloads(courses, contentRoot);
+  const teaching = await loadTeaching(courses, contentRoot);
   await mkdir(join(destination, "src/generated"), { recursive: true });
   const design = await readFile(
     join(root, "public/design-system/sc.css"),
@@ -327,6 +332,123 @@ export async function buildContent(
       href: `#/lesson/${g.lessonId}/${g.sectionId}`,
     })),
   ]);
+  const teachingIndex: TeachingIndexEntry[] = [];
+  const teachingDirectory = join(destination, "public/teaching");
+  await rm(teachingDirectory, { recursive: true, force: true });
+  await mkdir(teachingDirectory, { recursive: true });
+  for (const module of teaching.modules) {
+    const {
+      courseId,
+      moduleId,
+      title,
+      summary,
+      outcomes,
+      startingAssumptions,
+      lessonIds,
+      optionalBridgeLessonIds,
+      cardLinks,
+      extensionCards,
+    } = module;
+    const filename = `${courseId}-${moduleId}.json`;
+    const bytes = JSON.stringify(module);
+    if (Buffer.byteLength(bytes) > 750000)
+      throw Error(`Teaching module exceeds bounded payload: ${moduleId}`);
+    await writeFile(join(teachingDirectory, filename), bytes);
+    teachingIndex.push({
+      courseId,
+      moduleId,
+      title,
+      summary,
+      outcomes,
+      startingAssumptions,
+      lessonIds,
+      optionalBridgeLessonIds,
+      cardLinks,
+      extensionCards,
+      visualIds: module.visuals.map((v) => v.id),
+      conceptIds: module.concepts.map((c) => c.id),
+      referenceIds: [
+        ...module.concepts,
+        ...module.questions,
+        ...module.selfQuestions,
+        ...module.visuals,
+        ...module.visuals.flatMap((v) => v.states),
+      ].map((x) => x.id),
+      url: `teaching/${filename}`,
+      beats: module.beats.map(
+        ({ id, title, version, lessonId, sectionId, recap, questionIds }) => ({
+          id,
+          title,
+          version,
+          lessonId,
+          sectionId,
+          recap,
+          questionIds,
+        }),
+      ),
+    });
+    for (const beat of module.beats)
+      index.push({
+        id: beat.id,
+        type: "Teaching beat",
+        courseId,
+        title: `${module.title} · ${beat.title}`,
+        text: [
+          beat.title,
+          beat.explanation,
+          beat.handbook.markdown,
+          beat.samajh?.text ?? "",
+          ...beat.conceptIds,
+        ].join(" "),
+        href: `#/module/${moduleId}/${beat.id}`,
+      });
+    for (const card of module.extensionCards)
+      index.push({
+        id: card.id,
+        type: "Extension card",
+        courseId,
+        title: card.prompt,
+        text: [
+          card.prompt,
+          card.answer,
+          card.explanation,
+          card.whyItMatters,
+          ...card.conceptIds,
+        ].join(" "),
+        href: `#/module/${moduleId}/${card.beatId}?view=handbook&detour=1&extension=${card.id}`,
+      });
+    for (const concept of module.concepts) {
+      const beat = module.beats.find((b) => b.conceptIds.includes(concept.id)),
+        card = module.extensionCards.find((c) =>
+          c.conceptIds.includes(concept.id),
+        );
+      index.push({
+        id: concept.id,
+        type: "Glossary",
+        courseId,
+        title: concept.term,
+        text: [
+          concept.term,
+          ...concept.aliases,
+          concept.definition,
+          concept.example,
+        ].join(" "),
+        href: beat
+          ? `#/module/${moduleId}/${beat.id}`
+          : card
+            ? `#/module/${moduleId}/${card.beatId}?view=handbook&detour=1&extension=${card.id}`
+            : `#/module/${moduleId}/${module.beats[0].id}`,
+      });
+    }
+  }
+  await writeFile(
+    join(destination, "src/generated/teaching-index.json"),
+    JSON.stringify(teachingIndex),
+  );
+  await writeFile(
+    join(teachingDirectory, "media.json"),
+    JSON.stringify(teaching.media),
+  );
   for (const path of paths) {
     const firstId = path.groups[0].lessonIds[0];
     const courseId = courses.find((course) =>
@@ -361,6 +483,10 @@ export async function buildContent(
     join(destination, "src/generated/search.json"),
     JSON.stringify(index),
   );
+  await writeFile(
+    join(teachingDirectory, "search.json"),
+    JSON.stringify(index),
+  );
   await rm(join(destination, "public/content-assets"), {
     recursive: true,
     force: true,
@@ -388,6 +514,35 @@ export async function buildContent(
     JSON.stringify(counts(courses), null, 2) + "\n",
   );
   return courses;
+}
+export async function loadTeaching(
+  courses: Course[],
+  contentRoot = join(root, "content"),
+) {
+  const raw: unknown[] = [],
+    media: unknown[] = [];
+  let dirs: import("node:fs").Dirent[] = [];
+  try {
+    dirs = await readdir(join(contentRoot, "teaching"), {
+      withFileTypes: true,
+    });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  for (const dir of dirs.filter((d) => d.isDirectory()))
+    for (const name of (await readdir(join(contentRoot, "teaching", dir.name)))
+      .filter((n) => n.endsWith(".json"))
+      .sort()) {
+      const data = JSON.parse(
+        await readFile(
+          await confinedFile(join(contentRoot, "teaching", dir.name), name),
+          "utf8",
+        ),
+      );
+      if (name === "media.json") media.push(...data);
+      else raw.push(data);
+    }
+  return validateTeaching(raw, courses, media);
 }
 export async function verifyDesign() {
   const directory = join(root, "public/design-system");
@@ -418,6 +573,7 @@ if (
     ? await buildContent()
     : await loadCourses();
   await loadPaths(c);
+  await loadTeaching(c);
   await loadDownloads(c);
   console.log(JSON.stringify(counts(c), null, 2));
 }
