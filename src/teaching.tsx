@@ -8,6 +8,7 @@ import {
   lessonHref,
   loadLessonBody,
   loadTeachingMedia,
+  loadReferences,
   loadTeachingModule,
   moduleLessonIds,
   paths,
@@ -939,12 +940,14 @@ export function ModuleWorkspace({
   useEffect(() => {
     let active = true;
     setError("");
-    // The module and the lesson bodies its beats and cards draw on load in
-    // parallel; either failure is retried through the same control.
+    // The module, the lesson bodies its beats and cards draw on, and the
+    // course references (glossary definitions, sources) load in parallel;
+    // any failure is retried through the same control.
     const entry = teachingIndex.find((m) => m.moduleId === id);
     void Promise.all([
       loadTeachingModule(id),
       Promise.all((entry ? moduleLessonIds(entry) : []).map(loadLessonBody)),
+      entry ? loadReferences(entry.courseId) : undefined,
     ])
       .then(([module, lessons]) => {
         if (active) setLoaded({ module, lessons });
@@ -1600,8 +1603,11 @@ export function CourseHandbook({
   useEffect(() => {
     let active = true;
     if (unknownTrack || !taught.length) return;
-    void Promise.all(taught.map((m) => loadTeachingModule(m.id)))
-      .then((modules) => {
+    void Promise.all([
+      Promise.all(taught.map((m) => loadTeachingModule(m.id))),
+      loadReferences(id),
+    ])
+      .then(([modules]) => {
         if (active) setAssembled({ key, modules });
       })
       .catch((e: Error) => {

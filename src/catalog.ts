@@ -85,9 +85,10 @@ const moduleLinkTargets = () =>
 /**
  * The reference tier: one file per course with the full source, claim and
  * glossary records, validated and identity-checked against the catalog's
- * ids. A module workspace waits for it (its definitions and sources are part
- * of the teaching); a lesson or practice page fetches it only when a Sources
- * panel is opened.
+ * ids. A module workspace and a handbook wait for it beside their modules
+ * (definitions and sources are part of the teaching); a lesson or practice
+ * page fetches it only when a Sources panel is opened. Card text never needs
+ * it, so a review session does not depend on it.
  */
 const referenceLoader = createReferenceLoader({
   url: (courseId) =>
@@ -98,15 +99,13 @@ export const loadReferences = (courseId: string): Promise<CourseReferences> =>
   referenceLoader.load(courseId);
 export const cachedReferences = (courseId: string) =>
   referenceLoader.cached(courseId);
+export const subscribeReferences = (listener: () => void) =>
+  referenceLoader.subscribe(listener);
 export function loadTeachingModule(moduleId: string) {
   const entry = teachingIndex.find((m) => m.moduleId === moduleId);
   if (!entry)
     return Promise.reject(Error("This teaching module is unavailable."));
-  if (!moduleCache.has(moduleId)) {
-    // Fetched beside the module, awaited after it validates; the no-op
-    // handler only keeps an early failure from being reported as unhandled.
-    const references = loadReferences(entry.courseId);
-    references.catch(() => {});
+  if (!moduleCache.has(moduleId))
     moduleCache.set(
       moduleId,
       fetch(`${import.meta.env.BASE_URL}${entry.url}`)
@@ -158,7 +157,6 @@ export function loadTeachingModule(moduleId: string) {
             throw Error(
               "Course files changed or are incomplete. Reload to get a consistent version. Your study data is safe.",
             );
-          await references;
           return module;
         })
         .catch((error) => {
@@ -166,7 +164,6 @@ export function loadTeachingModule(moduleId: string) {
           throw error;
         }),
     );
-  }
   return moduleCache.get(moduleId)!;
 }
 export async function loadTeachingMedia(): Promise<TeachingMedia[]> {

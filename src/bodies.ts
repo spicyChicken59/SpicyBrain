@@ -68,14 +68,24 @@ export type BodyExpectation =
       sectionIds: string[];
       cards: Revision[];
       questions: Revision[];
+      /** The course's claims: every claim a section cites must be one of them. */
+      claimIds: ReadonlySet<string>;
     }
-  | { kind: Exclude<BodyKind, "lesson">; id: string };
+  | {
+      kind: "scenario";
+      id: string;
+      /** Saved self-assessments are keyed by these ids. */
+      rubric: { id: string; criterion: string }[];
+      claimIds: ReadonlySet<string>;
+    }
+  | { kind: Exclude<BodyKind, "lesson" | "scenario">; id: string };
 
 export function bodyExpectations(courses: CatalogCourse[]) {
   const map = new Map<string, BodyExpectation>();
-  const plain = (kind: Exclude<BodyKind, "lesson">, id: string) =>
+  const plain = (kind: Exclude<BodyKind, "lesson" | "scenario">, id: string) =>
     map.set(id, { kind, id });
   for (const course of courses) {
+    const claimIds = new Set(course.claims.map((c) => c.id));
     for (const module of course.modules)
       for (const lesson of module.lessons)
         map.set(lesson.id, {
@@ -88,8 +98,15 @@ export function bodyExpectations(courses: CatalogCourse[]) {
             id,
             revision,
           })),
+          claimIds,
         });
-    for (const scenario of course.scenarios) plain("scenario", scenario.id);
+    for (const scenario of course.scenarios)
+      map.set(scenario.id, {
+        kind: "scenario",
+        id: scenario.id,
+        rubric: scenario.rubric.map(({ id, criterion }) => ({ id, criterion })),
+        claimIds,
+      });
     for (const lab of course.labs ?? []) plain("lab", lab.id);
     for (const guide of course.guides ?? []) plain("guide", guide.id);
     for (const item of course.cases ?? []) plain("case", item.id);
@@ -138,7 +155,20 @@ export function checkBody(
       !same(
         body.questions.map(({ id, revision }) => ({ id, revision })),
         expected.questions,
+      ) ||
+      Object.values(body.sectionClaims).some((ids) =>
+        ids.some((id) => !expected.claimIds.has(id)),
       )
+    )
+      throw Error(bodyErrors.mismatch);
+  }
+  if (body.kind === "scenario" && expected.kind === "scenario") {
+    if (
+      !same(
+        body.rubric.map(({ id, criterion }) => ({ id, criterion })),
+        expected.rubric,
+      ) ||
+      body.claimIds.some((id) => !expected.claimIds.has(id))
     )
       throw Error(bodyErrors.mismatch);
   }
@@ -238,6 +268,8 @@ export type ReferenceLoader = {
   load: (courseId: string) => Promise<CourseReferences>;
   /** The references once loaded, so a view that preloaded them renders them at once. */
   cached: (courseId: string) => CourseReferences | undefined;
+  /** Called after any course's references load, so every waiting panel updates. */
+  subscribe: (listener: () => void) => () => void;
 };
 /** Promise-cached per course; a failed or mismatched load is evicted so Retry fetches again. */
 export function createReferenceLoader(options: {
@@ -246,7 +278,8 @@ export function createReferenceLoader(options: {
   fetch?: typeof fetch;
 }): ReferenceLoader {
   const cache = new Map<string, Promise<CourseReferences>>(),
-    resolved = new Map<string, CourseReferences>();
+    resolved = new Map<string, CourseReferences>(),
+    listeners = new Set<() => void>();
   const request = options.fetch ?? ((input) => fetch(input));
   const load = (courseId: string) => {
     const course = options.course(courseId);
@@ -268,6 +301,7 @@ export function createReferenceLoader(options: {
             }
             checkReferences(references, course);
             resolved.set(courseId, references);
+            for (const listener of listeners) listener();
             return references;
           })
           .catch((error: unknown) => {
@@ -277,5 +311,12 @@ export function createReferenceLoader(options: {
       );
     return cache.get(courseId)!;
   };
-  return { load, cached: (courseId) => resolved.get(courseId) };
+  return {
+    load,
+    cached: (courseId) => resolved.get(courseId),
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+  };
 }

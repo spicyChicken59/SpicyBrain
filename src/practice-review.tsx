@@ -248,56 +248,68 @@ export function Practice({ id }: { id?: string }) {
             You choose the rating. This is educational feedback, not automated
             evaluation or an employer score.
           </p>
-          {body?.rubric.map((r) => (
-            <fieldset className="rubric" key={r.id}>
-              <legend>{r.criterion}</legend>
-              {(["weak", "partial", "strong"] as const).map((level) => (
-                <label className="answer-option" key={level}>
-                  <input
-                    type="radio"
-                    name={r.id}
-                    checked={ratings[r.id] === level}
-                    onChange={() => setRatings({ ...ratings, [r.id]: level })}
-                  />
-                  <span>
-                    <strong>{level[0].toUpperCase() + level.slice(1)}</strong> ·{" "}
-                    {r[level]}
-                  </span>
-                </label>
+          {body ? (
+            <>
+              {body.rubric.map((r) => (
+                <fieldset className="rubric" key={r.id}>
+                  <legend>{r.criterion}</legend>
+                  {(["weak", "partial", "strong"] as const).map((level) => (
+                    <label className="answer-option" key={level}>
+                      <input
+                        type="radio"
+                        name={r.id}
+                        checked={ratings[r.id] === level}
+                        onChange={() =>
+                          setRatings({ ...ratings, [r.id]: level })
+                        }
+                      />
+                      <span>
+                        <strong>
+                          {level[0].toUpperCase() + level.slice(1)}
+                        </strong>{" "}
+                        · {r[level]}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
               ))}
-            </fieldset>
-          ))}
-          <button
-            className="sc-btn sc-btn--primary"
-            onClick={() => {
-              if (!body || body.rubric.some((r) => !ratings[r.id])) {
-                setMessage(
-                  "Choose a rating for each dimension before recording.",
-                );
-                return;
-              }
-              const id = uuid(),
-                at = nowISO();
-              void store.change((state) => ({
-                ...state,
-                assessments: {
-                  ...state.assessments,
-                  [id]: {
-                    id,
-                    courseId: course.id,
-                    targetId: s.id,
-                    at,
-                    ratings,
-                    kind: "self-assessment",
-                  },
-                },
-              }));
-              setRatings({});
-              setMessage("Self-assessment recorded.");
-            }}
-          >
-            Record self-assessment
-          </button>
+              <button
+                className="sc-btn sc-btn--primary"
+                onClick={() => {
+                  if (body.rubric.some((r) => !ratings[r.id])) {
+                    setMessage(
+                      "Choose a rating for each dimension before recording.",
+                    );
+                    return;
+                  }
+                  const id = uuid(),
+                    at = nowISO();
+                  void store.change((state) => ({
+                    ...state,
+                    assessments: {
+                      ...state.assessments,
+                      [id]: {
+                        id,
+                        courseId: course.id,
+                        targetId: s.id,
+                        at,
+                        ratings,
+                        kind: "self-assessment",
+                      },
+                    },
+                  }));
+                  setRatings({});
+                  setMessage("Self-assessment recorded.");
+                }}
+              >
+                Record self-assessment
+              </button>
+            </>
+          ) : (
+            <p className="sc-hint">
+              The rubric opens with the practice item above.
+            </p>
+          )}
           <p role="status">{message}</p>
           {prior.length > 0 && (
             <details className="sc-details">
@@ -308,8 +320,8 @@ export function Practice({ id }: { id?: string }) {
                   <ul>
                     {Object.entries(a.ratings).map(([id, value]) => (
                       <li key={id}>
-                        {body?.rubric.find((r) => r.id === id)?.criterion ?? id}
-                        : {value}
+                        {s.rubric.find((r) => r.id === id)?.criterion ?? id}:{" "}
+                        {value}
                       </li>
                     ))}
                   </ul>

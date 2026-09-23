@@ -443,10 +443,13 @@ export function stripCourse(course: Course): CatalogCourse {
         reasoning: _reasoning,
         disclosures: _disclosures,
         requirements: _requirements,
-        rubric: _rubric,
+        rubric,
         claimIds: _claimIds,
         ...scenario
-      }) => scenario,
+      }) => ({
+        ...scenario,
+        rubric: rubric.map(({ id, criterion }) => ({ id, criterion })),
+      }),
     ),
     ...(course.labs ? { labs: course.labs.map(withoutBody) } : {}),
     ...(course.guides ? { guides: course.guides.map(withoutBody) } : {}),

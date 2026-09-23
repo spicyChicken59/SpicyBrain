@@ -8,6 +8,7 @@ import type {
   Lab,
   Lesson,
   Question,
+  Rubric,
   Scenario,
   Section,
   Source,
@@ -40,6 +41,11 @@ export type CatalogLesson = Omit<Lesson, "sections" | "cards" | "questions"> & {
 export type CatalogModule = Omit<Course["modules"][number], "lessons"> & {
   lessons: CatalogLesson[];
 };
+/**
+ * A rubric keeps its dimension ids and criterion names inline: saved
+ * self-assessments are keyed by those ids and name them even when the body
+ * has not loaded. The weak/partial/strong descriptions are in the body.
+ */
 export type CatalogScenario = Omit<
   Scenario,
   | "context"
@@ -50,7 +56,7 @@ export type CatalogScenario = Omit<
   | "requirements"
   | "rubric"
   | "claimIds"
->;
+> & { rubric: Pick<Rubric, "id" | "criterion">[] };
 export type CatalogLab = Omit<Lab, "body">;
 export type CatalogGuide = Omit<Guide, "body">;
 export type CatalogCase = Omit<CaseAnalysis, "body">;

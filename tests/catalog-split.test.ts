@@ -102,10 +102,14 @@ test("the initial catalog carries identities and mappings, never section markdow
         "reasoning",
         "disclosures",
         "requirements",
-        "rubric",
         "claimIds",
       ])
         assert.equal(key in scenario, false, `${scenario.id}.${key}`);
+    // A rubric keeps its dimension ids and names (saved self-assessments are
+    // keyed by the ids); its level descriptions are in the body.
+    for (const scenario of course.scenarios)
+      for (const dimension of scenario.rubric)
+        assert.deepEqual(Object.keys(dimension).sort(), ["criterion", "id"]);
     for (const item of [
       ...(course.labs ?? []),
       ...(course.guides ?? []),
@@ -441,7 +445,18 @@ test("the body loader rejects a wrong id, kind, contentVersion, drifted revision
     json({ ...good, sections: { ...good.sections, "extra-section": "More." } }),
     mismatch,
   );
-  const [firstSection] = Object.keys(good.sectionClaims);
+  const [firstSection, secondSection] = Object.keys(good.sectionClaims);
+  await rejects(
+    lesson.id,
+    json({
+      ...good,
+      sectionClaims: {
+        ...good.sectionClaims,
+        [secondSection]: ["claim-from-another-version"],
+      },
+    }),
+    mismatch,
+  );
   await rejects(
     lesson.id,
     json({
@@ -455,6 +470,34 @@ test("the body loader rejects a wrong id, kind, contentVersion, drifted revision
     mismatch,
   );
   await rejects(lesson.id, json(scenarioBody), mismatch);
+  // A scenario body must carry the catalog's rubric (saved ratings are keyed
+  // by its ids) and cite only the course's claims.
+  if (scenarioBody.kind !== "scenario") throw Error("scenario body expected");
+  await rejects(
+    scenario.id,
+    json({
+      ...scenarioBody,
+      rubric: scenarioBody.rubric.map((r, i) =>
+        i ? r : { ...r, id: `${r.id}-renamed` },
+      ),
+    }),
+    mismatch,
+  );
+  await rejects(
+    scenario.id,
+    json({
+      ...scenarioBody,
+      rubric: scenarioBody.rubric.map((r, i) =>
+        i ? r : { ...r, criterion: `${r.criterion} (other version)` },
+      ),
+    }),
+    mismatch,
+  );
+  await rejects(
+    scenario.id,
+    json({ ...scenarioBody, claimIds: ["claim-from-another-version"] }),
+    mismatch,
+  );
   await rejects(
     lesson.id,
     () => new Response("{not json", { status: 200 }),
@@ -574,10 +617,19 @@ test("the reference loader refuses another course version, malformed or failed f
   const before = calls;
   await assert.rejects(loader.load("missing-course"), /unavailable/);
   assert.equal(calls, before, "an unknown course is refused without a request");
+  // Every waiting panel is told once the references arrive, never on failure.
+  let notified = 0;
+  const unsubscribe = loader.subscribe(() => notified++);
+  responses = [() => new Response("", { status: 503 })];
+  await assert.rejects(loader.load(course.id));
+  assert.equal(notified, 0);
   responses = [json(good)];
   const loaded = await loader.load(course.id);
+  assert.equal(notified, 1);
+  unsubscribe();
   assert.deepEqual(loaded, good);
   assert.equal(loader.cached(course.id), loaded);
   assert.equal(await loader.load(course.id), loaded);
-  assert.equal(calls, before + 1, "one request serves every later view");
+  assert.equal(calls, before + 2, "one request serves every later view");
+  assert.equal(notified, 1, "an unsubscribed panel is not told again");
 });

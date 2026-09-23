@@ -10,8 +10,14 @@ import {
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Asset } from "./content-schema";
-import type { CatalogCourse, CourseReferences } from "./catalog-types";
-import { cachedReferences, lessonHref, loadReferences, paths } from "./catalog";
+import type { CatalogCourse } from "./catalog-types";
+import {
+  cachedReferences,
+  lessonHref,
+  loadReferences,
+  paths,
+  subscribeReferences,
+} from "./catalog";
 import { pathForLesson } from "./paths";
 import { StudyStore, exportText } from "./study";
 export const store = new StudyStore();
@@ -309,20 +315,20 @@ export function StorageNotice() {
  * `enabled` first becomes true, so a closed Sources panel costs nothing.
  */
 export function useReferences(courseId: string, enabled = true) {
-  const [state, setState] = useState<{
-    courseId: string;
-    references?: CourseReferences;
-    error?: string;
-  }>({ courseId });
+  // Every panel reads the one loader's cache, so a load or a Retry in any of
+  // them updates all of them (an earlier failure in another panel included).
+  const references = useSyncExternalStore(subscribeReferences, () =>
+    cachedReferences(courseId),
+  );
+  const [state, setState] = useState<{ courseId: string; error?: string }>({
+    courseId,
+  });
   const [attempt, setAttempt] = useState(0);
-  const references =
-    (state.courseId === courseId ? state.references : undefined) ??
-    cachedReferences(courseId);
   useEffect(() => {
     if (!enabled || references) return;
     let live = true;
     loadReferences(courseId).then(
-      (loaded) => live && setState({ courseId, references: loaded }),
+      () => live && setState({ courseId }),
       (error: unknown) =>
         live &&
         setState({
@@ -339,14 +345,19 @@ export function useReferences(courseId: string, enabled = true) {
   }, [courseId, enabled, references, attempt]);
   return {
     references,
-    error: state.courseId === courseId ? state.error : undefined,
+    error: !references && state.courseId === courseId ? state.error : undefined,
     retry: () => {
       setState({ courseId });
       setAttempt((n) => n + 1);
     },
   };
 }
-/** What a Sources panel shows while its references load or after they fail. */
+/**
+ * What a Sources panel shows while its references load or after they fail.
+ * Retry moves focus to the panel's own summary or heading first: the button
+ * is replaced by the loading status and then by the sources, and focus must
+ * not fall back to the page.
+ */
 export function ReferencesPending({
   error,
   retry,
@@ -354,15 +365,32 @@ export function ReferencesPending({
   error?: string;
   retry: () => void;
 }) {
-  return error ? (
-    <div className="sc-notice" role="alert">
-      <p>{error}</p>
-      <button className="sc-btn sc-btn--secondary" onClick={retry}>
-        Retry
-      </button>
+  const box = useRef<HTMLDivElement>(null);
+  return (
+    <div ref={box} className="references-pending">
+      {error ? (
+        <div className="sc-notice" role="alert">
+          <p>{error}</p>
+          <button
+            className="sc-btn sc-btn--secondary"
+            onClick={() => {
+              const host =
+                box.current?.closest("details")?.querySelector("summary") ??
+                box.current?.closest("section")?.querySelector("h2");
+              if (host) {
+                if (host.tagName === "H2") host.tabIndex = -1;
+                host.focus();
+              }
+              retry();
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
+        <p role="status">Loading sources…</p>
+      )}
     </div>
-  ) : (
-    <p role="status">Loading sources…</p>
   );
 }
 export function Sources({

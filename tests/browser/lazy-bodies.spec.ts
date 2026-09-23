@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import type { LessonBody } from "../../src/catalog-types";
+import type { CatalogCourse, LessonBody } from "../../src/catalog-types";
 import type { TeachingIndexEntry } from "../../src/teaching-schema";
 import { ready, stored } from "./helpers";
 
@@ -13,6 +13,13 @@ const body = JSON.parse(
 const index = JSON.parse(
   await readFile("src/generated/teaching-index.json", "utf8"),
 ) as TeachingIndexEntry[];
+const rubric = (
+  JSON.parse(
+    await readFile("src/generated/catalog.json", "utf8"),
+  ) as CatalogCourse[]
+)
+  .flatMap((c) => c.scenarios)
+  .find((s) => s.id === scenario)!.rubric;
 // A plain-prose excerpt of the section text, so the assertion reads rendered
 // words rather than Markdown syntax.
 const excerpt = body.sections[section]
@@ -94,6 +101,14 @@ test("A failed scenario body keeps the draft editable; Retry restores the situat
   await expect(
     page.getByRole("heading", { name: "The situation", exact: true }),
   ).toHaveCount(0);
+  // The rubric's levels are in the body: no half-usable form meanwhile.
+  await expect(page.locator(".rubric")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Record self-assessment" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("The rubric opens with the practice item above."),
+  ).toBeVisible();
   const response = page.getByRole("textbox", {
     name: "Your response",
     exact: true,
@@ -120,6 +135,78 @@ test("A failed scenario body keeps the draft editable; Retry restores the situat
   await expect(response).toHaveValue(
     "SYNTHETIC draft written before the scenario loaded",
   );
+  const rubrics = page.locator(".rubric");
+  await expect(rubrics).toHaveCount(rubric.length);
+  for (let i = 0; i < rubric.length; i++)
+    await rubrics.nth(i).getByRole("radio").nth(1).check();
+  await page.getByRole("button", { name: "Record self-assessment" }).click();
+  await expect
+    .poll(async () => Object.keys((await stored(page)).assessments).length)
+    .toBe(1);
+  // A saved self-assessment names its dimensions from the catalog, so a
+  // later failed body still shows criteria, not ids.
+  fail = true;
+  await page.goto("about:blank");
+  await ready(page, `/#/practice/${scenario}`);
+  await expect(page.getByRole("alert")).toContainText(
+    "This practice item could not load",
+  );
+  await page.getByText("1 self-assessments recorded", { exact: true }).click();
+  for (const dimension of rubric)
+    await expect(
+      page.getByText(`${dimension.criterion}: partial`, { exact: true }),
+    ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("A failed reference file is retried from any Sources panel, updates every panel and keeps focus; card prompts never wait for it", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  let fail = true;
+  await page.route("**/teaching/references/*.json", (route) =>
+    fail ? route.fulfill({ status: 503, body: "" }) : route.continue(),
+  );
+  // Review needs card text only. A session of this lesson's three core and
+  // two extension cards loads its module for the extension text; with the
+  // reference file failing, every prompt still opens.
+  await ready(page, "/#/settings");
+  await page.getByLabel("New cards per introduction").selectOption("5");
+  await ready(page, "/#/review");
+  await page.getByLabel("Choose lessons").selectOption(lesson);
+  const moduleFile = page.waitForResponse((r) =>
+    r.url().endsWith("/teaching/dbxfe-dbxfe-m01.json"),
+  );
+  await page
+    .getByRole("button", { name: "Introduce new cards", exact: true })
+    .click();
+  await moduleFile;
+  await expect(
+    page.getByRole("button", { name: "Reveal answer", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await ready(page, `/#/lesson/${lesson}`);
+  await expect(page.locator(".knowledge-check")).toHaveCount(
+    body.questions.length,
+  );
+  const panels = page.locator("details.section-sources");
+  for (const i of [0, 1]) {
+    await panels.nth(i).locator("summary").click();
+    await expect(panels.nth(i).getByRole("alert")).toContainText(
+      "could not load",
+    );
+  }
+  fail = false;
+  await panels
+    .first()
+    .getByRole("button", { name: "Retry", exact: true })
+    .click();
+  for (const i of [0, 1]) {
+    await expect(panels.nth(i).getByRole("alert")).toHaveCount(0);
+    await expect(panels.nth(i).getByRole("status")).toHaveCount(0);
+  }
+  await expect(panels.first().locator("summary")).toBeFocused();
   expect(errors).toEqual([]);
 });
 

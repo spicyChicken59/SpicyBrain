@@ -35,6 +35,7 @@ const modules = await files(
   /^(?!search\.json$|media\.json$).*\.json$/,
 );
 const bodies = await files("public/teaching/bodies", /\.json$/);
+const references = await files("public/teaching/references", /\.json$/);
 const search = await files("public/teaching", /^search\.json$/);
 const media = await files("public/teaching", /^media\.json$/);
 const generated = await files("src/generated", /\.json$/);
@@ -51,9 +52,16 @@ console.log(
       publicTeaching: {
         modules: total(modules),
         bodies: total(bodies),
+        references: total(references),
         search: total(search),
         media: total(media),
-        total: total([...modules, ...bodies, ...search, ...media]),
+        total: total([
+          ...modules,
+          ...bodies,
+          ...references,
+          ...search,
+          ...media,
+        ]),
       },
     },
     null,
