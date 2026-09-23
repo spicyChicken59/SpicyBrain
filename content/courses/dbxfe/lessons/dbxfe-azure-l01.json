@@ -1,0 +1,628 @@
+{
+ "id": "dbxfe-azure-l01",
+ "title": "Azure deployment and network boundaries",
+ "summary": "Place Cinderline's Entra tenant, subscription, workspace resource and locked managed resource group, compare the two supported network patterns, keep storage access apart from application access, and run ordered diagnoses for a denied and an unreachable request.",
+ "contentVersion": "1.0.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 17,
+ "objectives": [
+  "Place the tenant, subscription, workspace resource, managed resource group, control plane and both compute planes, and compare the two supported network patterns.",
+  "Keep application access and storage access apart, and trace one query across Entra, Unity Catalog, the access connector's managed identity and the storage account.",
+  "Run an ordered diagnosis for a denied and an unreachable request, assemble an evidence checklist and name what differs from AWS without provisioning anything."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Governance and cloud architecture",
+  "Azure",
+  "Microsoft Entra ID",
+  "VNet injection",
+  "Private Link",
+  "Unity Catalog",
+  "ADLS Gen2",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-azure-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-azure-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-azure-l01-resources-concept",
+    "dbxfe-azure-l01-vnet-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-workspace",
+    "dbxfe-azure-course-claim-vnet",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-start",
+   "kind": "prerequisites",
+   "title": "Before the Azure diagram",
+   "conceptIds": [
+    "dbxfe-azure-l01-resources-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-workspace",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-resources",
+   "kind": "mechanism",
+   "title": "Tenant, subscription, workspace and the locked group",
+   "conceptIds": [
+    "dbxfe-azure-l01-resources-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-workspace",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-identity",
+   "kind": "mechanism",
+   "title": "Entra identities, two authorities",
+   "conceptIds": [
+    "dbxfe-azure-l01-entra-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-identity",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-patterns",
+   "kind": "mechanism",
+   "title": "Two supported network patterns",
+   "conceptIds": [
+    "dbxfe-azure-l01-vnet-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-vnet",
+    "dbxfe-azure-course-claim-routes",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-storage",
+   "kind": "mechanism",
+   "title": "Storage access is not application access",
+   "conceptIds": [
+    "dbxfe-azure-l01-connector-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-private",
+   "kind": "mechanism",
+   "title": "Private endpoints need their DNS answer",
+   "conceptIds": [
+    "dbxfe-azure-l01-privatelink-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-private",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-serverless",
+   "kind": "mechanism",
+   "title": "Serverless connectivity is configured, not built",
+   "conceptIds": [
+    "dbxfe-azure-l01-ncc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-serverless",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-example",
+   "kind": "example",
+   "title": "Two failures on the same table",
+   "conceptIds": [
+    "dbxfe-azure-l01-diagnosis-concept",
+    "dbxfe-azure-l01-connector-concept",
+    "dbxfe-azure-l01-privatelink-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-azure-course-claim-private",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-task",
+   "kind": "exercise",
+   "title": "Diagnose a changed case",
+   "conceptIds": [
+    "dbxfe-azure-l01-diagnosis-concept",
+    "dbxfe-azure-l01-ncc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-serverless",
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-solution",
+   "kind": "solution",
+   "title": "A bounded diagnosis",
+   "conceptIds": [
+    "dbxfe-azure-l01-diagnosis-concept",
+    "dbxfe-azure-l01-ncc-concept",
+    "dbxfe-azure-l01-connector-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-serverless",
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-differences",
+   "kind": "reference",
+   "title": "What differs from AWS",
+   "conceptIds": [
+    "dbxfe-azure-l01-resources-concept",
+    "dbxfe-azure-l01-vnet-concept",
+    "dbxfe-azure-l01-connector-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-workspace",
+    "dbxfe-azure-course-claim-vnet",
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-azure-course-claim-private",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction",
+    "dbxfe-fact-architecture",
+    "dbxfe-aws-course-claim-workspace",
+    "dbxfe-aws-course-claim-vpc",
+    "dbxfe-aws-course-claim-storage",
+    "dbxfe-aws-course-claim-profile",
+    "dbxfe-aws-course-claim-privatelink",
+    "dbxfe-aws-course-claim-egress",
+    "dbxfe-aws-course-claim-keys"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-limits",
+   "kind": "mistakes",
+   "title": "Mistakes this diagram invites",
+   "conceptIds": [
+    "dbxfe-azure-l01-diagnosis-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-sources",
+   "kind": "sources",
+   "title": "Sources and verification scope",
+   "conceptIds": [],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-links",
+   "kind": "related",
+   "title": "Where this connects",
+   "conceptIds": [],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-azure-l01-revisit",
+   "kind": "revisit",
+   "title": "Check your understanding",
+   "conceptIds": [],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-azure-l01-q1",
+   "revision": "1",
+   "prompt": "A serverless SQL warehouse query on the external table returns PERMISSION_DENIED naming sp-job-nightly and SELECT. Which boundary refused the request?",
+   "options": [
+    {
+     "id": "dbxfe-azure-l01-q1-a",
+     "text": "The Unity Catalog privilege check for the acting principal.",
+     "rationale": "The catalog names the principal and the privilege; no storage request and no Azure role were involved yet."
+    },
+    {
+     "id": "dbxfe-azure-l01-q1-b",
+     "text": "The access connector identity's role assignment on the storage account.",
+     "rationale": "A missing data role is reported by the storage account as a 403, and only after the catalog has agreed."
+    },
+    {
+     "id": "dbxfe-azure-l01-q1-c",
+     "text": "The Private DNS zone link for privatelink.dfs.core.windows.net.",
+     "rationale": "A DNS problem produces no catalog refusal; the request would fail on its way to storage instead."
+    },
+    {
+     "id": "dbxfe-azure-l01-q1-d",
+     "text": "The storage account's network rules.",
+     "rationale": "A network-rule refusal comes from the storage account as a 403 after the catalog agreed, not as a catalog privilege error."
+    }
+   ],
+   "correctOptionId": "dbxfe-azure-l01-q1-a",
+   "conceptIds": [
+    "dbxfe-azure-l01-diagnosis-concept",
+    "dbxfe-azure-l01-connector-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-q2",
+   "revision": "1",
+   "prompt": "Cinderline's analysts query quality.accepted.inspections successfully although none of them holds any Azure role on stcinderlinelake. What explains it?",
+   "options": [
+    {
+     "id": "dbxfe-azure-l01-q2-a",
+     "text": "Unity Catalog authorizes the analyst, then reads storage with the storage credential's managed identity, which holds the data role.",
+     "rationale": "Application access and storage access are separate chains: people need privileges, the credential's identity needs the Azure role."
+    },
+    {
+     "id": "dbxfe-azure-l01-q2-b",
+     "text": "Azure grants read access to every member of the Entra tenant by default.",
+     "rationale": "Creating a storage account grants no data access through Entra; roles are assigned explicitly, even to its creator."
+    },
+    {
+     "id": "dbxfe-azure-l01-q2-c",
+     "text": "The workspace storage account mirrors the table, so no lake access is needed.",
+     "rationale": "Workspace storage holds workspace system data and the DBFS root, not Cinderline's governed external tables."
+    },
+    {
+     "id": "dbxfe-azure-l01-q2-d",
+     "text": "The queries use the storage account key held in the metastore.",
+     "rationale": "Unity Catalog on Azure uses the access connector's managed identity, which is why no key is stored or rotated."
+    }
+   ],
+   "correctOptionId": "dbxfe-azure-l01-q2-a",
+   "conceptIds": [
+    "dbxfe-azure-l01-connector-concept",
+    "dbxfe-azure-l01-entra-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-azure-course-claim-identity",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-q3",
+   "revision": "1",
+   "prompt": "From an injected cluster, nslookup of stcinderlinelake.dfs.core.windows.net returns a public address and the read times out. The private endpoint shows Approved. What do you change first?",
+   "options": [
+    {
+     "id": "dbxfe-azure-l01-q3-a",
+     "text": "Link privatelink.dfs.core.windows.net to the cluster's VNet, or forward its DNS to a resolver that sees the zone, then retest from the same subnet.",
+     "rationale": "The public answer shows the private zone was not consulted; the endpoint is healthy but never used."
+    },
+    {
+     "id": "dbxfe-azure-l01-q3-b",
+     "text": "Grant the connector identity Storage Blob Data Owner.",
+     "rationale": "A timeout is not a refusal; a broader role cannot change where packets go."
+    },
+    {
+     "id": "dbxfe-azure-l01-q3-c",
+     "text": "Add an inbound NSG rule from the storage account to the host subnet.",
+     "rationale": "The cluster opens outbound connections; inbound rules are not consulted and would add exposure."
+    },
+    {
+     "id": "dbxfe-azure-l01-q3-d",
+     "text": "Approve the private endpoint again.",
+     "rationale": "It is already Approved; the DNS answer shows the cluster never tried to use it."
+    }
+   ],
+   "correctOptionId": "dbxfe-azure-l01-q3-a",
+   "conceptIds": [
+    "dbxfe-azure-l01-privatelink-concept",
+    "dbxfe-azure-l01-diagnosis-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-private",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-azure-l01-card1",
+   "revision": "1",
+   "prompt": "Which resources does creating an Azure Databricks workspace add to Cinderline's subscription?",
+   "answer": "The workspace resource in Cinderline's resource group, and a managed resource group holding the workspace storage account, networking and cluster virtual machines.",
+   "explanation": "The workspace resource is the handle Cinderline tags and configures. The managed resource group, created with it, is protected by a system deny assignment, so its contents are read but not changed; the control plane stays in the Databricks account.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-resources",
+   "conceptIds": [
+    "dbxfe-azure-l01-resources-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-workspace",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card2",
+   "revision": "1",
+   "prompt": "Which Entra identities does the SCIM provisioning connector leave out of the Databricks account?",
+   "answer": "Nested groups and Microsoft Entra service principals; automatic identity management syncs both of them.",
+   "explanation": "A job meant to run as sp-job-nightly cannot use an identity the account never received. With SCIM alone, the service principal is added another way; with automatic identity management, users, groups, memberships, nested groups and service principals sync from the tenant.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-identity",
+   "conceptIds": [
+    "dbxfe-azure-l01-entra-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-identity",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card3",
+   "revision": "1",
+   "prompt": "On an injected classic workspace, who opens the control-path connection, and to what?",
+   "answer": "Each cluster opens an outbound connection on port 443 to the control plane's secure cluster connectivity relay.",
+   "explanation": "Secure cluster connectivity gives nodes no public IP and opens no inbound port in the VNet. Administration requests reach the cluster through the tunnel the cluster opened, so launch problems are diagnosed on the outbound side: DNS, route, NSG and firewall.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-resources",
+   "conceptIds": [
+    "dbxfe-azure-l01-vnet-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-vnet",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card4",
+   "revision": "1",
+   "prompt": "Name two things VNet injection lets Cinderline add that the default managed VNet does not.",
+   "answer": "User-defined routes to an egress firewall, and private endpoints or custom DNS in the workspace network; back-end Private Link also requires injection.",
+   "explanation": "In the default pattern the VNet sits in the locked managed resource group, so routes, extra rules and endpoints cannot be added. Injection moves the network into Cinderline's subscription, and with it the address planning and the first response to launch timeouts.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-patterns",
+   "conceptIds": [
+    "dbxfe-azure-l01-vnet-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-vnet",
+    "dbxfe-azure-course-claim-private",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card5",
+   "revision": "1",
+   "prompt": "How many cluster nodes can an injected workspace run with /25 host and container subnets?",
+   "answer": "123 nodes: 128 addresses minus 5 reserved in each subnet, with one address per node in each subnet.",
+   "explanation": "Every node takes one host address and one container address, so the two subnets are separate pools that each cap the workspace. A /25 holds 128 addresses; Azure reserves five in every subnet, leaving 123 per subnet and therefore 123 nodes across all clusters.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-patterns",
+   "conceptIds": [
+    "dbxfe-azure-l01-vnet-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-vnet",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card6",
+   "revision": "1",
+   "prompt": "Why write the AzureDatabricks service tag into a route instead of IP ranges?",
+   "answer": "Microsoft maintains the tag's address prefixes, so the route keeps following the control plane and relay when their addresses change.",
+   "explanation": "Databricks recommends service tags to avoid outages caused by IP changes. The AzureDatabricks tag covers the control plane, relay and web application; Storage and EventHub cover artifact, log and logging destinations. A firewall in the path still needs matching allow rules.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-patterns",
+   "conceptIds": [
+    "dbxfe-azure-l01-vnet-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-routes",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card7",
+   "revision": "1",
+   "prompt": "Spot the risk: a notebook reads the lake with the storage account key from a secret scope.",
+   "answer": "The key authorizes whoever holds it for the whole account, and the storage account cannot tell which person used it.",
+   "explanation": "Shared Key grants access to every resource in the account, and service or account SAS tokens signed with it inherit the problem. Disallowing Shared Key rejects both, while Entra-authorized access, including a Unity Catalog credential's managed identity, keeps working.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-storage",
+   "conceptIds": [
+    "dbxfe-azure-l01-connector-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card8",
+   "revision": "1",
+   "prompt": "Which Azure object holds the permission that lets Unity Catalog read stcinderlinelake?",
+   "answer": "A role assignment, such as Storage Blob Data Contributor, for the access connector's managed identity on the storage account or container.",
+   "explanation": "The storage credential only names the connector's resource ID, and the external location only binds an abfss path to that credential; neither grants anything in Azure. If the role assignment is removed, every Unity Catalog object still looks correct while storage refuses the read.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-storage",
+   "conceptIds": [
+    "dbxfe-azure-l01-connector-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card9",
+   "revision": "1",
+   "prompt": "Correct this claim: analysts need Storage Blob Data Reader to query external tables.",
+   "answer": "They need Unity Catalog privileges; the storage credential's managed identity is the one that needs the Azure data role.",
+   "explanation": "Application access and storage access are separate chains. Giving analysts a storage role does not fix a catalog refusal, and it opens a direct path to the files that bypasses Unity Catalog's privileges, widening access instead of repairing it.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-storage",
+   "conceptIds": [
+    "dbxfe-azure-l01-connector-concept",
+    "dbxfe-azure-l01-entra-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-azure-course-claim-identity",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card10",
+   "revision": "1",
+   "prompt": "What must happen before a serverless private endpoint rule to stcinderlinelake carries traffic?",
+   "answer": "The storage account's owner approves the endpoint request in Azure, and the rule reaches the established state.",
+   "explanation": "Adding a rule to the network connectivity configuration makes Databricks request a private endpoint on the resource. Until the owner approves it, the rule is pending and unusable. Propagation after approval usually takes minutes but can take up to a day.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-serverless",
+   "conceptIds": [
+    "dbxfe-azure-l01-ncc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-serverless",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card11",
+   "revision": "1",
+   "prompt": "Which Private DNS zone must answer the cluster for a private abfss read?",
+   "answer": "privatelink.dfs.core.windows.net, linked to the cluster's VNet or reached through DNS forwarding, holding the endpoint's A record.",
+   "explanation": "The public name stcinderlinelake.dfs.core.windows.net is a CNAME into the privatelink name. Only a linked zone or a forwarding resolver turns it into the endpoint's private address; otherwise the cluster receives the public address, which is then refused or dropped.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-private",
+   "conceptIds": [
+    "dbxfe-azure-l01-privatelink-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-private",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card12",
+   "revision": "1",
+   "prompt": "Choose the next check: storage returns 403 after SHOW GRANTS confirmed the job's privileges.",
+   "answer": "Read the role assignments of the storage credential's managed identity on the account, then the account's network rules.",
+   "explanation": "The catalog agreed, so the refusal came from Azure. A missing data role and a network rule both surface as 403s from the storage account, so read the error details, fix only that layer and rerun as sp-job-nightly. A storage role for the job would never be used.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-example",
+   "conceptIds": [
+    "dbxfe-azure-l01-diagnosis-concept",
+    "dbxfe-azure-l01-connector-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card13",
+   "revision": "1",
+   "prompt": "Where should the DNS check run when a cluster's storage read times out?",
+   "answer": "On the asking network: from the cluster or its subnet, never from an administrator's laptop elsewhere.",
+   "explanation": "Resolution differs by network: only VNets linked to the Private DNS zone, or resolvers forwarding to one, return the private address. A laptop on another network can resolve correctly while the cluster does not, so testing elsewhere proves nothing about the failing path.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-example",
+   "conceptIds": [
+    "dbxfe-azure-l01-diagnosis-concept",
+    "dbxfe-azure-l01-privatelink-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-private",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-azure-l01-card14",
+   "revision": "1",
+   "prompt": "Why does translating an AWS runbook term for term mislead on Azure?",
+   "answer": "Azure's boundaries sit in different objects: a locked managed resource group, delegated subnets, managed identities with roles, and Private DNS zone links.",
+   "explanation": "An AWS step such as editing a security group or a role trust policy has no one-to-one Azure counterpart: Databricks manages the NSG rules it needs, and a storage credential's managed identity takes an Azure role instead of a trust policy. Tier names differ as well.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-differences",
+   "conceptIds": [
+    "dbxfe-azure-l01-vnet-concept",
+    "dbxfe-azure-l01-connector-concept"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-vnet",
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction",
+    "dbxfe-aws-course-claim-vpc",
+    "dbxfe-aws-course-claim-storage"
+   ]
+  }
+ ]
+}
