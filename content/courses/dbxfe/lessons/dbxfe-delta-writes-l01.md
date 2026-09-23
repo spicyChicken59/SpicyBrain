@@ -4,9 +4,9 @@ After this lesson you can move one Delta table through a pipeline's writes and s
 
 <!-- section:dbxfe-delta-writes-l01-start -->
 
-[Delta tables: files, log, and snapshots](#/lesson/dbxfe-m03-l02) explains why a version selects files and the folder is not the table; this lesson builds on it. [Version-aware updates and replay](#/lesson/dbxfe-versioned-updates) sets the update policy (newer replaces, older never overwrites, equal revisions with different values conflict); here that policy runs on a real table and extends to deletes, change records, schema and maintenance.
+[Delta tables: files, log, and snapshots](#/lesson/dbxfe-m03-l02) explains why a version selects files and the folder is not the table; this lesson builds on it. [Version-aware updates and replay](#/lesson/dbxfe-versioned-updates), in the ingestion module that follows this one in the track, sets the update policy (newer replaces, older never overwrites, equal revisions with different values conflict); read it first if the policy is new. Here that policy runs on a real table and extends to deletes, change records, schema and maintenance.
 
-The running example is Cinderline Components' inspection table: inspection_id, plant, inspected, defective and revision, where higher is newer and 0 marks a stale replay.
+The running example is Cinderline Components' inspection table: inspection_id, plant, inspected, defective and revision, where higher is newer and 0 marks a stale replay. The lab starts from the snapshots lesson's numbers in its own commits: version 0 wrote A (10 inspected), version 1 appended C, version 2 corrected A to 12 with an in-place UPDATE that kept its revision at 1, and version 3 enabled the change data feed. That UPDATE is a data fix; a source correction should arrive as a higher revision, as A revision 2 does in the snapshots and ingestion lessons, because the guard below trusts only revisions that grow.
 
 <!-- section:dbxfe-delta-writes-l01-clauses -->
 

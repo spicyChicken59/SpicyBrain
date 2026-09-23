@@ -92,6 +92,7 @@ By (seq, revision_no): C-1 has three versions, bronze from (1,1) to (2,1), silve
 - Letting arrival order pick the current row: the late P-100 change would win with an older price.
 - Appending history rows as changes arrive: a late change yields an interval that ends before it starts.
 - Dropping unplaceable changes and calling the table clean: the older state is published as current.
+- Filtering tied or unplaceable rows out of an incremental SCD flow's input and calling the key withheld: a key the flow already applied stays published until a table recomputed each update takes it out.
 - Breaking ties by ingestion time or event id: both describe delivery, not business order.
 - Fully refreshing a streaming table whose source has lost its early history.
 - Promising expectations or AUTO CDC type 2 on open-source Spark without naming a release.

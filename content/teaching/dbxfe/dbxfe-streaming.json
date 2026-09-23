@@ -2170,7 +2170,7 @@
    "title": "Exactly-once is a property of the whole path",
    "alt": "Exactly-once is a property of the whole path. A replayable source and the checkpoint feed four kinds of sink with different guarantees, then the lab's three downstream stand-ins after a replay.",
    "caption": "The engine processes each batch exactly once; whether the output does too depends on the sink and on your code. Synthetic fixture, executed locally in lab L08.",
-   "textEquivalent": "Where exactly-once holds: The documented guarantee of each built-in sink, fed by the same replayable source and checkpoint. Nodes: Replayable source: Files stay in place; offsets say which were read. (selected); Checkpointed engine: Offset log, state and commit log. (selected); File sink: Exactly-once: its own log records committed files. (selected); Kafka sink: At-least-once: a replay can write again. (warning); foreach sink: At-least-once per row. (warning); foreachBatch: Depends on the function you write. (pending). Relationships: Replayable source → Checkpointed engine: offsets; Checkpointed engine → File sink: batch output; Checkpointed engine → Kafka sink: batch output; Checkpointed engine → foreach sink: rows; Checkpointed engine → foreachBatch: batch id + rows.\n\nAfter batch 7 was replayed: The engine committed batch 7 once, but the function ran twice; each stand-in shows what that did. Nodes: Checkpointed engine: Batch 7 replayed once, committed once. (selected); foreachBatch: Called twice with batch id 7. (warning); Keyed table: 9 rows. Upsert by window and line. (selected); Naive outbox: 12 messages. Appends every message it is given. (warning); Keyed outbox: 9 messages. Skips a key it has sent. (selected). Relationships: Checkpointed engine → foreachBatch: batch id 7, twice; foreachBatch → Keyed table: upsert; foreachBatch → Naive outbox: append; foreachBatch → Keyed outbox: send if new key.",
+   "textEquivalent": "Where exactly-once holds: The documented guarantee of each built-in sink, fed by the same replayable source and checkpoint. Nodes: Replayable source: Files stay in place; offsets say which were read. (selected); Checkpointed engine: Offset log, state and commit log. (selected); File sink: Exactly-once: its own log records committed files. (selected); Kafka sink: At-least-once: a replay can write again. (warning); foreach sink: At-least-once per row. (warning); foreachBatch: Depends on the function you write. (pending). Relationships: Replayable source → Checkpointed engine: offsets; Checkpointed engine → File sink: batch output; Checkpointed engine → Kafka sink: batch output; Checkpointed engine → foreach sink: rows; Checkpointed engine → foreachBatch: batch id + rows.\n\nAfter batch 7 was replayed: The engine committed batch 7 once, but the function ran twice; each stand-in shows what that did. Nodes: Checkpointed engine: Batch 7 replayed once, committed once. (selected); foreachBatch: Called twice with batch id 7. (warning); Keyed table: 7 rows. Upsert by window and line; 9 rows at the end of the run. (selected); Naive outbox: 10 messages. Appends every message it is given; 12 for 9 windows at the end of the run. (warning); Keyed outbox: 7 messages. Skips a key it has sent; 9 at the end of the run. (selected). Relationships: Checkpointed engine → foreachBatch: batch id 7, twice; foreachBatch → Keyed table: upsert; foreachBatch → Naive outbox: append; foreachBatch → Keyed outbox: send if new key.",
    "provenance": "Original SpicyBrain authored visual; every count, watermark and checkpoint entry is read from the recorded run of lab L08 on local Apache Spark 4.0.4 in local[2] mode over its synthetic Cinderline fixture. No copied product screenshot and no Databricks execution.",
    "claimIds": [
     "dbxfe-streaming-claim-exactly-once",
@@ -2270,23 +2270,23 @@
       {
        "id": "table",
        "label": "Keyed table",
-       "detail": "Upsert by window and line.",
+       "detail": "Upsert by window and line; 9 rows at the end of the run.",
        "status": "selected",
-       "value": "9 rows"
+       "value": "7 rows"
       },
       {
        "id": "naive",
        "label": "Naive outbox",
-       "detail": "Appends every message it is given.",
+       "detail": "Appends every message it is given; 12 for 9 windows at the end of the run.",
        "status": "warning",
-       "value": "12 messages"
+       "value": "10 messages"
       },
       {
        "id": "keyed",
        "label": "Keyed outbox",
-       "detail": "Skips a key it has sent.",
+       "detail": "Skips a key it has sent; 9 at the end of the run.",
        "status": "selected",
-       "value": "9 messages"
+       "value": "7 messages"
       }
      ],
      "connections": [
@@ -2320,7 +2320,7 @@
    "title": "A replay repeats every effect the first attempt made",
    "alt": "A replay repeats every effect the first attempt made. Batch 7 is planned, delivers three rows, fails before its commit, and is replayed after a restart; the naive and keyed outboxes end differently.",
    "caption": "The replay is correct engine behaviour; the duplicate is created by the sink function. Synthetic fixture, executed locally in lab L08.",
-   "textEquivalent": "Naive outbox: The second call appends the same three messages again. Nodes: Batch 7 planned: offsets/7 written: watermark 09:33:00. (selected); Sink sends 3 rows: 09:20 L1 6, L2 4, L3 2 go downstream. (selected); Sink raises: Query fails; commits/7 is never written. (warning); Restart: Same query, same checkpoint. (context); Batch 7 replayed: 12 messages. Same id, same rows: three messages appended again. (warning); commits/7 written: The batch is done. (selected). Relationships: Batch 7 planned → Sink sends 3 rows: then; Sink sends 3 rows → Sink raises: then; Sink raises → Restart: then; Restart → Batch 7 replayed: then; Batch 7 replayed → commits/7 written: then.\n\nKeyed outbox: The second call finds each window|line key already sent and sends nothing. Nodes: Batch 7 planned: offsets/7 written: watermark 09:33:00. (selected); Sink sends 3 rows: 09:20 L1 6, L2 4, L3 2 go downstream. (selected); Sink raises: Query fails; commits/7 is never written. (warning); Restart: Same query, same checkpoint. (context); Batch 7 replayed: 9 messages. Same id, same rows: three keys already sent, skipped. (selected); commits/7 written: The batch is done. (selected). Relationships: Batch 7 planned → Sink sends 3 rows: then; Sink sends 3 rows → Sink raises: then; Sink raises → Restart: then; Restart → Batch 7 replayed: then; Batch 7 replayed → commits/7 written: then.",
+   "textEquivalent": "Naive outbox: The second call appends the same three messages again. Nodes: Batch 7 planned: offsets/7 written: watermark 09:33:00. (selected); Sink sends 3 rows: 09:20 L1 6, L2 4, L3 2 go downstream. (selected); Sink raises: Query fails; commits/7 is never written. (warning); Restart: Same query, same checkpoint. (context); Batch 7 replayed: 10 messages. Same id, same rows: three messages appended again. (warning); commits/7 written: The batch is done. Batch 9 later adds the two 09:30 windows: 12 in the end. (selected). Relationships: Batch 7 planned → Sink sends 3 rows: then; Sink sends 3 rows → Sink raises: then; Sink raises → Restart: then; Restart → Batch 7 replayed: then; Batch 7 replayed → commits/7 written: then.\n\nKeyed outbox: The second call finds each window|line key already sent and sends nothing. Nodes: Batch 7 planned: offsets/7 written: watermark 09:33:00. (selected); Sink sends 3 rows: 09:20 L1 6, L2 4, L3 2 go downstream. (selected); Sink raises: Query fails; commits/7 is never written. (warning); Restart: Same query, same checkpoint. (context); Batch 7 replayed: 7 messages. Same id, same rows: three keys already sent, skipped. (selected); commits/7 written: The batch is done. Batch 9 later adds the two 09:30 windows: 9 in the end. (selected). Relationships: Batch 7 planned → Sink sends 3 rows: then; Sink sends 3 rows → Sink raises: then; Sink raises → Restart: then; Restart → Batch 7 replayed: then; Batch 7 replayed → commits/7 written: then.",
    "provenance": "Original SpicyBrain authored visual; every count, watermark and checkpoint entry is read from the recorded run of lab L08 on local Apache Spark 4.0.4 in local[2] mode over its synthetic Cinderline fixture. No copied product screenshot and no Databricks execution.",
    "claimIds": [
     "dbxfe-streaming-claim-exactly-once",
@@ -2364,12 +2364,12 @@
        "label": "Batch 7 replayed",
        "detail": "Same id, same rows: three messages appended again.",
        "status": "warning",
-       "value": "12 messages"
+       "value": "10 messages"
       },
       {
        "id": "commit",
        "label": "commits/7 written",
-       "detail": "The batch is done.",
+       "detail": "The batch is done. Batch 9 later adds the two 09:30 windows: 12 in the end.",
        "status": "selected"
       }
      ],
@@ -2435,12 +2435,12 @@
        "label": "Batch 7 replayed",
        "detail": "Same id, same rows: three keys already sent, skipped.",
        "status": "selected",
-       "value": "9 messages"
+       "value": "7 messages"
       },
       {
        "id": "commit",
        "label": "commits/7 written",
-       "detail": "The batch is done.",
+       "detail": "The batch is done. Batch 9 later adds the two 09:30 windows: 9 in the end.",
        "status": "selected"
       }
      ],
@@ -2760,7 +2760,7 @@
     {
      "id": "dbxfe-streaming-clock-question-b",
      "text": "48, because landing time is when Spark actually processed the rows.",
-     "rationale": "Landing time answers when data reached the pipeline; it moves e007 and e008, made before 09:10, into a later window."
+     "rationale": "Landing time answers when data reached the pipeline; it moves all four of L1's 09:00-09:10 events (e001, e003, e007, e011) into later windows."
     },
     {
      "id": "dbxfe-streaming-clock-question-c",
@@ -3186,7 +3186,7 @@
     "dbxfe-streaming-clock-question"
    ],
    "handbook": {
-    "markdown": "Every record in a stream has at least two times. Event time is recorded by the source: the press stamped `event_time` when it counted the parts. Processing time is set by delivery: the gateway, the network and the landing directory decide when a record reaches Spark. The lab's batch comparison reads the same five files twice:\n\n```python\nevents = (spark.read.schema(schema).json(landing_dir)\n          .select(\"*\", F.col(\"_metadata.file_modification_time\").alias(\"landed_at\")))\nby_event = events.groupBy(F.window(\"event_time\", \"10 minutes\"), \"line\").agg(F.sum(\"units\"))\nby_landing = events.groupBy(F.window(\"landed_at\", \"10 minutes\"), \"line\").agg(F.sum(\"units\"))\n```\n\nThe file's modification time is its landing time, because the lab stamps each file before moving it in. Grouped by landing time, files 01 and 02 both fall into 09:10-09:20, so L1 shows 48 units there and nothing earlier; grouped by event time, L1 made 36 units in 09:00-09:10 and 21 in 09:10-09:20. The difference is pure delivery delay: e007 and e008 were made before 09:10 and arrived at 09:19.\n\nUse event time for questions about the business: output per shift, defects per hour, sales per day. Use processing time to measure the pipeline itself: throughput, arrival lag, how far behind the source you are. The price of event time is that a window can still receive rows after it ends, so the engine needs a rule for how long to wait; that rule is the watermark in the next beats.\n\nWhat to inspect: the gap between a record's event time and its arrival. In this fixture e011 arrived 25 minutes after it happened; a delay chosen without measuring that gap is a guess. The same split applies to retail orders stamped at the till and uploaded in batches.",
+    "markdown": "Every record in a stream has at least two times. Event time is recorded by the source: the press stamped `event_time` when it counted the parts. Processing time is set by delivery: the gateway, the network and the landing directory decide when a record reaches Spark. The lab's batch comparison reads the same five files twice:\n\n```python\nevents = (spark.read.schema(schema).json(landing_dir)\n          .select(\"*\", F.col(\"_metadata.file_modification_time\").alias(\"landed_at\")))\nby_event = events.groupBy(F.window(\"event_time\", \"10 minutes\"), \"line\").agg(F.sum(\"units\"))\nby_landing = events.groupBy(F.window(\"landed_at\", \"10 minutes\"), \"line\").agg(F.sum(\"units\"))\n```\n\nThe file's modification time is its landing time, because the lab stamps each file before moving it in. Grouped by landing time, files 01 and 02 both fall into 09:10-09:20, so L1 shows 48 units there and nothing earlier; grouped by event time, L1 made 36 units in 09:00-09:10 and 21 in 09:10-09:20. The difference is pure delivery delay: L1's e001 and e003 landed at 09:13, e007 at 09:19 and e011 at 09:28, so none of L1's 09:00-09:10 units land in that window.\n\nUse event time for questions about the business: output per shift, defects per hour, sales per day. Use processing time to measure the pipeline itself: throughput, arrival lag, how far behind the source you are. The price of event time is that a window can still receive rows after it ends, so the engine needs a rule for how long to wait; that rule is the watermark in the next beats.\n\nWhat to inspect: the gap between a record's event time and its arrival. In this fixture e011 arrived 25 minutes after it happened; a delay chosen without measuring that gap is a guess. The same split applies to retail orders stamped at the till and uploaded in batches.",
     "sourceSectionIds": [
      "dbxfe-streaming-l01-time"
     ]
@@ -3473,7 +3473,7 @@
     "dbxfe-streaming-sink-question"
    ],
    "handbook": {
-    "markdown": "Spark's guarantee is stated as a chain. Sources have offsets and can be replayed from them; the engine records each batch's offset range and state in the checkpoint; sinks are idempotent for reprocessing. Break one link and the guarantee becomes at-least-once.\n\n| Sink | Documented guarantee | Why |\n|---|---|---|\n| File (Parquet, JSON, ...) | exactly-once | its `_spark_metadata` log names the files each committed batch wrote |\n| Kafka | at-least-once | a replay can publish the same records again |\n| foreach | at-least-once | your per-row code runs again on replay |\n| foreachBatch | depends on the implementation | at-least-once by default; deduplicate with the batch id or a key |\n| console, memory | debugging only | not fault-tolerant |\n\nThe source matters as much. The file source is replayable because the files stay in place; a message source needs retention longer than your longest outage. Platform sinks such as Delta Lake tables document their own guarantees; check the current documentation for the runtime you use rather than assuming.\n\nThe lab shows both ends. The stream-static join wrote through the file sink, was stopped with `stop()`, restarted from its checkpoint, and ended with 14 rows and 14 distinct event ids; the sink's own log listed batches 0, 1 and 2. The windowed query wrote through foreachBatch, failed once after its effects, and its naive outbox then held 12 messages for 9 windows.\n\nThe operation matters too. Inside foreachBatch you may run operations the engine cannot plan incrementally, or write one batch to several places, but then the end-to-end semantics of those operations are yours to reason about, and each extra write can recompute the batch unless it is persisted first. On Databricks, foreachBatch receives each micro-batch with its batch id, and a stateful query must consume the whole batch DataFrame, as the lab does with one `collect()` of a tiny result. Exactly-once is not always needed: an alert that is safe to repeat, or a consumer that deduplicates, can accept at-least-once, provided someone decided that deliberately.",
+    "markdown": "Spark's guarantee is stated as a chain. Sources have offsets and can be replayed from them; the engine records each batch's offset range and state in the checkpoint; sinks are idempotent for reprocessing. Break one link and the guarantee becomes at-least-once.\n\n| Sink | Documented guarantee | Why |\n|---|---|---|\n| File (Parquet, JSON, ...) | exactly-once | its `_spark_metadata` log names the files each committed batch wrote |\n| Kafka | at-least-once | a replay can publish the same records again |\n| foreach | at-least-once | your per-row code runs again on replay |\n| foreachBatch | depends on the implementation | at-least-once by default; deduplicate with the batch id or a key |\n| console, memory | debugging only | not fault-tolerant |\n\nThe source matters as much. The file source is replayable because the files stay in place; a message source needs retention longer than your longest outage. Platform sinks such as Delta Lake tables document their own guarantees; check the current documentation for the runtime you use rather than assuming.\n\nThe lab shows both ends. The stream-static join wrote through the file sink, was stopped with `stop()`, restarted from its checkpoint, and ended with 14 rows and 14 distinct event ids; the sink's own log listed batches 0, 1 and 2. The windowed query wrote through foreachBatch, failed once after its effects, and its naive outbox held 10 messages for 7 windows right after the replay and 12 for 9 at the end of the run.\n\nThe operation matters too. Inside foreachBatch you may run operations the engine cannot plan incrementally, or write one batch to several places, but then the end-to-end semantics of those operations are yours to reason about, and each extra write can recompute the batch unless it is persisted first. On Databricks, foreachBatch receives each micro-batch with its batch id, and a stateful query must consume the whole batch DataFrame, as the lab does with one `collect()` of a tiny result. Exactly-once is not always needed: an alert that is safe to repeat, or a consumer that deduplicates, can accept at-least-once, provided someone decided that deliberately.",
     "sourceSectionIds": [
      "dbxfe-streaming-l01-sinks",
      "dbxfe-streaming-l01-joins"
@@ -3701,7 +3701,7 @@
  },
  "appliedTask": {
   "title": "Predict a sixth file, then fail it on purpose",
-  "prompt": "Scenario S has processed 05.json: the watermark is 09:41:00 and the state holds only 09:40 L1 (8 units, 1 event). 06.json now lands at 09:59 with e019 (L3, 09:39:30, 4 units), e020 (L1, 09:58:00, 6 units) and e021 (L2, 09:44:00, 5 units). Predict batch by batch the input rows, the watermark used, the rows dropped, the state after each batch and what the sink receives. Then say what the naive and keyed outboxes hold if the sink fails after sending in the batch that emits the 09:40 windows, and propose one change if the plant needs e019 counted.",
+  "prompt": "The lab's one-file-per-run sequence (scenario S in the lesson) has processed 05.json: the watermark is 09:41:00 and the state holds only 09:40 L1 (8 units, 1 event). 06.json now lands at 09:59 with e019 (L3, 09:39:30, 4 units), e020 (L1, 09:58:00, 6 units) and e021 (L2, 09:44:00, 5 units). Predict batch by batch the input rows, the watermark used, the rows dropped, the state after each batch and what the sink receives. Then say what the naive and keyed outboxes hold if the sink fails after sending in the batch that emits the 09:40 windows, and propose one change if the plant needs e019 counted.",
   "modelAnswer": "Batch 10 reads 3 rows under the watermark 09:41:00. e019 belongs to 09:30-09:40, which batch 9 emitted and removed, so it is dropped (numRowsDroppedByWatermark = 1). e021 opens 09:40 L2 and e020 opens 09:50 L1: 2 keys updated, 3 state rows (09:40 L1 8/1, 09:40 L2 5/1, 09:50 L1 6/1), nothing sent. Batch 11 is a no-data batch with watermark 09:58:00 minus 5 minutes, 09:53:00, past 09:50: it emits 09:40 L1 8/1 and 09:40 L2 5/1 and leaves only 09:50 L1 in state. If the sink fails after sending, batch 11 stays uncommitted and the restart replays it with the same two rows: the naive outbox goes from 12 to 14 and then 16, the keyed outbox from 9 to 11 and stays there. To count e019, the delay must keep 09:30-09:40 open when e019 arrives: the previous batch's watermark must still be before 09:40, so with the latest event at 09:46 the delay must exceed 6 minutes; the 15-minute delay of the transfer run would count it, at the cost of later results. Alternatively keep 5 minutes for fast alerts and reconcile daily totals with a batch recount by event time. The batch predictions were checked once on local Spark 4.0.4 by adding this file to the lab's sequential run.",
   "reasoning": "The answer applies the three rules the lab asserted to a changed dataset: late rows are judged by window end against the previous batch's watermark, state is evicted at the current watermark, and a restart replays the uncommitted batch. It keeps engine behaviour separate from sink behaviour and treats the delay as a trade-off rather than a fix.",
   "beatIds": [
