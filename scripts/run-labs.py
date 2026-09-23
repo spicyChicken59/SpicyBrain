@@ -2,15 +2,17 @@
 """Execute every runnable lab package and compare with the committed evidence.
 
 Usage:
-  python scripts/run-labs.py [--python PATH] [--evidence-dir DIR] [--only lab-id ...]
+  python scripts/run-labs.py [--python PATH] [--spark-python PATH] [--ml-python PATH]
+                             [--evidence-dir DIR] [--only lab-id ...]
 
 For each content/exercises/lab-*/run_tests.py the runner executes
 `python run_tests.py --evidence <dir>/<lab>.json` with the lab directory as
 the working directory, then checks the produced evidence against
 docs/academy/labs/<lab>.json: same execution class, same test count, zero
 skips, exit status 0 and identical fixture hashes. A differing test count or
-a skipped test fails the run; nothing is relabelled. The interpreter must
-already have the union of the labs' pinned requirements installed.
+a skipped test fails the run; nothing is relabelled. The committed evidence's
+"runtime" field ("spark", "ml" or absent for the standard library) selects the
+interpreter, which must already have that lab's pinned requirements.
 """
 from __future__ import annotations
 
@@ -27,7 +29,12 @@ COMMITTED = ROOT / "docs" / "academy" / "labs"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--python", default=sys.executable)
+    parser.add_argument("--python", default=sys.executable,
+                        help="interpreter for labs whose evidence names no runtime")
+    parser.add_argument("--spark-python", default=None,
+                        help="interpreter for labs whose evidence runtime is 'spark'")
+    parser.add_argument("--ml-python", default=None,
+                        help="interpreter for labs whose evidence runtime is 'ml'")
     parser.add_argument("--evidence-dir", default=str(ROOT / "test-results" / "labs"))
     parser.add_argument("--only", nargs="*", default=None)
     args = parser.parse_args()
@@ -40,8 +47,18 @@ def main() -> int:
     summary = []
     for lab in labs:
         evidence = out / f"{lab}.json"
+        committed_path = COMMITTED / f"{lab}.json"
+        runtime = (
+            json.loads(committed_path.read_text()).get("runtime")
+            if committed_path.exists()
+            else None
+        )
+        interpreter = {
+            "spark": args.spark_python,
+            "ml": args.ml_python,
+        }.get(runtime) or args.python
         result = subprocess.run(
-            [args.python, "run_tests.py", "--evidence", str(evidence)],
+            [interpreter, "run_tests.py", "--evidence", str(evidence)],
             cwd=EXERCISES / lab,
             capture_output=True,
             text=True,
@@ -51,7 +68,6 @@ def main() -> int:
             failures.append(f"{lab}: exit {result.returncode}\n{tail}")
             continue
         produced = json.loads(evidence.read_text())
-        committed_path = COMMITTED / f"{lab}.json"
         if not committed_path.exists():
             failures.append(f"{lab}: no committed evidence at {committed_path}")
             continue
