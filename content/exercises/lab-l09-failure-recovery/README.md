@@ -46,8 +46,13 @@ After the lab you can:
 
 Python you can read (functions, dictionaries, exceptions, a class), JSON, and
 the course's module *Orchestration and operations* (lesson *Orchestration,
-failure, and reconciliation*). The record-resolution rules reused here (duplicates,
-versions, invalid rows, conflicts) come from the ingestion module.
+failure, and reconciliation*). The record-resolution rules here (duplicates,
+versions, invalid rows, conflicts) are a simplified version of the ingestion
+module's: this lab keeps the highest *valid* version per lot, while the
+ingestion module takes the highest observed version first, validates it, and
+blocks publication on an unresolved conflict. Use this lab for task
+boundaries, run ids, effect keys and freshness, and the ingestion module for
+publication decisions.
 
 ## Files
 

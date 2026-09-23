@@ -216,16 +216,17 @@
     {
       "id": "dbxfe-m07",
       "title": "Machine learning fundamentals",
-      "summary": "Choose a bounded AI task, evaluate it, and keep authority and failure handling explicit.",
+      "summary": "Define a useful prediction, keep future information out, and connect model scores to operational decisions.",
       "objectives": [
-        "Distinguish prediction, retrieval, and tool use.",
-        "Design an evaluation set with human escalation."
+        "Specify a prediction's target, horizon and available features, and choose an evaluation split that matches deployment.",
+        "Calculate baseline, precision and recall results from counts, and explain how a decision threshold changes them.",
+        "Connect evaluation evidence to the owner's action, error costs and monitoring before recommending rollout."
       ],
       "prerequisiteIds": [],
       "lessonFiles": [
         "lessons/dbxfe-m07-l01.json"
       ],
-      "scenarioId": "dbxfe-m07-scenario"
+      "scenarioId": "dbxfe-m07-evaluation-scenario"
     },
     {
       "file": "modules/dbxfe-features.json"
@@ -2363,6 +2364,77 @@
       "isCapstone": false
     },
     {
+      "id": "dbxfe-m07-evaluation-scenario",
+      "title": "Review a press-failure warning before Cinderline relies on it",
+      "context": "Fictional Cinderline Components' North plant runs eight stamping presses. A contractor proposes a model that “predicts press failures” and reports 97% accuracy. Its training table holds one row per five-minute sensor message, split at random into training and test rows, and joins each message to that day's repair ticket, which brings in the field `stoppage_reason`. The plant's maintenance planner, who assigns the day's work at 06:00, would use the warnings to choose which presses get an unscheduled inspection. The contractor asks to switch off the plant's current warning rule next month.\n\nBefore anyone acts, Cinderline's own analyst rebuilt the evidence. Each row is now one press at 06:00, labelled 1 when an unplanned stoppage needing repair starts in the following 24 hours. Inputs are limited to readings that had arrived by 06:00. The model was fitted on January to June and scored on 50 production days in July and August: 400 press-days, 20 of them followed by a stoppage. September and October, another 400 press-days, are set aside and have not been scored. Every count here is a synthetic teaching value.\n\n| July–August: 400 press-days, 20 stoppages | Warnings | Stoppages warned | Stoppages missed |\n|---|---|---|---|\n| Model, warn when score ≥ 0.60 | 15 | 9 | 11 |\n| Model, warn when score ≥ 0.35 | 36 | 15 | 5 |\n| Current rule: oil above the alarm setting twice in the last shift | 25 | 7 | 13 |\n| Never warn | 0 | 0 | 20 |",
+      "task": "Write the review the planner and the contractor will read before anyone relies on the warnings. Define the prediction and when it is made, say which evidence is invalid and why, calculate precision and recall at both thresholds beside the current rule and never-warn, recommend what, if anything, goes into a pilot, and state what the sealed September–October test must show first.",
+      "requirements": [
+        "State the prediction opportunity: the decision time, the 24-hour horizon, the label, the inputs allowed, and the action a warning triggers and who takes it.",
+        "Name the leaked input and the flawed split in the original proposal, and say what its 97% can and cannot be used for.",
+        "From the table, calculate precision, recall and warnings per day for both thresholds and the current rule, showing each fraction, and set never-warn's accuracy and recall beside them.",
+        "Recommend a threshold from the owner's stated costs and capacity, keep September–October untouched until every choice is frozen, and name what a pilot must still measure."
+      ],
+      "model": "### The prediction\n\nOne row is one press at 06:00, when the planner assigns work. The label is 1 if an unplanned stoppage needing repair starts before 06:00 the next day. Inputs are only readings that had arrived by 06:00. A warning must reach the planner by 06:15 so a technician can inspect before the 14:00 shift change, and the planner owns the decision to inspect. The contractor's five-minute messages are not prediction opportunities: dozens of near-identical rows describe the same press and hour.\n\n### Why the 97% is not evidence\n\n`stoppage_reason` is written when a technician closes the repair ticket, hours after the press stopped, and is empty whenever no stoppage followed. Copied onto earlier messages, it all but names the label, so it is leakage: it did not exist at 06:00. The random message-level split also puts neighbouring readings from the same press and hour on both sides of the test. Keep the 97% only as a diagnostic finding. Never-warn already scores 380/400 = 95% accuracy on the rebuilt cohort, so accuracy is the wrong headline here.\n\n### The counts on July–August\n\n| Warning rule | Precision | Recall | Warnings a day |\n|---|---|---|---|\n| Score ≥ 0.60 | 9/15 = 60% | 9/20 = 45% | 15/50 = 0.30 |\n| Score ≥ 0.35 | 15/36 ≈ 41.7% | 15/20 = 75% | 36/50 = 0.72 |\n| Current rule | 7/25 = 28% | 7/20 = 35% | 25/50 = 0.50 |\n| Never warn | none issued (0/0) | 0/20 = 0% | 0 |\n\nAt 0.60 the model beats the current rule outright: two more stoppages warned (9 against 7) with twelve fewer false alarms (6 against 18). Dropping to 0.35 adds 21 warnings: 6 more stoppages warned, so misses fall from 11 to 5, and 15 more false alarms, 21 in all. Accuracy falls from 383/400 = 95.75% to 374/400 = 93.5% while recall rises from 45% to 75%. With only 20 stoppages, each one moves recall by 5 points, so these are small-sample figures, not precise rates.\n\n### The owner's decision\n\nThe planner's costs set the choice. A warning costs about one technician-hour and a 20-minute press pause; a stoppage costs about six press-hours and a scrapped coil. Over the 50 days, 0.35 means 21 more inspections, so 21 technician-hours and 7 press-hours of pauses, to warn on 6 more stoppages: worth at most 6 × 6 = 36 press-hours, and only if every warned stoppage were avoided, which nobody has measured. It averages 0.72 warnings a day against a capacity of two, and only one day reached three. I would recommend 0.35 to the planner, who decides, provided we agree how a third warning on one day is handled.\n\n### Before anyone relies on it\n\nFreeze the model fitted on January to June, the 06:00 feature cut-off and the 0.35 threshold chosen on July–August, then score September–October once and report the four counts. Refuse the request to use those months to pick the threshold; that would make them tuning data. Agree the pass condition first, for example recall above the current rule's on the same months and no more than two warnings on almost every day. Drop each period's last day, whose 24-hour label reaches into the next period. If the test holds, pilot with the current rule still running and record what every inspection found.",
+      "reasoning": "The review fixes validity before arithmetic. It defines one prediction at a decision time the planner can act on, rejects the 97% for its leaked field and message-level split, and only then reads the rebuilt counts. It computes each rate from its own denominator, sets both thresholds against the rule in use and never-warn, and turns the owner's costs and capacity into a threshold choice, while saying plainly that the benefit of an inspection is unmeasured and that the sealed test stays untouched until every choice is frozen.",
+      "rubric": [
+        {
+          "id": "dbxfe-m07-evaluation-scenario-rubric-1",
+          "criterion": "Target and timing",
+          "weak": "Accepts “predict press failures” with five-minute messages as rows and names no decision time or horizon.",
+          "partial": "States a 24-hour horizon but omits the 06:00 decision time, the arrived-by-06:00 rule for inputs, or who acts on a warning.",
+          "strong": "Defines one press at 06:00, the 24-hour stoppage label, inputs that had arrived by 06:00, and the planner's inspection as the action with its 06:15 deadline."
+        },
+        {
+          "id": "dbxfe-m07-evaluation-scenario-rubric-2",
+          "criterion": "Leakage and split",
+          "weak": "Treats the 97% accuracy as evidence that the model works.",
+          "partial": "Removes the stoppage_reason field but accepts the random message-level split, or lets September–October be used to choose the threshold.",
+          "strong": "Rejects the 97% for the leaked field and the random split, keeps it only as a diagnostic, makes choices on July–August and keeps September–October sealed until the model, cut-off and threshold are frozen."
+        },
+        {
+          "id": "dbxfe-m07-evaluation-scenario-rubric-3",
+          "criterion": "Counts and baselines",
+          "weak": "Quotes accuracy alone, or uses one denominator for both precision and recall.",
+          "partial": "Calculates precision and recall for the model but leaves out the current rule or never-warn.",
+          "strong": "Shows every fraction for both thresholds and the current rule, notes never-warn's 95% accuracy with 0% recall, and says 20 stoppages make every rate imprecise."
+        },
+        {
+          "id": "dbxfe-m07-evaluation-scenario-rubric-4",
+          "criterion": "Owner decision and limits",
+          "weak": "Picks whichever threshold has the best single score and promises fewer stoppages.",
+          "partial": "Mentions false alarms and misses without the planner's costs, the crew's capacity or who decides.",
+          "strong": "Uses the planner's costs and the two-a-day capacity to justify a threshold, treats prevented stoppages as unmeasured, keeps the current rule running in the pilot and leaves the decision with the planner."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "When is the stoppage_reason field filled in?",
+          "response": "When the technician closes the repair ticket, usually two to six hours after the press stops. The contractor's table copied it onto every message from that press and day, including messages recorded before the stoppage. On days with no stoppage it is empty, so a filled code almost identifies the label."
+        },
+        {
+          "question": "What does a warning cost the plant, and what does a missed stoppage cost?",
+          "response": "An unscheduled inspection takes one technician about an hour and pauses the press for about 20 minutes. An unplanned stoppage typically costs around six hours of press time and a scrapped coil. We have never measured how often an inspection actually prevents a stoppage, so treat that as unknown."
+        },
+        {
+          "question": "How many warnings can the crew handle, and when must they arrive?",
+          "response": "The day crew can take two unscheduled inspections a day without cancelling planned lubrication. Warnings must reach me by 06:15 so an inspection can finish before the 14:00 shift change. The analyst reports that at 0.35 the busiest July–August day had three warnings and no other day had more than two; at 0.60 no day had more than one."
+        },
+        {
+          "question": "Has anyone looked at September and October?",
+          "response": "No. I sealed those 400 press-days before fitting on January to June, and every threshold comparison so far used July and August only. The contractor has asked for September and October to “check which threshold works best”, but nobody has sent the data or scored it."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-m07-l01"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-fact-leakage"
+      ],
+      "isCapstone": false
+    },
+    {
       "id": "dbxfe-m08-scenario",
       "title": "Defend a reversible one-plant migration",
       "context": "Fictional Cinderline needs a trusted daily quality report. Source corrections are approved periodically, and a small team operates the current SQL-based path. The sponsor wants improvement without losing the existing morning report.",
@@ -3111,7 +3183,7 @@
       "description": "Failure-recovery lab: a fictional four-task pipeline with a local runner and ledger, injected failure points, starters, solutions, expected outcomes, tests and a mutation check. Python 3.12 standard library; nothing connects to Databricks or sends a message.",
       "path": "lab-l09-failure-recovery.zip",
       "mediaType": "application/zip",
-      "sha256": "9eb2823243b5dd42cfae913c3e32c6acead757b1f700e82230fdf50ca6fd1348"
+      "sha256": "6cc41ea785b5bc1760af130d989dd07f55e1cf0a4e7a438e6867c5dc9666637a"
     },
     {
       "id": "download-lab-l10-contracts-quarantine",
