@@ -1,0 +1,233 @@
+{
+ "_derivation": "Hand-authored. Evidence reasons follow from what each run logs (see DATA.md, 'Decisions'): a run is checked for a time split, a recorded seed, a logged training dataset, a recorded feature list, no post-event feature and a signature equal to contract.json; threshold reasons compare metrics.json with contract.json's thresholds (recall 0.8333 >= 0.75, precision 0.2206 >= 0.2, 1.8889 <= 2.0 warnings a day for time-split-C-1; precision 0.1868 < 0.2 and 2.5278 > 2.0 for time-split-C-0.01; recall 0.6 < 0.75 on the transfer plant). Every reason list is sorted. The MLflow message fragments are what schema enforcement in MLflow 3.16.1 prints for the documented rule that missing required inputs raise and only lossless type conversions are allowed.",
+ "candidates": {
+  "time-split-C-1": {
+   "decision": "promote-candidate",
+   "gate": "thresholds",
+   "reasons": []
+  },
+  "time-split-C-0.01": {
+   "decision": "reject",
+   "gate": "thresholds",
+   "reasons": [
+    "precision_below_min",
+    "warnings_above_cap"
+   ]
+  },
+  "random-split-seeded": {
+   "decision": "reject",
+   "gate": "evidence",
+   "reasons": [
+    "split_not_time_based"
+   ]
+  },
+  "time-split-leaky": {
+   "decision": "reject",
+   "gate": "evidence",
+   "reasons": [
+    "post_event_feature:repair_minutes",
+    "unexpected_input:repair_minutes"
+   ]
+  },
+  "hero": {
+   "decision": "reject",
+   "gate": "evidence",
+   "reasons": [
+    "dataset_digest_missing",
+    "features_not_recorded",
+    "seed_not_recorded",
+    "signature_missing",
+    "split_not_time_based"
+   ]
+  }
+ },
+ "baselines": [
+  "never-warn",
+  "temperature-rule"
+ ],
+ "promoted": [
+  "time-split-C-1"
+ ],
+ "transfer": {
+  "time-split-C-1": {
+   "decision": "reject",
+   "gate": "thresholds",
+   "reasons": [
+    "recall_below_min"
+   ]
+  }
+ },
+ "accuracy_ranking": [
+  [
+   "hero",
+   1.0
+  ],
+  [
+   "time-split-leaky",
+   1.0
+  ],
+  [
+   "never-warn",
+   0.9375
+  ],
+  [
+   "temperature-rule",
+   0.8715
+  ],
+  [
+   "random-split-seeded",
+   0.8438
+  ],
+  [
+   "time-split-C-1",
+   0.8056
+  ],
+  [
+   "time-split-C-0.01",
+   0.7396
+  ]
+ ],
+ "naive_pick_is_one_of": [
+  "hero",
+  "time-split-leaky"
+ ],
+ "comparisons": {
+  "time-split-C-1|time-split-C-0.01": {
+   "differing_params": [
+    "C"
+   ],
+   "same_dataset_digest": true,
+   "comparable": true
+  },
+  "time-split-C-1|time-split-leaky": {
+   "differing_params": [
+    "features"
+   ],
+   "same_dataset_digest": true,
+   "comparable": true
+  },
+  "time-split-C-1|random-split-seeded": {
+   "differing_params": [
+    "split",
+    "train_fraction",
+    "train_through_day"
+   ],
+   "same_dataset_digest": false,
+   "comparable": false
+  },
+  "time-split-C-1|hero": {
+   "differing_params": [
+    "C",
+    "class_weight",
+    "features",
+    "max_iter",
+    "scikit_learn",
+    "seed",
+    "split",
+    "train_through_day"
+   ],
+   "same_dataset_digest": false,
+   "comparable": false
+  }
+ },
+ "reproduce_refusals": {
+  "hero": {
+   "missing": [
+    "C",
+    "class_weight",
+    "features",
+    "max_iter",
+    "scikit_learn",
+    "seed",
+    "split",
+    "training_dataset"
+   ],
+   "mismatched": []
+  },
+  "environment_copy": {
+   "missing": [],
+   "mismatched": [
+    "scikit-learn 1.8.0 recorded, 1.9.1 installed"
+   ]
+  }
+ },
+ "leakage_flags": {
+  "repair_minutes": "recorded_after_prediction",
+  "fault_code": "recorded_after_prediction",
+  "fault_next_24h": "is_the_label"
+ },
+ "random_split_reason": "test rows start on day 1, before training ends on day 120",
+ "drift_cases": {
+  "renamed": {
+   "change": "humidity_pct renamed to humidity",
+   "reasons": [
+    "missing_input:humidity_pct",
+    "unexpected_input:humidity"
+   ]
+  },
+  "retyped": {
+   "change": "door_cycles sent as int64",
+   "reasons": [
+    "type_mismatch:door_cycles:double->long"
+   ]
+  },
+  "extra": {
+   "change": "repair_minutes added",
+   "reasons": [
+    "unexpected_input:repair_minutes"
+   ]
+  },
+  "output_renamed": {
+   "change": "output named prediction",
+   "reasons": [
+    "output_mismatch:prediction:long"
+   ]
+  },
+  "reordered": {
+   "change": "same six columns in reverse order",
+   "reasons": []
+  }
+ },
+ "pyfunc_enforcement": {
+  "renamed": {
+   "raises": true,
+   "message_contains": "Model is missing inputs ['humidity_pct']"
+  },
+  "retyped": {
+   "raises": true,
+   "message_contains": "Can not safely convert int64 to float64"
+  },
+  "extra": {
+   "raises": false,
+   "log_contains": "These inputs will be ignored"
+  },
+  "reordered": {
+   "raises": false,
+   "same_predictions": true
+  }
+ },
+ "registry": {
+  "after_promotion": {
+   "version": 1,
+   "alias": "candidate",
+   "alias_points_to": 1,
+   "tags": {
+    "contract_version": "1.0.0"
+   }
+  },
+  "after_second_version": {
+   "alias_points_to": 2,
+   "version_1_aliases": [],
+   "version_2_aliases": [
+    "candidate"
+   ]
+  },
+  "after_rollback": {
+   "alias_points_to": 1,
+   "version_1_aliases": [
+    "candidate"
+   ],
+   "version_2_aliases": []
+  }
+ }
+}
