@@ -1,0 +1,31 @@
+{
+  "contract_id": "inspection-feed-v1",
+  "description": "Original fictional data contract for a plant inspection feed delivered as CSV text. Row rules decide whether one row is admissible; batch rules need every row of the delivery and the manifest.",
+  "fields": [
+    {"name": "event_id", "type": "string", "required": true, "unique": true, "meaning": "one delivered payload; a repeat with the same payload is a duplicate delivery, a repeat with a different payload is a contradiction"},
+    {"name": "plant_id", "type": "string", "required": true, "references": {"dimension": "plants", "field": "plant_id", "label": "plant"}},
+    {"name": "inspection_id", "type": "string", "required": true, "meaning": "business key; versions are comparable within one inspection only"},
+    {"name": "version", "type": "integer", "required": true, "minimum": 1},
+    {"name": "revised_at", "type": "date", "required": true, "format": "YYYY-MM-DD"},
+    {"name": "inspected_units", "type": "integer", "required": true, "minimum": 0},
+    {"name": "defective_units", "type": "integer", "required": true, "minimum": 0},
+    {"name": "note", "type": "string", "required": false}
+  ],
+  "key": ["inspection_id", "version"],
+  "text_rules": "values are trimmed; an empty string after trimming is missing; integer text must match ^[+-]?[0-9]+$ (so 12.0 and twelve are invalid); dates must be ISO calendar dates",
+  "row_rules": [
+    {"id": "defective_exceeds_inspected", "rule": "defective_units <= inspected_units, checked only when both parsed as integers"},
+    {"id": "zero_denominator", "rule": "an accepted row with inspected_units == 0 has defect_rate null: never 0.0 and never a division error"}
+  ],
+  "batch_rules": [
+    {"id": "duplicate_delivery", "rule": "the same event_id with an identical payload: the first row is kept, later repeats are quarantined; disclosed, does not block"},
+    {"id": "event_id_conflict", "rule": "the same event_id with a different payload: every such row is quarantined; blocks publication"},
+    {"id": "key_version_conflict", "rule": "the same (inspection_id, version) with different quantities under different event IDs: every such row is quarantined; blocks publication"},
+    {"id": "redundant_key_version", "rule": "the same (inspection_id, version) with identical quantities under different event IDs: later rows are quarantined as redundant; disclosed, does not block"},
+    {"id": "version_time_inversion", "rule": "within one inspection_id, revised_at must not decrease as version increases; every row of that inspection is quarantined; blocks publication"},
+    {"id": "manifest_row_count_mismatch", "rule": "manifest delivered_rows must equal the number of data rows in the CSV; blocks publication"},
+    {"id": "missing_column", "rule": "every required field must be a CSV column; blocks publication"}
+  ],
+  "reason_order": "for each field in contract order: missing_<field>, then invalid_<field>, then below_minimum_<field>, then unknown_<label> for a reference; then defective_exceeds_inspected; batch reasons follow row reasons",
+  "publication_rule": "publication_allowed is true only when there are no contradictions and no batch failures; row-level quarantine is disclosed and does not block"
+}
