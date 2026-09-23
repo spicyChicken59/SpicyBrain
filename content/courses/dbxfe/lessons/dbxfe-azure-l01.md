@@ -45,7 +45,7 @@ CREATE EXTERNAL LOCATION IF NOT EXISTS cinderline_quality
 GRANT READ FILES ON EXTERNAL LOCATION cinderline_quality TO `grp-quality-eng`;
 ```
 
-The address reads as container `quality`, account `stcinderlinelake`, the `dfs` endpoint and path `accepted`; `abfss` is the ABFS driver over TLS.
+The address reads as container `quality`, account `stcinderlinelake`, the `dfs` endpoint and path `accepted`; `abfss` is the ABFS driver over TLS. `READ FILES` controls direct path reads of files under the location, a route separate from any table's SELECT, so it goes only to the engineers who need file access, here `grp-quality-eng`; table consumers get table privileges and nothing on the location.
 
 Every read passes two chains. Application access: an Entra-authenticated principal holds Unity Catalog privileges. Storage access: the credential's identity holds a data role and the account's network rules admit it. Analysts need no Azure role on the lake; granting one opens a path around Unity Catalog.
 

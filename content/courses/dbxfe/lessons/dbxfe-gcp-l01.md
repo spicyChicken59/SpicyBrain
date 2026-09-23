@@ -38,7 +38,7 @@ Firewall rules belong to the whole network: the lowest priority number decides, 
 
 Back-end PSC keeps node-to-control-plane traffic private with two endpoints in your VPC, for the relay and the REST API. Each is a forwarding rule targeting a Databricks service attachment, registered in the Databricks account by project, endpoint name and region, and listed in the network configuration as dataplane_relay and rest_api. Databricks' reference template adds a private Cloud DNS zone for gcp.databricks.com, visible to the VPC, answering the workspace URL, its dp- variant and tunnel.<region>.gcp.databricks.com, and creates no Cloud NAT.
 
-Front-end PSC puts an endpoint in a transit VPC for users reaching the web application, REST API and Databricks Connect. A workspace using any PSC scenario is created with private access settings: ACCOUNT level admits any endpoint registered in the Databricks account, ENDPOINT level only the listed ones, and public access defaults to enabled on Google Cloud. Databricks' reference architecture requires a customer-managed VPC for PSC.
+Front-end PSC puts an endpoint in a transit VPC for users reaching the web application, REST API and Databricks Connect. A workspace using any PSC scenario is created with private access settings: ACCOUNT level admits any endpoint registered in the Databricks account, ENDPOINT level only the listed ones, and the settings' public_access_enabled field defaults to true on Google Cloud. Databricks' reference architecture requires a customer-managed VPC for PSC.
 
 <!-- section:dbxfe-gcp-l01-serverless -->
 
@@ -55,7 +55,7 @@ Ask each cloud the same questions and source each answer separately.
 | Traffic filter | Network firewall rules | Security groups | Network security groups |
 | Storage identity | Databricks-managed service account | IAM role with trust policy | Access connector identity |
 | Classic private link | PSC endpoints, private zone | PrivateLink endpoints | Private endpoints |
-| Public access default | Enabled | Disabled | Set on the workspace resource |
+| Public access default (private access settings field) | true (public access enabled) | false (public access disabled) | Set on the workspace resource |
 | Serverless NCC binding | Unknown until verified | Public Preview | Available |
 
 AWS and Azure columns are contrast only, from provider documentation; their own modules own those answers. Never fill a Google Cloud cell from another column.

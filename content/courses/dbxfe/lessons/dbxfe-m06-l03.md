@@ -18,7 +18,7 @@ The schematic shows two **alternative** compute paths, not a recommendation to d
 
 <!-- section:deeper -->
 
-AWS serverless networking uses regional account-level network connectivity configurations for relevant connectivity management. Feature availability, previews, permitted endpoints, and charging conditions vary; the current source includes availability caveats. This lesson intentionally does not prescribe an endpoint configuration. Classic networking has its own configuration model. Azure and GCP details are not taught as equivalents here because their corresponding setup requirements have not been reviewed for this course.
+AWS serverless networking uses regional account-level network connectivity configurations for relevant connectivity management. Feature availability, previews, permitted endpoints, and charging conditions vary; the current source includes availability caveats. This lesson intentionally does not prescribe an endpoint configuration. Classic networking has its own configuration model. This lesson uses the AWS context; the [Azure](#/module/dbxfe-azure) and [Google Cloud](#/module/dbxfe-gcp) modules in this track answer the same questions with their own constructs and sources. Do not transpose one cloud's objects onto another.
 
 <!-- section:customer -->
 

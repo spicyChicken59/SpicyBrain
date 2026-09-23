@@ -74,7 +74,7 @@ The portal must show supplier S-17 its own rejected inspections.
 
 sp-supplier-portal belongs to supplier-portal and authenticates with workload identity federation, or M2M where federation is unavailable. The table carries a row filter for S-17 and a mask on inspector emails.
 
-The test matrix, run as sp-supplier-portal and never as an administrator: SELECT on supplier_rejections is allowed; SELECT on quality.accepted.inspections is denied; MODIFY on supplier_rejections is denied; rows for supplier S-22 number zero; inspector emails are masked; Maya's SELECT on supplier_rejections is denied. A plan granting SELECT on the whole catalog passes every row except the second: the must-fail rows are the evidence. Requester, approving owner, applying administrator and security reviewer are four different people.
+The test matrix, run as sp-supplier-portal and never as an administrator: SELECT on supplier_rejections is allowed; SELECT on quality.accepted.inspections is denied; MODIFY on supplier_rejections is denied; rows for supplier S-22 number zero; inspector emails are masked; Maya's SELECT on supplier_rejections is denied. A plan granting USE SCHEMA and SELECT on the whole catalog passes every row except the second: the must-fail rows are the evidence. SELECT on the catalog alone would still be refused on the second row, because USE SCHEMA on quality.accepted is missing. Requester, approving owner, applying administrator and security reviewer are four different people.
 
 <!-- section:dbxfe-identity-l01-task -->
 
@@ -84,7 +84,7 @@ Cinderline adds a plant-manager dashboard and a nightly export to a logistics pa
 
 **Dashboard.** Plant managers sign in with U2M. An account group plant-managers, maintained by SCIM, holds USE CATALOG on quality, USE SCHEMA on quality.accepted and SELECT on inspections; the row filter gains one clause per manager group and the mask keeps inspector emails hidden. Must-fail rows: another plant's rows (zero), MODIFY on inspections (denied), anything in quality.raw (denied).
 
-**Export.** The job runs as sp-logistics-export, whose group holds SELECT on one export table and READ on scope logistics-sftp. Must-fail rows: SELECT on inspections (denied), WRITE on the scope (denied), a plant manager reading the export table (denied).
+**Export.** The job runs as sp-logistics-export, whose group holds USE CATALOG and USE SCHEMA on the export table's parents, SELECT on that one table and READ on scope logistics-sftp. Must-fail rows: SELECT on inspections (denied), WRITE on the scope (denied), a plant manager reading the export table (denied).
 
 **Duties and evidence.** The quality lead requests, the schema owner approves, a platform administrator applies, and security reviews the permission-change rows and the matrix output. Audit query: secrets getSecret rows for logistics-sftp and table reads by sp-logistics-export over seven days, grouped by day. Unknown: attribute-based policy status, the partner's transfer protocol and audit delivery delay.
 

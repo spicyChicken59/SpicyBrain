@@ -25,9 +25,11 @@ With Unity Catalog, the identity moves off the cluster. A **storage credential**
 
 ```sql
 -- Synthetic teaching example; not executed.
-GRANT USE CATALOG ON CATALOG quality TO `job-nightly`;
-GRANT USE SCHEMA ON SCHEMA quality.accepted TO `job-nightly`;
-GRANT SELECT ON TABLE quality.accepted.inspections TO `job-nightly`;
+-- SQL names a service principal by its application ID, not its display name:
+-- the angle-bracket value stands for job-nightly's ID (a group holding it also works).
+GRANT USE CATALOG ON CATALOG quality TO `<job-nightly-application-id>`;
+GRANT USE SCHEMA ON SCHEMA quality.accepted TO `<job-nightly-application-id>`;
+GRANT SELECT ON TABLE quality.accepted.inspections TO `<job-nightly-application-id>`;
 ```
 
 A missing grant returns `PERMISSION_DENIED` naming the principal and privilege, with no AWS call made. If all three hold, Databricks assumes the credential's role and S3 evaluates the role and bucket policies; a refusal here is an `AccessDenied` from AWS. Serverless compute has no instance to carry a role, so the credential path is its only storage path.

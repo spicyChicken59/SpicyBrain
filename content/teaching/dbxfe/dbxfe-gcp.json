@@ -1137,8 +1137,8 @@
       "kind": "nodes",
       "title": "One query, four paths, a named identity on each",
       "alt": "The nightly quality query crosses the author, control, execution and storage paths; each hop names the identity used and the project or account that owns it.",
-      "caption": "After sign-in, no hop uses the analyst's identity; only the execution node changes between classic and serverless. Synthetic teaching example.",
-      "textEquivalent": "Classic execution: Ana schedules the job; it runs as sp-quality-nightly on a VM in cl-dbx-prod and reads the bucket as the credential's service account. Nodes: Ana (analyst): ana.ruiz@cinderline.example. Signs in and schedules the job: the author path. (selected); Databricks control plane: Web application, jobs and Unity Catalog in the Databricks account. (selected); sp-quality-nightly: Job run-as principal; Unity Catalog checks its grants. (selected); Compute Engine VM: cl-dbx-prod. Classic node in cl-dbx-prod; dials out to the relay. (selected); Serverless compute: Databricks-managed. Not used by this run. (excluded); Credential service account: uc-cred-quality (synthetic). Databricks-managed; used only after the catalog allows the read. (selected); gs://cl-quality-raw: cl-data-lake. Cloud Storage checks the service account's roles on the bucket. (selected). Relationships: Ana (analyst) → Databricks control plane: author path; Databricks control plane → sp-quality-nightly: control: runs as; Databricks control plane → Compute Engine VM: execution path; Compute Engine VM → Credential service account: reads as; Credential service account → gs://cl-quality-raw: storage path.\n\nServerless execution: The same job on serverless compute: the VM and its subnet drop out; the catalog check and the bucket's roles do not. Nodes: Ana (analyst): ana.ruiz@cinderline.example. Same sign-in and schedule. (selected); Databricks control plane: Same jobs service and catalog check. (selected); sp-quality-nightly: Same run-as principal and grants. (selected); Compute Engine VM: cl-dbx-prod. Not used: no Cinderline VM or subnet. (excluded); Serverless compute: Databricks-managed. Runs the query outside Cinderline's projects. (selected); Credential service account: uc-cred-quality (synthetic). Same Databricks-managed identity. (selected); gs://cl-quality-raw: cl-data-lake. Same bucket roles decide. (selected). Relationships: Ana (analyst) → Databricks control plane: author path; Databricks control plane → sp-quality-nightly: control: runs as; Databricks control plane → Serverless compute: execution path; Serverless compute → Credential service account: reads as; Credential service account → gs://cl-quality-raw: storage path.",
+      "caption": "After sign-in, no hop uses the analyst's identity; between classic and serverless only the compute node, and the tunnel that reaches it, change. Synthetic teaching example.",
+      "textEquivalent": "Classic execution: Ana schedules the job; the control plane reaches a VM in cl-dbx-prod through the relay tunnel, the VM runs the query as sp-quality-nightly, and it reads the bucket as the credential's service account. Nodes: Ana (analyst): ana.ruiz@cinderline.example. Signs in and schedules the job: the author path. (selected); Databricks control plane: Web application, jobs and Unity Catalog in the Databricks account. (selected); sp-quality-nightly: Job run-as principal; the query executes as it after Unity Catalog checks its grants. (selected); Compute Engine VM: cl-dbx-prod. Classic node in cl-dbx-prod; dials out to the relay, which carries the control path. (selected); Serverless compute: Databricks-managed. Not used by this run. (excluded); Credential service account: uc-cred-quality (synthetic). Databricks-managed; used only after the catalog allows the read. (selected); gs://cl-quality-raw: cl-data-lake. Cloud Storage checks the service account's roles on the bucket. (selected). Relationships: Ana (analyst) → Databricks control plane: author path; Databricks control plane → Compute Engine VM: control path (relay tunnel); Compute Engine VM → sp-quality-nightly: execution: runs as; Compute Engine VM → Credential service account: reads as; Credential service account → gs://cl-quality-raw: storage path.\n\nServerless execution: The same job on serverless compute: the VM, its subnet and its tunnel drop out; the catalog check on sp-quality-nightly and the bucket's roles do not. Nodes: Ana (analyst): ana.ruiz@cinderline.example. Same sign-in and schedule. (selected); Databricks control plane: Same jobs service and catalog check. (selected); sp-quality-nightly: Same run-as principal; the query executes as it. (selected); Compute Engine VM: cl-dbx-prod. Not used: no Cinderline VM, subnet or tunnel. (excluded); Serverless compute: Databricks-managed. Receives the job over Databricks' own network and runs it outside Cinderline's projects. (selected); Credential service account: uc-cred-quality (synthetic). Same Databricks-managed identity. (selected); gs://cl-quality-raw: cl-data-lake. Same bucket roles decide. (selected). Relationships: Ana (analyst) → Databricks control plane: author path; Databricks control plane → Serverless compute: control path; Serverless compute → sp-quality-nightly: execution: runs as; Serverless compute → Credential service account: reads as; Credential service account → gs://cl-quality-raw: storage path.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-gcp-claim-workspace",
@@ -1152,7 +1152,7 @@
         {
           "id": "classic",
           "title": "Classic execution",
-          "explanation": "Ana schedules the job; it runs as sp-quality-nightly on a VM in cl-dbx-prod and reads the bucket as the credential's service account.",
+          "explanation": "Ana schedules the job; the control plane reaches a VM in cl-dbx-prod through the relay tunnel, the VM runs the query as sp-quality-nightly, and it reads the bucket as the credential's service account.",
           "nodes": [
             {
               "id": "ana",
@@ -1170,14 +1170,14 @@
             {
               "id": "n-sp",
               "label": "sp-quality-nightly",
-              "detail": "Job run-as principal; Unity Catalog checks its grants.",
+              "detail": "Job run-as principal; the query executes as it after Unity Catalog checks its grants.",
               "status": "selected"
             },
             {
               "id": "n-vm",
               "label": "Compute Engine VM",
               "value": "cl-dbx-prod",
-              "detail": "Classic node in cl-dbx-prod; dials out to the relay.",
+              "detail": "Classic node in cl-dbx-prod; dials out to the relay, which carries the control path.",
               "status": "selected"
             },
             {
@@ -1210,13 +1210,13 @@
             },
             {
               "from": "n-cp",
-              "to": "n-sp",
-              "label": "control: runs as"
+              "to": "n-vm",
+              "label": "control path (relay tunnel)"
             },
             {
-              "from": "n-cp",
-              "to": "n-vm",
-              "label": "execution path"
+              "from": "n-vm",
+              "to": "n-sp",
+              "label": "execution: runs as"
             },
             {
               "from": "n-vm",
@@ -1233,7 +1233,7 @@
         {
           "id": "serverless",
           "title": "Serverless execution",
-          "explanation": "The same job on serverless compute: the VM and its subnet drop out; the catalog check and the bucket's roles do not.",
+          "explanation": "The same job on serverless compute: the VM, its subnet and its tunnel drop out; the catalog check on sp-quality-nightly and the bucket's roles do not.",
           "nodes": [
             {
               "id": "ana",
@@ -1251,21 +1251,21 @@
             {
               "id": "n-sp",
               "label": "sp-quality-nightly",
-              "detail": "Same run-as principal and grants.",
+              "detail": "Same run-as principal; the query executes as it.",
               "status": "selected"
             },
             {
               "id": "n-vm",
               "label": "Compute Engine VM",
               "value": "cl-dbx-prod",
-              "detail": "Not used: no Cinderline VM or subnet.",
+              "detail": "Not used: no Cinderline VM, subnet or tunnel.",
               "status": "excluded"
             },
             {
               "id": "sls",
               "label": "Serverless compute",
               "value": "Databricks-managed",
-              "detail": "Runs the query outside Cinderline's projects.",
+              "detail": "Receives the job over Databricks' own network and runs it outside Cinderline's projects.",
               "status": "selected"
             },
             {
@@ -1291,13 +1291,13 @@
             },
             {
               "from": "n-cp",
-              "to": "n-sp",
-              "label": "control: runs as"
+              "to": "sls",
+              "label": "control path"
             },
             {
-              "from": "n-cp",
-              "to": "sls",
-              "label": "execution path"
+              "from": "sls",
+              "to": "n-sp",
+              "label": "execution: runs as"
             },
             {
               "from": "sls",
@@ -1940,9 +1940,9 @@
       "id": "dbxfe-gcp-psc-visual",
       "kind": "nodes",
       "title": "Back-end PSC: two endpoints and the names that reach them",
-      "alt": "A node resolves Databricks names in a private zone to two PSC endpoints in its VPC, each forwarding to a Databricks service attachment and registered in the Databricks account; without the tunnel record the relay name answers publicly.",
+      "alt": "A node resolves Databricks names in a private zone to two PSC endpoints in its VPC, each forwarding to a Databricks service attachment and registered in the Databricks account; without the tunnel record the relay name does not resolve at all.",
       "caption": "The endpoints only carry traffic when the names resolve to them; a healthy endpoint with a missing record is never used. Synthetic teaching example.",
-      "textEquivalent": "Endpoints and names in place: The private zone answers the tunnel name with relay-pe and the workspace names with workspace-pe; both endpoints are registered and listed in the network configuration. Nodes: Compute Engine node: Resolves Databricks names from its VPC. (selected); Private zone gcp.databricks.com: visible to cl-vpc-dbx. Workspace URL, dp- variant and tunnel records. (selected); relay-pe: 10.20.8.5. Forwarding rule to the relay service attachment. (selected); workspace-pe: 10.20.8.6. Forwarding rule to the workspace service attachment. (selected); Databricks account registration: Both endpoints registered; listed as dataplane_relay and rest_api. (selected); Databricks service attachments: Producer side; regional values. (selected). Relationships: Compute Engine node → Private zone gcp.databricks.com: resolves; Private zone gcp.databricks.com → relay-pe: tunnel name; Private zone gcp.databricks.com → workspace-pe: workspace names; relay-pe → Databricks service attachments: forwards to; workspace-pe → Databricks service attachments: forwards to; Databricks account registration → relay-pe: registers.\n\nTunnel record missing: The zone holds only the workspace records. The relay name falls through to a public answer, and with no NAT the tunnel never forms. Nodes: Compute Engine node: Bootstrap stalls: the tunnel name answers publicly. (warning); Private zone gcp.databricks.com: visible to cl-vpc-dbx. Workspace records only; no tunnel record. (warning); relay-pe: 10.20.8.5. Healthy but never used. (context); workspace-pe: 10.20.8.6. Still used for REST calls. (selected); Databricks account registration: Unchanged; not the cause. (selected); Databricks service attachments: Never contacted on the relay path. (context). Relationships: Compute Engine node → Private zone gcp.databricks.com: resolves; Private zone gcp.databricks.com → relay-pe: no record; Private zone gcp.databricks.com → workspace-pe: workspace names; workspace-pe → Databricks service attachments: forwards to; Databricks account registration → relay-pe: registers.",
+      "textEquivalent": "Endpoints and names in place: The private zone answers the tunnel name with relay-pe and the workspace names with workspace-pe; both endpoints are registered and listed in the network configuration. Nodes: Compute Engine node: Resolves Databricks names from its VPC. (selected); Private zone gcp.databricks.com: visible to cl-vpc-dbx. Workspace URL, dp- variant and tunnel records. (selected); relay-pe: 10.20.8.5. Forwarding rule to the relay service attachment. (selected); workspace-pe: 10.20.8.6. Forwarding rule to the workspace service attachment. (selected); Databricks account registration: Both endpoints registered; listed as dataplane_relay and rest_api. (selected); Databricks service attachments: Producer side; regional values. (selected). Relationships: Compute Engine node → Private zone gcp.databricks.com: resolves; Private zone gcp.databricks.com → relay-pe: tunnel name; Private zone gcp.databricks.com → workspace-pe: workspace names; relay-pe → Databricks service attachments: forwards to; workspace-pe → Databricks service attachments: forwards to; Databricks account registration → relay-pe: registers.\n\nTunnel record missing: The zone holds only the workspace records. A private zone answers for its whole domain, so the tunnel name gets NXDOMAIN rather than a public answer: the node cannot resolve the relay and the tunnel never forms. Nodes: Compute Engine node: Bootstrap stalls: the tunnel name does not resolve (NXDOMAIN). (warning); Private zone gcp.databricks.com: visible to cl-vpc-dbx. Workspace records only; no tunnel record. (warning); relay-pe: 10.20.8.5. Healthy but never used. (context); workspace-pe: 10.20.8.6. Still used for REST calls. (selected); Databricks account registration: Unchanged; not the cause. (selected); Databricks service attachments: Never contacted on the relay path. (context). Relationships: Compute Engine node → Private zone gcp.databricks.com: resolves; Private zone gcp.databricks.com → relay-pe: no record; Private zone gcp.databricks.com → workspace-pe: workspace names; workspace-pe → Databricks service attachments: forwards to; Databricks account registration → relay-pe: registers.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-gcp-claim-psc",
@@ -2032,12 +2032,12 @@
         {
           "id": "norecord",
           "title": "Tunnel record missing",
-          "explanation": "The zone holds only the workspace records. The relay name falls through to a public answer, and with no NAT the tunnel never forms.",
+          "explanation": "The zone holds only the workspace records. A private zone answers for its whole domain, so the tunnel name gets NXDOMAIN rather than a public answer: the node cannot resolve the relay and the tunnel never forms.",
           "nodes": [
             {
               "id": "n-vm",
               "label": "Compute Engine node",
-              "detail": "Bootstrap stalls: the tunnel name answers publicly.",
+              "detail": "Bootstrap stalls: the tunnel name does not resolve (NXDOMAIN).",
               "status": "warning"
             },
             {
@@ -2110,7 +2110,7 @@
       "title": "Which requests reach the workspace",
       "alt": "Three request sources evaluated under ACCOUNT level with public access on, then under ENDPOINT level with public access off.",
       "caption": "ACCOUNT admits any endpoint registered in the Databricks account, including one nobody meant to allow; ENDPOINT admits only the list. Synthetic teaching example.",
-      "textEquivalent": "ACCOUNT level, public access on: Public access defaults to enabled on Google Cloud; any endpoint registered in Cinderline's Databricks account may connect. Table columns: Request from | Arrives through | Result. Rows: Office laptop | Public internet | Allowed if the IP access list admits it; VPN user in transit VPC | Front-end endpoint, registered | Allowed; Contractor VPC | Its endpoint, registered in Cinderline's account | Allowed: ACCOUNT admits any registered endpoint.\n\nENDPOINT level, public access off: Only the listed front-end endpoint may connect, and the public path is closed. Table columns: Request from | Arrives through | Result. Rows: Office laptop | Public internet | Refused: public access disabled; VPN user in transit VPC | Front-end endpoint, listed | Allowed; Contractor VPC | Its endpoint, not listed | Refused: not in allowed_vpc_endpoint_ids.",
+      "textEquivalent": "ACCOUNT level, public access on: public_access_enabled defaults to true in private access settings on Google Cloud; any endpoint registered in Cinderline's Databricks account may connect. Table columns: Request from | Arrives through | Result. Rows: Office laptop | Public internet | Allowed if the IP access list admits it; VPN user in transit VPC | Front-end endpoint, registered | Allowed; Contractor VPC | Its endpoint, registered in Cinderline's account | Allowed: ACCOUNT admits any registered endpoint.\n\nENDPOINT level, public access off: Only the listed front-end endpoint may connect, and the public path is closed. Table columns: Request from | Arrives through | Result. Rows: Office laptop | Public internet | Refused: public access disabled; VPN user in transit VPC | Front-end endpoint, listed | Allowed; Contractor VPC | Its endpoint, not listed | Refused: not in allowed_vpc_endpoint_ids.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-gcp-claim-frontend",
@@ -2122,7 +2122,7 @@
         {
           "id": "account",
           "title": "ACCOUNT level, public access on",
-          "explanation": "Public access defaults to enabled on Google Cloud; any endpoint registered in Cinderline's Databricks account may connect.",
+          "explanation": "public_access_enabled defaults to true in private access settings on Google Cloud; any endpoint registered in Cinderline's Databricks account may connect.",
           "nodes": [],
           "connections": [],
           "table": {
@@ -2288,7 +2288,7 @@
       "title": "Same questions, separate answers for three clouds",
       "alt": "A common questions matrix answering the same deployment questions for Google Cloud, AWS and Azure, first for classic networking and identity, then for private and serverless connectivity.",
       "caption": "Each column is sourced separately; one Google Cloud cell is unknown and stays that way. Synthetic teaching layout; the answers summarise the sources listed in the module.",
-      "textEquivalent": "Classic network and identity: The hand-over, the network shape, the traffic filter and the storage identity all differ by cloud. Table columns: Question | Google Cloud | AWS | Azure. Rows: What the workspace names | A project | Credential role and storage configuration | Itself an Azure resource; Compute network | One regional subnet, /29 to /9 | Two subnets in two zones, /17 to /25 | Two delegated subnets; Traffic filter | Network firewall rules by priority | Security groups | Network security groups; Unity Catalog storage identity | Databricks-managed service account | IAM role with a trust policy | Access connector managed identity.\n\nPrivate and serverless connectivity: Private links share a purpose but not a mechanism, the public-access default differs, and serverless on Google Cloud is still unknown. Table columns: Question | Google Cloud | AWS | Azure. Rows: Classic private link | PSC endpoints and a private zone | PrivateLink endpoints | Private endpoints, incl. browser auth; Public access default | Enabled | Disabled | Set on the workspace resource; NCC binding | Unknown until verified | Public Preview | Available; Serverless default egress rule | None documented | Stable IP ranges | Service endpoints.",
+      "textEquivalent": "Classic network and identity: The hand-over, the network shape, the traffic filter and the storage identity all differ by cloud. Table columns: Question | Google Cloud | AWS | Azure. Rows: What the workspace names | A project | Credential role and storage configuration | Itself an Azure resource; Compute network | One regional subnet, /29 to /9 | Two subnets in two zones, /17 to /25 | Two delegated subnets; Traffic filter | Network firewall rules by priority | Security groups | Network security groups; Unity Catalog storage identity | Databricks-managed service account | IAM role with a trust policy | Access connector managed identity.\n\nPrivate and serverless connectivity: Private links share a purpose but not a mechanism, the private access settings' public-access default differs, and serverless on Google Cloud is still unknown. Table columns: Question | Google Cloud | AWS | Azure. Rows: Classic private link | PSC endpoints and a private zone | PrivateLink endpoints | Private endpoints, incl. browser auth; Public access default (private access settings field) | true (public access enabled) | false (public access disabled) | Set on the workspace resource; NCC binding | Unknown until verified | Public Preview | Available; Serverless default egress rule | None documented | Stable IP ranges | Service endpoints.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-gcp-claim-contrast",
@@ -2344,7 +2344,7 @@
         {
           "id": "private",
           "title": "Private and serverless connectivity",
-          "explanation": "Private links share a purpose but not a mechanism, the public-access default differs, and serverless on Google Cloud is still unknown.",
+          "explanation": "Private links share a purpose but not a mechanism, the private access settings' public-access default differs, and serverless on Google Cloud is still unknown.",
           "nodes": [],
           "connections": [],
           "table": {
@@ -2362,9 +2362,9 @@
                 "Private endpoints, incl. browser auth"
               ],
               [
-                "Public access default",
-                "Enabled",
-                "Disabled",
+                "Public access default (private access settings field)",
+                "true (public access enabled)",
+                "false (public access disabled)",
                 "Set on the workspace resource"
               ],
               [
@@ -3092,8 +3092,8 @@
     },
     {
       "id": "dbxfe-gcp-psc-question",
-      "revision": "1",
-      "prompt": "With back-end PSC and no NAT, clusters start and the tunnel works, but a notebook calling the workspace REST API from the cluster times out. The private zone holds only tunnel.us-east4.gcp.databricks.com. What is missing?",
+      "revision": "2",
+      "prompt": "With back-end PSC and no NAT, clusters start and the tunnel works, but a notebook calling the workspace REST API from the cluster fails at once with a name-resolution error for the workspace hostname. The private zone for gcp.databricks.com, visible to cl-vpc-dbx, holds only tunnel.us-east4.gcp.databricks.com. What is missing?",
       "options": [
         {
           "id": "dbxfe-gcp-psc-question-a",
@@ -3245,9 +3245,9 @@
   "selfQuestions": [
     {
       "id": "dbxfe-gcp-paths-self",
-      "revision": "1",
+      "revision": "2",
       "prompt": "For the nightly job reading gs://cl-quality-raw from a classic cluster, name the identity used on each of the four paths and the organization or account that owns it.",
-      "modelAnswer": "Author path: Ana's user identity, signing in to the workspace URL; her account is Cinderline's. Control path: the job runs as service principal sp-quality-nightly, a Databricks identity whose grants Unity Catalog checks in the Databricks account. Execution path: a Compute Engine VM in Cinderline's project cl-dbx-prod, dialling out to the relay. Storage path: the storage credential's Databricks-managed service account, whose roles Cinderline's data team granted on the bucket in cl-data-lake.",
+      "modelAnswer": "Author path: Ana's user identity, signing in to the workspace URL; her account is Cinderline's. Control path: the Databricks control plane itself, in the Databricks account, carries no user or job identity; it dispatches the job to a Compute Engine VM in Cinderline's project cl-dbx-prod over the relay tunnel that VM dialled out. Execution path: that VM runs the query as service principal sp-quality-nightly, a Databricks identity whose grants Unity Catalog checks in the Databricks account. Storage path: the storage credential's Databricks-managed service account, whose roles Cinderline's data team granted on the bucket in cl-data-lake.",
       "reasoning": "The answer keeps the four paths apart and names an owner for each, which is what lets a reviewer check every boundary; naming the VM's own attached service account as an extra identity is acceptable if it is marked unknown.",
       "conceptIds": [
         "dbxfe-gcp-sa-concept",
@@ -3301,7 +3301,7 @@
       "revision": "1",
       "prompt": "A security reviewer asks why Cinderline cannot reuse its AWS network checklist for the Google Cloud workspace. Answer in three sentences with concrete differences.",
       "modelAnswer": "On Google Cloud the workspace names a project and takes one regional subnet with a /29 to /9 netmask, where AWS takes two subnets in different availability zones plus security groups. Traffic is filtered by network-wide firewall rules decided by priority rather than by security groups, and back-end private connectivity uses PSC forwarding rules registered by project, name and region plus a private Cloud DNS zone. The storage identity is a Databricks-managed service account granted bucket roles, not an IAM role with a trust policy, and serverless private connectivity is still unknown on Google Cloud.",
-      "reasoning": "The answer names mechanisms rather than product labels and points to evidence rows that differ; mentioning the public-access default (enabled on Google Cloud, disabled on AWS) instead of one of these is acceptable.",
+      "reasoning": "The answer names mechanisms rather than product labels and points to evidence rows that differ; mentioning the private access settings' public_access_enabled default (true on Google Cloud, false on AWS) instead of one of these is acceptable.",
       "conceptIds": [
         "dbxfe-gcp-matrix-concept",
         "dbxfe-gcp-vpc-concept",
@@ -3414,7 +3414,7 @@
       "version": "1.0.0",
       "title": "One query crosses four paths, each with a named identity",
       "outcome": "Trace the author, control, execution and storage paths of one query on Google Cloud and name the identity and owner at each hop.",
-      "explanation": "Follow the nightly quality query. Ana signs in to the workspace URL: the author path. The control plane schedules the job, which runs as service principal sp-quality-nightly, and Unity Catalog checks that principal's grants: the control path. A Compute Engine VM in cl-dbx-prod, or serverless compute, executes it. The read of gs://cl-quality-raw uses the storage credential's Databricks-managed [[dbxfe-gcp-sa-concept|service account]], which Cloud Storage authorizes by its bucket roles. Notice that no hop after sign-in uses Ana's identity, and serverless changes only the execution node.",
+      "explanation": "Follow the nightly quality query. Ana signs in to the workspace URL: the author path. The control plane schedules the job and hands it to compute: the control path, which reaches a classic Compute Engine VM in cl-dbx-prod through the relay tunnel that VM opened outbound. The execution path is that VM, or serverless compute, running the query as service principal sp-quality-nightly once Unity Catalog accepts its grants. The read of gs://cl-quality-raw uses the storage credential's Databricks-managed [[dbxfe-gcp-sa-concept|service account]], which Cloud Storage authorizes by its bucket roles. Notice that no hop after sign-in uses Ana's identity.",
       "lessonId": "dbxfe-gcp-l01",
       "sectionId": "dbxfe-gcp-l01-placement",
       "conceptIds": [
@@ -3435,13 +3435,13 @@
       ],
       "hint": "After sign-in, whose identity does the catalog check, and whose does Cloud Storage check?",
       "handbook": {
-        "markdown": "**Author path.** Ana reaches the workspace URL over the public internet or, if Cinderline builds it, through a front-end Private Service Connect endpoint. Her identity authenticates her session; it does not travel with the job.\n\n**Control path.** The job's run-as principal, `sp-quality-nightly`, is what Unity Catalog checks: `USE CATALOG`, `USE SCHEMA` and `SELECT` on the table, and `READ FILES` on the external location for file reads. A refusal here names that principal and a privilege.\n\n**Execution path.** On classic compute, a Compute Engine VM in `cl-dbx-prod` takes an address from the registered subnet and opens an outbound tunnel to the secure cluster connectivity relay, through Cloud NAT or a back-end PSC endpoint. On serverless compute the VM, subnet and tunnel are not Cinderline's.\n\n**Storage path.** The external location pairs `gs://cl-quality-raw/inspections/` with credential `cred_quality`, whose Databricks-managed service account reads the objects; Cloud Storage checks that account's roles on the bucket. Unity Catalog's temporary-credential API, which returns a short-lived Google OAuth token for a path, shows the pattern: the catalog holds the service account, and callers never see a key.\n\n**Evidence to collect, read-only.**\n```sql\nSHOW GRANTS ON TABLE quality.raw.inspections;\nDESCRIBE EXTERNAL LOCATION loc_quality_raw;\nDESCRIBE STORAGE CREDENTIAL cred_quality;\n```\nRecord the run-as principal from the job settings, the credential's service account email, and the bucket's IAM policy for that email. What this beat does not settle: which service account Databricks attaches to classic VMs by default and what it may read. That row stays unknown until verified, and it matters, because code on a VM can request tokens for the VM's own service account through the metadata server.",
+        "markdown": "**Author path.** Ana reaches the workspace URL over the public internet or, if Cinderline builds it, through a front-end Private Service Connect endpoint. Her identity authenticates her session; it does not travel with the job.\n\n**Control path.** The control plane schedules the job and dispatches it to compute. On classic compute, a Compute Engine VM in `cl-dbx-prod` takes an address from the registered subnet and opens an outbound tunnel to the secure cluster connectivity relay, through Cloud NAT or a back-end PSC endpoint; the control plane's commands reach the VM over that tunnel, so no inbound rule is involved. On serverless compute the VM, subnet and tunnel are not Cinderline's.\n\n**Execution path.** The VM or serverless compute runs the query as the job's run-as principal, `sp-quality-nightly`, and Unity Catalog checks that principal before any read: `USE CATALOG`, `USE SCHEMA` and `SELECT` on the table, and `READ FILES` on the external location for file reads. A refusal here names that principal and a privilege.\n\n**Storage path.** The external location pairs `gs://cl-quality-raw/inspections/` with credential `cred_quality`, whose Databricks-managed service account reads the objects; Cloud Storage checks that account's roles on the bucket. Unity Catalog's temporary-credential API, which returns a short-lived Google OAuth token for a path, shows the pattern: the catalog holds the service account, and callers never see a key.\n\n**Evidence to collect, read-only.**\n```sql\nSHOW GRANTS ON TABLE quality.raw.inspections;\nDESCRIBE EXTERNAL LOCATION loc_quality_raw;\nDESCRIBE STORAGE CREDENTIAL cred_quality;\n```\nRecord the run-as principal from the job settings, the credential's service account email, and the bucket's IAM policy for that email. What this beat does not settle: which service account Databricks attaches to classic VMs by default and what it may read. That row stays unknown until verified, and it matters, because code on a VM can request tokens for the VM's own service account through the metadata server.",
         "sourceSectionIds": [
           "dbxfe-gcp-l01-placement",
           "dbxfe-gcp-l01-identities"
         ]
       },
-      "recap": "Author, control, execution and storage paths each carry their own identity; only execution changes between classic and serverless.",
+      "recap": "The author path acts as Ana, the execution path as sp-quality-nightly and the storage path as the credential's service account; the control path carries no user identity, and serverless swaps only the compute node and its tunnel.",
       "changeNote": "New academy beat.",
       "mediaIds": []
     },
@@ -3647,7 +3647,7 @@
       ],
       "hint": "Count the endpoints, then count the hostnames that must point at them.",
       "handbook": {
-        "markdown": "**Google Cloud side.** A PSC endpoint is a forwarding rule whose target is a producer's service attachment; Google's API says a PSC forwarding rule to a managed service must target a service attachment, and reports a `pscConnectionStatus` of `ACCEPTED`, `PENDING`, `REJECTED`, `CLOSED` or `NEEDS_ATTENTION`. Databricks' reference template reserves two internal addresses in a small endpoint subnet (with Private Google Access on), creates `relay-pe` and `workspace-pe` targeting the region's relay and workspace service attachments, and adds a private Cloud DNS zone for `gcp.databricks.com`, visible to the workspace VPC, with A records for the workspace URL (`<workspace-id>.<last digit>.gcp.databricks.com`), its `dp-` variant and `tunnel.<region>.gcp.databricks.com`, the name cluster VMs use to open the secure tunnel. Its README calls these zones required for back-end PSC.\n\n**Databricks side.** Each endpoint is registered as a VPC endpoint object, then referenced by the network configuration (documented shape, for reading):\n```hcl\nresource \"databricks_mws_vpc_endpoint\" \"relay\" {\n  account_id        = var.databricks_account_id\n  vpc_endpoint_name = \"cl-relay-use4\"\n  gcp_vpc_endpoint_info {\n    project_id        = \"cl-net-host\"\n    psc_endpoint_name = \"relay-pe\"\n    endpoint_region   = \"us-east4\"\n  }\n}\n# network configuration: vpc_endpoints { dataplane_relay = [relay id], rest_api = [workspace-pe id] }\n```\nRegistration exports `psc_connection_id` and `service_attachment_id`. The workspace must be created with a private access settings object to support any PSC scenario, a customer-managed VPC is required, and the provisioning account needs `compute.forwardingRules.get` and `list`.\n\n**Evidence, read-only.**\n```bash\ngcloud compute forwarding-rules describe relay-pe --region=us-east4 --project=cl-net-host --format=\"value(pscConnectionStatus)\"\ngcloud dns record-sets list --zone=dbx-psc-zone --project=cl-net-host\n```\n**Not settled here:** the service attachment URIs per region, whether Cinderline's account or project must be enabled before connections are accepted, and tier requirements. They are on the PSC page, unknown until verified.",
+        "markdown": "**Google Cloud side.** A PSC endpoint is a forwarding rule whose target is a producer's service attachment; Google's API says a PSC forwarding rule to a managed service must target a service attachment, and reports a `pscConnectionStatus` of `ACCEPTED`, `PENDING`, `REJECTED`, `CLOSED` or `NEEDS_ATTENTION`. Databricks' reference template reserves two internal addresses in a small endpoint subnet (with Private Google Access on), creates `relay-pe` and `workspace-pe` targeting the region's relay and workspace service attachments, and adds a private Cloud DNS zone for `gcp.databricks.com`, visible to the workspace VPC, with A records for the workspace URL (`<workspace-id>.<last digit>.gcp.databricks.com`), its `dp-` variant and `tunnel.<region>.gcp.databricks.com`, the name cluster VMs use to open the secure tunnel. Its README calls these zones required for back-end PSC. A private zone answers for its whole domain in the networks it is visible to, so a name missing from it gets NXDOMAIN, not a public fallback; a missing record therefore shows as a resolution failure, and a public answer means the zone is not visible to that network (Cloud DNS behaviour; confirm on its name-resolution-order page).\n\n**Databricks side.** Each endpoint is registered as a VPC endpoint object, then referenced by the network configuration (documented shape, for reading):\n```hcl\nresource \"databricks_mws_vpc_endpoint\" \"relay\" {\n  account_id        = var.databricks_account_id\n  vpc_endpoint_name = \"cl-relay-use4\"\n  gcp_vpc_endpoint_info {\n    project_id        = \"cl-net-host\"\n    psc_endpoint_name = \"relay-pe\"\n    endpoint_region   = \"us-east4\"\n  }\n}\n# network configuration: vpc_endpoints { dataplane_relay = [relay id], rest_api = [workspace-pe id] }\n```\nRegistration exports `psc_connection_id` and `service_attachment_id`. The workspace must be created with a private access settings object to support any PSC scenario, a customer-managed VPC is required, and the provisioning account needs `compute.forwardingRules.get` and `list`.\n\n**Evidence, read-only.**\n```bash\ngcloud compute forwarding-rules describe relay-pe --region=us-east4 --project=cl-net-host --format=\"value(pscConnectionStatus)\"\ngcloud dns record-sets list --zone=dbx-psc-zone --project=cl-net-host\n```\n**Not settled here:** the service attachment URIs per region, whether Cinderline's account or project must be enabled before connections are accepted, and tier requirements. They are on the PSC page, unknown until verified.",
         "sourceSectionIds": [
           "dbxfe-gcp-l01-private"
         ]
@@ -3661,7 +3661,7 @@
       "version": "1.0.0",
       "title": "Private access settings decide which endpoints reach the workspace",
       "outcome": "Predict whether a user request reaches the workspace from the access level, the endpoint used and whether public access is enabled.",
-      "explanation": "Front-end PSC puts an endpoint in a transit VPC so users reach the web application, REST API and Databricks Connect privately. What may connect is decided by the workspace's [[dbxfe-gcp-pas-concept|private access settings]]. ACCOUNT level admits any VPC endpoint registered in the Databricks account; ENDPOINT level admits only the listed endpoint IDs. Public access defaults to enabled on Google Cloud, unlike AWS, and while it is enabled an IP access list is the control for public sources. Notice how the contractor's registered endpoint gets in under ACCOUNT and is refused under ENDPOINT.",
+      "explanation": "Front-end PSC puts an endpoint in a transit VPC so users reach the web application, REST API and Databricks Connect privately. What may connect is decided by the workspace's [[dbxfe-gcp-pas-concept|private access settings]]. ACCOUNT level admits any VPC endpoint registered in the Databricks account; ENDPOINT level admits only the listed endpoint IDs. Their public_access_enabled field defaults to true on Google Cloud (false on AWS), and while it is true an IP access list is the control for public sources. Notice how the contractor's registered endpoint gets in under ACCOUNT and is refused under ENDPOINT.",
       "lessonId": "dbxfe-gcp-l01",
       "sectionId": "dbxfe-gcp-l01-private",
       "conceptIds": [
@@ -3826,7 +3826,7 @@
       ],
       "hint": "What does the relay name resolve to from inside the node subnet?",
       "handbook": {
-        "markdown": "**The sequence.** Follow the packet; each hop is read-only and cheap.\n1. Record the symptom: a timeout, the cluster and the time. No principal is named, which is itself evidence that no layer received the request.\n2. Note what changed: PSC enabled, NAT removed, zones created, rules added. Changes point, they do not prove.\n3. Resolve the relay and workspace names from the node subnet, for example from a notebook on a running cluster in that subnet or a test VM the network team places there:\n```bash\ngetent hosts tunnel.us-east4.gcp.databricks.com\n```\n4. If the answer is public, check the zone's visibility (Cloud DNS private zones are visible only to the networks listed) and its records:\n```bash\ngcloud dns managed-zones describe dbx-psc-zone --project=cl-net-host --format=\"value(privateVisibilityConfig.networks)\"\n```\n5. If the answer is the endpoint's address, read the endpoint's `pscConnectionStatus`. `ACCEPTED` is healthy; `PENDING` means pending acceptance by the producer, and why Databricks has not accepted it (registration, enablement) is a question for the PSC page and the account team, unknown until verified.\n6. Egress rules by priority for the node network, plus any firewall policies attached above it.\n7. Retest one start and write every fault found, not only the last.\n\n**Why this order.** Each hop depends on the previous: a status check is meaningless while the name points elsewhere, and a rule check is premature while the endpoint is not accepted. The second state shows why the row lists both faults: fixing DNS exposed a deny that had been hidden behind it.\n\n**What not to do.** Granting IAM roles, opening ingress rules and recreating the workspace all change things a timeout never implicated. Adding a NAT back may make starts succeed through the public path while the private design stays broken; note it as a workaround, not a fix.",
+        "markdown": "**The sequence.** Follow the packet; each hop is read-only and cheap.\n1. Record the symptom: a timeout, the cluster and the time. No principal is named, which is itself evidence that no layer received the request.\n2. Note what changed: PSC enabled, NAT removed, zones created, rules added. Changes point, they do not prove.\n3. Resolve the relay and workspace names from the node subnet, for example from a notebook on a running cluster in that subnet or a test VM the network team places there:\n```bash\ngetent hosts tunnel.us-east4.gcp.databricks.com\n```\n4. If the answer is public, check the zone's visibility (Cloud DNS private zones are visible only to the networks listed); if there is no answer at all (NXDOMAIN), the zone is visible but lacks the record. Check both:\n```bash\ngcloud dns managed-zones describe dbx-psc-zone --project=cl-net-host --format=\"value(privateVisibilityConfig.networks)\"\n```\n5. If the answer is the endpoint's address, read the endpoint's `pscConnectionStatus`. `ACCEPTED` is healthy; `PENDING` means pending acceptance by the producer, and why Databricks has not accepted it (registration, enablement) is a question for the PSC page and the account team, unknown until verified.\n6. Egress rules by priority for the node network, plus any firewall policies attached above it.\n7. Retest one start and write every fault found, not only the last.\n\n**Why this order.** Each hop depends on the previous: a status check is meaningless while the name points elsewhere, and a rule check is premature while the endpoint is not accepted. The second state shows why the row lists both faults: fixing DNS exposed a deny that had been hidden behind it.\n\n**What not to do.** Granting IAM roles, opening ingress rules and recreating the workspace all change things a timeout never implicated. Adding a NAT back may make starts succeed through the public path while the private design stays broken; note it as a workaround, not a fix.",
         "sourceSectionIds": [
           "dbxfe-gcp-l01-example",
           "dbxfe-gcp-l01-private"
