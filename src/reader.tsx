@@ -35,11 +35,13 @@ export function NoteEditor({
   lessonId,
   sectionId,
   noteId,
+  label = "Your lesson note",
 }: {
   courseId: string;
   lessonId: string;
   sectionId: string;
   noteId?: string;
+  label?: string;
 }) {
   const { data, store } = useStudy();
   const id = noteId ?? `note-${sectionId}`;
@@ -66,7 +68,7 @@ export function NoteEditor({
   return (
     <div className="note-editor">
       <label className="sc-field">
-        Your lesson note
+        {label}
         <textarea
           maxLength={100000}
           className="sc-input"
@@ -395,10 +397,15 @@ export function Reader({
       const nodes = lesson.sections
         .map((s) => ({ s, node: document.getElementById(s.id) }))
         .filter((v) => v.node);
-      const selected =
-        nodes
-          .filter((v) => v.node!.getBoundingClientRect().top <= 180)
-          .at(-1) ?? nodes[0];
+      const reached = nodes.filter(
+        (v) => v.node!.getBoundingClientRect().top <= 180,
+      );
+      // Above the first section (title, outcomes, context) no section is being
+      // read, so an existing saved place is kept: scrolling up to the masthead
+      // to search or to reread the outcomes must not move it back to the start.
+      // A first visit still records the first section.
+      if (!reached.length && store.getSnapshot().data.positions[id]) return;
+      const selected = reached.at(-1) ?? nodes[0];
       if (!selected) return;
       const position = {
         courseId: course.id,
