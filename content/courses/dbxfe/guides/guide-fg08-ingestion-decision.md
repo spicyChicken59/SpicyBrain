@@ -19,41 +19,41 @@ Status: proposed, conditional on the DBA's answers.
 
 #### Sources
 
-**Inspections** live in the ERP on SQL Server. Each row has an inspection identifier that persists through corrections and a source revision number. The DBA has confirmed a nightly export job already exists for the plant sheet; whether change capture or change tracking is enabled or would be permitted is unknown, as are the version and topology.
+**Inspections** live in the ERP on SQL Server. Each row has an inspection identifier that persists through corrections; rows are updated in place, carry no revision and keep no visible history. The DBA confirms a nightly export already exists for the plant sheet; whether change capture or change tracking is enabled or permitted is unknown, as are the version and topology.
 
-**Corrections** arrive as CSV exports after periodic approval by the quality lead, typically once a day and sometimes not for several days. Each row carries the inspection identifier, the new revision and the full replacement quantities. The quality lead owns approval; nobody owns the file drop after that.
+**Corrections** never touch the ERP. They arrive as CSV files on a file share after the quality lead's approval, on Fridays and ad hoc for urgent cases. Each row carries the inspection identifier, a source revision that supersedes lower ones, and the complete replacement quantities. The quality lead owns approval; nobody owns the file drop after that.
 
 **Sensor events** are out of the pilot's scope.
 
 #### Freshness needed versus offered
 
-Needed: the accepted rate for the previous business day, available before 7:30 a.m. Offered: inspections by the existing nightly export, completing before 6:00 a.m. by the DBA's account (not measured); corrections whenever approved, which may be after the morning report. The gap is not technical: a correction approved at 10:00 a.m. for yesterday cannot appear in a 7:30 report by any pattern. The requirements contract's restatement rule handles it, and the operations director has accepted that the number may be restated later in the day.
+Needed: the accepted rate for the previous business day, available before 7:30 a.m. Offered: inspections by the existing nightly export, completing before 6:00 a.m. by the DBA's account (not measured); corrections when approved, which may be after the morning report. The gap is not technical: an urgent correction approved at 10:00 a.m. for yesterday cannot reach a 7:30 report by any pattern. Under the contract's restatement rule the day is restated on the next nightly run, and marked; the operations director has accepted that.
 
 #### Replay
 
-Inspections: the ERP retains rows indefinitely and the export can be re-run for a date range by the DBA, so a failed night can be replayed from source, at the cost of the DBA's time. Corrections: an overwritten CSV is gone; the quality lead keeps no archive. Every correction file is therefore copied to retained raw storage on arrival, named by arrival time, before anything reads it.
+Inspections: the DBA can re-run the export for a date range, but rows are updated in place, so a re-run returns each inspection's current state, not what the failed night saw; the retained raw export is what replays a night. Corrections: an overwritten CSV is gone; the quality lead keeps no archive. Every export and correction file is copied to retained raw storage on arrival, named by arrival time, before anything reads it.
 
 #### Owners
 
-Source export: the DBA, who has not agreed to be called at 6:00 a.m. Correction files: unowned after approval; proposed owner is the quality lead's team, to be agreed. Ingestion: the data team, with an operator still unnamed.
+Source export: the DBA, who has not agreed to be called at 6:00 a.m. Correction files: unowned after approval; the quality lead's team is proposed, not agreed. Ingestion: the data team, with an operator still unnamed.
 
 #### Patterns compared
 
 | Pattern | What it needs granted | What it misses | Cost to the source | Fit |
 |---|---|---|---|---|
-| Nightly full snapshot of the plant's inspections | Read on the export or the tables | Nothing for a daily report; carries every row every night | One export per night, already running | Fits the pilot volume; wasteful at three plants |
-| Incremental by revision watermark | Read plus a reliable revision column | Rows whose revision is not updated on change; deletes | Small | Depends on a column nobody has validated |
-| Change capture from SQL Server | Enabling capture, log access, a permission the DBA has not granted | Nothing, if configured; deletes appear as deletes | Log retention, DBA operations | Answers a freshness need that does not exist yet |
-| File drop with incremental file discovery | Storage path and a landing convention | Files that are overwritten in place before discovery | None | The right shape for corrections; needs an owner for the drop |
-| Managed connector to SQL Server | Verified support for this version and the customer's network path | Unknown until support is confirmed | Depends | Not choosable until version and path are known |
+| Nightly full snapshot | Read on the export or the tables | Nothing for a daily report; carries every row nightly | One nightly export, already running | Fits the pilot volume; wasteful at three plants |
+| Incremental by modified-time watermark | Read plus a reliable modified-time column | Rows whose timestamp is not updated on change; deletes | Small | Needs a column nobody has validated |
+| Change capture from SQL Server | Enabling capture and log access, which the DBA has not granted | The CSV corrections; changes past the capture retention; schema changes (check current documentation) | Log retention, DBA operations | Serves a freshness need nobody has established |
+| File drop with incremental file discovery | Storage path and a landing convention | Files overwritten in place before discovery | None | Right for corrections; needs a drop owner |
+| Managed connector to SQL Server | Change tracking or change data capture on the source tables (the same DBA permission); support for this version and network path, per current documentation | Unknown until confirmed | Depends | Not choosable until version and path are known |
 
 #### Decision
 
-Inspections by the existing nightly full export for the pilot, landed as files with retained raw copies. Corrections by file drop into a landing path with incremental discovery, retained on arrival, applied by revision order in the nightly job. Change capture is not chosen: it needs a permission the DBA has not granted and answers a need nobody has established.
+Inspections by the existing nightly export, landed as files with retained raw copies. Corrections by file drop into a landing path with incremental discovery, retained on arrival, applied in revision order in the nightly job. Change capture is not chosen: it needs an ungranted permission, cannot carry the corrections, and answers a need nobody has established.
 
 #### Conditions and what would change this
 
-If the DBA measures the export finishing after 6:30 a.m., the pattern holds but the job schedule moves and the 7:30 target is at risk. If the revision column is validated as reliable, the incremental watermark replaces the full snapshot when the second plant joins. If operations shows that morning-approved corrections must appear the same morning, change capture is re-examined with the DBA. If nobody owns the correction drop, corrections are not ingested and the pilot reports inspections only, saying so.
+If the DBA measures the export finishing after 6:45 a.m., the 7:30 target is at risk. If a modified-time column is validated, the watermark replaces the full snapshot when the second plant joins. If operations shows that morning-approved corrections must appear the same morning, an intraday run over newly discovered correction files is examined. If nobody owns the correction drop, the pilot reports inspections only and says so.
 
 <!-- section:template -->
 
@@ -90,4 +90,4 @@ If the DBA measures the export finishing after 6:30 a.m., the pattern holds but 
 
 <!-- section:limits -->
 
-This decision records what the source owner has confirmed the source can do and chooses a pattern that fits it; it cannot establish connector support for a specific source version and network path, which needs current documentation and a test, nor the reliability of a revision column nobody has validated. It does not define how records are resolved once ingested; that is the change-data contract. Owners named here have not agreed until they say so. A pattern that fits one plant's volume is not evidence for three. Escalate when the source owner will not grant a permission the chosen pattern needs, when a source cannot be re-read and no retained copy exists, or when the freshness the decision needs cannot be offered by any pattern the source supports.
+This decision records what the source owner has confirmed the source can do and chooses a pattern that fits it; it cannot establish connector support for a specific source version and network path, which needs current documentation and a test, nor the reliability of a change column nobody has validated. It does not define how records are resolved once ingested; that is the change-data contract. Owners named here have not agreed until they say so. A pattern that fits one plant's volume is not evidence for three. Escalate when the source owner will not grant a permission the chosen pattern needs, when a source cannot be re-read and no retained copy exists, or when the freshness the decision needs cannot be offered by any pattern the source supports.

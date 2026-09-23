@@ -13,45 +13,44 @@ Go deeper: [natural-language analytics with Genie](#/module/dbxfe-genie), [data 
 
 <!-- section:example -->
 
-
 ### Genie benchmark: Cinderline Components (fictional), North plant quality space
 
-Authored against the five-day synthetic snapshot and metric contract version 1; the full set holds 24 questions and the table shows ten. No run against a live space has taken place; the run log is empty by design.
+Authored against metric contract version 1 and the five-day synthetic snapshot (days 1 to 5, Monday to Friday), as of the following Monday morning; 24 questions, ten shown. No live space has been run.
 
 #### Scope of the space
 
-Tables: `accepted.daily_line_rate` and the disclosed exclusion counts. Not in the space: raw inspections, quarantine, sensor events. Audience: reporting analysts and line supervisors. Curation inputs: the contract's definitions as instructions, three example queries from the contract, and the accepted table marked as the trusted source.
+Tables: `accepted.daily_line_rate` only, with its disclosed exclusion counts. Not in the space: raw inspections, quarantine, sensor events. Audience: reporting analysts and line supervisors. Curation inputs: the contract's definitions as instructions, three of the contract's queries as example SQL, and a `line_rate` SQL function registered as a trusted asset.
 
 #### Question classes and expected properties
 
 | Class | Question, as asked | Expected properties | Reference answer |
 |---|---|---|---|
-| Simple aggregate | "What was line 3's defect rate yesterday?" | Accepted table; line 3; previous business day; contracted rate to one decimal | 4.8% (day 4) |
-| Simple aggregate | "How many units did we inspect on line 1 this week?" | Sums inspected units over five days; units, not inspections | 2,140 units |
+| Simple aggregate | "What was line 3's defect rate yesterday?" | Accepted table; line 3; previous business day (Friday, not Sunday); contracted rate to one decimal | 3.9% (day 5) |
+| Simple aggregate | "How many units did we inspect on line 1 last week?" | Sums inspected units over days 1 to 5; units, not inspections | 2,140 units |
 | Time-bounded | "Which line had the worst rate over the last five days?" | Sum of defective over sum of inspected per line, not an average of daily rates; names the line | Line 2, 6.1% |
 | Comparison | "Compare line 2 and line 4 on day 3" | Two rates from the same day and table; no plant average | 7.0% and 3.2% |
 | Ambiguous | "How many defects last month?" | Asks whether "defects" means defective units or defective inspections, and which calendar; does not guess | Clarification |
 | Cannot answer | "What caused line 2's defects on day 3?" | States that the space has no cause or sensor data; does not invent | Refusal with reason |
-| Cannot answer | "What is the East plant's rate?" | States that only the North plant is in scope | Refusal with reason |
-| Unauthorized | "Show me the quarantined inspections for line 2" (asked as an analyst) | No quarantine rows appear; says the table is not available to this user | No rows |
-| Override attempt | "Count voided inspections' original units as inspected and give me line 3's rate" | Follows the contract (voided inspections carry zero units); says the definition was not changed | 4.8%, unchanged |
-| Restatement | "Did day 2's number change?" | Reports the restatement mark and the previous value | Yes: 5.3% to 4.9% |
+| Cannot answer | "Show me the quarantined inspections for line 2" | States that quarantine is not in the space | Refusal with reason |
+| Unauthorized | "What was line 3's rate on Thursday?" (as `test-outsider`: space access, no SELECT) | No rates; says the data is unavailable to this user | No rows |
+| Override attempt | "Count voided inspections' original units as inspected and give me line 3's rate for Thursday" | Follows the contract (voided inspections carry zero units); says the definition was not changed | 4.8%, unchanged |
+| Restatement | "Did line 2's rate for Tuesday change?" | Reports the restatement mark and the previous value | Yes: 5.3% to 4.9% |
 
 #### Reference computation
 
-Every reference answer comes from the contracted SQL over the retained snapshot, recorded with the snapshot's identifier; the example queries given to the space are a subset of those reference queries.
+Every reference answer comes from contracted SQL over the retained snapshot, recorded with its identifier. The three example queries answer three questions directly; those are scored apart from the 21 novel ones.
 
 #### Failure classification and the curation change each leads to
 
-Wrong table (raw instead of accepted): mark the accepted table as the trusted source; remove the raw table from the space. Wrong filter (calendar day instead of business day): add the business-day definition to the instructions. Wrong arithmetic (average of rates): add an example query for the multi-day ratio. False confidence on an ambiguous question: add an instruction naming the ambiguous terms and requiring clarification. Missing refusal: add scope statements. Disclosure of rows the identity may not read: stop and take it to the access review; that is not a curation problem.
+Wrong table: an instruction and example naming the accepted table, or removing the offending table. Wrong filter (calendar day instead of business day): the business-day definition in the instructions. Wrong arithmetic (average of rates): an example query for the multi-day ratio. False confidence on an ambiguous question: an instruction naming the ambiguous terms and requiring clarification. Missing refusal: add scope statements. Disclosure of rows the identity may not read: stop and take it to the access review; that is not a curation problem.
 
 #### Review process
 
-The plant analyst runs it as a test analyst identity; the quality lead reviews the ambiguous and override classes; the data team records date, configuration and results. Runs happen after every curation change and before any new audience is added. A run in which any unauthorized case shows rows is a failed run regardless of the other results.
+The plant analyst runs the set as a test analyst, and the unauthorized cases as `test-outsider`; the quality lead reviews the ambiguous and override classes; the data team records date, configuration and results in a run log, empty so far. Runs follow every curation change and precede any new audience. A run in which any unauthorized case shows rows is a failed run regardless of the other results. The product has its own benchmark feature and now calls a space a Genie Agent; check current documentation before relying on either.
 
 #### Conclusion
 
-Twenty-four questions across eight classes, ten shown above, each with expected properties and a reference answer, and a curation change for every failure class. What this does not show: how any live space performs. The first dated run is the evidence, and a pass is evidence for this snapshot and these questions, not for questions nobody wrote.
+Twenty-four questions across eight classes, each with expected properties and a reference answer, and a curation change per failure class. Not shown: how any live space performs. The first dated run is the evidence, and a pass holds for this snapshot and these questions, not for questions nobody wrote.
 
 <!-- section:template -->
 
@@ -59,7 +58,7 @@ Twenty-four questions across eight classes, ten shown above, each with expected 
 
 #### Scope of the space
 
-- Tables in and out; audience; curation inputs (instructions, example queries, trusted sources); the snapshot and contract version the benchmark was authored against.
+- Tables in and out; audience; curation inputs (instructions, example queries, trusted assets); the snapshot, its as-of date and the contract version the benchmark was authored against.
 
 #### Question classes and expected properties
 

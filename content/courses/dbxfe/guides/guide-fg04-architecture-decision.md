@@ -17,47 +17,47 @@ Go deeper: [architecture reasoning and migration decisions](#/module/dbxfe-m08),
 
 ### Architecture decision record: Cinderline Components (fictional), daily quality report
 
-Status: proposed, awaiting the DBA's confirmation of change-capture permission.
+Status: proposed, 16 March; the operations director decides; B waits on the security review and a named operator.
 
 #### Decision to make
 
-How the North plant's accepted daily defect rate will be produced for the pilot, given that corrections are approved in periodic batches, the existing SQL Server morning report must keep running, and two part-time engineers will operate whatever is chosen.
+How the pilot produces the North plant's accepted daily defect rate under requirements contract version 0.2.
 
 #### Constraints on every option
 
-No real data leaves the plant network before the security review. The existing morning report is not switched off during the pilot. The metric contract, not the pipeline, defines the rate. There is no named operator yet.
+No real data leaves the plant network before the security review. The existing SQL Server morning report keeps running. The metric contract, not the pipeline, defines the rate. Two part-time engineers operate whatever is chosen, and there is no named operator yet.
 
 #### Options
 
-**Option A: improve the current path.** Rewrite the analyst's workbook logic as a scheduled SQL Server job that applies corrections in revision order and publishes one table both reports read. Nothing moves off the plant network. The data team already operates this environment. It cannot hold conflicting records visibly without new tables, and it does not create a path toward sensor data or shared access across plants.
-
-**Option B: nightly extract to a governed lakehouse path.** A scheduled extract of inspections and the approved correction CSVs lands in cloud storage, a nightly job resolves revisions, quarantines conflicts and publishes the accepted rate, and the morning report reads it. Corrections approved after the extract appear the next morning. It needs the security review, a workload identity, a storage path and an operator, none of which exist today.
-
-**Option C: change-data capture from SQL Server.** Continuous capture of inspection changes, resolved as they arrive. It answers a freshness requirement nobody has established, depends on a permission the DBA has not granted, and adds a component the team has not operated.
-
-**Option D: nothing yet.** Measure the baseline for five days first. Costs nothing but time; produces the number every other option is judged against.
+| Option | What moves | Who operates it | Change for report users | Effort (guessed) | What it cannot do |
+|---|---|---|---|---|---|
+| A: improve the current path | Nothing leaves the plant; the workbook logic becomes a scheduled SQL Server job applying corrections in revision order | The data team, as today | Both reports read one table | Low: existing tools | Show conflicts without new tables; open a path to sensor data or other plants |
+| B: nightly extract to a governed lakehouse path | Inspections and the approved correction CSVs land in cloud storage; a nightly job resolves revisions, quarantines conflicts and publishes the accepted rate | Unnamed; an operator must exist first | The morning report reads the accepted rate; corrections approved after the extract appear the next morning | High: security review, workload identity, storage path, the job | Run before the review completes |
+| C: change-data capture from SQL Server | Inspection changes, continuously | Data team and DBA; a component nobody here has run | Numbers fresher than the meeting needs | Highest: B's prerequisites plus a change request in a DBA window | Carry corrections, which arrive as CSV files and never pass through the ERP; start without the DBA's permission |
+| D: nothing yet | Nothing; five days of baseline measurement | The data lead | None; today's two reports continue | Five staffed days | Fix anything; it only measures |
 
 #### Assumptions
 
-| Assumption | Option(s) | Status |
+| Assumption | Option(s) | Status, and when recorded |
 |---|---|---|
-| The ERP export completes before 6:00 a.m. | B | Stated by the DBA, not measured |
-| Daily freshness satisfies the 8 a.m. decision | A, B | Stated by the operations director; untested |
-| Change capture is permitted on the ERP | C | Unknown |
-| Two part-time engineers can operate a nightly job with a runbook | B | Stated by the data lead |
-| Conflicting records are rare | A | Guessed; nobody has counted them |
+| The ERP export completes before 6:00 a.m. | B | Stated by the DBA, 12 March; not measured |
+| Daily freshness satisfies the 8 a.m. decision | A, B | Stated by the operations director, 4 March; untested |
+| Change capture is permitted on the ERP | C | Unknown; asked of the DBA, 12 March |
+| Two part-time engineers can operate a nightly job with a runbook | B | Stated by the data lead, 5 March |
+| Conflicting records are rare | A | Guessed, 16 March; nobody has counted them |
+| Hidden conflicts and exclusions caused today's disagreement | A, B | Guessed, 16 March; D measures it |
 
 #### Tradeoffs as consequences
 
-A keeps everything local and familiar but leaves conflicts and exclusions invisible, which is the cause of today's disagreement. B makes exclusions visible and creates a governed place other plants could join, at the price of a security review, a new operating duty and next-morning corrections. C buys freshness that has not been asked for at the highest operational and permission cost. D delays everything by a week and de-risks every other choice.
+A keeps everything local and familiar, but conflicts and exclusions stay invisible, so its one number cannot show why it differs from the old reports; whether they caused today's disagreement is unmeasured. B makes exclusions visible and creates a governed place other plants could join, at the price of a security review, a new operating duty and next-morning corrections. C buys freshness nobody has asked for at the highest operational and permission cost. D delays everything by a week and de-risks every other choice.
 
 #### Decision
 
-D first, then B for the pilot, on the condition that the security review completes and an operator is named before real data moves. A remains the fallback if the review does not complete within the pilot window, because it still fixes revision ordering. C is not chosen.
+D first, then B for the pilot, provided the security review completes and an operator is named before real data moves. A remains the fallback if the review does not complete within the pilot window, because it still fixes revision ordering. C is not chosen.
 
 #### What would reverse this
 
-If the baseline shows corrections approved during the morning routinely change the previous day's rate, next-morning freshness is insufficient and C or an intraday extract must be re-examined. If the security review requires a connectivity pattern the team cannot operate, A becomes the decision. If the data team cannot name an operator, no option beyond D should proceed.
+If the baseline shows morning-approved corrections routinely change the previous day's rate, next-morning freshness is insufficient and an intraday run over new correction files must be examined; C would not help. If the security review requires a connectivity pattern the team cannot operate, A becomes the decision. If the data team cannot name an operator, no option beyond D should proceed.
 
 #### Open
 

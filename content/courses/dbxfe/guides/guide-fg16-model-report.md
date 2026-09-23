@@ -16,47 +16,53 @@ Go deeper: [machine-learning foundations and evaluation](#/module/dbxfe-m07), [s
 
 ### Model report: Cinderline Components (fictional), coating-oven fault warning
 
-Every count below is from a synthetic dataset built for this example; nothing was deployed.
+Every count below is from a synthetic dataset; nothing was deployed.
 
 #### Target and action
 
-Predict, at 09:00 each day for each of the North plant's six coating ovens, whether the oven will have a fault stop in the following 24 hours. The action: the maintenance lead adds a flagged oven to that day's inspection round, which holds four ovens at most. Available at 09:00: sensor readings to 09:00 (temperature, door cycles, humidity), oven age, days since last service. Recorded afterwards and excluded: fault code, technician's diagnosis, repair duration, any later reading.
+Predict at 09:00 each day, for each of the North plant's six coating ovens, a fault stop in the next 24 hours. The action: the maintenance lead adds a flagged oven to that day's inspection round, which holds four ovens at most. Available at 09:00: sensor readings to 09:00 (temperature, door cycles, humidity), oven age, days since last service. Recorded afterwards and excluded: fault code, technician's diagnosis, repair duration, any later reading.
 
 #### Baselines
 
-Rule in use: inspect an oven when its temperature exceeded the set point twice in the previous shift. Trivial predictor: never warn. Class balance in the dataset: 84 fault stops in 2,160 oven-days (3.9%).
+Rule in use: inspect an oven when its temperature exceeded the set point twice in the previous shift. Trivial predictor: never warn. Class balance: 84 fault stops in the 2,184 oven-days the splits use (3.8%).
 
 #### Split
 
-By time and by oven. Training: weeks 1 to 8, four ovens (1,344 oven-days, 52 faults). Validation: weeks 9 and 10, the same four ovens (336 oven-days, 14 faults), used to choose the threshold. Test: weeks 11 and 12, all six ovens (504 oven-days, 18 faults), of which the two ovens never seen in training contribute 168 oven-days and 7 faults. Leakage check: a point-in-time join test compared every feature's timestamp with 09:00; a first version computing "days since last service" from the service after the fault was caught by it and rebuilt.
+By time and by oven. Training: weeks 1 to 48, four ovens (1,344 oven-days, 52 faults). Validation: weeks 49 to 60, the same four ovens (336 oven-days, 14 faults), used to choose the threshold. Test: weeks 61 to 72, all six ovens (504 oven-days, 18 faults), of which the two ovens never seen in training contribute 168 oven-days and 7 faults; their earlier weeks are set aside. Leakage check: a point-in-time join test compared every feature's timestamp with 09:00; a first version computing "days since last service" from the service after the fault was caught by it and rebuilt.
 
 #### Results on the test period, threshold chosen on validation
 
-| Predictor | Recall of fault stops | Precision of warnings | Warnings per day (six ovens) | Missed faults |
+| Predictor | Recall | Precision | Warnings a day (84 days) | Missed |
 |---|---|---|---|---|
 | Never warn | 0 of 18 | none | 0 | 18 |
-| Temperature rule | 7 of 18 | 7 of 31 | 2.2 | 11 |
-| Model, all six ovens | 11 of 18 | 11 of 34 | 2.4 | 7 |
-| Model, four training ovens only | 9 of 11 | 9 of 22 | 1.6 per four ovens | 2 |
-| Model, two unseen ovens only | 2 of 7 | 2 of 12 | 0.9 per two ovens | 5 |
+| Rule, six ovens | 7 of 18 | 7 of 31 | 0.37 | 11 |
+| Model, six ovens | 11 of 18 | 11 of 34 | 0.40 | 7 |
+| Rule, four training ovens | 4 of 11 | 4 of 20 | 0.24 | 7 |
+| Model, four training ovens | 9 of 11 | 9 of 22 | 0.26 | 2 |
+| Rule, two unseen ovens | 3 of 7 | 3 of 11 | 0.13 | 4 |
+| Model, two unseen ovens | 2 of 7 | 2 of 12 | 0.14 | 5 |
 
-At this threshold the round holds 2.4 flagged ovens on average against a capacity of four; a lower threshold recovering two more faults raised warnings to 4.1 a day, beyond the round.
+At this threshold the round gets 0.4 flagged ovens a day against four places; a lower threshold catching two more faults raised warnings to 2.9 a day, most of the round.
 
 #### Reading the results
 
-On ovens the model has seen, it catches more faults than the rule at a similar warning load. On the two ovens it has not seen it is worse than the rule, and 7 faults are too few to say by how much. Since the plan is to warn on all ovens, including two replaced next quarter, the unseen-oven result is the one that matters.
+On seen ovens the model catches 9 of 11 against the rule's 4, at a similar load (22 warnings against 20). On unseen ovens it catches 2 of 7 against the rule's 3; 7 faults are too few to say by how much. The plan warns on all ovens, including two replaced next quarter, so the unseen result is the one that matters.
 
 #### Risks
 
-Small sample: 18 test faults; the difference between the model and the rule on all six ovens is 4 faults. Label delay: a fault is confirmed by the technician the next day, so any monitoring is a day behind. Drift: the ovens' set points change with product mix, which the training period covered only partly. Untested: behaviour after a service, when readings reset; the humidity sensor on oven 5, which was offline for a week and imputed.
+Small sample: 18 test faults; model and rule differ by 4 on all six ovens. Label delay: the technician confirms a fault the next day, so monitoring is a day behind. Drift: set points change with product mix, which training covered only partly. Untested: behaviour after a service, when readings reset; oven 5's humidity sensor, offline for a week and imputed.
 
 #### Monitoring, if used
 
-Daily: warnings against the round's capacity; each input's distribution against its training range; ovens with missing readings. Weekly, once labels arrive: recall and precision on the confirmed faults, separately for ovens seen and unseen in training. Review triggered by warnings exceeding capacity on three days, by any input outside its training range for a full day, or by four consecutive weeks with recall below the rule's.
+Daily: warnings against capacity; each input against its training range; missing readings. Weekly, once labels arrive: recall and precision, separately for seen and unseen ovens. Review when warnings exceed capacity on three days, an input leaves its training range for a full day, or recall trails the rule's for four consecutive weeks.
 
 #### Decision
 
-Not for use on all ovens. Supported: the model is worth continuing, because on seen ovens it beats the rule at the same load. Not supported: any claim about unseen ovens or about the two replacements. Recommended: keep the temperature rule, collect twelve more weeks including the replaced ovens, and re-run this report with the same split design. What would change the decision: recall on unseen ovens at or above the rule's on at least 20 faults.
+Not for use on all ovens. Supported: the model is worth continuing, because on seen ovens it beats the rule at a similar load. Not supported: any claim about unseen ovens or the two replacements. Recommended: keep the temperature rule, collect twelve more weeks including the replaced ovens, and re-run this report with the same split design. What would change the decision: recall on unseen ovens at or above the rule's on at least 20 faults.
+
+#### Run record
+
+Tracked run `ovens-eval-01`, dataset snapshot `ovens-synthetic-v1`, code tag `report-v1`, environment captured with the run; all are synthetic placeholders.
 
 <!-- section:template -->
 

@@ -16,7 +16,7 @@ Go deeper: [data modeling and metric contracts](#/module/dbxfe-modeling), [build
 
 ### Metric contract: Cinderline Components (fictional), unit defect rate
 
-Version 1, proposed; owner: the quality lead. The plant analyst and the operations director have reviewed the definitions; the business-day boundary is agreed, the treatment of rework is not.
+Version 1, proposed 12 March; owner: the quality lead. The plant analyst and the operations director have reviewed the definitions; the business-day boundary is agreed, the treatment of rework is not.
 
 #### Name and grain
 
@@ -24,11 +24,11 @@ Version 1, proposed; owner: the quality lead. The plant analyst and the operatio
 
 #### Numerator
 
-`defective_units`: the sum of the defective-units field over accepted inspections for the line and day. Accepted means the highest valid version of each inspection under the change-data contract, excluding quarantined and withheld inspections. Units found defective and then reworked are counted as defective at inspection; whether rework changes the count is the open item.
+`defective_units`: the sum of the defective-units field over accepted inspections for the line and day. Accepted means the highest valid version of each inspection under the change-data contract; quarantined, excluded and unresolved inspections are outside it, and while any inspection is unresolved no new rate is published. Units found defective and then reworked are counted as defective at inspection; whether rework changes the count is the open item.
 
 #### Denominator
 
-`inspected_units`: the sum of the inspected-units field over the same accepted inspections. The denominator uses exactly the population of the numerator: an inspection excluded from one is excluded from both. An inspection with zero inspected units contributes nothing to either and is not an error. A line with no accepted inspections on a day has no rate, shown as "no inspections," never as zero.
+`inspected_units`: the sum of the inspected-units field over the same accepted inspections. The denominator uses exactly the population of the numerator: an inspection excluded from one is excluded from both. An inspection with zero inspected units contributes nothing to either and is not an error. A line with no accepted inspections on a day has no rate, shown as "no inspections," never as zero; one whose accepted units total zero shows "no inspected units."
 
 #### Units and precision
 
@@ -36,7 +36,7 @@ Both quantities are counts of physical units as recorded at inspection. The rate
 
 #### Reporting period
 
-The business day runs from 00:00 to 23:59:59 plant local time, assigned by the inspection's recorded inspection time, not by the time a correction was approved. An inspection with a missing inspection time is quarantined as unorderable in time and disclosed. The plant does not observe daylight-saving changes during the pilot window; the rule for the transition day is recorded as "assign by local wall-clock time; the duplicated hour belongs to the earlier day" and is untested.
+The business day is the half-open interval from 00:00 plant local time to the next 00:00, assigned by the inspection's recorded inspection time, not by the time a correction was approved. An inspection with a missing inspection time is quarantined as unorderable in time and disclosed. No daylight-saving change falls in the pilot window; on a transition day records are assigned by local calendar date, so the day has 23 or 25 hours. The rule is untested.
 
 #### Restatement
 
@@ -44,7 +44,7 @@ A correction approved after a day has been reported changes that day's rate on t
 
 #### Why the two existing reports disagreed
 
-The analyst's workbook used approved corrections as of the morning, so a correction approved at 10 a.m. changed yesterday's number in the workbook but not in the plant sheet, which was printed at 7. The plant sheet counted a voided inspection's original units; the workbook dropped it. Neither was wrong under its own rule; neither rule was written down. Under this contract both would be computed from the same accepted set and the plant sheet would show the restatement mark.
+On the disputed day (North, 2 March) the workbook said 7.1%, the plant sheet 10.8%, and the figure quality later agreed 5.0%: three answers to three questions. The workbook averages per-row rates by load date, and keeps a package retry's duplicate rows and the superseded revision beside its correction. The sheet sums units by inspection date over whatever was pasted, including a negative quantity typed as an adjustment. Neither rule was written down. Under this contract both read one accepted set: each delivery counted once, only the highest valid version, invalid rows quarantined and disclosed.
 
 #### Tests
 
@@ -53,13 +53,17 @@ The analyst's workbook used approved corrections as of the morning, so a correct
 | Join inspections to lines and sum units | Double-counting through a one-to-many join | Sum equals the raw accepted sum |
 | Exclude one inspection from the numerator only | Denominator drift | Test fails; both must exclude |
 | Feed a weight field as units | Unit mixing | Test fails on the field name |
-| Inspection at 23:59:59 and 00:00:00 | Boundary assignment | Two different days |
+| Inspections at 23:59:59.5 and 00:00:00 | Boundary assignment | Two different days |
 | Correction for a day already reported | Restatement | Rate changes; mark set |
-| Line with no inspections | No rate | "no inspections," not 0 |
+| Line with no inspections, or only voided ones | Empty case | "no inspections" or "no inspected units", never 0 |
 
 #### Conclusion
 
-The contract explains the morning disagreement without blaming either report and gives both a shared definition. One item stays open (rework) and one rule is untested (the daylight-saving day). Version 1 is proposed to the quality lead for signature with those two noted.
+The contract explains the morning disagreement without blaming anyone and gives both reports one definition. One item stays open (rework) and one rule is untested (the daylight-saving day). Version 1 is proposed to the quality lead for signature with those two noted.
+
+#### Change log
+
+Version 1, 12 March: first proposal after the baseline interviews; not yet signed.
 
 <!-- section:template -->
 

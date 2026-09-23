@@ -5,7 +5,7 @@ Plan the dashboard from the action it must support, not from the tables you have
 1. **Name each audience and the action** they take from the page, at what time, and what they do today instead. One page can serve two audiences only if their actions need the same numbers at the same grain.
 2. **Bind every number on the page to a metric contract** by name and version. A tile without a contract is removed or labelled as unverified.
 3. **Decide how freshness is communicated**: the period the numbers cover, when they were published, whether a shown period has been restated, and what the page says when it is not updated. Put it where the eye lands, not in a tooltip.
-4. **Write the access matrix for the page and its underlying objects**: who sees it, who must not, and whether filters can leak rows the viewer may not read.
+4. **Write the access matrix for the page and its underlying objects**: who sees it, who must not, whose credentials its queries run with, and whether filters can leak rows the viewer may not read.
 5. **Write the validation script before the page exists**: for a fixed input snapshot, the exact values each tile must show, the filter states to try, the empty and restated cases, and who signs.
 6. **Assign ownership**: who changes a definition, who answers "is this number right," who is told when refresh fails.
 
@@ -23,17 +23,17 @@ Proposed; the storyboard is a sketch reviewed with the operations director and t
 |---|---|---|---|
 | Line supervisors, 8 a.m. meeting | Choose which line to investigate first | 7:45 to 8:15 a.m. | Argue over two printed reports |
 | Plant analyst | Confirm the number and explain exclusions if asked | 7:30 a.m. | Reconcile the workbook against the plant sheet |
-| Quality lead | See how many inspections are withheld or quarantined and open them | During the morning | Hears about problems a day later |
+| Quality lead | See how many inspections are excluded or quarantined and open them | During the morning | Hears about problems a day later |
 
-The supervisors and the analyst need the same numbers at the same grain, so one page serves both. The quality lead's need is a count and a link, not a second page.
+Supervisors and the analyst need the same numbers at the same grain, so one page serves both. The quality lead's need is a count and a link, not a second page.
 
 #### Content, bound to contracts
 
-Tile per line: `unit_defect_rate` version 1, previous business day, one decimal place. Beside each tile: accepted inspections, withheld (conflict), quarantined (invalid or unorderable), from the quality response plan's disclosed counts. A seven-day line per production line of the same metric. A restatement mark on any day changed since it was first shown, with the previous value on hover and in the table view. No plant-level average of line rates; the plant figure is the contract's all-lines calculation. No sensor tiles: no contract exists for them.
+Tile per line: `unit_defect_rate` version 1, previous business day, one decimal place. Beside each tile: inspections accepted, inspections excluded and records quarantined, from the quality response plan's disclosed counts. A seven-day line per production line, same metric. A restatement mark on any day changed since it was first shown, with the previous value on hover and in the table view. No plant-level average of line rates; the plant figure is the contract's all-lines calculation. No sensor tiles: no contract exists for them.
 
 #### Freshness communication
 
-Top of the page, in words: the business day covered, the publish time of the nightly run, and "restated days are marked." When the nightly run has not published by 7:30 a.m., the page shows the last published day with "not updated: see the operator note" in the same position, and the operator's note appears below it. The refresh is scheduled once after the nightly job signals completion; the morning queries read the published table and are not re-run per viewer.
+Top of the page, in words: the business day covered, the publish time of the nightly run, and "restated days are marked." When the nightly run has not published by 7:30 a.m., or its report is held, the page shows the last verified day labelled stale in the same position, with the reason ("not updated: see the operator note", "held: conflict under adjudication") and the owner's note below it. The refresh is scheduled once after the nightly job signals completion.
 
 #### Access
 
@@ -41,14 +41,14 @@ Top of the page, in words: the business day covered, the publish time of the nig
 |---|---|---|---|
 | `north-reporting-analysts` (supervisors and analyst) | View | SELECT on `accepted.daily_line_rate` | Read raw or quarantine rows through any filter |
 | `quality-stewards` | View, plus the quarantine link | SELECT on accepted and quarantine tables | Edit the page |
-| Page owner (data team) | Edit | As the service principal that publishes | Publish a tile with no contract |
+| Page owner (data team) | Edit | Its own grants, not the nightly service principal's | Publish a tile with no contract |
 | Everyone else | None | None | |
 
-Filters are restricted to line and day; there is no free-text filter and no drill-through to raw rows, so a viewer cannot reach objects beyond the page's own grants. This is checked in the access review, not assumed here.
+Queries run with each viewer's own credentials, so these grants protect the rows; the tool's credential options are checked against current documentation. Filters are restricted to line and day, with no free-text filter and no drill-through to raw rows; the access review checks this rather than assuming it.
 
 #### Validation script
 
-On the retained five-day synthetic snapshot: each line tile equals the reconciliation sheet's value to one decimal (line 3, day 4: 4.8%); the counts beside each tile equal the sheet's accepted, withheld and quarantined counts (day 2: 19, 1, 1); the day-2 restatement mark appears after the day-4 correction and shows the previous value 5.3%; a line with no inspections on day 5 shows "no inspections," not 0.0%; filtering to line 3 does not change the plant figure; the page under a test analyst identity shows the tiles and refuses the quarantine link; the page under the outsider identity does not load. Signed by the plant analyst (values), the quality lead (counts and marks) and the security lead (access), with the storyboard attached.
+On the retained five-day synthetic snapshot: each line tile equals the reconciliation sheet's value to one decimal (line 3, day 4: 4.8%); the counts beside each tile equal the sheet's (line 2, day 2: 20 accepted, 1 excluded, 1 quarantined); line 2's day-2 restatement mark appears after the day-4 correction and shows the previous value 5.3%; line 4, with no inspections on day 5, shows "no inspections," not 0.0%; filtering to line 3 does not change the plant figure; the page under a test analyst identity shows the tiles and refuses the quarantine link; the page under the outsider identity does not load. Signed by the plant analyst (values), the quality lead (counts and marks) and the security lead (access), with the storyboard attached.
 
 #### Ownership
 
@@ -56,7 +56,7 @@ Definition changes go through the metric contract's owner and a new version, the
 
 #### Conclusion
 
-The page supports one action, shows one contracted metric with its exclusions and its freshness in words, and has a validation script with exact expected values and three signers. Not established: the built page's behaviour, which waits on the access review, and whether supervisors act on it, which the pilot readout must observe rather than assume.
+One primary action, choosing a line, with two supporting uses; one contracted metric with its exclusions and freshness in words; a validation script with exact expected values and three signers. Not established: the built page's behaviour, which waits on the access review, and whether supervisors act on it, which the pilot readout must observe rather than assume.
 
 <!-- section:template -->
 
@@ -80,7 +80,7 @@ The page supports one action, shows one contracted metric with its exclusions an
 | Principal | Page permission | Underlying object privileges | Must not be able to |
 |---|---|---|---|
 
-- How filters and drill-throughs are bounded so the page cannot reach beyond its grants.
+- Whose credentials run viewers' queries (each viewer's own, or a named read-only publishing identity) and how filters and drill-throughs are bounded so the page cannot reach beyond its grants.
 
 #### Validation script
 

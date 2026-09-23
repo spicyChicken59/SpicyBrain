@@ -17,22 +17,22 @@ Go deeper: [the customer decision journey](#/module/dbxfe-m01) and [work with th
 
 ### Stakeholder map: Cinderline Components (fictional), quality-data engagement
 
-Prepared after two calls and one plant visit. Influence ratings are your judgement from those conversations, not facts.
+Scope: the choice of which line to investigate at the 8 a.m. meeting; reflects the calls of 4 and 5 March and the plant visit of 9 March. Influence ratings are your judgement from those conversations, not facts.
 
 | Person (role) | Interest, in their words | Influence: decision / delivery | Evidence they need | Next conversation |
 |---|---|---|---|---|
-| Operations director | "Which line do we investigate at 8 a.m., and can I trust the number" | High / Medium | Two reports agreeing for five days; a named operator | Confirm the daily cadence is enough; ask who covers a failed feed |
-| Quality lead | "Defective units over inspected units, corrections in approved order" | Medium / High | The metric contract written down; conflict handling shown on a sample | Agree the business-day boundary and whether history is restated |
+| Operations director | "Which line do we investigate at 8 a.m., and can I trust the number" | High / Medium | Two reports agreeing for five days; a named operator | With the data lead: confirm the daily cadence is enough; ask who covers a failed feed |
+| Quality lead | "Defective units over inspected units, corrections in approved order" | Medium / High | The metric contract written down; conflict handling shown on a sample | With the plant analyst: agree the business-day boundary and whether history is restated |
 | Data lead | "We can give you synthetic records now; two engineers, part time" | Medium / High | A design the team can run without continuous support | Walk through the operating runbook; ask what they will not take on |
 | DBA (not yet met) | Unknown; relayed as "CDC permission needs the DBA" | Low / High | Unknown until asked | Introduction via the data lead; SQL Server version, topology, change-capture permission |
-| Security lead | "Classify the data, name the identities, review the source-to-cloud path" | High / Medium | Classification of inspection fields; identity list; a drawn request path | Bring the request-path map and the access matrix; ask which fields are restricted |
+| Security lead | "Classify the data, name the identities, review the source-to-cloud path" | High / Medium | Classification of inspection fields; identity list; a drawn request path | With the network owner: bring the request-path map and the access matrix; ask which fields are restricted |
 | Sponsor | "Evidence for an expansion decision within a planning ceiling I have not approved" | High / Low | A readout with pass, fail and blocked separated; usage reported against the ceiling | Agree the readout format before the pilot, not after |
 | Plant analyst | "Stop spending my week reconciling" | Low / High | The new report matching what they already know to be right | Ask which disagreements they trust their own workbook on, and why |
 | Maintenance lead | "A read-only manual assistant later; keep the quality pilot bounded" | Low / Low | None for this pilot | None now; record the deferred request |
 
 #### Conflicts recorded, not resolved
 
-The operations director wants something usable soon; the security lead will not permit real data before a specialist review. Neither can be talked round by you, and the map says so. The sponsor's planning ceiling is labelled unapproved, while the data lead's capacity assumes a short pilot; if the review takes longer than the ceiling covers, the sponsor has to choose, not the data team.
+The operations director needs two reports agreeing for five days, which only real data can show; the security lead will not permit real data before a specialist review. Neither can be talked round by you, and the map says so. The sponsor wants evidence "within a planning ceiling I have not approved", and the data lead offers "two engineers, part time"; if the review delays the pilot, neither the ceiling nor that capacity stretches on its own, and the sponsor has to choose, not the data team.
 
 #### Whose evidence is missing entirely
 
@@ -40,7 +40,11 @@ The DBA has been referred to twice and never spoken to. Every ingestion option d
 
 #### Conclusion
 
-Three people can stop this engagement: the sponsor, the security lead and, in practice, the plant analyst, who will not use a report that disagrees with a workbook they trust. The next three conversations, in order: the quality lead on the metric contract, the DBA through the data lead, and the security lead with a drawing. The operations director gets an update after those, not a meeting before them. Revise this map after each conversation and keep the previous version, because who was influential when is itself evidence about the account.
+Four people can stop this engagement: the operations director and the sponsor, who fund it, the security lead and, in practice, the plant analyst, who will not use a report that disagrees with a workbook they trust. The next three conversations, in order: the quality lead on the metric contract, the DBA through the data lead, and the security lead with a drawing. The operations director gets an update after those, not a meeting before them. Revise this map after each conversation and keep the previous version, because who was influential when is itself evidence about the account.
+
+#### Revision log
+
+9 March: first version, after the plant visit; the DBA added as not yet met.
 
 <!-- section:template -->
 

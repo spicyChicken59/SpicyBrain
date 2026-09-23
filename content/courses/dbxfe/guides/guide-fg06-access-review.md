@@ -15,63 +15,64 @@ Go deeper: [Unity Catalog and governance](#/module/dbxfe-m06), [design least-pri
 
 ### Access review: Cinderline Components (fictional), North plant pilot
 
-Reviewed on synthetic objects in a test catalog. Real-data objects are not yet created, so every result below must be repeated once they are; this review establishes the design and the test method, not the production state.
+Run on synthetic objects in a test catalog; every result must be repeated on real objects once they exist, so this establishes the design and the test method, not the production state.
 
 #### Principals
 
 | Principal | Work it does | Type |
 |---|---|---|
-| `north-reporting-analysts` | Read the published daily rate and its exclusion counts | Group of human users |
-| `quality-stewards` | Read quarantined and conflicting rows; record adjudications | Group of human users |
-| `svc-quality-nightly` | Read raw inspections and correction exports; write accepted and quarantine tables | Service principal |
-| `platform-admins` | Own the catalog; grant privileges | Group; excluded from data reads in this design |
+| `north-reporting-analysts` | Read the published rate and exclusion counts | Group of human users |
+| `quality-stewards` | Read quarantine; record adjudications | Group of human users |
+| `svc-quality-nightly` | Read raw tables; write accepted and quarantine tables | Service principal |
+| `platform-admins` | Own the catalog; grant privileges | Group; no data reads, by policy |
 | `test-outsider` | None | Test user in no pilot group |
 
 #### Objects
 
-Catalog `quality_pilot`; schemas `raw`, `accepted`, `quarantine`; tables `raw.inspections`, `raw.corrections`, `accepted.daily_line_rate`, `quarantine.conflicts`; one SQL warehouse for reporting; one job compute for the nightly run.
+Catalog `quality_pilot`; schemas `raw`, `accepted`, `quarantine`; tables `raw.inspections`, `raw.corrections`, `accepted.daily_line_rate`, `quarantine.conflicts`; a reporting SQL warehouse; job compute for the nightly run.
 
 #### Matrix, expected outcomes
 
 | Principal | Object | Action | Expected | Reason |
 |---|---|---|---|---|
 | reporting analysts | `accepted.daily_line_rate` | SELECT | Allow | The published report |
-| reporting analysts | `raw.inspections` | SELECT | Deny | Raw rows carry fields not yet classified |
-| reporting analysts | `quarantine.conflicts` | SELECT | Deny | Conflicts are the steward's to adjudicate |
-| reporting analysts | `accepted.daily_line_rate` | MODIFY | Deny | Nobody edits the published rate by hand |
+| reporting analysts | `raw.inspections` | SELECT | Deny | Fields not yet classified |
+| reporting analysts | `quarantine.conflicts` | SELECT | Deny | The stewards' to adjudicate |
+| reporting analysts | `accepted.daily_line_rate` | MODIFY | Deny | No hand edits |
 | quality stewards | `quarantine.conflicts` | SELECT | Allow | Adjudication |
-| quality stewards | `raw.inspections` | SELECT | Allow, provisional | Needed to adjudicate; the security lead must confirm field classification |
-| quality stewards | `accepted.daily_line_rate` | MODIFY | Deny | Adjudications flow through the pipeline, not manual edits |
+| quality stewards | `raw.inspections` | SELECT | Allow, provisional | Adjudication; field classification unconfirmed |
+| quality stewards | `accepted.daily_line_rate` | MODIFY | Deny | Adjudications flow through the pipeline |
 | nightly service principal | `raw.*` | SELECT | Allow | Its input |
 | nightly service principal | `accepted.*`, `quarantine.*` | MODIFY | Allow | Its output |
-| nightly service principal | catalog `quality_pilot` | Grant or own | Deny | A pipeline does not administer its own catalog |
+| nightly service principal | catalog `quality_pilot` | Grant or own | Deny | A pipeline does not administer its catalog |
+| platform admins | `raw.inspections` | SELECT | Deny by policy | An owner can grant itself SELECT; see gaps |
 | test outsider | any table | SELECT | Deny | Not in any group |
-| every principal above | reporting warehouse | Use | Allow for analysts and stewards; deny for the service principal, which uses job compute |
+| every principal above | reporting warehouse | Use | Allow analysts and stewards; deny the service principal | The nightly job uses job compute |
 
-Every allow on a table implies USE CATALOG and USE SCHEMA on its parents; those were granted to the group, not to individuals.
+Each table allow implies USE CATALOG and USE SCHEMA on its parents, granted to groups and the service principal, never to individuals.
 
 #### Negative tests executed
 
 | Test | Identity used | Result | Evidence |
 |---|---|---|---|
-| Read raw inspections | Test analyst in `north-reporting-analysts` | Denied; error names the identity and the missing SELECT | Captured error text |
-| Read quarantine | Same | Denied | Captured error text |
-| Modify the published rate | Same | Denied | Captured error text |
-| Own the catalog | `svc-quality-nightly` | Denied | Captured error text |
-| Read the published rate | `test-outsider` | Denied | Captured error text |
-| Read raw inspections | Test steward | Allowed, 5 rows | Provisional; flagged for the security lead |
+| Read raw inspections | Test analyst | Denied; error names the identity and the missing SELECT | Error text |
+| Read quarantine | Same | Denied | Error text |
+| Modify the published rate | Same | Denied | Error text |
+| Modify the published rate | Test steward | Denied | Error text |
+| Own the catalog | `svc-quality-nightly` | Denied | Error text |
+| Read the published rate | `test-outsider` | Denied | Error text |
 
 #### Positive tests executed
 
-The test analyst read the published rate (five rows, one per test day). The service principal's nightly job wrote both output tables and read nothing outside `raw`. No test used an administrator identity.
+The test analyst read the published rate (five rows: one synthetic line, five test days). The test steward read `quarantine.conflicts`, and raw inspections provisionally, flagged for the security lead. The nightly job wrote both output tables and read nothing outside `raw`. No test used an administrator identity.
 
 #### Gaps
 
-Row-level separation between plants is not tested because only one plant is in scope; when a second joins, the analysts' allow must be re-examined with a row filter or per-plant views. Audit-log review is not tested; the security lead has not said which events they want retained. The stewards' raw read is provisional.
+Not tested: the service principal's use of the reporting warehouse; the outsider against tables other than the published rate. The platform-admins deny is policy only; the proposed compensating control (an owner group with no data consumers, plus review of grant events) needs checking against current documentation. Row-level separation between plants is untested with one plant in scope; a second plant needs a row filter or per-plant views. Audit-log review is not tested; the security lead has not said which events to retain.
 
 #### Conclusion
 
-The design gives each principal only its work and every deny that matters has been exercised with error text captured. It is not approved: one allow is provisional and two cells are untested, and everything was run on synthetic objects. Send the matrix and the captured errors to the security lead with the three gaps named, and repeat the whole run on the real objects once they exist.
+Six of eight expected denies were exercised with error text captured, the outsider's only against the published rate; the other two are listed under gaps. Not approved: one allow is provisional, the gaps are open, and everything ran on synthetic objects. Send the matrix, errors and gaps to the security lead; repeat the run on real objects once they exist.
 
 <!-- section:template -->
 

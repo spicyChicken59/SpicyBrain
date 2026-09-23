@@ -23,33 +23,31 @@ A reporting analyst at the North plant opens the morning dashboard at 7:40 a.m. 
 
 #### The identity
 
-A human user, authenticated through the customer's identity provider by single sign-on. The permissions that apply are the analyst's, through the reporting-analysts group. The nightly job that produced the table ran under a separate workload identity (a service principal); that is a different request path with different permissions and is mapped separately.
+A human user, authenticated through the customer's identity provider by single sign-on. The permissions that apply are the analyst's, through the reporting-analysts group. The nightly job that produced the table ran as a service principal: a different request path with different permissions, mapped separately.
 
 #### Hops, owners and boundaries
 
-| Hop | What happens | Who owns it | Trust boundary crossed |
-|---|---|---|---|
-| 1. Authoring surface | The dashboard issues the saved query | Customer workspace configuration | None |
-| 2. Control plane | The identity is verified; the workspace checks the analyst may use the SQL warehouse; the catalog checks USE CATALOG, USE SCHEMA and SELECT on the accepted table | Platform provider's control plane, using the customer's identity provider | Customer identity provider to provider control plane |
-| 3. Compute | The query runs on a SQL warehouse. If classic, the engine runs in the customer's AWS account inside a VPC the customer configured; if serverless, it runs in provider-managed infrastructure with a connectivity pattern the security lead has not agreed | Customer account (classic) or provider (serverless); not confirmed which | Control plane to compute plane |
-| 4. Storage | The engine reads Delta files from an S3 bucket through a storage credential backed by an IAM role, scoped to an external location for the accepted schema | Customer's AWS account; role trust configured by the customer | Compute plane to customer storage |
-| 5. Result delivery | Rows return to the dashboard in the browser | Provider, then the analyst's network | Compute plane back to the surface |
+| Hop | What happens | Who owns it | Trust boundary crossed | Confirmed or not |
+|---|---|---|---|---|
+| 1. Authoring surface | The dashboard issues the saved query | Customer workspace configuration | None | Query saved; the plant-to-workspace route not confirmed |
+| 2. Control plane | The identity is verified; the workspace checks the analyst may use the SQL warehouse; the catalog checks USE CATALOG, USE SCHEMA and SELECT on the accepted table | Platform provider's control plane, using the customer's identity provider | Customer identity provider to provider control plane | Group, catalog and schema confirmed |
+| 3. Compute | The query runs on a SQL warehouse. If classic, the engine runs in the customer's AWS account inside a VPC the customer configured; if serverless, in provider-managed infrastructure with a connectivity pattern not yet agreed | Customer account (classic) or provider (serverless); not confirmed which | Control plane to compute plane | Not confirmed: classic or serverless, region, private connectivity |
+| 4. Storage | The engine reads Delta files from an S3 bucket through a storage credential backed by an IAM role, scoped to an external location for the accepted schema | Customer's AWS account; role trust configured by the customer | Compute plane to customer storage | Not confirmed: bucket and role |
+| 5. Result delivery | Rows return to the dashboard in the browser | Provider, then the analyst's network | Compute plane back to the surface | Not confirmed: as hop 1 |
+
+The security lead has said that a "classic" or "serverless" label alone does not satisfy them, which is why hop 3 is drawn with both possibilities and neither chosen.
 
 #### Failures you would see at each hop
 
-Hop 2, permission: a definite error naming the analyst and the missing privilege; the fix is a grant, never an administrator token. Hop 3, connectivity: the warehouse fails to start or the query never begins because the subnet has no route or the outbound rule blocks the control plane; a permission grant cannot fix that. Hop 4, permission: the query starts and fails on the bucket with an access error naming the role; the IAM policy or the external location is wrong. Hop 4, connectivity: a timeout reaching the storage endpoint, typically a private-endpoint or DNS matter the customer's network owner must check. Hop 5: the query completes but the browser shows nothing, usually a corporate proxy, not the platform.
-
-#### What is confirmed and what is not
-
-Confirmed: the analyst group exists in the identity provider; the accepted table lives under one catalog and schema; the metric query is saved. Not confirmed: the AWS region; whether the warehouse is classic or serverless; whether the plant network permits outbound connections to the control plane; which S3 bucket and which IAM role; whether private connectivity is required by policy. The security lead has said that a "classic" or "serverless" label alone does not satisfy them, which is why hop 3 is drawn with both possibilities and neither chosen.
+Hop 1: the dashboard reports a missing table because its saved query still names a renamed one; the fix is the query, not a grant. Hop 2, permission: a definite error naming the analyst and the missing privilege; the fix is a grant, never an administrator token. Hop 3, connectivity: the warehouse fails to start or the query never begins because the subnet has no route or the outbound rule blocks the control plane; a grant cannot fix that. Hop 4, permission: the query starts and fails on the bucket with an access error naming the role; the IAM policy or the external location is wrong. Hop 4, connectivity: a timeout reaching the storage endpoint, typically a private-endpoint or DNS matter for the network owner. Hop 5: the query completes but the browser shows nothing, usually a corporate proxy, not the platform.
 
 #### Evidence that would confirm the map
 
-A successful run of the saved query as a test analyst identity with the group's privileges and nothing more. A deliberately denied run as an identity outside the group, with the error text captured. A written statement from the network owner of the route from plant workstations to the workspace and from compute to storage. Until those three exist, this map is a hypothesis for the review, and it says so.
+A successful run of the saved query as a test analyst identity with the group's privileges and nothing more. A deliberately denied run as an identity outside the group, with the error text captured. The network owner's written description of the routes from plant workstations to the workspace and from compute to storage. Until those three exist, this map is a hypothesis for the review.
 
 #### Conclusion
 
-Complete enough to review, not to build on. Hops 3 and 4 carry every unconfirmed item and both belong to the customer's cloud account, so the next conversation is with the security lead and the network owner together, with this drawing in front of them.
+Complete enough to review, not to build on. Hops 3 and 4 carry most unconfirmed items, and hop 3's owner is itself unconfirmed: the customer's account if classic, the provider if serverless. The plant-to-workspace route for hops 1 and 5 is unconfirmed too, so the next conversation covers both paths with the security lead and the network owner, with this drawing in front of them.
 
 <!-- section:template -->
 

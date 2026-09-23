@@ -21,34 +21,34 @@ All timings are fictional observations from a test environment on synthetic reco
 
 The nightly job that resolves inspections and corrections ran in about 6 minutes for the North plant alone. The night after the East plant's export was added, it ran 41 minutes, then 39 and 44 on the following two nights. The 7:30 a.m. report was late twice. Input grew from roughly 40,000 to 95,000 inspection rows per night and from 300 to 700 correction rows; the correction file format did not change. Compute was unchanged: job compute, four workers. No results are cached in this path.
 
-Stage view for the 44-minute run: three stages; the second, a join of inspections to corrections on `inspection_id`, took 38 minutes. Within it, 199 of 200 tasks finished in under 30 seconds; one task ran 37 minutes and spilled to disk. Shuffle size was ordinary for the row count. The first and third stages were unchanged from the fast nights.
+Stage view for the 44-minute run: three stages; the second, the full outer join of inspections to corrections on `inspection_id`, took 38 minutes. Its plan showed a sort-merge join, adaptive execution on and no skew split. Within it, 199 of 200 tasks read about 320 rows each and finished in under 30 seconds; one task read 31,618 rows (4 MB, far below the 256 MB default at which adaptive execution splits a skewed partition), wrote 6.66 million, ran 37 minutes and spilled 2.1 GB. The first and third stages were unchanged from the fast nights.
 
 What could not be seen: the East export's row-level content on the first slow night, because raw retention started the following night.
 
 #### Hypothesis
 
-One join key value carries a very large share of the rows, so one partition does almost all the work: skew on `inspection_id`. The East export is suspected of filling `inspection_id` with a placeholder for rows the ERP has not yet assigned, because the DBA mentioned that East assigns identifiers in a nightly batch. A single key value with tens of thousands of rows would produce exactly one slow, spilling task.
+One join key value carries a large share of the rows on both sides, so one partition does almost all the work and multiplies it: skew on `inspection_id`. The East export is suspected of filling `inspection_id` with a placeholder for rows not yet assigned, because the DBA mentioned that East assigns identifiers in a nightly batch; East's corrections may copy it. Tens of thousands of rows on one side and hundreds on the other under one key would produce exactly one slow, spilling task writing millions of rows.
 
 #### Experiment
 
-Variable changed: rows with the placeholder key are routed to quarantine before the join, as the change-data contract already requires for missing identity, instead of after it. Held fixed: the same retained input snapshot from the 44-minute night, the same job compute, the same code otherwise. Repeated three times. Correctness check: accepted per-line totals and the quarantine count must equal the totals from the unmodified run, and the quarantined rows must be exactly the placeholder-key rows.
+Variable changed: rows with the placeholder key are routed to quarantine before the join, as the change-data contract already requires for missing identity, instead of after it. Held fixed: the same retained input snapshot from the 44-minute night, the same job compute, the same code otherwise. Repeated three times. Correctness check: accepted per-line totals must equal the unmodified run's, and the quarantined records must be exactly the placeholder-key rows.
 
-Before running, the retained East export was checked: 31,406 of 55,000 rows carried `inspection_id` = `0`. The hypothesis was now supported by input evidence, not only by the task shape.
+Before running, the retained East files were checked: 31,406 of 55,000 export rows and 212 of 400 correction rows carried `inspection_id` = `0`, and 31,406 × 212 is the slow task's 6.66 million. The hypothesis was now supported by input evidence, not only by the task shape.
 
 #### Results
 
 | Run | Total | Join stage | Slowest task | Spill | Correctness |
 |---|---|---|---|---|---|
 | Unmodified, retained input | 43 min | 38 min | 37 min | Yes | Reference |
-| Modified, run 1 | 7 min | 2 min | 40 s | No | Totals equal; 31,406 quarantined |
+| Modified, run 1 | 7 min | 2 min | 40 s | No | Totals equal; 31,618 quarantined |
 | Modified, run 2 | 7 min | 2 min | 38 s | No | Equal |
 | Modified, run 3 | 8 min | 2 min | 41 s | No | Equal |
 
 #### Conclusion
 
-Supported: the slowdown was skew from a placeholder join key in the East export, and routing missing-identity rows to quarantine before the join removes it on this input, with identical accepted totals. Not the cause: input volume as such, compute size, or the North plant's rows. Unproven: whether East's placeholder rows receive real identifiers later and should be re-admitted, which is a source-contract question for the DBA and the quality lead; whether production nights with three plants show other skewed keys; and whether the 7-minute figure holds on real volume, which only a measured production run can show. Not recommended: more workers, which would have shortened nothing for one task.
+Supported: the slowdown was skew from a placeholder join key in the East files, and routing missing-identity rows to quarantine before the join removes it on this input, with identical accepted totals. Not the cause: input volume as such, compute size, or the North plant's rows. Unproven: whether East's placeholder rows receive real identifiers later and should be re-admitted, which is a source-contract question for the DBA and the quality lead; whether production nights with three plants show other skewed keys; and whether the 7-minute figure holds on real volume, which only a measured production run can show. Not recommended: more workers, which would have shortened nothing for one task.
 
-The quarantine count of 31,406 is itself a finding for the ingestion decision: more than half of East's export has no identity yet, and the report's exclusion count will say so until the source is fixed.
+The 31,618 quarantined records are themselves a finding for the ingestion decision: more than half of East's export and of its corrections have no identity yet, and the report's exclusion count will say so until the source is fixed.
 
 <!-- section:template -->
 

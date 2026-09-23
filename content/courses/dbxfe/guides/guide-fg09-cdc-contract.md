@@ -6,7 +6,7 @@ Write the contract before the first incremental load and have the source owner r
 2. **Name the ordering field and its owner**: a source revision, a sequence, a commit timestamp. Arrival order is not business order; say what the field means and who validates it.
 3. **Decide what a deletion is**: an explicit delete event, a tombstone flag, or nothing. Absence from a later batch is never a delete unless the source owner has said the batch is a complete snapshot.
 4. **Classify duplicates**: an identical redelivery (count once), redundant evidence of the same key and revision (count once, retain both), and a conflict (same key and revision, different payload). Each gets a rule.
-5. **Write the conflict policy**: whether publication is blocked or the record is withheld, who adjudicates, how the adjudication is recorded, and whether the source is corrected.
+5. **Write the conflict policy**: what a conflict blocks and what the reader sees meanwhile (the course's reliable-data policy blocks the new report and keeps the last verified one visible, labelled stale), who adjudicates, how the adjudication is recorded, and whether the source is corrected.
 6. **Choose the target shape**: current state only, or history with valid-from and valid-to, and how late corrections and tied revisions are represented.
 7. **Test with an authored sequence** covering every rule, with the expected output written by hand.
 
@@ -16,47 +16,47 @@ Go deeper: [ingestion, quality and changing records](#/module/dbxfe-m04), [ident
 
 ### Change-data contract: Cinderline Components (fictional), inspection corrections
 
-Version 1, proposed; the quality lead has agreed the ordering rule and the conflict policy in conversation and not yet in writing.
+Version 1, proposed; the quality lead agreed the ordering rule and the conflict policy in conversation, not yet in writing.
 
 #### Keys
 
-`inspection_id` is the business key and persists through corrections; the quality lead confirms it is never reused. `event_id` identifies one delivered payload and is immutable; the same `event_id` with a different payload is a conflict, not a correction. The target adds no surrogate for the pilot.
+`inspection_id` is the business key and persists through corrections; the quality lead confirms it is never reused. `event_id` identifies one delivered payload and is immutable. The target adds no surrogate for the pilot.
 
 #### Ordering
 
-`version` is a positive integer assigned by the ERP when a correction is approved. Version 3 replaces version 2 completely; it is not a delta of quantities. Arrival order is ignored for ordering because correction files can arrive out of sequence and a nightly rerun re-reads them. A record with a missing, zero or non-integer version cannot be ordered and is quarantined. The DBA has not yet confirmed that the ERP never assigns the same version twice for one inspection; until confirmed, equal versions are treated as described under conflicts.
+`version` is a positive integer: the nightly export delivers an inspection as version 1; each approved correction, which never touches the ERP, carries a higher one in the corrections file. Version 3 replaces version 2 completely; it is not a delta. Arrival order is ignored: correction files arrive out of sequence and reruns re-read them. A record with a missing, zero or non-integer version is quarantined as unorderable; one whose quantities are not non-negative integers with defective at most inspected, as invalid. A re-typed row has already reused a version once, so equal versions are handled under conflicts.
 
 #### Deletions
 
-The source has no delete event. An inspection voided by the plant is delivered as a new version with zero inspected units, which the resolver treats as a replacement state, not a deletion. Absence from a later correction file means nothing, because correction files contain only approved changes. Absence from the nightly inspection export is not treated as a deletion for the pilot; the DBA is asked whether rows are ever physically removed.
+The source has no delete event. A voided inspection arrives as a new version with zero inspected units: a replacement state, not a deletion. Absence from a correction file means nothing; those files carry only approved changes. Absence from the nightly export is not a deletion; the DBA is asked whether rows are ever physically removed.
 
 #### Duplicates
 
 | Case | Rule |
 |---|---|
-| Same `event_id`, identical payload | Identical redelivery; retained in raw, counted once |
+| Same `event_id`, identical payload | Redelivery; retained, counted once |
 | Different `event_id`, same key, same version, identical quantities | Redundant evidence; both retained, one state |
 | Same key, same version, different quantities | Conflict; see policy |
 | Same `event_id`, different payload | Conflict; see policy |
-| Same key, lower version than accepted | Older revision; retained, ignored for current state |
+| Same key, lower version than accepted | Older revision; retained, not current |
 
 #### Conflict policy
 
-A conflict withholds the affected inspection from the accepted current state and lists it in `quarantine.conflicts` with both payloads and their arrival times. It does not block publication of the rest of the plant's rate; the published report shows the count of withheld inspections beside the rate. The quality lead adjudicates by approving a new, higher version in the ERP, which arrives through the ordinary path; no manual edit of the accepted table is permitted. Adjudications are recorded in the quarantine table with the adjudicator and date. Two conflicts in a day for the same line trigger a message to the quality lead before the morning report.
+A conflict blocks any new report. The last verified snapshot stays visible, labelled stale with the reason; with no earlier snapshot the state is "blocked, no snapshot". An inspection whose latest version is invalid after it had a valid state blocks in the same way. Candidate totals meanwhile are diagnostic, never a published rate. Both payloads go to `quarantine.conflicts` with arrival times, and the quality lead is messaged before the morning report. The quality lead adjudicates by recording there which payload was mistyped and approving a higher version through the corrections file; nobody edits the accepted table. Publication resumes only when both exist, because a later version alone does not clear a conflict in retained history.
 
 #### Target shape
 
-For the pilot, current state only: one row per `inspection_id` with the highest valid version. History is retained implicitly in raw and in table history, not modelled. When restatement reporting is required, a history table with valid-from and valid-to by version is added; tied versions cannot occur under this contract because equal versions are conflicts.
+For the pilot, current state only: one row per `inspection_id` with the highest valid version. History stays in raw and table history until restatement reporting needs a valid-from, valid-to table by version. Equal versions either conflict or, with identical quantities, collapse to one state, so no tie reaches the target.
 
 #### Test sequence, expected output authored by hand
 
-Arrivals: `ev1` A v1 10/1; `ev1` A v1 10/1 again; `ev2` B v1 with inspected units −3; `ev3` A v2 12/1; `ev4` C v1 8/0; `ev5` A v3 14/1; `ev5` A v3 15/1; `ev6` A with no version 16/1; `ev7` A v2 12/1.
+Arrivals: `ev1` A v1 10/1; `ev1` A v1 10/1 again; `ev2` B v1 −3/1; `ev3` A v2 12/1; `ev4` C v1 8/0; `ev5` A v3 14/1; `ev5` A v3 15/1; `ev6` E, no version, 16/1; `ev7` A v2 12/1; `ev8` A v3 15/1; `ev9` D v2 0/0; `ev10` D v1 5/0.
 
-Expected: accepted rows are C v1 8/0 only, because A is withheld by the `ev5` conflict; B is quarantined as invalid; `ev6` is quarantined as unorderable; `ev7` is redundant evidence for an already superseded version. Published rate for the day: 0 of 8 inspected units, with two inspections withheld and one invalid, and the counts printed beside it. If the conflict were adjudicated by a v4 for A of 14/1, A would enter as 14/1 and the rate would be 1 of 22.
+Expected: `ev1` counts once; `ev7` is redundant evidence for A's superseded v2. B (invalid) and E (unorderable) are quarantined and, never having been valid, excluded and disclosed. `quarantine.conflicts` holds an event conflict (`ev5`, two payloads) and a key-and-version conflict (A v3: 14/1 against 15/1 in `ev5` and `ev8`), so A is unresolved. D v2 voids D at 0/0; `ev10` is older and ignored. The candidate, C 8/0 plus D 0/0, is a diagnostic 0 of 8, not a published rate: the state is "blocked, no snapshot", with A unresolved and B and E excluded beside it. If the quality lead records the 15/1 payloads as mistyped and approves A v4 14/1, A enters as 14/1 and the published rate is 1 of 22.
 
 #### Conclusion
 
-The contract is executable and its test sequence has a hand-authored answer, so the resolver can be checked against something it did not produce. Two facts remain the source owner's to confirm: version uniqueness and physical deletion. Until then the contract treats both conservatively and says so in the published exclusion counts.
+The test sequence has a hand-authored answer, so the resolver is checked against something it did not produce. Still to confirm: whether approval can stop a re-typed row reusing a version (the quality lead) and whether rows are ever physically removed (the DBA); until then both are treated conservatively.
 
 <!-- section:template -->
 
@@ -81,7 +81,7 @@ The contract is executable and its test sequence has a hand-authored answer, so 
 
 #### Conflict policy
 
-- What is withheld and what still publishes; who adjudicates and through which path; how adjudications are recorded; what triggers a message and to whom.
+- What a conflict blocks and what the reader sees meanwhile; who adjudicates and through which path; how adjudications are recorded and when publication resumes; what triggers a message and to whom.
 
 #### Target shape
 

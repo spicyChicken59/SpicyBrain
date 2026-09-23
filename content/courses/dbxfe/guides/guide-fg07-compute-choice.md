@@ -19,17 +19,17 @@ All figures are fictional observations from the five-day baseline or stated assu
 
 #### Workload 1: the nightly resolution job
 
-**Pattern.** A scheduled batch: read the day's extract of inspections and the correction export, resolve revisions, quarantine conflicts, write the accepted table. Runs once after the ERP export, which the DBA says completes before 6:00 a.m. (stated, not measured). Idle the rest of the day. The synthetic run processed a few thousand rows in under two minutes on a small local engine; the real volume for one plant is estimated by the data lead at tens of thousands of rows per day, not measured.
+**Pattern.** A scheduled batch: read the day's extract of inspections and the correction export, resolve revisions, quarantine conflicts, write the accepted table. Runs once after the ERP export, which the DBA says completes before 6:00 a.m. Idle the rest of the day. The synthetic run processed a few thousand rows in under two minutes on a small local engine; the data lead estimates one plant's real volume at tens of thousands of rows per day.
 
 **Concurrency.** One run. A rerun after a failure must not overlap the scheduled run.
 
-**Latency tolerance.** The accepted table must exist by 7:30 a.m.; the job may take an hour. Startup time is irrelevant at this tolerance.
+**Latency tolerance.** The accepted table must exist by 7:30 a.m. The job starts at 6:45 to absorb an export up to 45 minutes late, and publishing takes about five minutes, so the run itself may take 40 minutes, startup included.
 
-**Choice.** Job compute created for the run and terminated after it, single small node class, no autoscaling, with a retry policy and a lock so a rerun waits for a running instance. Serverless job compute is the alternative if the security lead accepts its connectivity pattern; it removes the startup and node-class decisions but that is not yet permitted.
+**Choice.** Job compute created for the run and terminated after it, single small node class, no autoscaling, with a retry policy and a lock so a rerun waits for a running instance. Serverless job compute is the alternative if the security lead accepts its connectivity pattern; it removes the startup and node-class decisions, and is not yet permitted.
 
-**Operational limits.** The data team owns the job definition; only the platform administrators change the compute policy. Usage is tagged to the pilot. Cloud quota for the instance family is not confirmed.
+**Operational limits.** The data team owns the job definition; only the platform administrators change the compute policy. Usage is tagged to the pilot. Cloud quota for the instance family is not confirmed. A failed run pages the operator, not yet named.
 
-**Evidence that would change this.** A measured run over real volume longer than 40 minutes (the margin to 7:30 disappears); an export finishing later than 6:30 a.m. on any test day; a second plant joining, at which point the run either partitions by plant or grows.
+**Evidence that would change this.** A measured run over real volume longer than 40 minutes (the margin to 7:30 disappears); an export finishing after 6:45 a.m. on any test day; a second plant joining, at which point the run either partitions by plant or grows.
 
 #### Workload 2: the morning report
 
@@ -39,11 +39,15 @@ All figures are fictional observations from the five-day baseline or stated assu
 
 **Latency tolerance.** The operations director tolerates "a few seconds after opening the page" and would not accept a minute. The baseline measured the existing SQL Server report at 15 to 45 seconds depending on the morning; users say the variance is the annoyance.
 
-**Choice.** One small SQL warehouse, auto-stop after the morning window, scaled for four concurrent queries with headroom for eight. Because the window is predictable, a scheduled start ten minutes before 7:30 avoids a cold start for the first user; that choice is recorded as an assumption to test. Serverless would remove the start question entirely and is the preferred alternative once policy allows it.
+**Choice.** One small SQL warehouse that auto-stops after 10 idle minutes, so around 8:25, scaled for four concurrent queries with headroom for eight. Because the window is predictable, a scheduled start at 7:25 avoids a cold start for the first user. Serverless would remove the start question and is preferred once policy allows it.
 
-**Operational limits.** Analysts cannot resize the warehouse. The dashboard's refresh is scheduled once after the nightly job completes, so the morning queries hit cached results where the platform permits and are not re-executed thirty times.
+**Operational limits.** Analysts cannot resize the warehouse. The dashboard's refresh is scheduled once after the nightly job completes, so the morning queries hit cached results where the platform permits and are not re-executed for each of the eleven viewers. A failed refresh notifies the operator.
 
 **Evidence that would change this.** Queue time above five seconds in the busiest minute on more than one test day; queries other than the saved five appearing in the history, which would mean the pattern is not what was assumed; a second plant doubling the concurrent load.
+
+#### Assumptions
+
+Export done by 6:00 a.m. (the DBA; not measured); tens of thousands of rows a day (the data lead; not measured); four overlapping queries (measured, five baseline days); the 7:25 start avoiding a cold first query (untested).
 
 #### What was not chosen and why
 

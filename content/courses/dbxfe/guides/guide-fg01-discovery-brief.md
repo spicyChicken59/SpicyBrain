@@ -27,13 +27,13 @@ At the 8 a.m. meeting each plant's supervisors choose which production line to i
 
 #### Reported facts, attributed
 
-| Statement | Source | Measured? |
-|---|---|---|
-| About 20 hours a week go to reconciling the two reports | Plant analyst, self-estimate | No |
-| Investigation choices happen at shift change | Operations director | No, stated from memory |
-| Inspection records reach the ERP promptly; quality corrections are approved in periodic batches | DBA | Partly: batch approval confirmed, timing not |
-| No source path to any cloud environment is approved | Security lead | Yes, by policy |
-| Three plants; ERP on SQL Server; corrections arrive as CSV exports; sensor events held separately | Data lead | Yes, by inventory |
+| Statement | Source | Date heard | Measured? |
+|---|---|---|---|
+| The analyst spends about six hours a week reconciling the two reports | Plant analyst, self-estimate | 5 March | No |
+| Investigation choices happen at shift change | Operations director | 4 March | No, stated from memory |
+| Inspection records reach the ERP promptly; quality corrections are approved in periodic batches | DBA, relayed by the data lead | 5 March | Partly: batch approval confirmed, timing not |
+| No source path to any cloud environment is approved | Security lead | 5 March | Yes, by policy |
+| Three plants; ERP on SQL Server; corrections arrive as CSV exports; sensor events held separately | Data lead | 5 March | Yes, by inventory |
 
 #### Assumptions found in the request
 
@@ -41,23 +41,27 @@ That hourly freshness would improve the morning choice (nobody has tested a dail
 
 #### Stakeholders and their stake
 
-Operations director: funds a next step only if the metric is trusted and someone maintains the feed. Quality lead: owns the metric definition and the correction policy. Data lead: can prepare approved synthetic records now; two engineers part time. Security lead: requires classification, named identities and a reviewed source-to-cloud path before any real data moves. DBA: holds the SQL Server version, topology and change-capture permission. Sponsor: has set a planning ceiling for pilot usage and labelled it unapproved.
+Operations director: funds a next step only if the metric is trusted and someone maintains the feed. Quality lead: owns the metric definition and the correction policy. Data lead: can prepare approved synthetic records now; two engineers part time. Security lead: requires classification, named identities and a reviewed source-to-cloud path before any real data moves. DBA: holds the SQL Server version, topology and change-capture permission. Sponsor: holds the planning ceiling.
 
 #### Constraints
 
-No real data until the security review completes. Synthetic samples are available now. No named operator for a failed feed. The cloud region and connectivity pattern are not agreed. Any pilot must keep the existing morning report running.
+No real data until the security review completes. Synthetic samples are available now. No named operator for a failed feed. The cloud region and connectivity pattern are not agreed. Any pilot must keep the existing morning report running. The sponsor's planning ceiling is unapproved, so nothing that spends can start. The number is needed before 8 a.m. daily; no pilot date is set.
 
 #### Unknowns, ranked by what they change
 
 1. What is the defect-rate denominator, and what is the business-day boundary? Changes the metric and both reports. Quality lead.
-2. How are corrections identified and ordered, and are historical reports restated? Changes the ingestion design. Quality lead with the DBA.
+2. How are corrections identified and ordered, and are historical reports restated? Changes the ingestion design. Quality lead.
 3. Which SQL Server version and topology, and is change capture permitted? Changes the source path. DBA.
 4. What is the classification of inspection data and which network path is permitted? Changes whether a pilot may use real data at all. Security lead.
-5. Who operates a failed feed on a Monday morning? Changes whether the sponsor will fund anything. Operations director with the data lead.
+5. Who operates a failed feed on a Monday morning? Changes whether the sponsor will fund anything. Data lead.
 
 #### Proposed next step
 
 Subject to agreement, measure one plant for five staffed days before building anything: the time from approved source availability to the report, and the number of days the two reports disagree and by how much. This is a baseline, not a benefit. The data lead validates the measurement, operations accepts whether the disagreement count matches experience, security accepts the sample scope. If daily data is sufficient for the morning decision, the alternative to compare is a reliable scheduled report, not a streaming design.
+
+#### What would stop this
+
+No metric definition both reports' users accept, no operator for a failed feed, or no source path the security review permits.
 
 #### Conclusion
 
