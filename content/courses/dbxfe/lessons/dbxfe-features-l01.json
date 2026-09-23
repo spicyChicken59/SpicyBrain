@@ -1,0 +1,680 @@
+{
+ "id": "dbxfe-features-l01",
+ "title": "Features, point-in-time correctness and data contracts",
+ "summary": "Give each feature row the time it describes and the time it became usable, join training rows as of their prediction times, handle missing values by cause in both paths, and map the mechanism onto Databricks Feature Store with its caveats.",
+ "contentVersion": "1.0.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 22,
+ "objectives": [
+  "Identify a feature row's entity key, window, availability time and the label times it must be joined against.",
+  "Build and check a point-in-time join, and explain event-time joins, latest-value lookups and backfills as leaks.",
+  "Apply a missingness, contract and consistency discipline across training and serving, and choose batch or online delivery."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Machine learning",
+  "Features",
+  "Point-in-time joins",
+  "Training and serving",
+  "Data contracts",
+  "Databricks Feature Store",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-features-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-features-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-features-l01-feature-concept",
+    "dbxfe-features-l01-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-start",
+   "kind": "prerequisites",
+   "title": "Before you start",
+   "conceptIds": [
+    "dbxfe-features-l01-feature-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-feature",
+   "kind": "mechanism",
+   "title": "A feature row and its keys",
+   "conceptIds": [
+    "dbxfe-features-l01-feature-concept",
+    "dbxfe-features-l01-entity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-times",
+   "kind": "mechanism",
+   "title": "Two times on every row",
+   "conceptIds": [
+    "dbxfe-features-l01-availability-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-join",
+   "kind": "mechanism",
+   "title": "The point-in-time join",
+   "conceptIds": [
+    "dbxfe-features-l01-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-asof",
+    "dbxfe-features-course-claim-pit"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-missing",
+   "kind": "mechanism",
+   "title": "Missing values by cause",
+   "conceptIds": [
+    "dbxfe-features-l01-missing-concept",
+    "dbxfe-features-l01-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-contract",
+   "kind": "mechanism",
+   "title": "Contracts, duplicates and late versions",
+   "conceptIds": [
+    "dbxfe-features-l01-contract-concept",
+    "dbxfe-features-l01-version-concept",
+    "dbxfe-features-l01-entity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-constraints"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-serving",
+   "kind": "mechanism",
+   "title": "Training, serving, batch and online",
+   "conceptIds": [
+    "dbxfe-features-l01-skew-concept",
+    "dbxfe-features-l01-delivery-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-skew"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-platform",
+   "kind": "mechanism",
+   "title": "On Databricks, after the mechanism",
+   "conceptIds": [
+    "dbxfe-features-l01-store-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-store",
+    "dbxfe-features-course-claim-pit",
+    "dbxfe-features-course-claim-online"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-example",
+   "kind": "example",
+   "title": "Worked example: one prediction, three joins",
+   "conceptIds": [
+    "dbxfe-features-l01-pit-concept",
+    "dbxfe-features-l01-availability-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-asof"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-exercise",
+   "kind": "exercise",
+   "title": "Try it",
+   "conceptIds": [
+    "dbxfe-features-l01-pit-concept",
+    "dbxfe-features-l01-missing-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-solution",
+   "kind": "solution",
+   "title": "Solution",
+   "conceptIds": [
+    "dbxfe-features-l01-pit-concept",
+    "dbxfe-features-l01-missing-concept",
+    "dbxfe-features-l01-version-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-mistakes",
+   "kind": "mistakes",
+   "title": "Mistakes to catch",
+   "conceptIds": [
+    "dbxfe-features-l01-skew-concept",
+    "dbxfe-features-l01-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-constraints"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-sources",
+   "kind": "sources",
+   "title": "Sources and their limits",
+   "conceptIds": [
+    "dbxfe-features-l01-store-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-store",
+    "dbxfe-features-course-claim-pit",
+    "dbxfe-features-course-claim-online",
+    "dbxfe-features-course-claim-asof"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-related",
+   "kind": "related",
+   "title": "Related",
+   "conceptIds": [
+    "dbxfe-features-l01-feature-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-features-l01-revisit",
+   "kind": "revisit",
+   "title": "Revisit",
+   "conceptIds": [
+    "dbxfe-features-l01-availability-concept",
+    "dbxfe-features-l01-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-features-l01-q1",
+   "revision": "1",
+   "prompt": "Cinderline's job publishes the (08:00, 10:00] window at 10:30. Which feature row should a training example for PR-02 at 10:15 receive?",
+   "options": [
+    {
+     "id": "dbxfe-features-l01-q1-a",
+     "text": "The 10:00 window, because it ended before 10:15.",
+     "rationale": "It ended before 10:15 but was published at 10:30; using it is the event-time leak."
+    },
+    {
+     "id": "dbxfe-features-l01-q1-b",
+     "text": "No row, because the newest window is not yet available.",
+     "rationale": "An older window was available; none_available applies only when nothing was published."
+    },
+    {
+     "id": "dbxfe-features-l01-q1-c",
+     "text": "The 08:00 window, published at 08:30 and 135 minutes old.",
+     "rationale": "It is the newest row published by 10:15, which is what a live model would have read."
+    },
+    {
+     "id": "dbxfe-features-l01-q1-d",
+     "text": "The 10:00 window, provided the model is retrained after 10:30.",
+     "rationale": "Retraining later does not change what existed at 10:15, the moment the training row represents."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-l01-q1-c",
+   "conceptIds": [
+    "dbxfe-features-l01-pit-concept",
+    "dbxfe-features-l01-availability-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-asof"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-q2",
+   "revision": "1",
+   "prompt": "Serving fills a missing vibration value with 0.0, while the training set kept it null. Which statement is accurate?",
+   "options": [
+    {
+     "id": "dbxfe-features-l01-q2-a",
+     "text": "This is training/serving skew: in production the model receives a measured zero where it only ever saw 'not measured'.",
+     "rationale": "The two paths encode the same absence differently, so the model's inputs differ for the same moment."
+    },
+    {
+     "id": "dbxfe-features-l01-q2-b",
+     "text": "It is harmless, because 0.0 and null both mean low vibration.",
+     "rationale": "Null means nothing was measured; 0.0 claims a perfectly smooth press."
+    },
+    {
+     "id": "dbxfe-features-l01-q2-c",
+     "text": "It only matters if vibration is the model's most important feature.",
+     "rationale": "Any feature's values differing between paths changes predictions in ways training never measured."
+    },
+    {
+     "id": "dbxfe-features-l01-q2-d",
+     "text": "Filling training nulls with the training mean fixes it.",
+     "rationale": "Serving would still send 0.0; the paths would differ in a new way."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-l01-q2-a",
+   "conceptIds": [
+    "dbxfe-features-l01-skew-concept",
+    "dbxfe-features-l01-missing-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-skew"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-q3",
+   "revision": "1",
+   "prompt": "A backfill recomputes last month's windows once from all readings and stamps each with its window end plus 30 minutes. What is the risk?",
+   "options": [
+    {
+     "id": "dbxfe-features-l01-q3-a",
+     "text": "None: the values are more complete than the live ones.",
+     "rationale": "More complete than what a live model had is exactly the problem for training."
+    },
+    {
+     "id": "dbxfe-features-l01-q3-b",
+     "text": "Only storage cost, because the table is recomputed.",
+     "rationale": "The cost is secondary; the timing claim of each row is wrong."
+    },
+    {
+     "id": "dbxfe-features-l01-q3-c",
+     "text": "Only performance, because the recomputation is slow.",
+     "rationale": "Speed is not the defect; the stamped availability times are."
+    },
+    {
+     "id": "dbxfe-features-l01-q3-d",
+     "text": "Rows that include late readings claim availability before those readings arrived, so some training rows use future data.",
+     "rationale": "The lineage timestamp exposes it: a row stamped 10:30 that used an 11:05 reading."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-l01-q3-d",
+   "conceptIds": [
+    "dbxfe-features-l01-version-concept",
+    "dbxfe-features-l01-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-constraints"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-features-l01-card1",
+   "revision": "1",
+   "prompt": "What identifies one row of Cinderline's two-hour sensor feature table?",
+   "answer": "The machine_id and the window end (feature_time), plus available_at when versions exist.",
+   "explanation": "The value, such as temp_mean_2h 70.0, is what the row says; the entity key and the window it describes are what it is about. Once late data can republish a window, the publication time joins the key so each version stays distinct.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-feature",
+   "conceptIds": [
+    "dbxfe-features-l01-feature-concept",
+    "dbxfe-features-l01-entity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card2",
+   "revision": "1",
+   "prompt": "Why can a 10:15 prediction not use the window that ended at 10:00?",
+   "answer": "The job published that window at 10:30, so at 10:15 the row did not exist for any model.",
+   "explanation": "A window's end is the time it describes, not the time it became usable. Cinderline publishes 30 minutes after each window closes, so any prediction between 10:00 and 10:30 must use an older window or none.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-times",
+   "conceptIds": [
+    "dbxfe-features-l01-availability-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card3",
+   "revision": "1",
+   "prompt": "Which merge_asof settings express 'newest row published by the prediction time, same machine'?",
+   "answer": "left_on prediction_time, right_on available_at, by machine_id, direction backward, both frames sorted by their keys.",
+   "explanation": "Backward selects the last right-hand row whose key is at or before the left key; by keeps rows within one machine; allow_exact_matches, true by default, admits a row published exactly at the prediction time.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-join",
+   "conceptIds": [
+    "dbxfe-features-l01-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-asof"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card4",
+   "revision": "1",
+   "prompt": "When is 'each machine's newest row' the right feature lookup, and when is it a leak?",
+   "answer": "Right at request time, when the prediction time is now; a leak when used to build historical training rows.",
+   "explanation": "Online serving reads the newest published row and nothing later can exist. Applied to history, the same lookup hands a 09:00 row values published at 12:30; in the lab it was wrong for seven of eleven rows.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-join",
+   "conceptIds": [
+    "dbxfe-features-l01-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-pit"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card5",
+   "revision": "1",
+   "prompt": "What does a label keyed 'pr-02' instead of 'PR-02' do to a point-in-time join?",
+   "answer": "It matches no feature row, so every feature looks missing; the contract should refuse it as an unknown entity key.",
+   "explanation": "Entity keys must match exactly across labels, features and requests. A case mismatch masquerades as missingness and quietly removes a machine from training, so keys are validated against an entity registry before joining.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-contract",
+   "conceptIds": [
+    "dbxfe-features-l01-entity-concept",
+    "dbxfe-features-l01-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card6",
+   "revision": "1",
+   "prompt": "Predict the status of PR-03 at 13:00 when its only window ends at 10:00 under a 180-minute limit.",
+   "answer": "ok: the age is exactly 180 minutes and the limit is inclusive; at 13:30 the same row is stale.",
+   "explanation": "Age is prediction time minus window end. The boundary is part of the missingness policy and must be identical in training and serving, or a row can be usable in one path and a fallback in the other.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-missing",
+   "conceptIds": [
+    "dbxfe-features-l01-freshness-concept",
+    "dbxfe-features-l01-missing-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card7",
+   "revision": "1",
+   "prompt": "Which contract rule refuses a backfilled row stamped 10:30 that used a reading ingested at 11:05?",
+   "answer": "The lineage rule: a row's latest input ingestion time may not be later than its stated availability time.",
+   "explanation": "A one-pass backfill stamps nominal publication times on values computed from all data. Only the recorded ingestion time of the inputs reveals the contradiction, so the column must be written when rows are created.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-contract",
+   "conceptIds": [
+    "dbxfe-features-l01-contract-concept",
+    "dbxfe-features-l01-version-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-constraints"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card8",
+   "revision": "1",
+   "prompt": "Why did the drifted serving port agree with the training code on the 08:30 run?",
+   "answer": "By 08:30 no reading on a window boundary and no missing vibration value had arrived, so neither drift was exercised.",
+   "explanation": "A consistency check proves agreement only on the inputs it compares. At 10:30 the boundary reading and the missing values expose both drifts, which is why the check's fixture must contain every edge case the contract names.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-serving",
+   "conceptIds": [
+    "dbxfe-features-l01-skew-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-skew"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card9",
+   "revision": "1",
+   "prompt": "After the late reading, why does the 11:00 prediction keep 77.0 while 11:45 gets 78.0?",
+   "answer": "Version 2 of the 10:00 window was published at 11:30; only predictions after that can use it.",
+   "explanation": "The late 09:50 reading was ingested at 11:05. A point-in-time join picks, among rows published by each prediction time, the newest window and then its newest version, so each prediction keeps what existed at its moment.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-contract",
+   "conceptIds": [
+    "dbxfe-features-l01-version-concept",
+    "dbxfe-features-l01-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card10",
+   "revision": "1",
+   "prompt": "What does a second model reuse from a shared feature table, and what must it own itself?",
+   "answer": "It reuses definitions, the contract and published rows; it owns its decision times, freshness limit and cutoff.",
+   "explanation": "Cinderline's handover model reads the same rows but predicts on the hour with a 90-minute limit, so every row is 120 minutes old. The fix is its schedule or decision time, not a different join or a recomputed table.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-missing",
+   "conceptIds": [
+    "dbxfe-features-l01-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-store"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card11",
+   "revision": "1",
+   "prompt": "Contrast batch and online feature delivery for a 06:00 list and a press-side alert.",
+   "answer": "The list is batch scoring over the offline table; the alert needs online lookup plus on-demand request inputs.",
+   "explanation": "Delivery follows decision timing. Batch freshness equals the schedule and fails silently when a run is skipped; online freshness equals the sync cadence and fails silently when a sync stalls, so each path needs its own monitoring.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-serving",
+   "conceptIds": [
+    "dbxfe-features-l01-delivery-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-online"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card12",
+   "revision": "1",
+   "prompt": "What must a Databricks time series table's timestamp key hold when values publish with a delay?",
+   "answer": "The time each value became usable, or lookups prior to a prediction time will return values not yet published.",
+   "explanation": "The documented lookup returns the latest value prior to each timestamp, by the timestamp key alone. If the key holds the window end, a 10:15 lookup returns the 10:00 window published at 10:30, the same leak as the event-time join.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-platform",
+   "conceptIds": [
+    "dbxfe-features-l01-store-concept",
+    "dbxfe-features-l01-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-pit"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card13",
+   "revision": "1",
+   "prompt": "What does lookback_window do in training that it does not do in online inference?",
+   "answer": "It excludes values older than the window in training and batch inference; online inference always serves the latest value.",
+   "explanation": "A row training treats as missing because it is too old can still be served online. The caller must carry the value's timestamp and apply the same age rule, or the model meets stale inputs it never saw in training.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-platform",
+   "conceptIds": [
+    "dbxfe-features-l01-freshness-concept",
+    "dbxfe-features-l01-store-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-features-course-claim-pit",
+    "dbxfe-features-course-claim-online"
+   ]
+  },
+  {
+   "id": "dbxfe-features-l01-card14",
+   "revision": "1",
+   "prompt": "Which result shows that a point-in-time guard actually works?",
+   "answer": "The guard refusing deliberately leaky joins by name, then passing the real pipeline on the same inputs.",
+   "explanation": "A guard that never failed proves nothing. In the lab the event-time join is refused for two named rows and the latest-value lookup for seven, while the point-in-time join passes; a stable accuracy score shows none of this.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-example",
+   "conceptIds": [
+    "dbxfe-features-l01-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,333 @@
+{
+  "module": {
+    "id": "dbxfe-features",
+    "title": "Features, point-in-time correctness and data contracts",
+    "summary": "Give every feature row an entity, the time it describes and the time it became usable; build point-in-time training sets, handle missing values by cause, keep training and serving on one transformation, and map the mechanism onto Databricks Feature Store capabilities with their caveats.",
+    "objectives": [
+      "Define a feature by entity, window, transformation and inputs, and write a feature contract whose keys, time meanings, null semantics and bounds are checked by code.",
+      "Build a point-in-time training set joined on availability time and diagnose event-time joins, latest-value lookups and overwrite backfills as future-data leakage.",
+      "Apply one missingness and freshness policy in training and serving, detect skew with edge-case consistency checks, and choose batch or online delivery from the decision."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m07"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-features-l01.json"
+    ],
+    "scenarioId": "dbxfe-features-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-features-scenario",
+      "title": "Review Cinderline's failure-warning features before the pilot",
+      "context": "Fictional Cinderline Components wants a four-hour failure warning for its press line. A data scientist reports that validation recall rose from 0.41 to 0.78 (synthetic figures) after the training join was switched to a current_features view. The feature job publishes two-hour windows at half past each hour; a gateway delivers some readings hours late; last month's history was rebuilt by a one-pass backfill. A serving team has ported the transformation to a separate service. Operations wants a press-side alert and a 06:00 maintenance list. No workspace, region, runtime or feature entitlement has been confirmed.",
+      "task": "Write a one-page feature review for the model owner: what the recall jump most likely measures and how to confirm it, the point-in-time join and its guard, the missingness policy, how late data and the backfill are handled, how training and serving are kept consistent, batch or online delivery for each decision, the Databricks capabilities to verify, and what remains unknown.",
+      "requirements": [
+        "Explain the recall jump in terms of which rows received values published after their prediction times, and name the evidence that would confirm it.",
+        "Specify the point-in-time join on availability time with a future-information guard, a lineage check and versioned late data.",
+        "Give a missingness and freshness policy by cause with identical training and serving behaviour.",
+        "Choose delivery for the 06:00 list and the press-side alert, and say how served features will be compared with training features.",
+        "Mark platform capabilities, preview status, runtime versions and entitlement as verification items and claim no measured latency or cost."
+      ],
+      "model": "### What the recall jump measures\nA current_features view gives every historical row each machine's newest values, published after most prediction times. The jump most likely measures future-data leakage. Confirm it by joining on availability time and running a guard that names every row using a value published after its prediction; expect lower, honest recall.\n\n### Join and late data\nEach training row takes, among rows published by its prediction time, the newest window and then its newest version. Late readings append versions; nothing is rewritten. The backfill is rejected: its rows carry nominal publication times, so every window is recomputed by replaying the schedule, and a lineage rule refuses any row whose inputs arrived after its stated availability.\n\n### Missingness and consistency\nNo row yet and older-than-limit rows are excluded in training and get a fallback in serving; empty columns stay null; unknown keys are refused. The service must import the training transformation or pass a consistency check on a fixture with a boundary reading, a missing value and a late reading, and on logged serving values.\n\n### Delivery\nThe 06:00 list is batch scoring. The alert is an online lookup that returns each value's timestamp and enforces the same age limit in the caller, because online inference ignores the lookback window.\n\n### Verify before promising\nUnity Catalog time series feature tables, online stores, automatic lookup and any Feature View use depend on runtime, region, entitlement and preview terms; none has been checked. Unknown: the rate of late readings and whether the rebuilt month can be replayed from raw ingestion times.",
+      "reasoning": "The review turns an attractive number into a testable hypothesis, fixes the join and the history before anything is trained, keeps one policy across both paths, and treats every platform feature as a verification item rather than a promise. A mixed outcome is honest: recall will likely fall, and the pilot is better for it.",
+      "rubric": [
+        {
+          "id": "dbxfe-features-scenario-rubric-1",
+          "criterion": "Leak diagnosis",
+          "weak": "Accepts the recall jump or credits the model.",
+          "partial": "Names leakage but not which rows leak or how to confirm it.",
+          "strong": "Identifies rows given values published after their predictions, proposes the guard and a failing test, and expects lower, honest recall."
+        },
+        {
+          "id": "dbxfe-features-scenario-rubric-2",
+          "criterion": "Join, versions and history",
+          "weak": "Joins on window end or keeps the current view.",
+          "partial": "Joins on availability but overwrites late data or keeps the backfill.",
+          "strong": "Newest window then newest version among published rows, appended versions, the backfill replayed and refused by a lineage rule."
+        },
+        {
+          "id": "dbxfe-features-scenario-rubric-3",
+          "criterion": "Missingness and consistency",
+          "weak": "Fills nulls with zero; the ported service is untested.",
+          "partial": "A policy exists but differs between paths or ignores that online inference skips the lookback window.",
+          "strong": "Policy by cause, the same limit in both paths, and consistency checks on edge-case fixtures and on logged served values."
+        },
+        {
+          "id": "dbxfe-features-scenario-rubric-4",
+          "criterion": "Delivery and platform honesty",
+          "weak": "Recommends online for everything and promises latency.",
+          "partial": "Sensible delivery choice, but capabilities stated as available.",
+          "strong": "Batch for the list, online with an enforced age rule for the alert, every capability and preview marked for verification."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can the gateway team tell us when late readings arrived?",
+          "response": "Yes. Every reading carries ingested_at. The team says delays over an hour happen a few times a week; nobody has measured the rate."
+        },
+        {
+          "question": "Was last month's backfill run with the scheduled job's code?",
+          "response": "The same aggregation code, run once over the whole month, stamping each window with its end plus 30 minutes."
+        },
+        {
+          "question": "Does the ported service have tests against the Python job?",
+          "response": "One smoke test on a single morning's data, which passed."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-features-l01"
+      ],
+      "claimIds": [
+        "dbxfe-fact-leakage",
+        "dbxfe-fact-ml",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-features-course-claim-store",
+        "dbxfe-features-course-claim-pit",
+        "dbxfe-features-course-claim-online",
+        "dbxfe-features-course-claim-constraints",
+        "dbxfe-features-course-claim-asof",
+        "dbxfe-features-course-claim-skew"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-features-course-source-store",
+      "title": "Databricks Feature Store",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; feature tables and Feature Views in Unity Catalog.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Feature Views are Public Preview; entitlement and region must be verified. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-features-course-source-pit",
+      "title": "Point-in-time feature joins",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/time-series",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; time series feature tables and lookups.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Runtime and client versions apply; test the boundary behaviour at equal timestamps. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-features-course-source-online",
+      "title": "Databricks Online Feature Stores",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/online-feature-store",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Lakebase-backed online stores synced from Unity Catalog feature tables.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Region, capacity and pricing unverified; nothing was provisioned. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-features-course-source-constraints",
+      "title": "Constraints on Databricks",
+      "url": "https://docs.databricks.com/aws/en/tables/constraints",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Delta Lake constraints.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Constraint behaviour differs by table type. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-features-course-source-asof",
+      "title": "pandas.merge_asof",
+      "url": "https://pandas.pydata.org/docs/reference/api/pandas.merge_asof.html",
+      "publisher": "pandas development team",
+      "type": "official documentation",
+      "context": "pandas 3.0.x API; independent of cloud.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Library semantics only; Lab L18 pins pandas 3.0.6. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-features-course-source-rules",
+      "title": "Rules of Machine Learning",
+      "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+      "publisher": "Google for Developers",
+      "type": "primary reference",
+      "context": "Production machine-learning engineering guidance; not Databricks-specific.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Practitioner guidance from one organization. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-features-course-claim-store",
+      "description": "Databricks Feature Store registers features in Unity Catalog with lineage, point-in-time joins and online serving; any Delta table in Unity Catalog with a primary key can be a feature table; Feature Views, which Databricks computes and manages, are Public Preview.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-features-course-source-store"
+      ],
+      "context": "Databricks on AWS; availability varies by region, runtime and entitlement."
+    },
+    {
+      "id": "dbxfe-features-course-claim-pit",
+      "description": "A point-in-time lookup returns the latest feature values prior to each row's timestamp_lookup_key value, or null; lookback_window excludes older values during training and batch inference, while online inference always uses the latest value.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-features-course-source-pit"
+      ],
+      "context": "Databricks on AWS; availability varies by region, runtime and entitlement."
+    },
+    {
+      "id": "dbxfe-features-course-claim-online",
+      "description": "Online Feature Stores sync offline Unity Catalog feature tables with TRIGGERED, CONTINUOUS or SNAPSHOT publish modes, and Model Serving can look up the most recent published values automatically.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-features-course-source-online"
+      ],
+      "context": "Databricks on AWS; availability varies by region, runtime and entitlement."
+    },
+    {
+      "id": "dbxfe-features-course-claim-constraints",
+      "description": "Primary key constraints on Databricks are informational and not enforced; CHECK constraints are enforced by Delta Lake.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-features-course-source-constraints"
+      ],
+      "context": "Databricks on AWS; availability varies by region, runtime and entitlement."
+    },
+    {
+      "id": "dbxfe-features-course-claim-asof",
+      "description": "pandas merge_asof with direction='backward' picks the last right-hand row whose key is less than or equal to the left key, within `by` groups, on inputs sorted by the key.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-features-course-source-asof"
+      ],
+      "context": "pandas 3.0.x; executed locally in Lab L18."
+    },
+    {
+      "id": "dbxfe-features-course-claim-skew",
+      "description": "Training-serving skew comes from differences between how training and serving pipelines handle data; sharing code and monitoring a fraction of traffic reduce it.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-features-course-source-rules"
+      ],
+      "context": "General production-ML guidance."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-features-l01-feature-concept",
+      "term": "feature",
+      "aliases": [
+        "feature row"
+      ],
+      "definition": "A value computed by a transformation for one entity as of one time.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-feature"
+    },
+    {
+      "id": "dbxfe-features-l01-entity-concept",
+      "term": "entity key",
+      "aliases": [
+        "lookup key"
+      ],
+      "definition": "The column naming what a feature describes; it must match exactly across tables.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-feature"
+    },
+    {
+      "id": "dbxfe-features-l01-availability-concept",
+      "term": "availability time",
+      "aliases": [
+        "available_at"
+      ],
+      "definition": "The first moment a feature value could be read by a consumer.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-times"
+    },
+    {
+      "id": "dbxfe-features-l01-pit-concept",
+      "term": "point-in-time join",
+      "aliases": [
+        "as-of join"
+      ],
+      "definition": "A join giving each labelled row the newest value available by its prediction time.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-join"
+    },
+    {
+      "id": "dbxfe-features-l01-missing-concept",
+      "term": "missingness policy",
+      "aliases": [
+        "null handling"
+      ],
+      "definition": "A rule per cause of a missing value, identical in training and serving.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-missing"
+    },
+    {
+      "id": "dbxfe-features-l01-freshness-concept",
+      "term": "feature freshness",
+      "aliases": [
+        "staleness"
+      ],
+      "definition": "The age of a feature value at use, judged against a consumer's limit.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-missing"
+    },
+    {
+      "id": "dbxfe-features-l01-contract-concept",
+      "term": "feature contract",
+      "aliases": [
+        "data contract"
+      ],
+      "definition": "The producer's checkable promise about keys, time meanings, nulls and bounds.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-contract"
+    },
+    {
+      "id": "dbxfe-features-l01-version-concept",
+      "term": "feature version",
+      "aliases": [
+        "late-arriving data"
+      ],
+      "definition": "An appended row with a later availability time after late inputs change a value.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-contract"
+    },
+    {
+      "id": "dbxfe-features-l01-skew-concept",
+      "term": "training/serving skew",
+      "aliases": [
+        "training-serving skew"
+      ],
+      "definition": "Different feature values in training and serving for the same entity and moment.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-serving"
+    },
+    {
+      "id": "dbxfe-features-l01-delivery-concept",
+      "term": "batch versus online delivery",
+      "aliases": [
+        "offline store",
+        "online store"
+      ],
+      "definition": "Scheduled precomputed scoring versus request-time lookup.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-serving"
+    },
+    {
+      "id": "dbxfe-features-l01-store-concept",
+      "term": "Databricks Feature Store",
+      "aliases": [
+        "Feature Engineering in Unity Catalog"
+      ],
+      "definition": "Databricks' Unity Catalog registry for feature tables, lookups and online serving.",
+      "lessonId": "dbxfe-features-l01",
+      "sectionId": "dbxfe-features-l01-platform"
+    }
+  ]
+}

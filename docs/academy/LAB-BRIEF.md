@@ -82,6 +82,16 @@ must fail for the expected reason (assert the reason).
 
 Pin exactly the versions you tested in `requirements.txt` and README.
 
+## Public-safety rule
+
+Never write a build-machine path into any file you own: no `/home/user/...`,
+`/tmp/...` scratch paths, `labenv` interpreter paths or proxy settings in a
+README, requirements comment, runner docstring, walkthrough, DATA.md or
+evidence. Name the interpreter generically ("Python 3.12 with
+requirements.txt installed"). Evidence commands are normalized by
+`scripts/public-evidence.py`; `tests/public-safety.test.ts` fails the build on
+any remaining path.
+
 ## Honesty rules
 
 - Say what was executed: "local Spark 4.0.4 on one machine", never "on
