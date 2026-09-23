@@ -1,0 +1,46 @@
+{
+  "_provenance": "Synthetic bad writes, each breaking exactly one rule. They run as the application role after the primary intake stream and after R-101 has claimed QR-0001.",
+  "cases": [
+    {
+      "case": "severity out of range",
+      "sql": "INSERT INTO qr.review_item (item_id, plant_id, part_serial, defect_code, severity, flagged_at, source_seq) VALUES ('QR-0901', 'P1', 'CN-7999', 'CRACK', 7, '2026-09-14T07:00:00Z', 1);"
+    },
+    {
+      "case": "missing part serial",
+      "sql": "INSERT INTO qr.review_item (item_id, plant_id, part_serial, defect_code, severity, flagged_at, source_seq) VALUES ('QR-0902', 'P1', NULL, 'CRACK', 2, '2026-09-14T07:00:00Z', 1);"
+    },
+    {
+      "case": "unknown plant",
+      "sql": "INSERT INTO qr.review_item (item_id, plant_id, part_serial, defect_code, severity, flagged_at, source_seq) VALUES ('QR-0903', 'P9', 'CN-7999', 'CRACK', 2, '2026-09-14T07:00:00Z', 1);"
+    },
+    {
+      "case": "duplicate item",
+      "sql": "INSERT INTO qr.review_item (item_id, plant_id, part_serial, defect_code, severity, flagged_at, source_seq) VALUES ('QR-0001', 'P1', 'CN-7999', 'CRACK', 2, '2026-09-14T07:00:00Z', 1);"
+    },
+    {
+      "case": "decided without a decision",
+      "sql": "INSERT INTO qr.review_item (item_id, plant_id, part_serial, defect_code, severity, flagged_at, source_seq, status, claimed_by) VALUES ('QR-0905', 'P1', 'CN-7999', 'CRACK', 2, '2026-09-14T07:00:00Z', 1, 'decided', 'R-102');"
+    },
+    {
+      "case": "unknown defect code",
+      "sql": "INSERT INTO qr.review_item (item_id, plant_id, part_serial, defect_code, severity, flagged_at, source_seq) VALUES ('QR-0906', 'P1', 'CN-7999', 'SCRATCH', 2, '2026-09-14T07:00:00Z', 1);"
+    },
+    {
+      "case": "malformed item id",
+      "sql": "INSERT INTO qr.review_item (item_id, plant_id, part_serial, defect_code, severity, flagged_at, source_seq) VALUES ('QR-12', 'P1', 'CN-7999', 'CRACK', 2, '2026-09-14T07:00:00Z', 1);"
+    },
+    {
+      "case": "second open claim",
+      "sql": "UPDATE qr.review_item SET status = 'claimed', claimed_by = 'R-101', version = version + 1 WHERE item_id = 'QR-0002';"
+    },
+    {
+      "case": "unknown reviewer",
+      "sql": "UPDATE qr.review_item SET status = 'claimed', claimed_by = 'R-999', version = version + 1 WHERE item_id = 'QR-0003';"
+    },
+    {
+      "case": "claimed without an owner",
+      "sql": "UPDATE qr.review_item SET status = 'claimed', version = version + 1 WHERE item_id = 'QR-0004';"
+    }
+  ],
+  "atomic_batch": "INSERT INTO qr.review_item (item_id, plant_id, part_serial, defect_code, severity, flagged_at, source_seq) VALUES ('QR-0911', 'P1', 'CN-7911', 'CRACK', 2, '2026-09-14T07:00:00Z', 1), ('QR-0912', 'P2', 'CN-8912', 'SURFACE', 1, '2026-09-14T07:00:00Z', 1), ('QR-0913', 'P3', 'CN-9913', 'CRACK', 9, '2026-09-14T07:00:00Z', 1);"
+}

@@ -1,0 +1,596 @@
+{
+ "id": "dbxfe-lakebase-l01",
+ "title": "Lakebase, Postgres and operational state",
+ "summary": "Design Cinderline's quality-review state in PostgreSQL with constraints, short transactions, SKIP LOCKED claims, version checks and idempotent intake, then place it on Lakebase with its authentication, pooler, branches, restore window and synced copies.",
+ "contentVersion": "1.0.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 18,
+ "objectives": [
+  "Separate transactional requests from analytical pipelines and model operational state with constraints and short transactions.",
+  "Predict the results of isolation levels, SKIP LOCKED claims, version-checked updates and idempotent upserts across two sessions.",
+  "Adapt the design to Lakebase authentication, pooling, scale to zero, branches, restore and synchronization, with stated freshness and evidence labels."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Architecture, migration and operations",
+  "Lakebase",
+  "PostgreSQL",
+  "Transactions",
+  "Concurrency",
+  "Synced tables",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-lakebase-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-lakebase-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-workload-concept",
+    "dbxfe-lakebase-l01-state-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-lakebase",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-start",
+   "kind": "prerequisites",
+   "title": "Before the first transaction",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-workload-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-workloads",
+   "kind": "mechanism",
+   "title": "Two kinds of access, one managed Postgres",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-workload-concept",
+    "dbxfe-lakebase-l01-lakebase-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-lakebase",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-model",
+   "kind": "mechanism",
+   "title": "State as rows the schema guards",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-constraint-concept",
+    "dbxfe-lakebase-l01-state-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-transactions",
+   "kind": "mechanism",
+   "title": "Transactions and isolation",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-isolation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-isolation",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-concurrency",
+   "kind": "mechanism",
+   "title": "Three concurrency patterns",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-lock-concept",
+    "dbxfe-lakebase-l01-version-concept",
+    "dbxfe-lakebase-l01-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-locking",
+    "dbxfe-lakebase-course-claim-upsert",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-connections",
+   "kind": "mechanism",
+   "title": "Connections, pooling and identity",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-pooling-concept",
+    "dbxfe-lakebase-l01-auth-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-access",
+    "dbxfe-guidance"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-recovery",
+   "kind": "mechanism",
+   "title": "Branches and point-in-time restore",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-branch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-recovery",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-sync",
+   "kind": "mechanism",
+   "title": "Synchronization, freshness and consistency",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-sync-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-sync",
+    "dbxfe-guidance"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-example",
+   "kind": "example",
+   "title": "The claim and the decision in SQL",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-lock-concept",
+    "dbxfe-lakebase-l01-version-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-locking",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-exercise",
+   "kind": "exercise",
+   "title": "Exercise: a second producer",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-idempotency-concept",
+    "dbxfe-lakebase-l01-sync-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-solution",
+   "kind": "solution",
+   "title": "Solution: keys per source, freshness on screen",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-idempotency-concept",
+    "dbxfe-lakebase-l01-sync-concept",
+    "dbxfe-lakebase-l01-pooling-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-upsert",
+    "dbxfe-lakebase-course-claim-sync",
+    "dbxfe-lakebase-course-claim-access",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-mistakes",
+   "kind": "mistakes",
+   "title": "Mistakes that lose or corrupt state",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-state-concept",
+    "dbxfe-lakebase-l01-lock-concept",
+    "dbxfe-lakebase-l01-idempotency-concept",
+    "dbxfe-lakebase-l01-sync-concept",
+    "dbxfe-lakebase-l01-compat-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-lakebase",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-sources",
+   "kind": "sources",
+   "title": "Sources",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-lakebase-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-lakebase",
+    "dbxfe-lakebase-course-claim-access",
+    "dbxfe-lakebase-course-claim-recovery",
+    "dbxfe-lakebase-course-claim-sync",
+    "dbxfe-lakebase-course-claim-isolation",
+    "dbxfe-lakebase-course-claim-locking",
+    "dbxfe-lakebase-course-claim-upsert"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-related",
+   "kind": "related",
+   "title": "Related modules and lab",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-lakebase-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-l01-revisit",
+   "kind": "revisit",
+   "title": "Revisit this when",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-state-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-lakebase-l01-q1",
+   "revision": "1",
+   "prompt": "Two reviewers click Claim within the same millisecond on the lab's schema and claim statement. What is guaranteed?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-l01-q1-a",
+     "text": "Both receive QR-0001 and the second claim overwrites the first.",
+     "rationale": "That is the unlocked read-then-update approach the lab shows failing, not this statement."
+    },
+    {
+     "id": "dbxfe-lakebase-l01-q1-b",
+     "text": "They receive different items, or one receives no row if only one item is ready.",
+     "rationale": "Correct: the subquery's FOR UPDATE SKIP LOCKED means a row locked by one claim is passed over by the other."
+    },
+    {
+     "id": "dbxfe-lakebase-l01-q1-c",
+     "text": "One of them receives SQLSTATE 55P03 and must retry.",
+     "rationale": "55P03 comes from NOWAIT; SKIP LOCKED raises no error."
+    },
+    {
+     "id": "dbxfe-lakebase-l01-q1-d",
+     "text": "Both wait until a supervisor assigns the items.",
+     "rationale": "Nothing in the claim waits for a person; SKIP LOCKED does not even wait for the other session."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-l01-q1-b",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-lock-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-locking",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-q2",
+   "revision": "1",
+   "prompt": "The pipeline redelivers M-0002 an hour after it was applied. What does the lab's intake statement return, and why?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-l01-q2-a",
+     "text": "The item row at version 2, because the upsert ran again.",
+     "rationale": "The item upsert never runs for a repeated message, so the version cannot move."
+    },
+    {
+     "id": "dbxfe-lakebase-l01-q2-b",
+     "text": "A unique-violation error the app must catch.",
+     "rationale": "ON CONFLICT turns the conflict into a silent skip; no error is raised."
+    },
+    {
+     "id": "dbxfe-lakebase-l01-q2-c",
+     "text": "The item row unchanged at version 1, because DO UPDATE ran with identical values.",
+     "rationale": "DO UPDATE never runs, and if it did it would still increment the version."
+    },
+    {
+     "id": "dbxfe-lakebase-l01-q2-d",
+     "text": "No row: the message_id insert conflicts and does nothing, so the item upsert has no input row.",
+     "rationale": "Correct: ON CONFLICT (message_id) DO NOTHING returns nothing, and the item insert selects from that empty result."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-l01-q2-d",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-upsert",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-q3",
+   "revision": "1",
+   "prompt": "Which statement about Lakebase synced tables is accurate?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-l01-q3-a",
+     "text": "A synced table joins the app's transactions, so its reads are always current.",
+     "rationale": "Synchronization is asynchronous; a copy is always some time behind its source."
+    },
+    {
+     "id": "dbxfe-lakebase-l01-q3-b",
+     "text": "Snapshot mode streams each change within seconds.",
+     "rationale": "Snapshot copies the whole table per run; continuous mode is the streaming one."
+    },
+    {
+     "id": "dbxfe-lakebase-l01-q3-c",
+     "text": "Triggered and continuous modes need Change Data Feed on the source, and the synced copy is treated as read-only.",
+     "rationale": "Correct: both incremental modes read the source's change feed, and corrections belong in the source table."
+    },
+    {
+     "id": "dbxfe-lakebase-l01-q3-d",
+     "text": "The app can write corrections into a synced table and they flow back to Unity Catalog.",
+     "rationale": "The copy is read-only for the app; the flow goes from Unity Catalog to Postgres."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-l01-q3-c",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-sync-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-sync",
+    "dbxfe-guidance"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-lakebase-l01-card1",
+   "revision": "1",
+   "prompt": "What makes a reviewer's Claim click a transactional request rather than an analytical one?",
+   "answer": "It changes one row by key, must answer in milliseconds, and competes with other reviewers doing the same at once.",
+   "explanation": "Transactional (OLTP) work is many short, concurrent row-level changes that must be atomic and visible to the next request. Analytical work scans and aggregates many rows and tolerates age. The Claim needs row locks and constraints, which a Postgres database provides and a warehouse scan does not.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-workloads",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-workload-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-lakebase",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card2",
+   "revision": "1",
+   "prompt": "After a Lakebase compute scales to zero overnight, what survives and what is lost?",
+   "answer": "Committed rows in the branch's storage survive; idle connections close and their temporary tables, prepared statements and advisory locks are lost.",
+   "explanation": "Scale to zero suspends compute, not storage. The documentation lists session context as lost when idle connections close, so the next request opens a new connection. An app that keeps state only in committed rows loses nothing; one that relies on session state breaks.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-workloads",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-lakebase-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-lakebase",
+    "dbxfe-lakebase-course-claim-access",
+    "dbxfe-guidance"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card3",
+   "revision": "1",
+   "prompt": "Why state the review item's status rules as a table CHECK instead of in handler code?",
+   "answer": "The database checks every write from every handler, script and tool, and refuses an impossible row with SQLSTATE 23514.",
+   "explanation": "Handlers multiply: an API, a backfill, an admin tool. Only the database sees all writes. The review_item_state_consistent CHECK ties status to claimed_by and decision, so a decided row without a decision cannot be stored however it was written, and the error names the rule that fired.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-model",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-constraint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card4",
+   "revision": "1",
+   "prompt": "Where should an item's claim live while the reviewer spends minutes inspecting the part?",
+   "answer": "In a committed row (status claimed, claimed_by, claimed_at, version), not in a transaction held open until the decision.",
+   "explanation": "An open transaction holds the lock and a server connection for minutes and vanishes on any disconnect, restart, idle timeout or pooler hand-back. A committed claim survives all of those, and the later decision checks owner and version in its own short transaction.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-model",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-state-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card5",
+   "revision": "1",
+   "prompt": "Under Read Committed, where must an UPDATE's safety condition such as status = 'ready' live?",
+   "answer": "In the UPDATE's own WHERE clause, because only there is it re-checked against the newest committed row.",
+   "explanation": "Read Committed gives each statement a fresh snapshot. A check made in an earlier SELECT can be stale by the time the UPDATE runs; the UPDATE re-evaluates its WHERE clause on the newest row version after waiting for a lock, so the condition protects the write only when it is part of the write.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-transactions",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-isolation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-isolation",
+    "dbxfe-guidance"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card6",
+   "revision": "1",
+   "prompt": "What should application code do when a Repeatable Read transaction fails with SQLSTATE 40001?",
+   "answer": "Roll back and rerun the whole transaction from BEGIN, a small bounded number of times.",
+   "explanation": "40001 is a serialization failure: the transaction tried to act on a row changed after its snapshot. Re-running only the failed statement would keep the stale snapshot; restarting the transaction takes a new snapshot that includes the other session's committed change.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-transactions",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-isolation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-isolation",
+    "dbxfe-guidance"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card7",
+   "revision": "1",
+   "prompt": "Contrast plain FOR UPDATE, NOWAIT and SKIP LOCKED when another worker holds the first ready row.",
+   "answer": "Plain FOR UPDATE waits for the holder, NOWAIT fails with SQLSTATE 55P03, and SKIP LOCKED takes the next unlocked row at once.",
+   "explanation": "All three lock the rows they return; they differ only at a row someone else holds. In lab L23 plain FOR UPDATE waited on a lock and then took QR-0002, NOWAIT raised 55P03, and SKIP LOCKED returned QR-0002 immediately, all on a local PostgreSQL 16 server.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-concurrency",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-lock-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-locking",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card8",
+   "revision": "1",
+   "prompt": "A version-checked decision updates zero rows. What does that tell the app, and what should it do?",
+   "answer": "The row changed after the form loaded; reload it, show the reviewer what changed and let them decide again.",
+   "explanation": "Zero rows means the WHERE clause no longer matches: the version moved, the owner changed or the item was already decided. Retrying the same statement can never succeed because the stale version will not return; only a reload with the current version can.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-concurrency",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-version-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card9",
+   "revision": "1",
+   "prompt": "Which two keys make the lab's intake safe against redelivery and late messages?",
+   "answer": "The producer's message_id, logged once with ON CONFLICT DO NOTHING, and the item's source_seq compared before any update.",
+   "explanation": "The message key stops one message being applied twice; the sequence stops an older message overwriting newer state. In lab L23 replaying all ten deliveries changed nothing, and the late M-0005 was logged without touching QR-0006.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-concurrency",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-upsert",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card10",
+   "revision": "1",
+   "prompt": "Name two things that break behind a transaction-mode pooler and one that keeps working.",
+   "answer": "A SET search_path or temp table carried between transactions and SQL-level PREPARE break; a single-transaction claim keeps working.",
+   "explanation": "The pooler lends a server connection for one transaction and then gives it to another client, so session state stays on a connection you may never see again. Work that starts and finishes inside one transaction, with schema-qualified names, is unaffected.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-connections",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-pooling-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-access",
+    "dbxfe-guidance"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card11",
+   "revision": "1",
+   "prompt": "Which role type does the Lakebase documentation require for pooled connections?",
+   "answer": "A native Postgres password role; the pooling page says pooling is not available for OAuth roles.",
+   "explanation": "OAuth roles log in with one-hour tokens tied to a Databricks identity. The documented pooler path authenticates password roles, so an app that wants pooling uses a password role with its secret stored and rotated, while direct connections can still use OAuth roles.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-connections",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-auth-concept",
+    "dbxfe-lakebase-l01-pooling-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-access",
+    "dbxfe-guidance"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card12",
+   "revision": "1",
+   "prompt": "When is a point-in-time branch better than a restore after an accidental deletion?",
+   "answer": "When legitimate work continued after the deletion, because the branch lets you copy back only the lost rows.",
+   "explanation": "A restore returns the whole branch to the chosen moment and discards everything written after it. A branch from just before the deletion leaves production untouched, so you can select the lost rows there and insert them into production in one transaction.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-recovery",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-branch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-recovery",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card13",
+   "revision": "1",
+   "prompt": "Which synced-table mode needs no Change Data Feed on the source, and how fresh is it?",
+   "answer": "Snapshot mode, which copies the whole table per run and is only as fresh as its last run.",
+   "explanation": "Triggered and continuous modes apply changes incrementally, so they need Change Data Feed on the Unity Catalog source. Snapshot replaces the copy on each run; a screen that reads it should print the as-of time of that run instead of implying live data.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-sync",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-sync-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-sync",
+    "dbxfe-guidance"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-l01-card14",
+   "revision": "1",
+   "prompt": "What does a passing lab L23 run prove, and what does it leave unproven?",
+   "answer": "It proves the SQL's behaviour on a local PostgreSQL 16.13 server, not Lakebase authentication, pooling, branches, sync or performance.",
+   "explanation": "The lab executed constraints, locks, isolation and upserts on a throwaway local server. Tokens, the managed pooler, branching, restore, synced tables and resume times belong to the platform; they are verified on a project and labelled with their own evidence.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-mistakes",
+   "conceptIds": [
+    "dbxfe-lakebase-l01-compat-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-course-claim-lakebase",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ]
+}
