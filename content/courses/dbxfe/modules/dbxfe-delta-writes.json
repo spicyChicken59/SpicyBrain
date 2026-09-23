@@ -1,0 +1,437 @@
+{
+  "module": {
+    "id": "dbxfe-delta-writes",
+    "title": "Delta writes, evolution and table maintenance",
+    "summary": "Sort every row of a MERGE into its clause, keep omitted keys, retire rows only inside a snapshot's scope, refuse duplicates and stale replays, read the change data feed, evolve schemas deliberately, and decide OPTIMIZE, VACUUM, clustering and predictive optimization with their effects on files, reads, compatibility and recovery.",
+    "objectives": [
+      "Predict what a MERGE does to every row, including omitted keys, scoped snapshot deletes, duplicate matches and stale replays, and write the guarded fix.",
+      "Read the change data feed and tell schema enforcement, schema evolution and table features apart by their effect on writers and readers.",
+      "Write a maintenance decision table for OPTIMIZE, VACUUM, liquid clustering and predictive optimization that separates open-source mechanisms from Databricks-only services."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-delta"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-delta-writes-l01.json"
+    ],
+    "scenarioId": "dbxfe-delta-writes-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-delta-writes-scenario",
+      "title": "Write the maintenance decision memo for Cinderline's shared inspections table",
+      "context": "Fictional Cinderline Components keeps one shared Delta table of inspection lots. A quality dashboard reads it every hour, a supplier export stream consumes its change data feed and can lag up to nine days, and a monthly audit time-travels up to 14 days back. North sends incremental files that sometimes repeat a lot twice; South sends a complete daily snapshot of its open lots. Each nightly merge leaves hundreds of small files. The storage team proposes a one-day file retention with a nightly VACUUM; an engineer wants deletion vectors and liquid clustering. Whether the table runs on Databricks as a Unity Catalog managed table or on self-managed open-source Delta is not yet confirmed.",
+      "task": "Write a one-page maintenance decision memo for the table owner: the merge statements for both deliveries, the change-feed plan, how schema changes will be introduced, a decision table for the maintenance actions, the retention decision with its owners, and a list of what is an open-source mechanism, what is a Databricks-only service and what is still unknown.",
+      "requirements": [
+        "Give North's and South's MERGE statements, with de-duplication, a revision guard and a delete clause scoped to South's snapshot only.",
+        "Set the file retention from the longest stream lag and the audit window, name the owners who agree, and keep Delta's retention safety check enabled.",
+        "Fill a decision table for OPTIMIZE, VACUUM, liquid clustering and deletion vectors covering files, reads, compatibility and recovery.",
+        "Separate open-source Delta mechanisms from Databricks-only services such as predictive optimization and automatic clustering, and list what must be verified."
+      ],
+      "model": "### Writes\nNorth: keep the highest revision per inspection_id; same-revision rows with different values go to review. Merge with `WHEN MATCHED AND s.revision > t.revision THEN UPDATE SET *` and `WHEN NOT MATCHED THEN INSERT *`; no delete clause, because an incremental file's silence retires nothing. South: the same guard plus `WHEN NOT MATCHED BY SOURCE AND t.plant = 'South' THEN DELETE`, run only after the snapshot's row count matches the manifest.\n\n### Change feed and schema\nThe feed stays enabled (writer feature, readers unaffected). New columns arrive by `ALTER TABLE ... ADD COLUMNS` in a reviewed change, with the export owner warned because the stream stops at a schema change.\n\n### Decision table\n| Action | Files | Reads | Compatibility | Recovery |\n|---|---|---|---|---|\n| OPTIMIZE nightly | adds compacted files | same rows | unchanged | unchanged |\n| VACUUM nightly, 16-day retention | deletes files removed over 16 days ago | current unchanged | unchanged | 16 days of time travel |\n| Liquid clustering (plant, inspected_on) | rewritten by OPTIMIZE | same rows | writer features | unchanged |\n| Deletion vectors | fewer rewrites | same rows | reader feature | purge needs a rewrite |\n\n### Retention\nThe one-day proposal is declined: it would expire change files before the export reads them and break the audit. The retention becomes 16 days, above the nine-day lag and the 14-day audit, with the safety check on; the table, export, dashboard and audit owners sign it.\n\n### Open source, Databricks, unknown\nAll commands above are open-source Delta. Predictive optimization and automatic clustering keys exist only on Databricks for Unity Catalog managed tables. Unknown: the platform, the supplier's reader version (deletion vectors deferred until known) and storage cost (check current pricing).",
+      "reasoning": "The memo derives every decision from a mechanism: scope and guards for the merges, the longest consumer for retention, protocol sides for features. It declines the unsafe proposal with the consumers it would break, keeps the safety check on, and turns platform features into verification items.",
+      "rubric": [
+        {
+          "id": "dbxfe-delta-writes-scenario-rubric-1",
+          "criterion": "Merge semantics",
+          "weak": "One upsert for both plants, or a delete-by-source clause on the incremental file.",
+          "partial": "Guards present but the snapshot delete unscoped or duplicates not handled.",
+          "strong": "De-duplication, revision guard, and a South-scoped delete run only after a completeness check."
+        },
+        {
+          "id": "dbxfe-delta-writes-scenario-rubric-2",
+          "criterion": "Retention and ownership",
+          "weak": "Accepts the one-day retention or never names the consumers.",
+          "partial": "Keeps seven days without checking the nine-day lag or the audit.",
+          "strong": "Retention above the longest lag and audit window, safety check on, owners named."
+        },
+        {
+          "id": "dbxfe-delta-writes-scenario-rubric-3",
+          "criterion": "Maintenance effects",
+          "weak": "Lists commands without effects.",
+          "partial": "Covers files and reads but misses compatibility or recovery.",
+          "strong": "Every action has files, reads, compatibility and recovery, with reader features deferred until clients are confirmed."
+        },
+        {
+          "id": "dbxfe-delta-writes-scenario-rubric-4",
+          "criterion": "Platform honesty",
+          "weak": "Assumes predictive optimization or automatic clustering everywhere.",
+          "partial": "Names Databricks-only features without saying what must be verified.",
+          "strong": "Separates open-source mechanisms from Databricks services and lists the unknowns to verify."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can the supplier's reader handle deletion vectors?",
+          "response": "Unknown. The supplier has not confirmed its Delta reader version, so no reader feature is enabled until it does."
+        },
+        {
+          "question": "How far can the export stream fall behind?",
+          "response": "Its owner reports up to nine days after holidays; the audit team needs 14 days of time travel."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-delta-writes-l01"
+      ],
+      "claimIds": [
+        "dbxfe-delta-writes-course-claim-merge",
+        "dbxfe-delta-writes-course-claim-duplicate",
+        "dbxfe-delta-writes-course-claim-feed",
+        "dbxfe-delta-writes-course-claim-schema",
+        "dbxfe-delta-writes-course-claim-features",
+        "dbxfe-delta-writes-course-claim-maintenance",
+        "dbxfe-delta-writes-course-claim-clustering",
+        "dbxfe-delta-writes-course-claim-predictive",
+        "dbxfe-fact-merge",
+        "dbxfe-fact-delta",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-delta-writes-course-source-update",
+      "title": "Table deletes, updates, and merges",
+      "url": "https://raw.githubusercontent.com/delta-io/delta/v4.0.0/docs/source/delta-update.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "official documentation",
+      "context": "Open-source Delta Lake 4.0.0 documentation source, the release the module's lab executes.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Open-source semantics at one release. Databricks runs its own Delta implementation, and runtime-specific details such as which conditions count toward a duplicate match can differ; check the platform's MERGE reference for the runtime in use."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-batch",
+      "title": "Table batch reads and writes",
+      "url": "https://raw.githubusercontent.com/delta-io/delta/v4.0.0/docs/source/delta-batch.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "official documentation",
+      "context": "Open-source Delta Lake 4.0.0 documentation source: schema validation, schema updates and data retention.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Open-source Delta 4.0.0 behaviour; streaming behaviour and platform defaults differ by engine and release."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-feed",
+      "title": "Change data feed",
+      "url": "https://raw.githubusercontent.com/delta-io/delta/v4.0.0/docs/source/delta-change-data-feed.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "official documentation",
+      "context": "Open-source Delta Lake 4.0.0 documentation source for the change data feed.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Open-source change data feed as of Delta 4.0.0. Databricks documents an additional automatic mode for eligible Unity Catalog tables; verify which mode a table uses."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-utility",
+      "title": "Table utility commands",
+      "url": "https://raw.githubusercontent.com/delta-io/delta/v4.0.0/docs/source/delta-utility.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "official documentation",
+      "context": "Open-source Delta Lake 4.0.0 documentation source: VACUUM, DESCRIBE HISTORY and DESCRIBE DETAIL.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Open-source VACUUM semantics. The retention a shared table keeps is a decision for its owners and readers, never a default to shorten for convenience."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-optimize",
+      "title": "Optimizations",
+      "url": "https://raw.githubusercontent.com/delta-io/delta/v4.0.0/docs/source/optimizations-oss.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "official documentation",
+      "context": "Open-source Delta Lake 4.0.0 documentation source: compaction, Z-ordering, auto compaction and optimized writes.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Open-source defaults (for example optimized writes disabled) may differ from a managed platform's defaults; check the engine in use before assuming a behaviour."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-clustering",
+      "title": "Use liquid clustering for Delta tables",
+      "url": "https://raw.githubusercontent.com/delta-io/delta/v4.0.0/docs/source/delta-clustering.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "official documentation",
+      "context": "Open-source Delta Lake 4.0.0 documentation source for liquid clustering.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Open-source liquid clustering as of Delta 4.0.0; automatic key selection is a Databricks capability that this page does not cover."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-versioning",
+      "title": "How does Delta Lake manage feature compatibility?",
+      "url": "https://raw.githubusercontent.com/delta-io/delta/v4.0.0/docs/source/versioning.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "official documentation",
+      "context": "Open-source Delta Lake 4.0.0 documentation source for table protocols and table features.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Feature lists and minimum versions change with releases; compare every client against the table's DESCRIBE DETAIL output before enabling a feature."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-vectors",
+      "title": "What are deletion vectors?",
+      "url": "https://raw.githubusercontent.com/delta-io/delta/v4.0.0/docs/source/delta-deletion-vectors.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "official documentation",
+      "context": "Open-source Delta Lake 4.0.0 documentation source for deletion vectors.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Deletion vectors are optional in open-source Delta 4.0.0 and the lab's table does not use them; platform defaults can differ, so read DESCRIBE DETAIL rather than assume."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-tf-table",
+      "title": "databricks_sql_table (Resource)",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/4eda15ba717a14f53d0ad77a9225ec43cdb40622/docs/resources/sql_table.md",
+      "publisher": "Databricks (terraform-provider-databricks repository)",
+      "type": "primary reference",
+      "context": "Databricks Terraform provider documentation for Unity Catalog tables, main branch at commit 4eda15b.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Infrastructure-as-code reference, not a feature guide: it shows that automatic clustering can be requested for a managed table, not its requirements, availability or cost."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-tf-catalog",
+      "title": "databricks_catalog Resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/4eda15ba717a14f53d0ad77a9225ec43cdb40622/docs/resources/catalog.md",
+      "publisher": "Databricks (terraform-provider-databricks repository)",
+      "type": "primary reference",
+      "context": "Databricks Terraform provider documentation for Unity Catalog catalogs, main branch at commit 4eda15b.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read in full on 2026-09-23 as its source text on raw.githubusercontent.com (the rendered documentation site is blocked in this build). Shows the predictive optimization setting and its three values only; it does not say what the service runs, where it is available or what it costs."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-predictive",
+      "title": "Predictive optimization for Unity Catalog managed tables",
+      "url": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog managed tables.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Not searched or fetched in this build (search budget exhausted, documentation host blocked); verify title and passage before relying on it. Not confirmed in this build: title and passage are as previously read and must be re-checked before relying on them; availability, account defaults, regions and billing change over time."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-platform-clustering",
+      "title": "Use liquid clustering for tables",
+      "url": "https://docs.databricks.com/aws/en/delta/clustering",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; liquid clustering and automatic liquid clustering.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Not searched or fetched in this build (search budget exhausted, documentation host blocked); verify title and passage before relying on it. Not confirmed in this build; the requirements for automatic clustering (table type, runtime and predictive optimization) must be read on the current page before relying on them."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-source-platform-feed",
+      "title": "Use change data feed: change data feed schema",
+      "url": "https://docs.databricks.com/aws/en/tables/features/change-data-feed",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; change data feed modes for Delta and Unity Catalog tables.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Not searched or fetched in this build (search budget exhausted, documentation host blocked); verify title and passage before relying on it. Not re-read in this build; the mode, runtime and table eligibility must be checked on the current page."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-delta-writes-course-claim-merge",
+      "description": "MERGE sorts rows into matched (update or delete), not matched (insert only) and not matched by source (update or delete) cases; a row no clause selects is unchanged, and a delete-by-source clause acts only within its condition.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-writes-course-source-update",
+        "dbxfe-src-merge"
+      ],
+      "context": "Open-source Delta 4.0.0, observed in lab L05."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-claim-duplicate",
+      "description": "A MERGE fails when several source rows match and try to modify one target row; source rows for keys not yet in the target are each inserted, so the source is de-duplicated before merging.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-writes-course-source-update"
+      ],
+      "context": "Open-source Delta 4.0.0, observed in lab L05."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-claim-delete",
+      "description": "DELETE and UPDATE commit new versions; without deletion vectors changed files are rewritten whole, and removed data stays in storage until VACUUM deletes the old files after the retention.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-writes-course-source-update",
+        "dbxfe-delta-writes-course-source-vectors"
+      ],
+      "context": "Open-source Delta 4.0.0, observed in lab L05."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-claim-feed",
+      "description": "The change data feed is enabled per table, records changes only after enablement with insert, update_preimage, update_postimage and delete rows, and its change files expire with the table's retention; Databricks also documents an automatic mode for eligible Unity Catalog tables.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-writes-course-source-feed",
+        "dbxfe-delta-writes-course-source-platform-feed"
+      ],
+      "context": "Open-source Delta 4.0.0 observed in lab L05; the Databricks mode is to be verified per table."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-claim-schema",
+      "description": "Schema enforcement refuses writes with columns the table lacks or mismatched types and fills missing columns with null; evolution adds columns by ALTER TABLE, a per-write mergeSchema option or a session-wide setting, and a schema change stops streams reading the table.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-writes-course-source-batch",
+        "dbxfe-delta-writes-course-source-update"
+      ],
+      "context": "Open-source Delta 4.0.0, observed in lab L05."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-claim-features",
+      "description": "Enabling a table feature adds it to the table's protocol; writer features bind writers, reader features also bind readers, and protocol upgrades are irreversible.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-writes-course-source-versioning",
+        "dbxfe-src-delta-protocol"
+      ],
+      "context": "Open-source Delta 4.0.0 and Databricks; observed in lab L05."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-claim-maintenance",
+      "description": "OPTIMIZE compacts files without changing rows and is idempotent; VACUUM deletes unreferenced files removed longer ago than the retention (7 days by default), is not automatic in open-source Delta, keeps log files, ends time travel beyond the retention and refuses shorter retentions through a safety check.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-writes-course-source-optimize",
+        "dbxfe-delta-writes-course-source-utility",
+        "dbxfe-delta-writes-course-source-batch"
+      ],
+      "context": "Open-source Delta 4.0.0, observed in lab L05."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-claim-clustering",
+      "description": "Liquid clustering is declared with CLUSTER BY, applied incrementally by OPTIMIZE, changeable without rewriting data, incompatible with partitioning and ZORDER, and adds writer features; Databricks can also choose keys automatically for managed tables.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-writes-course-source-clustering",
+        "dbxfe-delta-writes-course-source-tf-table",
+        "dbxfe-delta-writes-course-source-platform-clustering"
+      ],
+      "context": "Open-source Delta 4.0.0 observed in lab L05; automatic clustering to be verified on Databricks."
+    },
+    {
+      "id": "dbxfe-delta-writes-course-claim-predictive",
+      "description": "Predictive optimization is a Databricks service for Unity Catalog managed tables that decides when to run maintenance such as OPTIMIZE and VACUUM, set per catalog and schema; open-source Delta has no such scheduler.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delta-writes-course-source-predictive",
+        "dbxfe-delta-writes-course-source-tf-catalog"
+      ],
+      "context": "Databricks on AWS; availability, defaults and billing to be verified."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-delta-writes-l01-merge-concept",
+      "term": "MERGE clause",
+      "aliases": [
+        "upsert",
+        "WHEN NOT MATCHED BY SOURCE"
+      ],
+      "definition": "A branch of MERGE that updates, deletes or inserts a row according to whether source and target matched.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-clauses"
+    },
+    {
+      "id": "dbxfe-delta-writes-l01-snapshot-concept",
+      "term": "complete snapshot",
+      "aliases": [
+        "full extract"
+      ],
+      "definition": "A delivery listing every current record of a stated scope, so a missing record in that scope is retired.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-clauses"
+    },
+    {
+      "id": "dbxfe-delta-writes-l01-duplicate-concept",
+      "term": "multiple-match error",
+      "aliases": [
+        "duplicate source match"
+      ],
+      "definition": "Delta's refusal of a MERGE in which several source rows would modify the same target row.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-duplicates"
+    },
+    {
+      "id": "dbxfe-delta-writes-l01-guard-concept",
+      "term": "guarded update",
+      "aliases": [
+        "revision guard"
+      ],
+      "definition": "A matched clause with a condition such as s.revision > t.revision, so only newer rows replace older ones.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-duplicates"
+    },
+    {
+      "id": "dbxfe-delta-writes-l01-feed-concept",
+      "term": "change data feed",
+      "aliases": [
+        "CDF",
+        "table_changes"
+      ],
+      "definition": "A per-table record of row-level changes, readable by version from the commit after it is enabled.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-feed"
+    },
+    {
+      "id": "dbxfe-delta-writes-l01-schema-concept",
+      "term": "schema enforcement and evolution",
+      "aliases": [
+        "mergeSchema",
+        "schema validation"
+      ],
+      "definition": "Refusing writes that do not fit the table's schema, and deliberately adding columns in a commit when they should.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-schema"
+    },
+    {
+      "id": "dbxfe-delta-writes-l01-feature-concept",
+      "term": "table feature",
+      "aliases": [
+        "protocol feature"
+      ],
+      "definition": "A capability listed in a table's protocol that every client reading or writing the table must understand.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-schema"
+    },
+    {
+      "id": "dbxfe-delta-writes-l01-maintenance-concept",
+      "term": "OPTIMIZE and VACUUM",
+      "aliases": [
+        "compaction",
+        "file retention"
+      ],
+      "definition": "Maintenance that rewrites small files into fewer ones, and that later deletes unreferenced files past the retention.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-maintenance"
+    },
+    {
+      "id": "dbxfe-delta-writes-l01-clustering-concept",
+      "term": "liquid clustering",
+      "aliases": [
+        "CLUSTER BY"
+      ],
+      "definition": "A layout declared with clustering keys that OPTIMIZE applies incrementally and that can change later.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-maintenance"
+    },
+    {
+      "id": "dbxfe-delta-writes-l01-predictive-concept",
+      "term": "predictive optimization",
+      "aliases": [
+        "automatic maintenance"
+      ],
+      "definition": "A Databricks service that schedules maintenance for Unity Catalog managed tables.",
+      "lessonId": "dbxfe-delta-writes-l01",
+      "sectionId": "dbxfe-delta-writes-l01-maintenance"
+    }
+  ]
+}
