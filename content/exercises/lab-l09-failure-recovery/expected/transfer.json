@@ -1,0 +1,99 @@
+{
+  "_derivation": "Hand-derived from fixtures/transfer/*.json by the rules in DATA.md. Report ids use the same independent one-line digest as reports.json, run over the content below.",
+  "reports": {
+    "2026-03-05": {
+      "report_id": "2026-03-05-e4afcdb63fbe",
+      "retention": {"added": 4, "duplicate": 1, "conflict": 0},
+      "content": {
+        "contract": "harbourline-dock-scans",
+        "report_date": "2026-03-05",
+        "rows": [
+          {"dock": "D1", "trailer": "T-88", "version": 1, "event_id": "h01", "expected_pallets": 12, "scanned_pallets": 12},
+          {"dock": "D1", "trailer": "T-89", "version": 1, "event_id": "h02", "expected_pallets": 10, "scanned_pallets": 9},
+          {"dock": "D2", "trailer": "T-88", "version": 1, "event_id": "h03", "expected_pallets": 8, "scanned_pallets": 8}
+        ],
+        "totals": {"expected_pallets": 30, "scanned_pallets": 29},
+        "excluded": [{"event_id": "h04", "reason": "scanned_pallets must be an integer"}]
+      }
+    },
+    "2026-03-05-corrected": {
+      "report_id": "2026-03-05-6f37e71712dc",
+      "retention": {"added": 1, "duplicate": 0, "conflict": 0},
+      "content": {
+        "contract": "harbourline-dock-scans",
+        "report_date": "2026-03-05",
+        "rows": [
+          {"dock": "D1", "trailer": "T-88", "version": 1, "event_id": "h01", "expected_pallets": 12, "scanned_pallets": 12},
+          {"dock": "D1", "trailer": "T-89", "version": 2, "event_id": "h05", "expected_pallets": 10, "scanned_pallets": 10},
+          {"dock": "D2", "trailer": "T-88", "version": 1, "event_id": "h03", "expected_pallets": 8, "scanned_pallets": 8}
+        ],
+        "totals": {"expected_pallets": 30, "scanned_pallets": 30},
+        "excluded": [{"event_id": "h04", "reason": "scanned_pallets must be an integer"}]
+      }
+    },
+    "2026-03-06-corrected": {
+      "report_id": "2026-03-06-7e3434362520",
+      "retention": {"added": 1, "duplicate": 0, "conflict": 0},
+      "content": {
+        "contract": "harbourline-dock-scans",
+        "report_date": "2026-03-06",
+        "rows": [
+          {"dock": "D1", "trailer": "T-91", "version": 2, "event_id": "h09", "expected_pallets": 14, "scanned_pallets": 14},
+          {"dock": "D2", "trailer": "T-92", "version": 1, "event_id": "h08", "expected_pallets": 9, "scanned_pallets": 9}
+        ],
+        "totals": {"expected_pallets": 23, "scanned_pallets": 23},
+        "excluded": []
+      }
+    }
+  },
+  "failed_after_resolution": {
+    "run_id": "harbour-2026-03-05",
+    "status": "failed",
+    "tasks": {"ingest_raw": "succeeded", "resolve": "failed", "publish_report": "upstream_failed", "notify": "upstream_failed"},
+    "view": {"status": "blocked_no_snapshot", "report_date": null},
+    "evidence": {"raw_retained": true, "resolved": true, "report_published": false, "outbox_pending": 0, "outbox_sent": 0, "pending_already_delivered": 0}
+  },
+  "repaired": {
+    "status": "succeeded",
+    "attempt": 2,
+    "executions": {"ingest_raw": 1, "resolve": 2, "publish_report": 1, "notify": 1},
+    "deliveries": [["dock-lead", "2026-03-05"], ["planner", "2026-03-05"], ["carrier-desk", "2026-03-05"]]
+  },
+  "correction_run": {
+    "run_id": "harbour-2026-03-05-c1",
+    "status": "succeeded",
+    "publish_action": "replaced",
+    "history": 1,
+    "deliveries_total": 6,
+    "new_deliveries": [["dock-lead", "2026-03-05"], ["planner", "2026-03-05"], ["carrier-desk", "2026-03-05"]]
+  },
+  "coarse_key_after_correction": {
+    "deliveries_total": 3,
+    "outbox_entries": 3,
+    "outbox_all_sent": true,
+    "outbox_report_is_the_replaced_one": true
+  },
+  "conflict_day": {
+    "run_id": "harbour-2026-03-06",
+    "status": "failed",
+    "tasks": {"ingest_raw": "succeeded", "resolve": "succeeded", "publish_report": "failed", "notify": "upstream_failed"},
+    "publish_reason": "conflict",
+    "conflicts": [{"key": ["D1", "T-91"], "version": 1, "reason": "version_conflict", "event_ids": ["h06", "h07"]}],
+    "view": {"status": "stale_previous", "report_date": "2026-03-05", "report": "2026-03-05-corrected"},
+    "deliveries_total": 6,
+    "alerts": [
+      {"run_id": "harbour-2026-03-05", "task": "resolve", "reason": "injected:after_resolution"},
+      {"run_id": "harbour-2026-03-06", "task": "publish_report", "reason": "conflict"}
+    ]
+  },
+  "conflict_superseded": {
+    "_setup": "After conflict_day, the source sends version 2 for D1/T-91 (fixtures/transfer/correction/2026-03-06.json), processed by the new run id harbour-2026-03-06-c1.",
+    "run_id": "harbour-2026-03-06-c1",
+    "status": "succeeded",
+    "resolve_detail": {"rows": 2, "excluded": 0, "conflicts": 0},
+    "publish_action": "published",
+    "view": {"status": "current", "report_date": "2026-03-06"},
+    "deliveries_total": 9,
+    "same_run_id_repair": {"status": "failed", "publish_reason": "conflict", "deliveries_total": 6}
+  }
+}

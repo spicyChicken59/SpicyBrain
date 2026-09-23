@@ -1,0 +1,105 @@
+{
+  "_derivation": "Hand-derived. Setup for every case: a fresh store, run line3-2026-03-02 on fixtures/landing/2026-03-02.json with no fault (2 deliveries), then run line3-2026-03-03 on fixtures/landing/2026-03-03.json with one non-transient fault at the named boundary and no retries; then repair by running line3-2026-03-03 again with no fault. The four-task chain and the boundary positions are described in DATA.md.",
+  "after_raw_retention": {
+    "failed": {
+      "status": "failed",
+      "tasks": {"ingest_raw": "failed", "resolve": "upstream_failed", "publish_report": "upstream_failed", "notify": "upstream_failed"},
+      "reason": "injected:after_raw_retention",
+      "evidence": {"raw_retained": true, "resolved": false, "report_published": false, "outbox_pending": 0, "outbox_sent": 0, "pending_already_delivered": 0},
+      "view": {"status": "stale_previous", "report_date": "2026-03-02"},
+      "deliveries_total": 2,
+      "alerts": 1
+    },
+    "repaired": {
+      "status": "succeeded",
+      "attempt": 2,
+      "executions": {"ingest_raw": 2, "resolve": 1, "publish_report": 1, "notify": 1},
+      "ingest_detail": {"added": 0, "duplicate": 5, "conflict": 0},
+      "deliveries_total": 4,
+      "deliveries_for_date": [["quality-lead", "2026-03-03"], ["line-3-supervisor", "2026-03-03"]],
+      "suppressed": 0,
+      "view": {"status": "current", "report_date": "2026-03-03"}
+    }
+  },
+  "after_resolution": {
+    "failed": {
+      "status": "failed",
+      "tasks": {"ingest_raw": "succeeded", "resolve": "failed", "publish_report": "upstream_failed", "notify": "upstream_failed"},
+      "reason": "injected:after_resolution",
+      "evidence": {"raw_retained": true, "resolved": true, "report_published": false, "outbox_pending": 0, "outbox_sent": 0, "pending_already_delivered": 0},
+      "view": {"status": "stale_previous", "report_date": "2026-03-02"},
+      "deliveries_total": 2,
+      "alerts": 1
+    },
+    "repaired": {
+      "status": "succeeded",
+      "attempt": 2,
+      "executions": {"ingest_raw": 1, "resolve": 2, "publish_report": 1, "notify": 1},
+      "ingest_detail": {"added": 4, "duplicate": 1, "conflict": 0},
+      "deliveries_total": 4,
+      "deliveries_for_date": [["quality-lead", "2026-03-03"], ["line-3-supervisor", "2026-03-03"]],
+      "suppressed": 0,
+      "view": {"status": "current", "report_date": "2026-03-03"}
+    }
+  },
+  "before_effect": {
+    "failed": {
+      "status": "failed",
+      "tasks": {"ingest_raw": "succeeded", "resolve": "succeeded", "publish_report": "succeeded", "notify": "failed"},
+      "reason": "injected:before_effect",
+      "evidence": {"raw_retained": true, "resolved": true, "report_published": true, "outbox_pending": 2, "outbox_sent": 0, "pending_already_delivered": 0},
+      "view": {"status": "current", "report_date": "2026-03-03"},
+      "deliveries_total": 2,
+      "alerts": 1
+    },
+    "repaired": {
+      "status": "succeeded",
+      "attempt": 2,
+      "executions": {"ingest_raw": 1, "resolve": 1, "publish_report": 1, "notify": 2},
+      "ingest_detail": {"added": 4, "duplicate": 1, "conflict": 0},
+      "deliveries_total": 4,
+      "deliveries_for_date": [["quality-lead", "2026-03-03"], ["line-3-supervisor", "2026-03-03"]],
+      "suppressed": 0,
+      "view": {"status": "current", "report_date": "2026-03-03"}
+    }
+  },
+  "after_effect": {
+    "failed": {
+      "status": "failed",
+      "tasks": {"ingest_raw": "succeeded", "resolve": "succeeded", "publish_report": "succeeded", "notify": "failed"},
+      "reason": "injected:after_effect",
+      "evidence": {"raw_retained": true, "resolved": true, "report_published": true, "outbox_pending": 2, "outbox_sent": 0, "pending_already_delivered": 1},
+      "view": {"status": "current", "report_date": "2026-03-03"},
+      "deliveries_total": 3,
+      "alerts": 1
+    },
+    "repaired": {
+      "status": "succeeded",
+      "attempt": 2,
+      "executions": {"ingest_raw": 1, "resolve": 1, "publish_report": 1, "notify": 2},
+      "ingest_detail": {"added": 4, "duplicate": 1, "conflict": 0},
+      "deliveries_total": 4,
+      "deliveries_for_date": [["quality-lead", "2026-03-03"], ["line-3-supervisor", "2026-03-03"]],
+      "suppressed": 1,
+      "view": {"status": "current", "report_date": "2026-03-03"}
+    }
+  },
+  "repeated_failure": {
+    "_setup": "After the 2026-03-02 run, line3-2026-03-03 fails at after_resolution, is repaired with the same fault and fails again, then is repaired with no fault.",
+    "after_second_failure": {"status": "failed", "attempt": 2, "resolve_executions": 2, "alerts": 1},
+    "after_clean_repair": {"status": "succeeded", "attempt": 3, "resolve_executions": 3, "ingest_executions": 1, "alerts": 1}
+  },
+  "new_run_id_same_input": {
+    "_setup": "After line3-2026-03-02 succeeds, a second run id line3-2026-03-02-rerun processes the same landing file on the same store.",
+    "status": "succeeded",
+    "ingest_detail": {"added": 0, "duplicate": 5, "conflict": 0},
+    "publish_detail": {"report_id": "2026-03-02-bce5195c4faf", "action": "unchanged"},
+    "notify_detail": {"sent": 0},
+    "deliveries_total": 2,
+    "history": 0
+  },
+  "run_identity": {
+    "_setup": "After line3-2026-03-02 succeeds, the same run id is offered for business date 2026-03-03.",
+    "error_contains": "run id line3-2026-03-02 belongs to 2026-03-02, not 2026-03-03"
+  }
+}
