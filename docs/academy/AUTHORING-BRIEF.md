@@ -168,6 +168,16 @@ primary; Samajh is optional and collapsible.
   `docs/academy/CONTRACT.md` and Databricks/Apache/Microsoft/Google/AWS/
   MLflow/scikit-learn primary pages. Do not invent URLs; if unsure of a
   URL, use the documented landing page from the index.
+- **When web search is unavailable** (the build session's search budget is
+  finite and was exhausted on 2026-09-23): first reuse a source record that
+  another module already confirmed by search (same URL, title and publisher;
+  keep its original `reviewedAt` and say whose confirmation it was). Otherwise
+  cite only a documentation landing page you are sure exists, and write
+  `reviewedEvidence` that says plainly the URL and title were not confirmed in
+  this build session; hedge or drop any detail that only such a page would
+  support. Never present a URL recalled from memory as confirmed. CI's
+  `npm run report:sources` probes every URL and lists the unreachable ones,
+  which the integrator corrects or removes before release.
 - `claims`: `documented` (needs sourceIds), `guidance` (original professional
   reasoning), `fictional` (synthetic records/organizations). Every beat,
   visual, check and card cites the claims it rests on.
