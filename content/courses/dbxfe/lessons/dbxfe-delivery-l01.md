@@ -4,7 +4,7 @@ After this lesson you can move a change to Cinderline's scrap-rate job to produc
 
 <!-- section:dbxfe-delivery-l01-start -->
 
-From [Platform, workspace and compute](#/module/dbxfe-m03): workspace, catalog, compute and storage as separate responsibilities. From [Python for dependable data work](#/module/dbxfe-python): testable functions with inputs and outputs. From [Identity, authorization and audit](#/module/dbxfe-identity): users, groups and service principals. Commands and keys are spelled as in Databricks CLI v1.17.0 and the Databricks SDK for Python v0.141.0; the rename from Databricks Asset Bundles to Declarative Automation Bundles changed neither.
+From [Platform, workspace and compute](#/module/dbxfe-m03): workspace, catalog, compute and storage as separate responsibilities. From [Python for dependable data work](#/module/dbxfe-python): testable functions with inputs and outputs. From [Identity, authorization and audit](#/module/dbxfe-identity), optional prior reading in the governance track: users, groups and service principals. In brief, a user is a person's identity, a group is a named set of identities that permissions are granted to, and a service principal is an identity for automation rather than a person. Commands and keys are spelled as in Databricks CLI v1.17.0 and the Databricks SDK for Python v0.141.0; the rename from Databricks Asset Bundles to Declarative Automation Bundles changed neither.
 
 <!-- section:dbxfe-delivery-l01-states -->
 

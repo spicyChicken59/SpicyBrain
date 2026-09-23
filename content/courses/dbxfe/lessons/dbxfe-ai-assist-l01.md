@@ -4,7 +4,7 @@ After this lesson you can ask the workspace coding assistant to explain, draft, 
 
 <!-- section:dbxfe-ai-assist-l01-start -->
 
-Bring SQL joins at the level of [Grain, joins, and execution behavior](#/lesson/dbxfe-grain-joins), the idea from [Unity Catalog names and basic access](#/lesson/dbxfe-m06-l01) that a principal sees only what it was granted, and a pencil: the fixture is five Cinderline order lines and six shipments, small enough to work on paper.
+Bring SQL joins at the level of [Grain, joins, and execution behavior](#/lesson/dbxfe-grain-joins), the idea from [Unity Catalog names and basic access](#/lesson/dbxfe-m06-l01), optional reading in the governance track, that a principal (a user, group or service principal) sees only what it was granted, with SELECT the privilege to read a table's data, and a pencil: the fixture is five Cinderline order lines and six shipments, small enough to work on paper.
 
 <!-- section:dbxfe-ai-assist-l01-names -->
 
@@ -14,7 +14,7 @@ Every documented feature proposes; none decides: **Chat** answers with citations
 
 <!-- section:dbxfe-ai-assist-l01-context -->
 
-To complete a task the assistant sends your prompt and relevant context to the model: table and column names, descriptions, the code you are working with, data samples from tables and cell outputs. You add context with **Add context** or `@resource_name`, and instruction files such as AGENTS.md above the open notebook are read too. The boundary is your own **Unity Catalog permissions**: the assistant can access only what you can, so a table you cannot SELECT contributes nothing and a draft over it is written blind.
+To complete a task the assistant sends your prompt and relevant context to the model: table and column names, descriptions, the code you are working with, data samples from tables and cell outputs. You add context with **Add context** or `@resource_name`, and, per the Google Cloud custom-instructions page (confirm it for your cloud and release), instruction files such as AGENTS.md above the open notebook are read too. The boundary is your own **Unity Catalog permissions**: the assistant can access only what you can, so without SELECT no data samples from a table are sent, and a table you hold no privilege on contributes nothing: a draft over it is written blind. Seeing a table's metadata is governed separately from reading its data (ownership, or a discovery privilege such as BROWSE where enabled), so its names can reach the model without SELECT.
 
 The trust page covers the model side: partners retain nothing submitted, even for abuse monitoring, and submissions are not used to train generative foundation models Databricks offers to third parties. That is not permission to paste: a credential in a prompt sits in a transcript, and personal data and bulk records stay out unless a policy allows them. Attach a labelled sample, use placeholders for secrets, and record what was withheld.
 

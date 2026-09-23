@@ -11,7 +11,7 @@
   "Choose the CLI, the SDK or a raw REST call for a task, authenticate people and pipelines as themselves, and write a promotion checklist ticked only by evidence."
  ],
  "startingAssumptions": [
-  "The platform module separates workspace, catalog, compute and storage, and the identity module has introduced users, groups and service principals.",
+  "The platform module separates workspace, catalog, compute and storage. The identity module, in the governance track, is optional prior reading: a user is a person's identity, a group is a named set of identities that permissions are granted to, and a service principal is an identity for automation, defined again where it is first used.",
   "Python functions with inputs and outputs, and enough YAML to read nested keys and lists."
  ],
  "lessonIds": [
@@ -1967,7 +1967,7 @@
    "title": "Records in, rates out, and what the starter got wrong",
    "alt": "Four records, the rates worked out by hand, the starter package's test results, and the difference between a unit test and an integration test.",
    "caption": "Expected values are computed by hand before the code runs; the starter results come from Lab L16's local run on synthetic records.",
-   "textEquivalent": "Records in: Four lines from the synthetic transfer export. Table columns: line | inspected | scrapped. Rows: L1 | 1000 | 41; L4 | 0 | 0; L6 | 32 | 1; L7 | 9 | 0.\n\nWorked out by hand: Half up to four places; alert only when strictly above 0.0400. Table columns: line | rate | alert. Rows: L1 | 0.0410 | yes; L4 | none | no; L6 | 0.0313 | no; L7 | 0.0000 | no.\n\nStarter package: 8 passed, 5 failed, 1 error: The lab's starter run: each failing test names the rule the code gets wrong. Table columns: test | result | cause. Rows: nothing inspected | error | division by zero; half-up rounding | fail | round() gives 0.0312; rate equal to threshold | fail | printed 0.04, not 0.0400; more scrapped than inspected | fail | record counted.\n\nUnit or integration?: A unit test needs no workspace; an integration test needs the deployed job. Equation: unit test = one function + hand-computed input and output, no workspace; integration test = deployed job + test workspace + output check",
+   "textEquivalent": "Records in: Four lines from the synthetic transfer export. Table columns: line | inspected | scrapped. Rows: L1 | 1000 | 41; L4 | 0 | 0; L6 | 32 | 1; L7 | 9 | 0.\n\nWorked out by hand: Half up to four places; alert only when the rounded rate is strictly above 0.0400. Table columns: line | rate | alert. Rows: L1 | 0.0410 | yes; L4 | none | no; L6 | 0.0313 | no; L7 | 0.0000 | no.\n\nStarter package: 8 passed, 5 failed, 1 error: The lab's starter run: each failing test names the rule the code gets wrong. Table columns: test | result | cause. Rows: nothing inspected | error | division by zero; half-up rounding | fail | round() gives 0.0312; rate equal to threshold | fail | printed 0.04, not 0.0400; the >= gap shows once rounding is fixed; more scrapped than inspected | fail | record counted.\n\nUnit or integration?: A unit test needs no workspace; an integration test needs the deployed job. Equation: unit test = one function + hand-computed input and output, no workspace; integration test = deployed job + test workspace + output check",
    "provenance": "Original SpicyBrain authored visual; the local results reflect a run of Lab L16 (lab-l16-bundle-delivery) in Python 3.12.3 with PyYAML 6.0.3 on synthetic records; no Databricks workspace, CLI or SDK was used.",
    "claimIds": [
     "dbxfe-delivery-claim-template",
@@ -2014,7 +2014,7 @@
     {
      "id": "expected",
      "title": "Worked out by hand",
-     "explanation": "Half up to four places; alert only when strictly above 0.0400.",
+     "explanation": "Half up to four places; alert only when the rounded rate is strictly above 0.0400.",
      "nodes": [],
      "connections": [],
      "table": {
@@ -2073,7 +2073,7 @@
        [
         "rate equal to threshold",
         "fail",
-        "printed 0.04, not 0.0400"
+        "printed 0.04, not 0.0400; the >= gap shows once rounding is fixed"
        ],
        [
         "more scrapped than inspected",
@@ -4304,7 +4304,7 @@
    ],
    "hint": "Look for the inputs that separate a right rule from a nearly right one: ties, zeros and boundaries.",
    "handbook": {
-    "markdown": "**A unit test.** Arrange a few records, act by calling one function, assert against values you computed before running the code:\n\n```python\ndef test_rate_rounds_half_up_to_four_places(self):\n    # 1 / 32 = 0.03125 exactly: half up gives 0.0313 (half even gives 0.0312).\n    self.assertEqual(scrap_rate(1, 32), Decimal(\"0.0313\"))\n```\n\nIndependence matters: an expected value copied from the code's own output proves nothing, so write the derivation beside the test.\n\n**Choose cases that separate right from wrong.** A tie at the fifth decimal separates half up from half even; an idle line separates \"no rate\" from \"zero\"; a rate exactly at the threshold separates \"above\" from \"at or above\"; a record with more scrapped than inspected tests rejection. In this module's lab the starter package fails exactly these: of 14 tests, 8 passed, 5 failed and 1 raised an error (the division by zero), run locally on synthetic records.\n\n**Integration tests are a later state.** They need the deployed job: deploy to test, `databricks bundle run scrap_summary --target test`, then compare the output with an expected summary for a known input. They catch what unit tests cannot: permissions, paths, parameters as the target renders them, the job's environment. They cost minutes and a workspace, so run them after merge rather than on every keystroke.\n\n**Frameworks.** The lab uses the standard library's `unittest` so it needs nothing installed beyond PyYAML; many projects use pytest. What matters is that CI runs the tests on every pull request and records the counts with the commit SHA.\n\n**What fails.** Tests that read the real volume (integration tests in disguise that fail offline), expected values pasted from the code's own output, and tests that pass because nothing asserts.",
+    "markdown": "**A unit test.** Arrange a few records, act by calling one function, assert against values you computed before running the code:\n\n```python\ndef test_rate_rounds_half_up_to_four_places(self):\n    # 1 / 32 = 0.03125 exactly: half up gives 0.0313 (half even gives 0.0312).\n    self.assertEqual(scrap_rate(1, 32), Decimal(\"0.0313\"))\n```\n\nIndependence matters: an expected value copied from the code's own output proves nothing, so write the derivation beside the test.\n\n**Choose cases that separate right from wrong.** A tie at the fifth decimal separates half up from half even; an idle line separates \"no rate\" from \"zero\"; a rate exactly at the threshold separates \"above\" from \"at or above\"; a record with more scrapped than inspected tests rejection. The alert compares the rate after half-up rounding, so 4001 of 100,000 (0.04001) prints 0.0400 with no alert while 4005 of 100,000 prints 0.0401 with one. In this module's lab the starter package fails on these cases: of 14 tests, 8 passed, 5 failed and 1 raised an error (the division by zero), run locally on synthetic records. One failure can hide another: the threshold test asserts the printed rate first, so the starter fails it on formatting (0.04, not 0.0400), and its `>=` surfaces only once rounding is fixed.\n\n**Integration tests are a later state.** They need the deployed job: deploy to test, `databricks bundle run scrap_summary --target test`, then compare the output with an expected summary for a known input. They catch what unit tests cannot: permissions, paths, parameters as the target renders them, the job's environment. They cost minutes and a workspace, so run them after merge rather than on every keystroke.\n\n**Frameworks.** The lab uses the standard library's `unittest` so it needs nothing installed beyond PyYAML; many projects use pytest. What matters is that CI runs the tests on every pull request and records the counts with the commit SHA.\n\n**What fails.** Tests that read the real volume (integration tests in disguise that fail offline), expected values pasted from the code's own output, and tests that pass because nothing asserts.",
     "sourceSectionIds": [
      "dbxfe-delivery-l01-code"
     ]

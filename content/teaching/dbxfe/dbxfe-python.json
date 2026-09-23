@@ -764,8 +764,8 @@
       "title": "Five values, five types, no implicit casts",
       "alt": "Five values, five types, no implicit casts. The literal decides the type; digits inside quotes are still text.",
       "caption": "Types decide equality; Python never casts text to a number during a comparison. Python results executed in Lab L01; the SQL column is a schematic analogy.",
-      "textEquivalent": "Five values, five types: The literal decides the type; digits inside quotes are still text. Columns: Literal | type() | SQL analogue (schematic) | Watch for. Rows: \"12\" | str | VARCHAR | text even when it holds digits; 12 | int | INTEGER | no fixed size; 12.5 | float | DOUBLE | binary approximation; True | bool | BOOLEAN | also an int subclass; None | NoneType | NULL | different equality rules.\n\nComparisons a SQL reader gets wrong: Each result was executed in the lab; none raises an error, so a wrong assumption passes silently. Columns: Expression | Result | Why. Rows: \"12\" == 12 | False | different types never compare equal; isinstance(True, int) | True | bool subclasses int; type(True) is int | False | the exact type is bool; 0.1 + 0.2 | 0.30000000000000004 | binary floating point; None == None | True | unlike NULL = NULL.",
-      "provenance": "Original SpicyBrain authored visual; every Python value shown was executed in Lab L01 (lab-l01-python-parsing) with CPython 3.12.3 on synthetic records; no product screenshot or cloud result.",
+      "textEquivalent": "Five values, five types: The literal decides the type; digits inside quotes are still text. Columns: Literal | type() | SQL analogue (schematic) | Watch for. Rows: \"12\" | str | VARCHAR | text even when it holds digits; 12 | int | INTEGER | no fixed size; 12.5 | float | DOUBLE | binary approximation; True | bool | BOOLEAN | also an int subclass; None | NoneType | NULL | different equality rules.\n\nComparisons a SQL reader gets wrong: Each result was executed on CPython 3.12.3; none raises an error, so a wrong assumption passes silently. Columns: Expression | Result | Why. Rows: \"12\" == 12 | False | str and int: Python never casts text to a number; 12 == 12.0 | True | numeric types compare by value; True == 1 | True | bool is an int, so True equals 1; isinstance(True, int) | True | bool subclasses int; type(True) is int | False | the exact type is bool; 0.1 + 0.2 | 0.30000000000000004 | binary floating point; None == None | True | unlike NULL = NULL.",
+      "provenance": "Original SpicyBrain authored visual; every Python value shown was executed in Lab L01 (lab-l01-python-parsing) with CPython 3.12.3 on synthetic records, except the rows 12 == 12.0 and True == 1, which were executed with the same CPython 3.12.3 in the builder editorial review; no product screenshot or cloud result.",
       "claimIds": [
         "dbxfe-python-claim-types",
         "dbxfe-python-claim-none",
@@ -824,7 +824,7 @@
         {
           "id": "compare",
           "title": "Comparisons a SQL reader gets wrong",
-          "explanation": "Each result was executed in the lab; none raises an error, so a wrong assumption passes silently.",
+          "explanation": "Each result was executed on CPython 3.12.3; none raises an error, so a wrong assumption passes silently.",
           "nodes": [],
           "connections": [],
           "table": {
@@ -837,7 +837,17 @@
               [
                 "\"12\" == 12",
                 "False",
-                "different types never compare equal"
+                "str and int: Python never casts text to a number"
+              ],
+              [
+                "12 == 12.0",
+                "True",
+                "numeric types compare by value"
+              ],
+              [
+                "True == 1",
+                "True",
+                "bool is an int, so True equals 1"
               ],
               [
                 "isinstance(True, int)",
@@ -1977,7 +1987,7 @@
       "title": "One lossy bug, with and without assertions",
       "alt": "One lossy bug, with and without assertions. The lossy step drops one record; the invariant catches it before any result is used.",
       "caption": "One deliberately lossy bug, run twice: the assertion is the only thing that notices, and -O removes it. Executed in Lab L01.",
-      "textEquivalent": "python: assertions on: The lossy step drops one record; the invariant catches it before any result is used. Nodes: Lossy duplicate step: Drops the last accepted record. (warning); Landed: 24. 9 accepted + 15 rejected. (warning); Received: 25. 15 CSV + 10 JSON. (context); assert landed == received: AssertionError; exit status 1. (selected). Relationships: Lossy duplicate step → Landed: loses one; Landed → assert landed == received: compared; Received → assert landed == received: compared.\n\npython -O: assertions removed: The same bug and the same 24 of 25, with no check at all: the program exits 0. Nodes: Lossy duplicate step: Drops the last accepted record. (warning); Landed: 24. 9 accepted + 15 rejected. (warning); Received: 25. 15 CSV + 10 JSON. (context); assert landed == received: Compiled away; prints 24 25, exit status 0. (excluded). Relationships: Lossy duplicate step → Landed: loses one; Landed → assert landed == received: never compared; Received → assert landed == received: never compared.",
+      "textEquivalent": "python: assertions on: The lossy step drops one record; the invariant catches it before any result is used. Nodes: Lossy duplicate step: Skips the duplicate rule and returns 9 of the 10 records that passed field checks. (warning); Landed: 24. 9 kept + 15 field rejections. (warning); Received: 25. 15 CSV + 10 JSON. (context); assert landed == received: AssertionError; exit status 1. (selected). Relationships: Lossy duplicate step → Landed: loses one; Landed → assert landed == received: compared; Received → assert landed == received: compared.\n\npython -O: assertions removed: The same bug and the same 24 of 25, with no check at all: the program exits 0. Nodes: Lossy duplicate step: Skips the duplicate rule and returns 9 of the 10 records that passed field checks. (warning); Landed: 24. 9 kept + 15 field rejections. (warning); Received: 25. 15 CSV + 10 JSON. (context); assert landed == received: Compiled away; prints 24 25, exit status 0. (excluded). Relationships: Lossy duplicate step → Landed: loses one; Landed → assert landed == received: never compared; Received → assert landed == received: never compared.",
       "provenance": "Original SpicyBrain authored visual; every Python value shown was executed in Lab L01 (lab-l01-python-parsing) with CPython 3.12.3 on synthetic records; no product screenshot or cloud result.",
       "claimIds": [
         "dbxfe-python-claim-assert",
@@ -1994,13 +2004,13 @@
             {
               "id": "lossy",
               "label": "Lossy duplicate step",
-              "detail": "Drops the last accepted record.",
+              "detail": "Skips the duplicate rule and returns 9 of the 10 records that passed field checks.",
               "status": "warning"
             },
             {
               "id": "landed",
               "label": "Landed",
-              "detail": "9 accepted + 15 rejected.",
+              "detail": "9 kept + 15 field rejections.",
               "status": "warning",
               "value": "24"
             },
@@ -2044,13 +2054,13 @@
             {
               "id": "lossy",
               "label": "Lossy duplicate step",
-              "detail": "Drops the last accepted record.",
+              "detail": "Skips the duplicate rule and returns 9 of the 10 records that passed field checks.",
               "status": "warning"
             },
             {
               "id": "landed",
               "label": "Landed",
-              "detail": "9 accepted + 15 rejected.",
+              "detail": "9 kept + 15 field rejections.",
               "status": "warning",
               "value": "24"
             },
@@ -2944,7 +2954,7 @@
         {
           "id": "dbxfe-python-logging-question-a",
           "text": "4, 5, 6, 7, then 2, 3, 8",
-          "rationale": "Correct: field rejections are logged while reading, and duplicate rejections afterwards, while walking the accepted records."
+          "rationale": "Correct: every validate() rejection, field or cross-field, is logged while reading, and duplicate rejections afterwards, while walking the accepted records."
         },
         {
           "id": "dbxfe-python-logging-question-b",
@@ -3144,7 +3154,7 @@
       "version": "1.0.0",
       "title": "Text that looks like a number is still text",
       "outcome": "Predict a value's type and whether two values of different types compare equal.",
-      "explanation": "Every Python value carries a [[dbxfe-python-type-concept|type]]: '12' is a str, 12 an int, 12.5 a float, True a bool and None the NoneType. Python never converts for you during a comparison, so '12' == 12 is simply False, where a SQL engine might cast. Two more facts matter for data: bool is a subclass of int, so True passes an isinstance check for int, and a float is a binary approximation, so 0.1 + 0.2 prints 0.30000000000000004. Notice in the second state which comparisons a SQL reader expects to behave differently.",
+      "explanation": "Every Python value carries a [[dbxfe-python-type-concept|type]]: '12' is a str, 12 an int, 12.5 a float, True a bool and None the NoneType. Python never converts text to a number in a comparison, so '12' == 12 is False, where a SQL engine might cast; numeric types do compare by value, so 12 == 12.0 is True. For data, bool is a subclass of int, so True passes an isinstance check for int and equals 1, and a float is a binary approximation, so 0.1 + 0.2 prints 0.30000000000000004. Notice which comparisons in the second state surprise a SQL reader.",
       "lessonId": "dbxfe-python-l01",
       "sectionId": "dbxfe-python-l01-values",
       "conceptIds": [
@@ -3162,12 +3172,12 @@
         "dbxfe-python-types-question"
       ],
       "handbook": {
-        "markdown": "Python decides behaviour by type, and the type comes from how a value was produced, not from what it looks like. The csv module produces str for every cell; json.load produces int, float, bool, str or None; your own code produces whatever it constructs.\n\n```python\n>>> type(\"12\"), type(12), type(12.5), type(True), type(None)\n(<class 'str'>, <class 'int'>, <class 'float'>, <class 'bool'>, <class 'NoneType'>)\n>>> \"12\" == 12\nFalse\n>>> isinstance(True, int), type(True) is int\n(True, False)\n>>> 0.1 + 0.2\n0.30000000000000004\n```\n\nThree consequences shape every parser in this module. First, there is no implicit cast: comparing the text '12' with the number 12 returns False without an error, so a filter such as `row[\"inspected_units\"] == 0` silently matches nothing on CSV data. Convert once, under a policy, then compare typed values. Second, bool is a subclass of int. A JSON `true` in a quantity field passes `isinstance(value, int)` and would be counted as 1 unit; the lab's policy uses `type(value) is int` to exclude it. Third, float is binary: 0.1 + 0.2 is not 0.3, and 5.1 is stored as 5.0999999999999996447…, which is why costs use Decimal.\n\nWhat to inspect when a result looks wrong: print `repr(value)` and `type(value)` for the exact record, not the value alone, because `print('12')` and `print(12)` look identical. The SQL column in the visual is a schematic analogy; SQL types have sizes and engine-specific casting rules that Python's types do not share.",
+        "markdown": "Python decides behaviour by type, and the type comes from how a value was produced, not from what it looks like. The csv module produces str for every cell; json.load produces int, float, bool, str or None; your own code produces whatever it constructs.\n\n```python\n>>> type(\"12\"), type(12), type(12.5), type(True), type(None)\n(<class 'str'>, <class 'int'>, <class 'float'>, <class 'bool'>, <class 'NoneType'>)\n>>> \"12\" == 12\nFalse\n>>> isinstance(True, int), type(True) is int\n(True, False)\n>>> 0.1 + 0.2\n0.30000000000000004\n```\n\nThree consequences shape every parser in this module. First, there is no implicit cast: comparing the text '12' with the number 12 returns False without an error, so a filter such as `row[\"inspected_units\"] == 0` silently matches nothing on CSV data. Convert once, under a policy, then compare typed values. The exception is numbers: 12 == 12.0 and True == 1 are both True, because numeric types compare by value, so a set of payload tuples keeps (True,) and (1,) as one member. Second, bool is a subclass of int. A JSON `true` in a quantity field passes `isinstance(value, int)` and would be counted as 1 unit; the lab's policy uses `type(value) is int` to exclude it. Third, float is binary: 0.1 + 0.2 is not 0.3, and 5.1 is stored as 5.0999999999999996447…, which is why costs use Decimal.\n\nWhat to inspect when a result looks wrong: print `repr(value)` and `type(value)` for the exact record, not the value alone, because `print('12')` and `print(12)` look identical. The SQL column in the visual is a schematic analogy; SQL types have sizes and engine-specific casting rules that Python's types do not share.",
         "sourceSectionIds": [
           "dbxfe-python-l01-values"
         ]
       },
-      "recap": "Convert once under a policy, because Python compares types exactly and never casts text for you.",
+      "recap": "Convert once under a policy, because Python never casts text to a number for you; only numbers, bool included, compare equal across types.",
       "changeNote": "New academy beat.",
       "mediaIds": []
     },
@@ -3500,7 +3510,7 @@
         "dbxfe-python-assert-question"
       ],
       "handbook": {
-        "markdown": "`assert condition, message` means: if __debug__ is true and the condition is false, raise AssertionError(message). __debug__ is true unless Python runs with -O, and then the compiler emits nothing for the statement at all.\n\n```python\nassert len(accepted) + len(rejected) == raw_count, \"every record is accepted or rejected exactly once\"\n```\n\nThat makes assertions the right tool for one job: stating something the code guarantees, so a future edit that breaks the guarantee fails loudly in development and in tests. The lab proves both halves with a deliberately lossy resolve_duplicates that silently drops one record. Run normally: AssertionError: every record is accepted or rejected exactly once, exit status 1. Run with python -O: the program prints 24 25 and exits 0; nothing noticed the missing record.\n\nSo never write a data rule as an assertion. `assert value >= 0` stops working the day someone runs with -O, and even when it works it raises one generic error instead of recording a reason and keeping the raw record. Input rules belong in ordinary if statements that always run and produce named reasons.\n\nTwo practical notes. unittest's methods such as assertEqual are ordinary method calls, not assert statements, so -O does not remove them; the lab runs its -O experiment in a separate interpreter because -O applies to a whole process. And an assertion message should state the promise that broke, not describe the data, because the data may be fine: here the reconciliation failed, not any record.",
+        "markdown": "`assert condition, message` means: if __debug__ is true and the condition is false, raise AssertionError(message). __debug__ is true unless Python runs with -O, and then the compiler emits nothing for the statement at all.\n\n```python\nassert len(accepted) + len(rejected) == raw_count, \"every record is accepted or rejected exactly once\"\n```\n\nThat makes assertions the right tool for one job: stating something the code guarantees, so a future edit that breaks the guarantee fails loudly in development and in tests. The lab proves both halves with a deliberately lossy resolve_duplicates: it skips the duplicate rule and silently returns only 9 of the 10 records that passed the field checks, so 9 + 15 field rejections = 24 land, where the correct step turns those 10 into 7 accepted and 3 duplicate rejections. Run normally: AssertionError: every record is accepted or rejected exactly once, exit status 1. Run with python -O: the program prints 24 25 and exits 0; nothing noticed the missing record.\n\nSo never write a data rule as an assertion. `assert value >= 0` stops working the day someone runs with -O, and even when it works it raises one generic error instead of recording a reason and keeping the raw record. Input rules belong in ordinary if statements that always run and produce named reasons.\n\nTwo practical notes. unittest's methods such as assertEqual are ordinary method calls, not assert statements, so -O does not remove them; the lab runs its -O experiment in a separate interpreter because -O applies to a whole process. And an assertion message should state the promise that broke, not describe the data, because the data may be fine: here the reconciliation failed, not any record.",
         "sourceSectionIds": [
           "dbxfe-python-l01-errors"
         ]

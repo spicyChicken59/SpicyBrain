@@ -11,7 +11,7 @@
   ],
   "startingAssumptions": [
     "A row contains fields; SUM adds quantities.",
-    "The optional Python bridge introduces records, conversion, functions and assertions."
+    "Records, conversion under a written contract, functions and assertions are taught in the Python module (Python for dependable data work); the optional Python bridge is a shorter refresher with a narrower quantity policy."
   ],
   "lessonIds": [
     "dbxfe-m04-l01",
@@ -969,7 +969,7 @@
       "title": "Read a plan as an explanation of work",
       "alt": "Read a plan as an explanation of work. Rows for the same plant start in different partitions. The teaching redistribution puts each plant together for totals.",
       "caption": "Plans explain work and movement; measured runs establish performance. Synthetic teaching example.",
-      "textEquivalent": "Before grouping: Rows for the same plant start in different partitions. Nodes: Partition A: North A12; South D5. Mixed plant keys. (context); Partition B: North C8; South E7. Mixed plant keys. (context); North group: Waiting. Needs matching keys. (pending); South group: Waiting. Needs matching keys. (pending). Relationships: Partition A → North group: North row; Partition B → North group: North row; Partition A → South group: South row; Partition B → South group: South row.\n\nAfter grouping: The teaching redistribution puts each plant together for totals. Nodes: Input partition A: Read. Original distribution. (context); Input partition B: Read. Original distribution. (context); North group: 20 inspected. 12+8. (selected); South group: 12 inspected. 5+7. (selected). Relationships: Input partition A → North group: keys redistributed; Input partition B → South group: keys redistributed; Input partition A → South group: South contribution: 5; Input partition B → North group: North contribution: 8.",
+      "textEquivalent": "Before grouping: Rows for the same plant start in different partitions. Nodes: Partition A: North A12; South P5. Mixed plant keys. (context); Partition B: North C8; South Q7. Mixed plant keys. (context); North group: Waiting. Needs matching keys. (pending); South group: Waiting. Needs matching keys. (pending). Relationships: Partition A → North group: North row; Partition B → North group: North row; Partition A → South group: South row; Partition B → South group: South row.\n\nAfter grouping: The teaching redistribution puts each plant together for totals. Nodes: Input partition A: Read. Original distribution. (context); Input partition B: Read. Original distribution. (context); North group: 20 inspected. 12+8. (selected); South group: 12 inspected. 5+7. (selected). Relationships: Input partition A → North group: keys redistributed; Input partition B → South group: keys redistributed; Input partition A → South group: South contribution: 5; Input partition B → North group: North contribution: 8.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-transformations-claim-plan",
@@ -986,14 +986,14 @@
             {
               "id": "p-one",
               "label": "Partition A",
-              "value": "North A12; South D5",
+              "value": "North A12; South P5",
               "detail": "Mixed plant keys.",
               "status": "context"
             },
             {
               "id": "p-two",
               "label": "Partition B",
-              "value": "North C8; South E7",
+              "value": "North C8; South Q7",
               "detail": "Mixed plant keys.",
               "status": "context"
             },
@@ -1503,7 +1503,7 @@
     },
     {
       "id": "dbxfe-transformations-python",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "A record needs deliberate conversion",
       "outcome": "Read a Python record and explain accepted versus rejected parsing results.",
       "explanation": "A Python [[dbxfe-transformations-python-concept|dictionary]] can represent one input record, but its field values are not automatically valid numbers. CSV text “12” must be deliberately converted; “many” cannot be treated as twelve. The optional bridge keeps rejected raw input and a reason, so an error becomes inspectable evidence instead of a silently vanished row.",
@@ -1523,13 +1523,13 @@
         "dbxfe-transformations-python-question"
       ],
       "handbook": {
-        "markdown": "Read the complete bridge below as a small local program. Imports make library functions available; a function names reusable behavior; a loop visits records; a conditional chooses a branch; an exception handler handles expected conversion failure. The accepted and rejected lists describe different outcomes. An assertion checks one explicit expectation; it is not a general proof of correctness.\n\nTrace one good and one bad input before running anything. A numeric string becomes an integer. A malformed value produces a reason attached to retained input. Domain checks then decide whether the number is sensible. This is ordinary Python processing of a tiny local input, not a Spark cluster loop or an arbitrary browser code runner.\n\nThe exact code below is reused from the preserved canonical bridge and its historical local exercise evidence. No new execution is claimed by this deck. Its independent expected output and changed-input task remain in the optional download. If functions, lists or assertions are unfamiliar, use that bridge before the DataFrame beat.\n\n~~~python\nimport json\nimport csv\nfrom io import StringIO\n\ndef units(value):\n    if type(value) is int:\n        result = value\n    elif isinstance(value, str) and value.strip().isdigit():\n        result = int(value.strip())\n    else:\n        raise ValueError(\"quantity must be an integer\")\n    if result < 0:\n        raise ValueError(\"quantity must be nonnegative\")\n    return result\n\ndef parse(rows):\n    accepted, rejected = [], []\n    for index, row in enumerate(rows):\n        try:\n            key = row.get(\"inspection_id\")\n            if not isinstance(key, str) or not key.strip():\n                raise ValueError(\"inspection_id is required\")\n            if \"inspected_units\" not in row:\n                raise ValueError(\"inspected_units is missing\")\n            count = units(row[\"inspected_units\"])\n            accepted.append({\"inspection_id\": key.strip(),\n                             \"inspected_units\": count})\n        except ValueError as error:\n            rejected.append({\"index\": index, \"raw\": row,\n                             \"reason\": str(error)})\n    return accepted, rejected\n\nrows = json.loads('[{\"inspection_id\":\"A\",\"inspected_units\":\"12\"},'\n                  '{\"inspection_id\":\"B\",\"inspected_units\":null},'\n                  '{\"inspection_id\":\"C\"}]')\naccepted, rejected = parse(rows)\nassert accepted == [{\"inspection_id\": \"A\", \"inspected_units\": 12}]\nassert [r[\"reason\"] for r in rejected] == [\n    \"quantity must be an integer\", \"inspected_units is missing\"]\ncsv_rows = list(csv.DictReader(StringIO(\n    \"inspection_id,inspected_units\\nD,8\\nE,eight\\n\")))\nassert parse(csv_rows)[0] == [{\"inspection_id\": \"D\", \"inspected_units\": 8}]\n~~~",
+        "markdown": "Read the complete bridge below as a small local program. Imports make library functions available; a function names reusable behavior; a loop visits records; a conditional chooses a branch; an exception handler handles expected conversion failure. The accepted and rejected lists describe different outcomes. An assertion checks one explicit expectation; it is not a general proof of correctness.\n\nTrace inputs before running anything. A digit-only string such as \"12\" (after trimming) or a JSON integer becomes an int; only then does the nonnegative check run, so a JSON -3 is refused as 'quantity must be nonnegative'. Signed text never reaches it: \"-3\" fails isdigit() and is refused as 'quantity must be an integer'. isdigit() also accepts non-ASCII digits such as '²', which int() refuses with its own message. Each refusal is a reason attached to retained input. The Python module's contract differs: it accepts an optional sign with ASCII digits, so \"-5\" converts and gets a negative_ reason, and it numbers positions from 1 where enumerate here counts from 0. This is ordinary local Python, not a Spark cluster loop or a browser code runner.\n\nThe exact code below is reused from the preserved canonical bridge and its historical local exercise evidence; this deck claims no new execution beyond the editorial review's run of units() on the inputs traced above (CPython 3.12.3). Its independent expected output and changed-input task remain in the optional download. If functions, lists or assertions are unfamiliar, use that bridge before the DataFrame beat.\n\n~~~python\nimport json\nimport csv\nfrom io import StringIO\n\ndef units(value):\n    if type(value) is int:\n        result = value\n    elif isinstance(value, str) and value.strip().isdigit():\n        result = int(value.strip())\n    else:\n        raise ValueError(\"quantity must be an integer\")\n    if result < 0:\n        raise ValueError(\"quantity must be nonnegative\")\n    return result\n\ndef parse(rows):\n    accepted, rejected = [], []\n    for index, row in enumerate(rows):\n        try:\n            key = row.get(\"inspection_id\")\n            if not isinstance(key, str) or not key.strip():\n                raise ValueError(\"inspection_id is required\")\n            if \"inspected_units\" not in row:\n                raise ValueError(\"inspected_units is missing\")\n            count = units(row[\"inspected_units\"])\n            accepted.append({\"inspection_id\": key.strip(),\n                             \"inspected_units\": count})\n        except ValueError as error:\n            rejected.append({\"index\": index, \"raw\": row,\n                             \"reason\": str(error)})\n    return accepted, rejected\n\nrows = json.loads('[{\"inspection_id\":\"A\",\"inspected_units\":\"12\"},'\n                  '{\"inspection_id\":\"B\",\"inspected_units\":null},'\n                  '{\"inspection_id\":\"C\"}]')\naccepted, rejected = parse(rows)\nassert accepted == [{\"inspection_id\": \"A\", \"inspected_units\": 12}]\nassert [r[\"reason\"] for r in rejected] == [\n    \"quantity must be an integer\", \"inspected_units is missing\"]\ncsv_rows = list(csv.DictReader(StringIO(\n    \"inspection_id,inspected_units\\nD,8\\nE,eight\\n\")))\nassert parse(csv_rows)[0] == [{\"inspection_id\": \"D\", \"inspected_units\": 8}]\n~~~",
         "sourceSectionIds": [
           "dbxfe-python-bridge-records"
         ]
       },
       "recap": "Representation, conversion and validity are separate decisions.",
-      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "changeNote": "1.1.0: the handbook traces signed text, a negative JSON integer and a non-ASCII digit through units() as the code actually behaves, instead of saying domain checks decide every number, and names where the bridge's policy differs from the Python module's contract. The explanation, visual, code and check are unchanged; earlier answers and notes are retained and a completed beat is marked revised.",
       "mediaIds": []
     },
     {
@@ -1667,7 +1667,7 @@
     },
     {
       "id": "dbxfe-transformations-window",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "A window adds context without collapsing rows",
       "outcome": "Compute a per-row rank or running total while keeping inspection grain.",
       "explanation": "Grouping collapses rows to one per key; a [[dbxfe-transformations-window-concept|window function]] keeps every row and computes a value over the partition of related rows. Rank North’s inspections by inspected units: A (12) gets rank 1, C (8) rank 2, and both rows remain. A running total over the same ordering gives 12, then 20. Notice that the output still has two rows at inspection grain; only new columns appeared. Ties and the frame decide which neighbours each row sees, so state both before trusting the numbers.",
@@ -1688,19 +1688,19 @@
       ],
       "hint": "Count the output rows first, then read the new column; a tie is still inside the partition.",
       "handbook": {
-        "markdown": "Grouping and windowing answer different questions. `GROUP BY plant` returns one row per plant, so the inspection identity is gone. A window function keeps the inspection row and computes a value over its partition, the rows sharing the same plant, in a stated order and frame. The lesson’s pipeline projects, then groups; a window is a third kind of step that adds columns without changing what one row means.\n\nWorked example (synthetic): North holds A=12, C=8 and E=8 inspected units.\n\n```sql\nSELECT inspection_id, inspected,\n       RANK() OVER (PARTITION BY plant ORDER BY inspected DESC) AS rnk,\n       SUM(inspected) OVER (PARTITION BY plant ORDER BY inspected DESC) AS running\nFROM inspections;\n```\n\n```python\nfrom pyspark.sql import Window, functions as F\nw = Window.partitionBy(\"plant\").orderBy(F.col(\"inspected\").desc())\nranked = (inspections\n          .withColumn(\"rnk\", F.rank().over(w))\n          .withColumn(\"running\", F.sum(\"inspected\").over(w)))\n```\n\nExpected rows: A gets rank 1; C and E share rank 2, because RANK leaves a gap rather than guessing between equals. The running column is 12 for A but 28 for both C and E: with ORDER BY and no frame clause, the documented default is a growing range frame from unbounded preceding to the current row, and a range frame includes the current row’s peers. If you mean a strict row-by-row total, add a deterministic tiebreaker to the ordering or state `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`. ROW_NUMBER would give C and E 2 and 3 in an order the engine chooses unless that tiebreaker exists.\n\nWhat to inspect: the output row count equals the input row count; the partition column matches the intended population; ties follow a stated rule; the frame is explicit whenever the answer depends on it. A window is evaluated after the FROM and WHERE stages, so filtering on a window result needs a subquery or a later DataFrame filter. Windows do not repair a multiplied join: compute them at the correct grain. Assert the expected rows on the pinned local Spark before quoting any of these numbers.",
+        "markdown": "Grouping and windowing answer different questions. `GROUP BY plant` returns one row per plant, so the inspection identity is gone. A window function keeps the inspection row and computes a value over its partition, the rows sharing the same plant, in a stated order and frame. The lesson’s pipeline projects, then groups; a window is a third kind of step that adds columns without changing what one row means.\n\nWorked example (synthetic): North holds A=12, C=8 and E=8 inspected units.\n\n```sql\nSELECT inspection_id, inspected,\n       RANK() OVER (PARTITION BY plant ORDER BY inspected DESC) AS rnk,\n       SUM(inspected) OVER (PARTITION BY plant ORDER BY inspected DESC) AS running\nFROM inspections;\n```\n\n```python\nfrom pyspark.sql import Window, functions as F\nw = Window.partitionBy(\"plant\").orderBy(F.col(\"inspected\").desc())\nranked = (inspections\n          .withColumn(\"rnk\", F.rank().over(w))\n          .withColumn(\"running\", F.sum(\"inspected\").over(w)))\n```\n\nExpected rows: A gets rank 1; C and E share rank 2, because RANK leaves a gap rather than guessing between equals. The running column is 12 for A but 28 for both C and E: with ORDER BY and no frame clause, the documented default is a growing range frame from unbounded preceding to the current row, and a range frame includes the current row’s peers. If you mean a strict row-by-row total, add a deterministic tiebreaker to the ordering or state `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`. ROW_NUMBER would give C and E 2 and 3 in an order the engine chooses unless that tiebreaker exists.\n\nWhat to inspect: the output row count equals the input row count; the partition column matches the intended population; ties follow a stated rule; the frame is explicit whenever the answer depends on it. A window is evaluated after the FROM and WHERE stages, so WHERE cannot filter on its result. On the pinned Spark 4.0.4 use a subquery or a later DataFrame filter: a QUALIFY clause raises ParseException there. Databricks SQL also documents a QUALIFY clause, so check the target runtime before relying on it. Windows do not repair a multiplied join: compute them at the correct grain. Assert the expected rows on the pinned local Spark before quoting any of these numbers.",
         "sourceSectionIds": [
           "dbxfe-m04-l01-foundation-mechanism",
           "dbxfe-grain-joins-totals-reference"
         ]
       },
       "recap": "A window computes per-row context over related rows; grouping computes per-key totals.",
-      "changeNote": "New academy beat.",
+      "changeNote": "1.1.0: the handbook scopes the window-filter advice to the pinned Spark 4.0.4, where QUALIFY raises ParseException, and notes that Databricks SQL documents QUALIFY. The explanation, visual and check are unchanged; earlier answers and notes are retained and a completed beat is marked revised.",
       "mediaIds": []
     },
     {
       "id": "dbxfe-transformations-plan",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "Read a plan as an explanation of work",
       "outcome": "Interpret scan/filter/join/aggregate/shuffle without inferring a benchmark.",
       "explanation": "A physical plan describes how Spark proposes to perform the work. Scans read data, filters reduce rows, joins form matches, and aggregates combine groups. A [[dbxfe-transformations-plan-concept|shuffle]] redistributes rows across partitions. Inspect these operations to explain data movement, but do not turn a tiny local plan into a production speed claim.",
@@ -1726,7 +1726,7 @@
         ]
       },
       "recap": "Plans explain work and movement; measured runs establish performance.",
-      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "changeNote": "1.1.0: the plan visual's South rows are relabelled P5 and Q7, so they no longer reuse the IDs D and E, which later beats give to North inspections; the numbers are unchanged. The explanation, handbook and check are unchanged; earlier answers and notes are retained and a completed beat is marked revised.",
       "mediaIds": []
     },
     {

@@ -412,7 +412,7 @@
     "BROADCAST hint",
     "sort-merge join"
    ],
-   "definition": "A join strategy that copies the small side to every task so the large side is not shuffled.",
+   "definition": "A join strategy that collects the small side on the driver and ships one copy to every executor, where its tasks share it, so the large side is not shuffled.",
    "example": "F.broadcast(plants) replaced SortMergeJoin with BroadcastHashJoin and cut shuffled records from 243 to 8.",
    "sourceIds": [
     "dbxfe-spark-execution-source-sql-tuning"
@@ -1294,7 +1294,7 @@
    "title": "Broadcast copies the small side instead of moving the big one",
    "alt": "Two states of the same regional join: a sort-merge join that shuffles 240 fact rows and 3 dimension rows, and a broadcast join that shuffles only 8 regional partials.",
    "caption": "Same result, two fewer exchanges; the small side travels instead of the big one. Records and operators from the recorded lab run.",
-   "textEquivalent": "Sort-merge join (broadcast off): Both inputs are shuffled by plant and sorted; three exchanges; executed stages 1, 4, 4, 4. Nodes: Facts, 240 rows: 240 shuffled. Exchange (3) hashpartitioning(plant#1, 4), then Sort. (warning); Plants, 3 rows: 3 shuffled. Exchange (8) hashpartitioning(plant#10, 4), then Sort. (warning); SortMergeJoin (10): 243 read. Read 206, 0, 37, 0 per task: one task held North and West. (selected); Regional sum: 3 partials. Exchange (13) hashpartitioning(region#11, 4), then the final sum. (context). Relationships: Facts, 240 rows → SortMergeJoin (10): shuffle by plant; Plants, 3 rows → SortMergeJoin (10): shuffle by plant; SortMergeJoin (10) → Regional sum: partial sums.\n\nBroadcast join (F.broadcast(plants)): A one-task job collects the dimension and copies it to every fact task; one exchange remains, for the regional sum. Nodes: Facts, 240 rows: 0 shuffled. Scanned in place and joined in the same task. (selected); Plants, 3 rows: copied. BroadcastExchange (6): a separate one-task job collects and copies it. (context); BroadcastHashJoin (7): BuildRight. Runs inside the four tasks that scanned the facts. (selected); Regional sum: 8 partials. Exchange (10) hashpartitioning(region#11, 4), then the final sum. (context). Relationships: Plants, 3 rows → BroadcastHashJoin (7): broadcast copy; Facts, 240 rows → BroadcastHashJoin (7): same task; BroadcastHashJoin (7) → Regional sum: partial sums.",
+   "textEquivalent": "Sort-merge join (broadcast off): Both inputs are shuffled by plant and sorted; three exchanges; executed stages 1, 4, 4, 4. Nodes: Facts, 240 rows: 240 shuffled. Exchange (3) hashpartitioning(plant#1, 4), then Sort. (warning); Plants, 3 rows: 3 shuffled. Exchange (8) hashpartitioning(plant#10, 4), then Sort. (warning); SortMergeJoin (10): 243 read. Read 206, 0, 37, 0 per task: one task held North and West. (selected); Regional sum: 3 partials. Exchange (13) hashpartitioning(region#11, 4), then the final sum. (context). Relationships: Facts, 240 rows → SortMergeJoin (10): shuffle by plant; Plants, 3 rows → SortMergeJoin (10): shuffle by plant; SortMergeJoin (10) → Regional sum: partial sums.\n\nBroadcast join (F.broadcast(plants)): A one-task job computes the dimension, the driver collects it and ships one copy to every executor for the fact tasks to share; one exchange remains, for the regional sum. Nodes: Facts, 240 rows: 0 shuffled. Scanned in place and joined in the same task. (selected); Plants, 3 rows: copied. BroadcastExchange (6): a separate one-task job computes it; the driver collects it and ships one copy per executor. (context); BroadcastHashJoin (7): BuildRight. Runs inside the four tasks that scanned the facts. (selected); Regional sum: 8 partials. Exchange (10) hashpartitioning(region#11, 4), then the final sum. (context). Relationships: Plants, 3 rows → BroadcastHashJoin (7): broadcast copy; Facts, 240 rows → BroadcastHashJoin (7): same task; BroadcastHashJoin (7) → Regional sum: partial sums.",
    "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
    "claimIds": [
     "dbxfe-spark-execution-claim-broadcast",
@@ -1358,7 +1358,7 @@
     {
      "id": "broadcast",
      "title": "Broadcast join (F.broadcast(plants))",
-     "explanation": "A one-task job collects the dimension and copies it to every fact task; one exchange remains, for the regional sum.",
+     "explanation": "A one-task job computes the dimension, the driver collects it and ships one copy to every executor for the fact tasks to share; one exchange remains, for the regional sum.",
      "nodes": [
       {
        "id": "facts",
@@ -1370,7 +1370,7 @@
       {
        "id": "dim",
        "label": "Plants, 3 rows",
-       "detail": "BroadcastExchange (6): a separate one-task job collects and copies it.",
+       "detail": "BroadcastExchange (6): a separate one-task job computes it; the driver collects it and ships one copy per executor.",
        "status": "context",
        "value": "copied"
       },
@@ -2584,7 +2584,7 @@
     {
      "id": "dbxfe-spark-execution-broadcast-question-b",
      "text": "Broadcast the fact side, because the larger side benefits most from being copied.",
-     "rationale": "Copying the large side to every task multiplies memory use; broadcasting is for the side small enough to fit in each task."
+     "rationale": "A broadcast side is collected on the driver and copied to every executor, so the large side would exhaust memory; broadcasting is for the side small enough to fit in driver and executor memory."
     },
     {
      "id": "dbxfe-spark-execution-broadcast-question-d",
@@ -3050,7 +3050,7 @@
    "version": "1.0.0",
    "title": "Broadcast copies the small side instead of moving the big one",
    "outcome": "Choose between a sort-merge and a broadcast join from the sizes of the two sides, and check the choice in the plan.",
-   "explanation": "A sort-merge join shuffles both inputs by the join key and sorts them; a [[dbxfe-spark-execution-broadcast-concept|broadcast join]] copies the small side to every task so the large side is never shuffled. In the comparison, notice the shuffled records: 240 fact rows and 3 dimension rows fed the sort-merge join, while the broadcast plan shuffled only 8 regional partials. Stages went from 1, 4, 4, 4 to a one-task broadcast job plus 4 and 4, with identical totals.",
+   "explanation": "A sort-merge join shuffles both inputs by the join key and sorts them; a [[dbxfe-spark-execution-broadcast-concept|broadcast join]] ships the small side once to every executor, where the tasks share it, so the large side is never shuffled. In the comparison, notice the shuffled records: 240 fact rows and 3 dimension rows fed the sort-merge join, while the broadcast plan shuffled only 8 regional partials. Stages went from 1, 4, 4, 4 to a one-task broadcast job plus 4 and 4, with identical totals.",
    "lessonId": "dbxfe-spark-execution-l01",
    "sectionId": "dbxfe-spark-execution-l01-worked",
    "conceptIds": [
@@ -3065,14 +3065,14 @@
    "visualId": "dbxfe-spark-execution-broadcast-visual",
    "samajh": {
     "text": "Ek chhoti price list hai aur hazaar customers. Har customer ko us ek counter par bhejna jahan list rakhi hai, woh sort-merge join jaisa hai: sab log line mein chalte hain. Price list ki photocopy har counter par rakh dena broadcast join hai: customer jahan khada hai wahin uska bill ban jata hai. Photocopy tabhi kaam karti hai jab list chhoti ho; poori customer list ki photocopy har counter par rakhna bewakoofi hogi.",
-    "mapping": "The price list is the small dimension, the customers are the fact rows, and the photocopy at each counter is the broadcast copy held by each task.",
-    "boundary": "Spark decides the small side from known sizes or a hint, not from what a person can carry, and the copy must fit in each task's memory."
+    "mapping": "The price list is the small dimension, the customers are the fact rows, and the photocopy at each counter is the broadcast copy held once per executor and shared by its tasks.",
+    "boundary": "Spark decides the small side from known sizes or a hint, not from what a person can carry, and the list is first gathered on the driver, so it must fit in driver and executor memory."
    },
    "questionIds": [
     "dbxfe-spark-execution-broadcast-question"
    ],
    "handbook": {
-    "markdown": "The Spark SQL tuning page documents join strategy hints (`BROADCAST`, `MERGE`, `SHUFFLE_HASH`, `SHUFFLE_REPLICATE_NL`) and `spark.sql.autoBroadcastJoinThreshold`, the size below which Spark broadcasts a relation automatically when it knows its size (default 10 MB; `-1` disables it). The lab set it to `-1` so that both strategies could be forced and compared.\n\n```python\nby_region_bc = facts.join(F.broadcast(plants), \"plant\").groupBy(\"region\").agg(\n    F.count(\"*\").alias(\"rows\"), F.sum(\"inspected_units\").alias(\"inspected\"))\n```\n\nBroadcast plan outline printed by local Spark 4.0.4:\n\n```text\n* HashAggregate (11)\n+- Exchange (10)\n   +- * HashAggregate (9)\n      +- * Project (8)\n         +- * BroadcastHashJoin Inner BuildRight (7)\n            :- * Project (2)\n            :  +- * Scan ExistingRDD (1)\n            +- BroadcastExchange (6)\n               +- * Project (5)\n                  +- * Filter (4)\n                     +- * Scan ExistingRDD (3)\n```\n\nThe sort-merge version instead had an `Exchange` and a `Sort` under each join input, then `SortMergeJoin`, then the regional `Exchange`. Measured shuffle records: the sort-merge job wrote 240 fact rows and 3 dimension rows into the join, whose tasks read 206, 0, 37 and 0, and then 3 regional partials; the broadcast job wrote only 8 regional partials, two per fact task. Both returned coastal 60 rows / 2352 and inland 180 / 5898.\n\nWhen not: the broadcast side must fit in the memory of every task that uses it, and a hint on a side that is not small spills or fails. When both sides are large, the sort-merge join is the honest plan and the question becomes skew.\n\nWhat to inspect: the join operator, which side is `Build`, and whether the large side still has an Exchange under it. What this run cannot show: which strategy is faster at production size; it shows only which one moves the fact rows.",
+    "markdown": "The Spark SQL tuning page documents join strategy hints (`BROADCAST`, `MERGE`, `SHUFFLE_HASH`, `SHUFFLE_REPLICATE_NL`) and `spark.sql.autoBroadcastJoinThreshold`, the size below which Spark broadcasts a relation automatically when it knows its size (default 10 MB; `-1` disables it). The lab set it to `-1` so that both strategies could be forced and compared.\n\n```python\nby_region_bc = facts.join(F.broadcast(plants), \"plant\").groupBy(\"region\").agg(\n    F.count(\"*\").alias(\"rows\"), F.sum(\"inspected_units\").alias(\"inspected\"))\n```\n\nBroadcast plan outline printed by local Spark 4.0.4:\n\n```text\n* HashAggregate (11)\n+- Exchange (10)\n   +- * HashAggregate (9)\n      +- * Project (8)\n         +- * BroadcastHashJoin Inner BuildRight (7)\n            :- * Project (2)\n            :  +- * Scan ExistingRDD (1)\n            +- BroadcastExchange (6)\n               +- * Project (5)\n                  +- * Filter (4)\n                     +- * Scan ExistingRDD (3)\n```\n\nThe sort-merge version instead had an `Exchange` and a `Sort` under each join input, then `SortMergeJoin`, then the regional `Exchange`. Measured shuffle records: the sort-merge job wrote 240 fact rows and 3 dimension rows into the join, whose tasks read 206, 0, 37 and 0, and then 3 regional partials; the broadcast job wrote only 8 regional partials, two per fact task. Both returned coastal 60 rows / 2352 and inland 180 / 5898.\n\nWhen not: the broadcast side is first collected on the driver and then held once per executor, so it must fit in driver memory and in each executor's memory; a hint on a side that is not small can run the driver out of memory or fail the job. When both sides are large, the sort-merge join is the honest plan and the question becomes skew.\n\nWhat to inspect: the join operator, which side is `Build`, and whether the large side still has an Exchange under it. What this run cannot show: which strategy is faster at production size; it shows only which one moves the fact rows.",
     "sourceSectionIds": [
      "dbxfe-spark-execution-l01-worked"
     ]
@@ -3102,7 +3102,7 @@
    "samajh": {
     "text": "Ek hospital OPD mein teen doctor hain, par saare heart ke patients sirf Dr. Sharma ke paas jaate hain, aur aaj 180 heart patients aaye. Do aur doctor bula lo, unke paas patient hi nahi hain; Dr. Sharma ki line utni hi lambi rahegi. Line lambi patients ki ginti se nahi, unke ek hi doctor ke paas jaane se hai. Spark mein key hi tay karti hai ki row kis doctor ke paas jayegi.",
     "mapping": "A doctor is a partition, a patient is a row, and the specialty that routes a patient is the hash of the key.",
-    "boundary": "A hospital can retrain a doctor; Spark's hash never sends one key's rows to two partitions unless the key itself changes."
+    "boundary": "A hospital can retrain a doctor; Spark's hash never sends one key's rows to two partitions unless the key itself changes, though adaptive skew-join handling can later split a join partition's reads across tasks."
    },
    "questionIds": [
     "dbxfe-spark-execution-skew-question"
@@ -3114,7 +3114,7 @@
      "dbxfe-spark-execution-l01-skew"
     ]
    },
-   "recap": "The hot key is a floor: one task carries it however many partitions or slots exist.",
+   "recap": "Under hash partitioning the hot key is a floor: one task carries it however many partitions or slots exist, unless adaptive skew-join handling splits that join partition (a later beat).",
    "changeNote": "New academy beat.",
    "mediaIds": []
   },
@@ -3471,12 +3471,13 @@
  "appliedTask": {
   "title": "Diagnose the supplier roll-up before anyone doubles the cluster",
   "prompt": "Fictional Harbourline Supplies runs a nightly job that joins 2,000,000 shipment rows to a 40-row supplier table and sums weight per region. One supplier now sends about 70% of the rows. The plan screenshot shows SortMergeJoin with an Exchange under each input, adaptive execution is on at its defaults, and the only other evidence is a run time that doubled. Predict what the plan and the stage page will show, choose one first experiment, and state what would change your mind.",
-  "modelAnswer": "From the plan: three Exchanges (each join input and the regional aggregate), so four stages, and the join stage has one task per shuffle partition. Prediction for the stage page: one join task reads about 70% of the shuffled rows, roughly 1,400,000 plus the matching supplier row, several times the median, while the other tasks finish early; more executors would idle. The supplier table has 40 rows, so the first experiment changes one thing: broadcast it with a hint, then compare the plan (BroadcastHashJoin, one Exchange), the shuffled records (only regional partials), the busiest task's read and the totals, which must not change. If a task still dominates, check whether the regional aggregate or another key is now the skewed step, and whether that partition exceeds both adaptive skew thresholds, five times the median and 256 MB by default, before relying on adaptive skew handling; otherwise salt the key. What would change my mind: evenly sized, slow tasks across the join stage, which means volume rather than skew, and then more executors are justified. Unknowns to state: actual partition bytes, spill, and whether the platform overrides the defaults.",
-  "reasoning": "The answer reads structure from the plan, predicts the runtime signature of skew from the key share, tests the cheapest single change with named evidence and an unchanged-total check, and names the measurement under which scaling out is the right call.",
+  "modelAnswer": "First, establish which plan the screenshot shows. A 40-row supplier side is far below the 10 MB broadcast threshold, so a SortMergeJoin itself needs explaining. Under a header reading isFinalPlan=false it is only the initial plan, drawn without a usable size estimate; with adaptive execution on at its defaults, expect the plan printed after the action (isFinalPlan=true) to show BroadcastHashJoin with AQEShuffleRead local under both inputs. The join then runs where each map output is read, no join task holds the hot supplier, and the stage page's long tasks, if any, point elsewhere: evenly slow tasks or spill mean volume. If the final plan still shows SortMergeJoin, find out why before predicting skew: a lowered or disabled threshold, a size the runtime could not measure, or a join type that cannot build on the supplier side. Only if it really ran as a sort-merge join: three Exchanges (each join input and the regional aggregate), so four stages, and the join stage has one task per shuffle partition. Prediction for the stage page: one join task reads about 70% of the shuffled rows, roughly 1,400,000 plus the matching supplier row, several times the median, while the other tasks finish early; more executors would idle. Either way the first experiment changes one thing: broadcast the supplier table with a hint, because a planned broadcast also skips the input shuffles a runtime conversion has already paid for. Compare the plan (BroadcastHashJoin, one Exchange), the shuffled records (only regional partials), the busiest task's read and the totals, which must not change. If a task still dominates, check whether another key is now the skewed step, and whether that partition exceeds both adaptive skew thresholds, five times the median and 256 MB by default, before relying on adaptive skew handling; otherwise salt the key. What would change my mind: evenly sized, slow tasks across the join stage, which means volume rather than skew, and then more executors are justified. Unknowns to state: whether the screenshot is the final plan, actual partition bytes, spill, and whether the platform overrides the defaults.",
+  "reasoning": "The answer first establishes whether the screenshot is the plan that ran, then reads structure from the plan, predicts the runtime signature of skew from the key share only for a join that really shuffled, tests the cheapest single change with named evidence and an unchanged-total check, and names the measurement under which scaling out is the right call.",
   "beatIds": [
    "dbxfe-spark-execution-explain",
    "dbxfe-spark-execution-skew",
    "dbxfe-spark-execution-broadcast",
+   "dbxfe-spark-execution-adaptive",
    "dbxfe-spark-execution-skewjoin",
    "dbxfe-spark-execution-experiment"
   ]

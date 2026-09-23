@@ -51,7 +51,7 @@ The grouped sum's outline as printed by local Spark 4.0.4; node 4's arguments re
 | Regional sum, broadcast off | `SortMergeJoin` | 3 | 1, 4, 4, 4 | 243 rows, then 3 partials |
 | Regional sum, `F.broadcast(plants)` | `BroadcastHashJoin` | 1 | 1 (broadcast job), then 4, 4 | 8 partials |
 
-Each grouped map task wrote three partial rows, one per plant, and the reduce tasks read 8, 0, 4 and 0 of them. The broadcast removed the exchange over the 240 fact rows: one task collected the dimension and copied it to every task, and the join ran where the facts were scanned. Both joins return coastal 60 rows / 2352 and inland 180 / 5898.
+Each grouped map task wrote three partial rows, one per plant, and the reduce tasks read 8, 0, 4 and 0 of them. The broadcast removed the exchange over the 240 fact rows: a one-task job computed the dimension, the driver collected it and shipped one copy to every executor, and the join ran where the facts were scanned. Both joins return coastal 60 rows / 2352 and inland 180 / 5898.
 
 <!-- section:dbxfe-spark-execution-l01-skew -->
 
