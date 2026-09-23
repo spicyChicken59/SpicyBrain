@@ -97,12 +97,29 @@ const go = async (page: Page, hash: string) => {
   await page.goto(`${origin}/${hash}`);
   await expect(page.locator("main h1")).toBeVisible();
 };
+// Every edit is queued as its own write, so a snapshot or a navigation taken
+// while "Saving…" shows can see (or lose) a half-typed draft. Settle waits
+// until no save is pending and two reads a moment apart agree.
 const settle = async (page: Page) => {
   await expect.poll(async () => (await stored(page))?.schemaVersion).toBe(4);
-  await expect(
-    page.getByText("Unsaved · keep this tab open", { exact: true }),
-  ).toHaveCount(0);
+  for (const text of ["Unsaved · keep this tab open", "Saving…"])
+    await expect(page.getByText(text, { exact: true })).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      const first = JSON.stringify(await stored(page));
+      await page.waitForTimeout(250);
+      return first === JSON.stringify(await stored(page));
+    })
+    .toBe(true);
 };
+const noteSaved = (page: Page, ending: string) =>
+  expect
+    .poll(async () =>
+      Object.values((await stored(page)).notes).some((n) =>
+        n.text.trimEnd().endsWith(ending),
+      ),
+    )
+    .toBe(true);
 try {
   const page = context.pages()[0] ?? (await context.newPage());
   const errors: string[] = [];
@@ -118,6 +135,7 @@ try {
   await section
     .getByLabel("Your lesson note")
     .fill("Synthetic note written in the released build");
+  await noteSaved(page, "Synthetic note written in the released build");
   await section
     .getByRole("button", { name: "Bookmark section", exact: true })
     .click();
@@ -160,11 +178,16 @@ try {
   await page
     .getByRole("button", { name: "Mark this beat complete", exact: true })
     .click();
+  // The guide is required unless `--guide none` says the candidate has no
+  // guides: counting its parts before the lazy body renders would silently
+  // skip the draft.
   let guideTitle = "";
-  await go(page, `#/course/dbxfe/guides/${guideId}`);
-  const guidePublished =
-    (await page.locator("section.academy-guide-part").count()) > 0;
+  const guidePublished = guideId !== "none";
   if (guidePublished) {
+    await go(page, `#/course/dbxfe/guides/${guideId}`);
+    await expect(
+      page.locator("section.academy-guide-part").first(),
+    ).toBeVisible();
     guideTitle = (await page.locator("main h1").textContent())!.trim();
     const template = page.locator("section.academy-guide-part").filter({
       has: page.getByRole("heading", {
@@ -180,7 +203,9 @@ try {
     const draft = template.getByLabel("Your draft from this template");
     await draft.press("ControlOrMeta+End");
     await draft.pressSequentially("\nSynthetic guide draft");
+    await noteSaved(page, "Synthetic guide draft");
   }
+  await noteSaved(page, "Synthetic beat note on new material");
   await settle(page);
   const s1 = await stored(page);
   contains(s1, s0);
@@ -201,15 +226,37 @@ try {
   await expect(page.getByRole("alert")).toHaveCount(0);
   const s2a = await stored(page);
   contains(s2a, s1);
+  // The released build names a note's lesson when it still has that lesson
+  // (its search index lists every lesson it knows) and says "Removed lesson"
+  // otherwise; either way the section is new to it and marked unavailable.
+  const baseLessons = new Set(
+    (
+      JSON.parse(
+        await readFile(join(baseDist, "teaching", "search.json"), "utf8"),
+      ) as { href: string }[]
+    ).flatMap((e) => /^#\/lesson\/([^/?]+)/.exec(e.href)?.slice(1) ?? []),
+  );
+  const removedLesson = newNotes.filter(
+    (k) => !baseLessons.has(s1.notes[k].lessonId),
+  ).length;
   await expect(
     page.getByText("Removed lesson · note preserved", { exact: true }),
+  ).toHaveCount(removedLesson);
+  await expect(
+    page.getByText("The original section is unavailable.", { exact: true }),
   ).toHaveCount(newNotes.length);
+  // Each note is shown in full in the released build's note editor.
+  const shown = await page
+    .locator("main textarea")
+    .evaluateAll((els) => els.map((e) => (e as HTMLTextAreaElement).value));
+  for (const k of newNotes) expect(shown).toContain(s1.notes[k].text);
   await go(page, "#/lesson/dbxfe-m02-l01");
   const s2section = page.locator("section[id]").first();
   await s2section.getByText("Notes for this section", { exact: true }).click();
   await s2section
     .getByLabel("Your lesson note")
     .fill("Synthetic note written after the rollback");
+  await noteSaved(page, "Synthetic note written after the rollback");
   await settle(page);
   const s2 = await stored(page);
   contains(s2, s1);
@@ -218,7 +265,7 @@ try {
     checks: [
       "no alert and no page error",
       "every record from step 2 unchanged",
-      `${newNotes.length} new-material note(s) shown as preserved`,
+      `${newNotes.length} new-material note(s) listed with their section marked unavailable (${removedLesson} under "Removed lesson", ${newNotes.length - removedLesson} under their retained lesson)`,
       "an edit made in the released build",
     ],
   });
