@@ -1,0 +1,597 @@
+{
+  "module": {
+    "id": "dbxfe-identity",
+    "title": "Identity, authorization and audit",
+    "summary": "Tell people from workloads, choose OAuth U2M, M2M or workload identity federation, keep secrets out of code, predict row filters, column masks and attribute-based policies, and use audit rows as evidence in a narrow, tested access review.",
+    "objectives": [
+      "Identify who authenticated, whose permissions applied and where a request failed, for users, service principals and groups.",
+      "Choose OAuth U2M, OAuth M2M, workload identity federation or a secret scope for a given caller, and explain the token exposure mistakes each avoids.",
+      "Produce a threat and access review with a narrow permission plan, row and column controls, a must-fail test matrix, separated duties and an audit-based incident sequence."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m06"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-identity-l01.json"
+    ],
+    "scenarioId": "dbxfe-identity-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-identity-scenario",
+      "title": "Threat and access review after Cinderline's leaked token",
+      "context": "Fictional Cinderline Components found a data engineer's personal access token in a notebook committed to its quality-jobs repository. The nightly ingest job runs as that engineer because nobody set its run-as identity; the supplier SFTP password sits in a secret scope readable by all workspace users; a supplier-portal prototype uses a quality lead's token with SELECT on the whole quality catalog; inspector emails are unmasked. Identities come from the company's identity provider through SCIM. The status of attribute-based policies for Cinderline's region is unconfirmed.",
+      "task": "Write a threat and access review for the security owner: containment and an evidence plan for the leaked token, redesigned identities and authentication for the ingest job, the CI deploy and the portal, a narrow permission plan, secret-scope ACLs, row filter and column mask decisions, a test matrix with must-fail rows, the separation of duties for applying it, and an explicit list of unknowns.",
+      "requirements": [
+        "Contain the leaked token before any analysis and bound the evidence with an exposure window and audit queries.",
+        "Give every workload its own service principal with a named authentication method, leaving no personal or shared token in automation.",
+        "Grant to groups on the lowest securables that work, with a test matrix holding at least as many must-fail rows as must-succeed rows.",
+        "Separate request, approval, application and audit; never use administrator rights or ALL PRIVILEGES as a fix; claim no compliance certification."
+      ],
+      "model": "### Containment\nRevoke the token at once (the engineer or a workspace admin) and record the time. The exposure window runs from the commit to the revocation. Security queries system.access.audit for the engineer's identity inside the window and saves the result with the query time; the platform owner lists everything the engineer could reach, and every secret the engineer could read is rotated, starting with the SFTP password.\n\n### Identities\nIngest job: run-as sp-nightly-ingest, a member of ingest-jobs. CI deploy: sp-ci-deploy through workload identity federation limited to the main branch. Portal: sp-supplier-portal through federation, or M2M with a secret held in the portal platform's store. Only release managers hold the servicePrincipal user role on each principal.\n\n### Permission plan\ningest-jobs: MODIFY on quality.raw.deliveries with USE on its parents, and READ on scope supplier-sftp; users is removed from that ACL and MANAGE stays with quality-platform-owners. supplier-portal: USE CATALOG, USE SCHEMA and SELECT on quality.shared.supplier_rejections only, with a row filter for S-17 and a mask on inspector_email. Analysts keep reads through quality-analysts; direct user grants are removed.\n\n### Test matrix (excerpt)\nPortal reads supplier_rejections: allow. Portal reads inspections: deny. Portal writes supplier_rejections: deny. Portal rows for S-22: zero. An analyst reads scope supplier-sftp: deny. The engineer's personal MODIFY on raw deliveries: deny.\n\n### Duties and unknowns\nThe quality lead requests, the schema owner approves, a platform administrator applies, and security reviews the audit rows and the matrix output. Unknown: attribute-based policy status in the region, audit delivery delay for the evidence, and whether the token was used from an unfamiliar address, pending the audit query.",
+      "reasoning": "The model contains before it analyses, replaces people and shared tokens with workload identities, keeps every grant narrow and group-based, proves narrowness with must-fail tests, and states unknowns instead of promising features or compliance.",
+      "rubric": [
+        {
+          "id": "dbxfe-identity-scenario-rubric-1",
+          "criterion": "Containment and evidence",
+          "weak": "Replaces the token without revoking it, or reads audit logs before revoking.",
+          "partial": "Revokes the token but gives no exposure window or saves no query evidence.",
+          "strong": "Revokes first, fixes the window, queries audit rows inside it, lists the reach and rotates readable secrets."
+        },
+        {
+          "id": "dbxfe-identity-scenario-rubric-2",
+          "criterion": "Workload identities and authentication",
+          "weak": "Keeps personal or shared tokens in automation.",
+          "partial": "Introduces service principals but leaves their authentication unnamed or uses long-lived tokens.",
+          "strong": "Each workload has its own service principal with M2M or federation, and run-as roles are limited to the deployers."
+        },
+        {
+          "id": "dbxfe-identity-scenario-rubric-3",
+          "criterion": "Least privilege and test matrix",
+          "weak": "Grants catalog-wide SELECT, MANAGE or admin membership to clear errors.",
+          "partial": "Narrow grants, but no must-fail tests, or tests run as an administrator.",
+          "strong": "Group grants on the lowest securables, filters and masks where needed, and a matrix with must-fail rows run as the real principals."
+        },
+        {
+          "id": "dbxfe-identity-scenario-rubric-4",
+          "criterion": "Separation of duties and honesty",
+          "weak": "One person requests, approves and applies, and the design is called compliant.",
+          "partial": "Names an approver but omits audit review of the change or the unknowns.",
+          "strong": "Four separate duties, audit review of the change, and explicit unknowns such as feature status and delivery delay."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Was the leaked token used after it was committed?",
+          "response": "Unknown until security runs the audit query for the window; the token list's last-used day is the first signal, accurate only to one day."
+        },
+        {
+          "question": "Can the supplier's platform issue identity tokens for federation?",
+          "response": "Its platform team says it can issue OIDC tokens, but the issuer and subject format are not confirmed, so the plan keeps M2M with a rotated secret as the fallback."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-identity-l01"
+      ],
+      "claimIds": [
+        "dbxfe-identity-course-claim-principals",
+        "dbxfe-identity-course-claim-m2m",
+        "dbxfe-identity-course-claim-wif",
+        "dbxfe-identity-course-claim-pat",
+        "dbxfe-identity-course-claim-secrets",
+        "dbxfe-identity-course-claim-runas",
+        "dbxfe-identity-course-claim-filters",
+        "dbxfe-identity-course-claim-audit",
+        "dbxfe-fact-privileges",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-identity-course-source-sdk-iam",
+      "title": "Databricks SDK for Python v0.141.0: service/iam.py (identity and access APIs)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/iam.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Generated client for the account and workspace identity APIs: users, groups, service principals, the current-user call, workspace assignment, permissions and account access-control rule sets. Cloud-independent API behaviour.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Docstrings are generated from the API specification and describe API behaviour, not entitlements, tiers or regional availability; setup steps belong to the product documentation. File read in full on 2026-09-23 from the tagged raw file; Databricks-authored open-source code, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-sdk-auth",
+      "title": "Databricks SDK for Python v0.141.0: credentials_provider.py (authentication strategies)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/credentials_provider.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "How one Databricks client authenticates: personal access tokens (pat), OAuth machine-to-machine (oauth-m2m), OAuth user-to-machine through a browser (external-browser) and OIDC token exchange for federated workloads; oauth.py and oidc.py at the same tag hold the token requests.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Client behaviour of one SDK version; the CLI, Terraform and drivers implement the same flows separately, and token lifetimes are decided by the server, not by this code. File read in full on 2026-09-23 from the tagged raw file; Databricks-authored open-source code, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-sdk-oauth2",
+      "title": "Databricks SDK for Python v0.141.0: service/oauth2.py (service principal secrets and federation policies)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/oauth2.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Account APIs for service principal OAuth secrets, account federation policies and service principal (workload identity) federation policies.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API docstrings, not a configuration guide; which identity providers a given account trusts is decided by its own policies. File read in full on 2026-09-23 from the tagged raw file; Databricks-authored open-source code, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-sdk-workspace",
+      "title": "Databricks SDK for Python v0.141.0: service/workspace.py (Secrets API)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/workspace.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "The workspace Secrets API: secret scopes, secrets and their access-control lists.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Describes the Databricks-backed secret API; cloud-specific backends and newer secret objects are outside this record. File read in full on 2026-09-23 from the tagged raw file; Databricks-authored open-source code, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-sdk-jobs",
+      "title": "Databricks SDK for Python v0.141.0: service/jobs.py (job run-as settings)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/jobs.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Jobs API data types, including the run-as setting and the reported run-as user name.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The SDK also lists a group run-as option whose availability was not verified here; this record is used only for user and service principal run-as behaviour. File read in full on 2026-09-23 from the tagged raw file; Databricks-authored open-source code, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-sdk-catalog",
+      "title": "Databricks SDK for Python v0.141.0: service/catalog.py (row filters, column masks, ABAC policies, system schemas)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/catalog.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Unity Catalog API types for table row filters and column masks, the attribute-based access control Policies API and system schemas.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API field descriptions; supported compute, runtimes and access paths for filters, masks and policies are documented elsewhere and change. File read in full on 2026-09-23 from the tagged raw file; Databricks-authored open-source code, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-sdk-settings",
+      "title": "Databricks SDK for Python v0.141.0: service/settings.py (tokens and token management)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/settings.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Workspace APIs for personal access tokens, on-behalf-of tokens for service principals and administrator token management.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API behaviour only; whether token creation is allowed at all is a workspace setting and permission. File read in full on 2026-09-23 from the tagged raw file; Databricks-authored open-source code, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-auth",
+      "title": "Databricks Terraform provider v1.133.0: provider documentation (authentication)",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/index.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Authentication options of the official Databricks Terraform provider on AWS, Azure and Google Cloud: service principal OAuth, CLI profiles, personal access tokens and workload identity federation.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Provider documentation, not the product documentation site; the linked product pages hold the setup steps. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-principals",
+      "title": "Databricks Terraform provider v1.133.0: databricks_service_principal resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/service_principal.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Service principal types and their relationship to groups, entitlements and workspace assignment; the group and workspace-assignment pages at the same tag were read with it.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Provider documentation; entitlement names and deletion behaviour are provider-level details to recheck before automation. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-secrets",
+      "title": "Databricks Terraform provider v1.133.0: databricks_secret resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/secret.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Secrets, secret scopes and secret ACLs as managed through the provider; the secret_scope and secret_acl pages at the same tag were read with it.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Limits quoted here are the provider page's statements and should be rechecked against the current Secrets API before design. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-sp-secret",
+      "title": "Databricks Terraform provider v1.133.0: databricks_service_principal_secret resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/service_principal_secret.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "OAuth secrets for service principals: lifetime, expiry, status and rotation.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The default lifetime is the provider page's statement at this release; confirm the current default before relying on it. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-tokens",
+      "title": "Databricks Terraform provider v1.133.0: databricks_obo_token resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/obo_token.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "On-behalf-of tokens for service principals and the token usage permission; the databricks_token page at the same tag was read with it.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "On-behalf-of tokens are documented for AWS and Google Cloud workspaces; Azure uses native OAuth flows. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-federation",
+      "title": "Databricks Terraform provider v1.133.0: databricks_service_principal_federation_policy resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/service_principal_federation_policy.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Workload identity federation policies for service principals; the account federation policy page at the same tag was read with it.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The GA badge describes the provider resource's release stage at v1.133.0; issuer and subject formats belong to each workload platform. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-abac",
+      "title": "Databricks Terraform provider v1.133.0: databricks_policy_info resource (ABAC policies)",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/policy_info.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Unity Catalog attribute-based access control (ABAC) policies as managed through the provider: conditions, actions, scope and principals.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The page's GA badge describes the provider resource at v1.133.0; the product documentation's status label, supported compute and regional availability were not read in this build and must be checked. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-rulesets",
+      "title": "Databricks Terraform provider v1.133.0: databricks_access_control_rule_set resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/access_control_rule_set.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Account-level access rules on service principals, groups, tag policies and budget policies.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Authoritative per object in Terraform: declaring it overwrites existing rules of the same type. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-system-schema",
+      "title": "Databricks Terraform provider v1.133.0: databricks_system_schema resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/system_schema.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Enablement of system schemas, the Databricks-hosted store of an account's operational data.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Some schemas are enabled automatically and some cannot be disabled; enablement state is per metastore. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-dbt-policies",
+      "title": "dbt-databricks v1.12.5: row filter and column mask SQL macros",
+      "url": "https://raw.githubusercontent.com/databricks/dbt-databricks/v1.12.5/dbt/include/databricks/macros/relations/components/row_filter.sql",
+      "publisher": "Databricks (dbt-databricks, open-source adapter repository)",
+      "type": "primary reference",
+      "context": "The Databricks-maintained dbt adapter's SQL for attaching, replacing and dropping Unity Catalog row filters and column masks, with the adapter's functional tests that create and query them.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Adapter code, not the SQL language reference; clause options beyond those the adapter emits are not covered here. File read in full on 2026-09-23 from the tagged raw file; Databricks-authored open-source code, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-tf-log-delivery",
+      "title": "Databricks Terraform provider v1.133.0: databricks_mws_log_delivery resource (audit log delivery)",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/mws_log_delivery.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Delivery of audit logs and billable usage logs from Databricks on AWS to the account's own S3 bucket.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Describes the file delivery channel, not the audit system table; timings are the provider page's statements. File read in full on 2026-09-23 from the v1.133.0 tag; Databricks provider documentation, not the product documentation site."
+    },
+    {
+      "id": "dbxfe-identity-course-source-doc-audit",
+      "title": "Audit log system table reference",
+      "url": "https://docs.databricks.com/aws/en/admin/system-tables/audit-logs",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; schema and event reference for system.access.audit.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Column list, event coverage, delivery delay and retention change; confirm the current reference before writing a query that evidence depends on. Not confirmed by search in this authoring session: the session's web-search allowance was already used up, and the page body was not fetched because the documentation host is blocked by the sandbox egress proxy."
+    },
+    {
+      "id": "dbxfe-identity-course-source-doc-masks",
+      "title": "Row filters and column masks",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog row filters and column masks applied to tables.",
+      "accessDate": "2026-09-20",
+      "reviewDate": "2026-09-20",
+      "caveat": "Supported compute, runtimes and access paths have explicit limits; a mask is a query-time control, not encryption. Reused from the retained Unity Catalog module's record for this URL (reviewed 2026-09-20); not re-confirmed in this build session."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-identity-course-claim-principals",
+      "description": "Users are identities for people, represented by email addresses; service principals are identities for jobs, automated tools, scripts, apps and CI/CD platforms; Databricks recommends running production jobs as service principals so interactive users need no write, delete or modify privileges in production; Databricks-managed service principals exist on every cloud and reach only Databricks.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-iam",
+        "dbxfe-identity-course-source-tf-principals"
+      ],
+      "context": "Identity APIs; cloud-independent."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-groups",
+      "description": "Groups can contain users, service principals and other groups; members inherit the permissions assigned to their group; assigning workspace access and Unity Catalog access-control policies to groups rather than individual users is documented best practice; account principals are assigned to a workspace with USER or ADMIN permission and receive workspace entitlements separately.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-iam",
+        "dbxfe-identity-course-source-tf-principals"
+      ],
+      "context": "Account and workspace identity model."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-scim",
+      "description": "Databricks recommends SCIM provisioning to sync users and groups from the identity provider into the Databricks account, and terminating a user in the identity provider removes the user from the account; with identity federation enabled, user attributes are maintained through the account-level SCIM APIs rather than the workspace SCIM APIs.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-iam"
+      ],
+      "context": "Provisioning and identity federation; connector specifics vary by identity provider."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-u2m",
+      "description": "OAuth user-to-machine sign-in in the SDK's external-browser strategy runs an authorization-code flow with a PKCE challenge through the browser and a localhost redirect, requests offline_access for a refresh token and caches the tokens locally; after databricks auth login, tools can reuse the CLI profile's cached OAuth token, and every call acts as the signed-in user.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-auth",
+        "dbxfe-identity-course-source-tf-auth"
+      ],
+      "context": "Client behaviour of the SDK and CLI; server-side token lifetimes not stated."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-m2m",
+      "description": "OAuth machine-to-machine authentication presents a service principal's client ID (its application ID) and an OAuth secret with the client-credentials grant at the Databricks token endpoint, discovered from /oidc/.well-known/oauth-authorization-server; the SDK requests the all-apis scope by default, sends the bearer token on each request and refreshes it before expiry.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-auth",
+        "dbxfe-identity-course-source-tf-auth"
+      ],
+      "context": "OAuth M2M on account and workspace APIs, all clouds."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-sp-secret",
+      "description": "Service principal OAuth secrets are managed by administrators and used to obtain OAuth access tokens for account and workspace APIs; without an explicit lifetime a secret lasts 730 days, and each secret reports its creation time, expiry time and status.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-oauth2",
+        "dbxfe-identity-course-source-tf-sp-secret"
+      ],
+      "context": "Default lifetime as documented by the provider at v1.133.0."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-wif",
+      "description": "Workload identity federation lets workloads outside Databricks authenticate as a service principal by exchanging a token issued by their own runtime, with no Databricks secret; a service principal federation policy names the accepted issuer and the permitted subject, audiences default to the Databricks account ID, and Databricks strongly recommends it over OAuth client secrets or personal access tokens whenever possible; account federation policies extend token federation to users and service principals and are typically combined with SCIM.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-oauth2",
+        "dbxfe-identity-course-source-tf-federation",
+        "dbxfe-identity-course-source-sdk-auth"
+      ],
+      "context": "Federation policies at account level; GA badge on the provider resources at v1.133.0."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-pat",
+      "description": "Databricks strongly recommends OAuth instead of personal access tokens for user authentication; personal access tokens carry a lifetime set at creation; the right to use tokens is itself a permission (CAN_USE on the tokens object); on-behalf-of tokens for service principals exist on AWS and Google Cloud but OAuth is generally preferred; administrators can list and delete other users' tokens, and token records carry creation time, expiry time and an approximate last-used day.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-tf-auth",
+        "dbxfe-identity-course-source-tf-tokens",
+        "dbxfe-identity-course-source-sdk-settings"
+      ],
+      "context": "Workspace token APIs and settings."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-secrets",
+      "description": "Secret scope ACLs grant READ (read and list), WRITE (read and write) or MANAGE (also change the ACL) to users, groups or service principals; secret values are read only from within a command on a cluster, with the permission of whoever runs the command; values can be referenced as {{secrets/scope/key}} in Spark configuration and environment variables; Databricks redacts secret values shown in notebooks where it can but cannot prevent a permitted user from reading a secret.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-workspace",
+        "dbxfe-identity-course-source-tf-secrets"
+      ],
+      "context": "Databricks-backed secret scopes."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-runas",
+      "description": "A job runs as its run-as identity and, when none is set, as the user who created it; making a service principal the run-as identity requires the servicePrincipal user role, account rule sets separate the service principal Manager and User roles, and job permissions separately control who can view, manage, trigger or cancel a job.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-jobs",
+        "dbxfe-identity-course-source-tf-rulesets",
+        "dbxfe-identity-course-source-sdk-iam"
+      ],
+      "context": "Jobs and account access-control rules."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-filters",
+      "description": "Row filters and column masks are SQL functions attached to a table and evaluated at query time: a row filter, attached with SET ROW FILTER ... ON (columns), receives table columns and returns whether a row is visible, and a column mask, attached with ALTER COLUMN ... SET MASK, receives the masked column, with optional other columns, and returns the value to show, its first argument and return type matching the column; a query that meets them returns fewer rows or masked values rather than an error.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-sdk-catalog",
+        "dbxfe-identity-course-source-dbt-policies",
+        "dbxfe-identity-course-source-doc-masks",
+        "dbxfe-identity-course-source-tf-abac"
+      ],
+      "context": "Unity Catalog tables; supported compute and runtimes vary."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-abac",
+      "description": "Unity Catalog attribute-based access control policies are defined on a catalog, schema or table and apply to it and its descendants; they match tables and columns through conditions on governance tags and the user identity, apply a row filter or column mask function, name the principals they apply to and those excepted, and require MANAGE on the securable; the provider's page for the policy resource carried a GA badge when read on 2026-09-23.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-tf-abac",
+        "dbxfe-identity-course-source-sdk-catalog"
+      ],
+      "context": "Status, supported compute and regions to be verified on the product page."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-audit",
+      "description": "The audit log system table system.access.audit records account and workspace events with event time, workspace, service and action names, the acting identity, request parameters, source IP address, user agent and response; system schemas, including access, are enabled by an account admin; on AWS, audit logs can also be delivered as JSON files to the account's S3 bucket, available within 15 minutes of activation, with new files every few minutes and occasional later arrivals.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-doc-audit",
+        "dbxfe-identity-course-source-tf-system-schema",
+        "dbxfe-identity-course-source-sdk-catalog",
+        "dbxfe-identity-course-source-tf-log-delivery"
+      ],
+      "context": "System tables and log delivery; coverage and delay change, and the system-table column names were not re-read in this build."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-ext-sp-roles",
+      "description": "Account rule sets on a service principal grant roles/servicePrincipal.manager to manage it and roles/servicePrincipal.user to use it; making a service principal a job's run-as identity requires the servicePrincipal user role; the provider manages rule sets authoritatively, overwriting unmanaged rules of the same type.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-tf-rulesets",
+        "dbxfe-identity-course-source-sdk-jobs"
+      ],
+      "context": "Account access-control rules; cloud-independent."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-ext-secret-lifetime",
+      "description": "A service principal OAuth secret takes an optional lifetime in seconds and otherwise lasts 730 days; each secret exposes create_time, expire_time and a status such as ACTIVE; secrets can be listed per service principal and recreated for rotation.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-tf-sp-secret",
+        "dbxfe-identity-course-source-sdk-oauth2"
+      ],
+      "context": "Default lifetime as documented by the provider at v1.133.0."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-ext-token-permissions",
+      "description": "Permission to use tokens is granted as CAN_USE on the tokens authorization object, and declaring it overwrites existing groups' token permissions unless they are included; administrators can list every token, list one user's tokens and delete tokens for other users; token records show the creator, expiry and an approximate last-used day.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-tf-tokens",
+        "dbxfe-identity-course-source-sdk-settings"
+      ],
+      "context": "Workspace token permissions and token management."
+    },
+    {
+      "id": "dbxfe-identity-course-claim-ext-system-schema",
+      "description": "System tables are a Databricks-hosted store of the account's operational data that an account admin must enable schema by schema; enablement is identified per metastore and schema; some schemas are enabled automatically and some cannot be disabled; system schemas live in the system catalog.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-identity-course-source-tf-system-schema",
+        "dbxfe-identity-course-source-sdk-catalog"
+      ],
+      "context": "System schema enablement."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-identity-l01-principal-concept",
+      "term": "principal (user, service principal, group)",
+      "aliases": [
+        "identity",
+        "principal"
+      ],
+      "definition": "Any identity Databricks can authenticate or authorize: a user for a person, a service principal for a workload, or a group that collects them.",
+      "lessonId": "dbxfe-identity-l01",
+      "sectionId": "dbxfe-identity-l01-identities"
+    },
+    {
+      "id": "dbxfe-identity-l01-provisioning-concept",
+      "term": "SCIM provisioning and identity federation",
+      "aliases": [
+        "SCIM",
+        "account-level identities"
+      ],
+      "definition": "SCIM copies users and groups from the identity provider into the Databricks account; identity federation assigns those account identities to workspaces.",
+      "lessonId": "dbxfe-identity-l01",
+      "sectionId": "dbxfe-identity-l01-identities"
+    },
+    {
+      "id": "dbxfe-identity-l01-oauth-concept",
+      "term": "OAuth U2M and M2M",
+      "aliases": [
+        "user-to-machine",
+        "machine-to-machine",
+        "client credentials"
+      ],
+      "definition": "OAuth user-to-machine sign-in lets a tool act as a signed-in person; OAuth machine-to-machine lets a service principal trade its secret for an access token.",
+      "lessonId": "dbxfe-identity-l01",
+      "sectionId": "dbxfe-identity-l01-oauth"
+    },
+    {
+      "id": "dbxfe-identity-l01-token-concept",
+      "term": "bearer token",
+      "aliases": [
+        "personal access token",
+        "PAT",
+        "access token"
+      ],
+      "definition": "A credential that authenticates whoever presents it as the principal it was issued to, until it expires or is revoked.",
+      "lessonId": "dbxfe-identity-l01",
+      "sectionId": "dbxfe-identity-l01-oauth"
+    },
+    {
+      "id": "dbxfe-identity-l01-secret-concept",
+      "term": "secret scope and ACL",
+      "aliases": [
+        "secret scope",
+        "dbutils.secrets"
+      ],
+      "definition": "A named store of secret values whose READ, WRITE and MANAGE entries decide who may read, change or administer them at run time.",
+      "lessonId": "dbxfe-identity-l01",
+      "sectionId": "dbxfe-identity-l01-secrets"
+    },
+    {
+      "id": "dbxfe-identity-l01-actor-concept",
+      "term": "acting principal",
+      "aliases": [
+        "run-as identity",
+        "effective identity"
+      ],
+      "definition": "The principal whose privileges are checked for a request: the user for interactive work, the run-as identity for a job.",
+      "lessonId": "dbxfe-identity-l01",
+      "sectionId": "dbxfe-identity-l01-runas"
+    },
+    {
+      "id": "dbxfe-identity-l01-datapolicy-concept",
+      "term": "row filters, column masks and ABAC",
+      "aliases": [
+        "row filter",
+        "column mask",
+        "attribute-based access control"
+      ],
+      "definition": "Query-time functions that remove rows or replace column values for the calling principal, attached per table or through attribute-based policies on tagged data.",
+      "lessonId": "dbxfe-identity-l01",
+      "sectionId": "dbxfe-identity-l01-policies"
+    },
+    {
+      "id": "dbxfe-identity-l01-audit-concept",
+      "term": "audit evidence",
+      "aliases": [
+        "system.access.audit",
+        "incident evidence"
+      ],
+      "definition": "Rows in the audit log system table that tie an identity to an action, a time, a source address and a response, used to reconstruct what happened.",
+      "lessonId": "dbxfe-identity-l01",
+      "sectionId": "dbxfe-identity-l01-audit"
+    },
+    {
+      "id": "dbxfe-identity-l01-review-concept",
+      "term": "least-privilege review",
+      "aliases": [
+        "least privilege",
+        "separation of duties",
+        "test matrix"
+      ],
+      "definition": "A permission plan at the narrowest working scope, a test matrix with must-fail rows, and separate people to request, approve, apply and audit it.",
+      "lessonId": "dbxfe-identity-l01",
+      "sectionId": "dbxfe-identity-l01-example"
+    }
+  ]
+}

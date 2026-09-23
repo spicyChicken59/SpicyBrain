@@ -1,0 +1,62 @@
+{
+  "_note": "Row filters and column masks written as data, standing in for SQL functions attached with SET ROW FILTER and SET MASK. A row filter keeps a row when the caller belongs to a rule's group and the row's column value is in that rule's values ('*' means every value); no matching rule means no rows. A column mask returns the stored value to members of an unmasked group and the replacement to everyone else.",
+  "policies": [
+    {
+      "id": "plant_rows",
+      "type": "row_filter",
+      "table": "quality.accepted.inspections",
+      "column": "plant",
+      "rules": [
+        {
+          "group": "quality-leads",
+          "values": "*"
+        },
+        {
+          "group": "plant-eu-analysts",
+          "values": [
+            "EU-1",
+            "EU-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inspector_email_mask",
+      "type": "column_mask",
+      "table": "quality.accepted.inspections",
+      "column": "inspector_email",
+      "unmaskedGroups": [
+        "quality-leads"
+      ],
+      "replacement": "[masked]"
+    },
+    {
+      "id": "supplier_rows",
+      "type": "row_filter",
+      "table": "quality.shared.supplier_rejections",
+      "column": "supplier_id",
+      "rules": [
+        {
+          "group": "quality-leads",
+          "values": "*"
+        },
+        {
+          "group": "supplier-portal",
+          "values": [
+            "S-17"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rejections_email_mask",
+      "type": "column_mask",
+      "table": "quality.shared.supplier_rejections",
+      "column": "inspector_email",
+      "unmaskedGroups": [
+        "quality-leads"
+      ],
+      "replacement": "[masked]"
+    }
+  ]
+}
