@@ -42,3 +42,14 @@ distinguishes **authored** (files exist), **integrated** (registered in
 | 2026-09-23 | Schema: tracks/labs/guides/cases/crosswalk; module package files; `media-*.json` | yes | yes | typecheck+validate | — | `src/content-schema.ts`, `scripts/content.ts` |
 | 2026-09-23 | `scripts/academy-check.ts` (isolated module check + course audit) | yes | yes | smoke | — | |
 | 2026-09-23 | Academy contract manifest `content/courses/dbxfe/academy.json` | yes | yes | — | — | 48 modules, 24 labs, 32 guides |
+| 2026-09-23 | Baseline browser walk of `main` build (16 routes × desktop/phone × dark/light) | yes | — | yes | — | `docs/academy/evidence/baseline/manifest.json`; fresh profile, synthetic only |
+| 2026-09-23 | `scripts/package-labs.py` deterministic lab packaging | yes | — | smoke | — | |
+| 2026-09-23 | Pilot module A4 `dbxfe-spark-execution` + lab L04 | in progress (agent) | no | no | no | |
+| 2026-09-23 | Module C2 `dbxfe-analytical-sql` + lab L12 | in progress (agent) | no | no | no | |
+| 2026-09-23 | Module D3 `dbxfe-aws` | in progress (agent) | no | no | no | |
+| 2026-09-23 | Engine: two-tier catalog lazy loading | in progress (agent) | no | no | no | design in agent brief; SCALE.md expected |
+| 2026-09-23 | Labs L02, L03 (retained A3); L06, L10 (retained B3) | in progress (agents) | no | no | no | |
+| 2026-09-23 | Field guides FG01–FG16, FG17–FG32 | in progress (agents) | no | no | no | |
+| 2026-09-23 | Eight case analyses + crosswalk | in progress (agent) | no | no | no | search-level evidence only |
+| 2026-09-23 | Capstones: Cinderline deepening, service knowledge, coexistence | in progress (agents) | no | no | no | fragments under `content/courses/dbxfe/capstones/` |
+| 2026-09-23 | Retained-module deepening (cards ≥10, Samajh ≥2, windows beat, adoption) | in progress (agent) | no | no | no | |
