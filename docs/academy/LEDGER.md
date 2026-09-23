@@ -65,3 +65,11 @@ distinguishes **authored** (files exist), **integrated** (registered in
 | 2026-09-23 | E2 `dbxfe-features` + L18 (25 tests) | yes | registered | academy-check PASS; lab from source and ZIP | pending | |
 | 2026-09-23 | G5 `dbxfe-lakebase` + L23 (18 tests, platform guide on local PostgreSQL 16) | yes | registered | academy-check PASS; lab from source and ZIP | pending | ten Lakebase steps recorded as not executed |
 | 2026-09-23 | Registration policy | — | — | — | — | teaching JSON is auto-discovered, so a module is committed only together with its `course.json` registration; guides/cases/labs/capstones register once every linked module exists |
+| 2026-09-23 | Lab walkthroughs: H1 dropped, H2→H3 (the renderer shows h3/h4 only) | yes | yes (14 committed; new ones fixed at integration) | ZIPs unchanged | — | `8c6b13b` |
+| 2026-09-23 | Engine: generic collection views (tracks map, routes, lab shelf, guides, cases, crosswalk, capstone notices, Markdown audit) | yes | yes | check, nested build, prettier, `test:collections` 22, extension proof; CI green at `ff04aa3` | independent diff review: 5 medium + 3 low, all fixed with failing tests | `ab9a8ef` |
+| 2026-09-23 | G22: photography fixture carries tracks, a route, a lab with a download and a guide; extension proof covers them, renames, export/import and cleanup | yes | yes | isolated: check 159 unit, extension PASS; CI green | — | `a44d77d` |
+| 2026-09-23 | D4 `dbxfe-azure` | yes | registered | academy-check PASS; isolated unit tests | pending | `e73bb2c` |
+| 2026-09-23 | F4 `dbxfe-tools` + L22 (41 tests; mutation check 9/9 re-run) | yes | registered | academy-check PASS; lab from source and ZIP | pending | `ff04aa3` |
+| 2026-09-23 | Agent quota exhausted 08:10–10:10 UTC: every author, fixer and reviewer stopped mid-work; partial files kept on disk and reused | — | — | — | — | relaunched at 10:12 with fewer concurrent agents |
+| 2026-09-23 | E5 `dbxfe-forecasting` + L19 (41 tests), completed from the stopped author's files | yes | registered | academy-check PASS; lab from source and ZIP | pending | `c501c7d` |
+| 2026-09-23 | Package source caveats now state how each URL was checked (15 records); media and source review generators | yes | yes | prepare:content in isolation | — | `d772bed` |
