@@ -16,9 +16,9 @@ distinguishes **authored** (files exist), **integrated** (registered in
   365,221 B gzip; CSS 130,115 B / 24,489 B gzip. Baseline unit tests: 141 pass.
 - Python 3.12.3 (`/usr/bin/python3.12`), Java 21.0.10 (CI pins Java 17),
   PostgreSQL 16 client/server packages present.
-- Lab environments: `/home/user/labenv/spark-env` (pyspark 4.0.4, py4j
+- Lab environments: `<lab-envs>/spark-env` (pyspark 4.0.4, py4j
   0.10.9.9, delta-spark 4.0.0, pandas 3.0.6, pyarrow 25.0.1);
-  `/home/user/labenv/ml-env` (mlflow 3.16.1, scikit-learn 1.9.1, pandas 3.0.6,
+  `<lab-envs>/ml-env` (mlflow 3.16.1, scikit-learn 1.9.1, pandas 3.0.6,
   numpy 2.5.3, scipy 1.18.1).
 - Browsers: Playwright 1.63.0 expects Chromium build 1243; the sandbox has
   Chromium 141 (build 1194) at

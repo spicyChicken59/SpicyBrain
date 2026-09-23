@@ -67,12 +67,12 @@ must fail for the expected reason (assert the reason).
 
 ## Environments available here
 
-- Spark labs: `/home/user/labenv/spark-env/bin/python` (Python 3.12.3,
+- Spark labs: `<lab-envs>/spark-env/bin/python` (Python 3.12.3,
   PySpark 4.0.4, Py4J 0.10.9.9, delta-spark 4.0.0, pandas 3.0.6, pyarrow
   25.0.1; Java 21.0.10 at `/usr/lib/jvm/java-21-openjdk-amd64`). Delta labs
   configure `spark.jars.packages` only if network allows; prefer
   `delta-spark`'s `configure_spark_with_delta_pip` and record what happened.
-- ML labs: `/home/user/labenv/ml-env/bin/python` (mlflow 3.16.1,
+- ML labs: `<lab-envs>/ml-env/bin/python` (mlflow 3.16.1,
   scikit-learn 1.9.1, pandas 3.0.6, numpy 2.5.3, scipy 1.18.1). MLflow runs use
   a local file store inside a temporary directory, never a server.
 - PostgreSQL 16 server binaries are installed (`/usr/lib/postgresql/16`); L23
@@ -84,8 +84,8 @@ Pin exactly the versions you tested in `requirements.txt` and README.
 
 ## Public-safety rule
 
-Never write a build-machine path into any file you own: no `/home/user/...`,
-`/tmp/...` scratch paths, `labenv` interpreter paths or proxy settings in a
+Never write a build-machine path into any file you own: no home-directory or
+temporary scratch paths, `labenv` interpreter paths or proxy settings in a
 README, requirements comment, runner docstring, walkthrough, DATA.md or
 evidence. Name the interpreter generically ("Python 3.12 with
 requirements.txt installed"). Evidence commands are normalized by

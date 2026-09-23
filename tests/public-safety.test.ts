@@ -31,12 +31,14 @@ async function files(dir: string): Promise<string[]> {
   return out;
 }
 
-test("content, lab evidence, media decisions and evidence manifests carry no build-machine paths or proxy settings", async () => {
+test("content, the academy's documents and evidence, and the README carry no build-machine paths or proxy settings", async () => {
   const scanned = [
     ...(await files("content")),
-    ...(await files("docs/academy/labs")),
-    ...(await files("docs/academy/media-decisions")),
+    // Every academy document: briefs, reviews, lab evidence, media
+    // decisions, the release record and its evidence.
+    ...(await files("docs/academy")),
     ...(await files("docs/evidence")),
+    "README.md",
   ];
   assert.ok(scanned.length > 100);
   const leaks = [];
