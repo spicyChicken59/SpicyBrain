@@ -1,0 +1,3443 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-retrieval",
+ "title": "Document processing and retrieval engineering",
+ "summary": "Decide which sources may answer, parse and chunk them with their metadata, admit before ranking, compare lexical, vector and hybrid ranking with reranking, assemble cited context, and grade retrieval with recall@k and MRR before judging any answer.",
+ "outcomes": [
+  "Build a source inventory that says which collections may be cited, and trace how parsing and chunking decide what text can be found.",
+  "Apply authority, version, effective-date and permission rules before ranking, and show what post-filtering and prompt-only permission get wrong.",
+  "Explain TF-IDF scores term by term and choose between lexical, vector, hybrid and reranked retrieval for a stated question mix.",
+  "Assemble a budgeted context with checkable citations and evaluate retrieval with recall@k, MRR and safety counts, separately from answer groundedness.",
+  "Map the lab's local pipeline to current Databricks AI Search capabilities and list what must still be verified."
+ ],
+ "startingAssumptions": [
+  "The retained GenAI module separates corpus, context, permission and citation, and explains why a chunk must keep its labels.",
+  "You can read a short Python function and a SQL WHERE clause; TF-IDF, cosine similarity, recall@k and MRR are defined in the module."
+ ],
+ "lessonIds": [
+  "dbxfe-retrieval-l01"
+ ],
+ "optionalBridgeLessonIds": [
+  "dbxfe-m07-l02"
+ ],
+ "editorialRationale": "The retained GenAI module already argues that relevance is not permission and that a chunk must keep its labels; this module turns those rules into an engineered pipeline. It starts with which sources may answer and how parsing decides what text exists, then chunking and metadata, admission before ranking, version and freshness, lexical scoring worked term by term, a wrong-chunk diagnosis, vector and hybrid retrieval with reranking, budgeted context with citation checks, and retrieval-only evaluation. Every worked number comes from Lab L20's executed TF-IDF baseline; the managed service is described from Databricks-published client and SDK code read in this build, with availability left as a verification item.",
+ "sources": [
+  {
+   "id": "dbxfe-retrieval-source-client",
+   "title": "databricks-ai-search 0.78 (Databricks AI Search Python client)",
+   "url": "https://pypi.org/project/databricks-ai-search/0.78/",
+   "publisher": "Databricks (package published on PyPI)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": "2026-08-03",
+   "context": "Databricks-published Python client for AI Search, formerly Vector Search; client version 0.78.",
+   "caveat": "A client library names parameters and values; it does not establish region availability, preview status, limits or pricing, which the current documentation owns.",
+   "reviewedEvidence": "Read in this build on 2026-09-23: package metadata from PyPI's JSON API and the source of the downloaded wheel, whose SHA-256 matched PyPI's published digest. The summary reads 'Databricks AI Search Client (formerly Vector Search)'; the description calls AI Search 'the fully managed vector and keyword search service' and 'the new name for the product previously known as Databricks Vector Search', and says the legacy databricks-vectorsearch package becomes a deprecated re-export shim. similarity_search accepts query_type 'ANN', 'HYBRID' or 'FULL_TEXT', filters, num_results, score_threshold ('applied before reranking' when a reranker is used) and reranker=DatabricksReranker(columns_to_rerank=[...]). create_endpoint accepts STANDARD or STORAGE_OPTIMIZED; create_delta_sync_index takes a source table, primary key, pipeline_type CONTINUOUS or TRIGGERED, an embedding source column with a model endpoint or a self-managed vector column, optional columns_to_sync, and an index_subtype marked beta: 'HYBRID' (default) or 'FULL_TEXT', the latter only on STORAGE_OPTIMIZED endpoints."
+  },
+  {
+   "id": "dbxfe-retrieval-source-sdk",
+   "title": "databricks-sdk 0.141.0 (Databricks SDK for Python)",
+   "url": "https://pypi.org/project/databricks-sdk/0.141.0/",
+   "publisher": "Databricks (package published on PyPI)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": "2026-09-23",
+   "context": "Service modules generated from Databricks OpenAPI specifications; the SDK itself is labelled Beta.",
+   "caveat": "Generated API definitions show request and response fields, not entitlement, preview status or regional availability; confirm those in the current documentation before a design depends on them.",
+   "reviewedEvidence": "Read in this build on 2026-09-23 from the downloaded wheel (SHA-256 matched PyPI; uploaded 2026-09-23), files databricks/sdk/service/aisearch.py and aifunctions.py. AiSearchAPI is described as an 'AIP-conformant replacement for the legacy VectorSearchEndpoints API; functionally equivalent'. IndexType DELTA_SYNC 'automatically syncs with a source Delta Table, automatically and incrementally updating the index'; DIRECT_ACCESS 'supports direct read and write of vectors and metadata through our REST and SDK APIs'. PipelineType TRIGGERED 'stops after refreshing the source table once, using the data available when the update started'; CONTINUOUS 'processes new data as it arrives'. An index's name ends in its Unity Catalog table name. query_index takes query_type 'ANN, HYBRID, or FULL_TEXT. Defaults to ANN', filters_json, score_threshold and a reranker config. ai_parse_document 'Parse[s] structured content from unstructured documents' given a Unity Catalog volume path; formats PDF, DOCX, DOC, PPTX, PPT, JPG, JPEG, PNG, TIFF; the response holds the document's pages and elements and per-page error_status when individual pages fail."
+  },
+  {
+   "id": "dbxfe-retrieval-source-docs",
+   "title": "Databricks AI Search",
+   "url": "https://docs.databricks.com/aws/en/ai-search/ai-search",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-19",
+   "publishedAt": null,
+   "context": "Databricks on AWS; overview page of the managed retrieval service, current name formerly Vector Search.",
+   "caveat": "Not re-read in this build; region, endpoint type, preview status, limits and pricing must be checked on the live page before any design relies on them.",
+   "reviewedEvidence": "Reused source record: the retained GenAI module's dbxfe-genai-source-search (same URL, title and publisher), reviewed by that module's editorial review on 2026-09-19 and probed reachable on 2026-09-20 (HTTP 200, same final URL, docs/evidence/source-availability.json). Not re-read or re-confirmed in this build: the documentation host refused a direct request from this sandbox on 2026-09-23 and the build session's web-search allowance was already used up, so neither the page body nor a search snippet was read in this build. Passage relied on, as recorded in that review: the overview describes an index built from source data and metadata, embedding similarity, hybrid keyword search and filtering."
+  },
+  {
+   "id": "dbxfe-retrieval-source-tfidf",
+   "title": "TfidfVectorizer (scikit-learn 1.9 API reference)",
+   "url": "https://scikit-learn.org/1.9/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html",
+   "publisher": "scikit-learn developers",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "scikit-learn 1.9.1, the version pinned and executed in Lab L20.",
+   "caveat": "Describes the library's defaults; another tokenizer, stop-word list, sublinear tf or normalisation changes every score in the lab.",
+   "reviewedEvidence": "URL and title not confirmed by search or fetch in this build session: the documentation host refused a direct request on 2026-09-23 and the search allowance was used up. The URL is the one scikit-learn 1.9.1's own documentation-link method returns for TfidfVectorizer in the lab environment, and the docstrings that page is generated from were read in this build: tf-idf(t, d) = tf(t, d) * idf(t); with smooth_idf=True (the default) idf(t) = log[(1 + n) / (1 + df(t))] + 1, natural logarithm; norm='l2' by default, so cosine similarity between rows is their dot product; the default token_pattern keeps tokens of two or more alphanumeric characters and treats punctuation as a separator; lowercase=True; stop_words=None."
+  },
+  {
+   "id": "dbxfe-retrieval-source-mlflow",
+   "title": "mlflow 3.16.1",
+   "url": "https://pypi.org/project/mlflow/3.16.1/",
+   "publisher": "MLflow project (package published on PyPI)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": "2026-09-16",
+   "context": "Open-source MLflow 3.16.1 as installed in the course's ML lab environment.",
+   "caveat": "Judge-based scorers need a judge model and report agreement with their own instructions until calibrated against human review; nothing in this module runs them.",
+   "reviewedEvidence": "Read in this build on 2026-09-23 from the installed package's docstrings: mlflow.metrics.recall_at_k is deprecated since 3.4.0 in favour of the GenAI evaluation functionality and defines recall at k as the number of unique relevant retrieved doc IDs in the top k divided by the number of ground-truth doc IDs; mlflow.genai.scorers provides RetrievalGroundedness ('whether the agent's response is aligned with the information provided in the retrieved context'), RetrievalRelevance ('whether each chunk is relevant to the input request') and RetrievalSufficiency, each taking a judge model."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-retrieval-claim-name",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client",
+    "dbxfe-retrieval-source-sdk"
+   ],
+   "description": "Databricks AI Search is the current name of the managed vector and keyword search service previously called Databricks Vector Search; the databricks-ai-search client replaces the deprecated databricks-vectorsearch package, and the SDK's AiSearchAPI replaces the legacy VectorSearchEndpoints API.",
+   "context": "Read from Databricks-published client 0.78 and SDK 0.141.0; searchable former name retained as an alias."
+  },
+  {
+   "id": "dbxfe-retrieval-claim-overview",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-retrieval-source-docs"
+   ],
+   "description": "The AI Search overview describes an index built from source data and metadata, embedding similarity, hybrid keyword search and filtering.",
+   "context": "Recorded by this repository's 2026-09-19 review of the AWS page; not re-read in this build."
+  },
+  {
+   "id": "dbxfe-retrieval-claim-index",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-retrieval-source-sdk",
+    "dbxfe-retrieval-source-client"
+   ],
+   "description": "An AI Search index is either Delta Sync, kept in step with a source Delta table by a TRIGGERED pipeline (one refresh with the data available when it starts) or a CONTINUOUS one (processes new data as it arrives), with embeddings computed from a source column by a model endpoint or supplied in a vector column, or Direct Access, whose rows and vectors are written through the API; an index is named by a Unity Catalog table name and hosted on a STANDARD or STORAGE_OPTIMIZED endpoint.",
+   "context": "Field names from the SDK and client; availability of each option varies and is verified per workspace."
+  },
+  {
+   "id": "dbxfe-retrieval-claim-query",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client",
+    "dbxfe-retrieval-source-sdk"
+   ],
+   "description": "AI Search queries accept query_type ANN (the default), HYBRID or FULL_TEXT, filters, a score threshold and an optional reranker over named columns; the client documents that a score threshold is applied before reranking.",
+   "context": "Request fields, not fusion or scoring internals, which the provider's documentation owns."
+  },
+  {
+   "id": "dbxfe-retrieval-claim-subtype",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client",
+    "dbxfe-retrieval-source-sdk"
+   ],
+   "description": "An AI Search index subtype is HYBRID (vector embeddings for similarity search and hybrid search, the default) or FULL_TEXT (keyword search without embeddings); the client marks the subtype parameter as beta and FULL_TEXT as supported only on STORAGE_OPTIMIZED endpoints.",
+   "context": "Beta parameter per client 0.78; check current status before relying on it."
+  },
+  {
+   "id": "dbxfe-retrieval-claim-parse",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-retrieval-source-sdk"
+   ],
+   "description": "ai_parse_document parses PDF, DOCX, DOC, PPTX, PPT, JPG, JPEG, PNG and TIFF files given as a Unity Catalog volume path into a document of pages and elements, and reports individual pages that failed in a per-page error list while the request succeeds.",
+   "context": "REST definition in SDK 0.141.0; limits, versions and availability are on the current documentation page."
+  },
+  {
+   "id": "dbxfe-retrieval-claim-tfidf",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-retrieval-source-tfidf"
+   ],
+   "description": "scikit-learn's TfidfVectorizer lower-cases text, keeps tokens of two or more alphanumeric characters, weights each token by count times idf(t) = ln((1 + n) / (1 + df(t))) + 1 and scales each row to unit l2 length, so cosine similarity is a dot product.",
+   "context": "scikit-learn 1.9.1 defaults, executed in Lab L20."
+  },
+  {
+   "id": "dbxfe-retrieval-claim-scorers",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-retrieval-source-mlflow"
+   ],
+   "description": "MLflow 3.16.1 defines recall at k as unique relevant retrieved ids in the top k divided by the number of ground-truth ids (a metric deprecated since 3.4.0 in favour of GenAI evaluation), and provides judge-based scorers for retrieval groundedness, chunk relevance and context sufficiency.",
+   "context": "Open-source MLflow; judge scorers need a judge model and calibration against human review."
+  },
+  {
+   "id": "dbxfe-retrieval-claim-lab",
+   "kind": "guidance",
+   "sourceIds": [],
+   "description": "Recorded local run of Lab L20 (scikit-learn 1.9.1 TF-IDF over 18 synthetic documents, four callers and 13 labelled questions, 28 tests passing): governed small chunks score recall@1 0.7083 and MRR@5 0.8778, large chunks 0.8333 and 0.8917 with 92.08 words in the top three against 49.31; similarity alone returns 12 restricted, 7 superseded, 1 draft and 1 not-yet-effective chunk across the questions, governed retrieval none.",
+   "context": "docs/academy/labs/lab-l20-retrieval-quality.json; evidence about this synthetic fixture only, not a benchmark."
+  },
+  {
+   "id": "dbxfe-retrieval-guidance",
+   "kind": "guidance",
+   "sourceIds": [],
+   "description": "Original SpicyBrain reasoning on source inventories, admission before ranking, chunk design, remedy selection, context policies and retrieval evaluation; not a Databricks runbook.",
+   "context": "Independent curriculum; adapt to the actual corpus, callers and review."
+  },
+  {
+   "id": "dbxfe-retrieval-fiction",
+   "kind": "fictional",
+   "sourceIds": [],
+   "description": "Cinderline Components, its plants, machines, manuals, procedures, bulletins, values, callers, questions, labels and ranks, and the vector ranks in the fusion example are synthetic teaching records.",
+   "context": "No workspace, index, endpoint or model was created, queried or measured; values are not maintenance advice."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-retrieval-authority-concept",
+   "term": "source authority",
+   "aliases": [
+    "source inventory",
+    "citable source"
+   ],
+   "definition": "The recorded decision, per collection, of whether it may support an answer, only add context, or must be excluded, with an owner and a version rule.",
+   "example": "Approved M7 manuals are citable, training notes context-only, drafts and superseded revisions excluded.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-parsing-concept",
+   "term": "document parsing",
+   "aliases": [
+    "document processing",
+    "ai_parse_document",
+    "element extraction"
+   ],
+   "definition": "Turning files such as PDFs, slides and scans into typed text elements (headings, paragraphs, tables, figure descriptions) with file and page lineage before chunking.",
+   "example": "A torque table kept as rows 'M7: 95 Nm' and 'M8: 120 Nm' instead of one flattened line.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-chunk-concept",
+   "term": "chunk",
+   "aliases": [
+    "passage",
+    "chunk size",
+    "retrieval unit"
+   ],
+   "definition": "The unit of text that a retriever scores, returns and cites, cut from parsed elements under a size budget.",
+   "example": "Lab L20's 20-word budget yields one-sentence chunks; its 80-word budget yields whole sections.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-metadata-concept",
+   "term": "chunk metadata",
+   "aliases": [
+    "filter columns",
+    "contextual header"
+   ],
+   "definition": "Attributes stored beside each chunk's text, such as family, version, effective date, region, audience and status, that admission rules, freshness and citations read.",
+   "example": "man-m7-r3:small:1.2 carries family man-m7, version 3 and effective date 2026-06-01.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client",
+    "dbxfe-retrieval-source-docs"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-admission-concept",
+   "term": "admission before ranking",
+   "aliases": [
+    "pre-filtering",
+    "permission filter",
+    "filter before retrieval"
+   ],
+   "definition": "Applying authority, effective-date, version and permission rules to decide which chunks may be scored at all, before any ranking or top-k cut.",
+   "example": "A North technician's query never scores the South plant's lockout procedure.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-supersession-concept",
+   "term": "supersession",
+   "aliases": [
+    "current version",
+    "effective date",
+    "revision control"
+   ],
+   "definition": "The rule that, within a document family, only the highest approved version effective on the question's date may answer.",
+   "example": "On 2026-09-20 rev 4 answers; rev 5 waits until its 2026-11-01 effective date.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-freshness-concept",
+   "term": "freshness preference",
+   "aliases": [
+    "recency boost",
+    "time decay"
+   ],
+   "definition": "A small ranking adjustment that favours recent documents of time-sensitive types; a tuning choice that never overrides admission rules.",
+   "example": "A +0.05 bonus for bulletins effective within 365 days lifts bulletin 2026-004 to first.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-tfidf-concept",
+   "term": "TF-IDF",
+   "aliases": [
+    "term frequency-inverse document frequency",
+    "lexical retrieval",
+    "keyword search"
+   ],
+   "definition": "A lexical weighting in which each token counts by its frequency in a chunk times its rarity across chunks; chunks are ranked by cosine similarity of the weighted vectors.",
+   "example": "'setting' appears in 6 of 48 chunks and weighs ln(49/7) + 1 = 2.9459.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-tfidf"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-mismatch-concept",
+   "term": "vocabulary mismatch",
+   "aliases": [
+    "lexical gap",
+    "term mismatch"
+   ],
+   "definition": "The failure in which a question and its answer express the same thing with different tokens, so lexical overlap misses the answer.",
+   "example": "'setting' in the question and 'Set' in the answer share no token.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-tfidf"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-vector-concept",
+   "term": "vector retrieval",
+   "aliases": [
+    "embedding search",
+    "semantic search",
+    "approximate nearest neighbour (ANN)"
+   ],
+   "definition": "Retrieval that embeds chunks and questions as dense vectors with a model and returns the nearest neighbours, usually with an approximate index at scale.",
+   "example": "'shake after start-up' can land near 'vibrates hard during run-up'.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client",
+    "dbxfe-retrieval-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-hybrid-concept",
+   "term": "hybrid search",
+   "aliases": [
+    "rank fusion",
+    "reciprocal rank fusion (RRF)",
+    "keyword plus vector search"
+   ],
+   "definition": "Running a lexical and a vector retriever and merging their ranked lists, for example by adding 1/(k + rank) from each list.",
+   "example": "A chunk ranked 5 lexically and 1 by vectors scores 1/65 + 1/61 = 0.0318 with k = 60.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client",
+    "dbxfe-retrieval-source-docs"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-rerank-concept",
+   "term": "reranking",
+   "aliases": [
+    "reranker",
+    "second-stage ranking",
+    "cross-encoder"
+   ],
+   "definition": "A second stage that reads the question with each of the top candidates and reorders them; it cannot add a chunk the first stage did not return.",
+   "example": "An AI Search query can pass a reranker over named text columns.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-context-concept",
+   "term": "context assembly",
+   "aliases": [
+    "context budget",
+    "prompt context"
+   ],
+   "definition": "Building the passages an answer may use from a ranked list: in rank order, without repeats, within a size budget, each labelled for citation.",
+   "example": "Lab L20's 60-word contexts, each entry labelled with document, section, version and date.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-citation-concept",
+   "term": "citation check",
+   "aliases": [
+    "citation validator",
+    "out-of-context citation"
+   ],
+   "definition": "A deterministic test that every cited chunk id is present in the assembled context; it does not judge whether the passage supports the sentence.",
+   "example": "Citing the superseded man-m7-r2 sentence is rejected for a context built on 2026-09-20.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-recall-concept",
+   "term": "recall@k",
+   "aliases": [
+    "recall at k",
+    "retrieval recall"
+   ],
+   "definition": "The share of a question's labelled relevant chunks that appear in the first k results.",
+   "example": "Relevant {X, Y}, results [P, X, Q, R, Y]: recall@3 = 1/2.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-mlflow"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-mrr-concept",
+   "term": "mean reciprocal rank (MRR)",
+   "aliases": [
+    "MRR@k",
+    "reciprocal rank"
+   ],
+   "definition": "The average over questions of 1 divided by the rank of the first relevant chunk, counting 0 when none appears within the cutoff.",
+   "example": "An answer at rank 3 contributes 1/3; Lab L20's governed small MRR@5 is 0.8778.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-groundedness-concept",
+   "term": "groundedness",
+   "aliases": [
+    "answer support",
+    "faithfulness to context"
+   ],
+   "definition": "Whether each claim in a generated answer is supported by the retrieved context; it needs the answer, the context and a human or judge review.",
+   "example": "MLflow's RetrievalGroundedness scorer compares a response with its retrieved context using a judge model.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-mlflow"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-aisearch-concept",
+   "term": "Databricks AI Search",
+   "aliases": [
+    "Vector Search",
+    "Mosaic AI Vector Search",
+    "Databricks Vector Search"
+   ],
+   "definition": "Databricks' managed vector and keyword search service that hosts indexes on endpoints, syncs them from Delta tables or accepts direct writes, and serves ANN, hybrid and full-text queries.",
+   "example": "A Delta Sync index over Cinderline's chunk table queried with query_type HYBRID and a filter.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client",
+    "dbxfe-retrieval-source-sdk",
+    "dbxfe-retrieval-source-docs"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-deltasync-concept",
+   "term": "Delta Sync index",
+   "aliases": [
+    "Direct Access index",
+    "TRIGGERED sync",
+    "CONTINUOUS sync"
+   ],
+   "definition": "An AI Search index that follows a source Delta table through a TRIGGERED or CONTINUOUS pipeline, as opposed to a Direct Access index written through the API.",
+   "example": "A TRIGGERED index answers from older rows until its next sync after a manual revision lands.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-extension-sync-lag-concept",
+   "term": "sync lag",
+   "aliases": [
+    "index freshness",
+    "stale index"
+   ],
+   "definition": "The interval during which a source table already holds new rows that a synced index has not yet picked up.",
+   "example": "Rev 4 lands at 09:00; a TRIGGERED index still answers from rev 3 until the next sync.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-extension-threshold-concept",
+   "term": "score threshold before reranking",
+   "aliases": [
+    "similarity cut-off",
+    "pre-rerank threshold"
+   ],
+   "definition": "A minimum retrieval score applied to candidates before a reranker sees them, which fixes the set the reranker can reorder.",
+   "example": "A threshold of 0.2 removes a 0.18 candidate the reranker would have ranked first.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-extension-page-errors-concept",
+   "term": "per-page parse errors",
+   "aliases": [
+    "partial parse",
+    "page error status"
+   ],
+   "definition": "A parse result in which the request succeeds but named pages fail, so the document is incomplete unless those pages are reprocessed.",
+   "example": "Pages 13 and 14 of a manual fail while pages 1 to 12 parse.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-extension-full-text-concept",
+   "term": "full-text index subtype",
+   "aliases": [
+    "FULL_TEXT index",
+    "keyword-only index"
+   ],
+   "definition": "An AI Search index subtype that supports keyword search without embeddings, marked beta in the client.",
+   "example": "A part-number catalogue searched by exact codes such as QX-417.",
+   "sourceIds": [
+    "dbxfe-retrieval-source-client"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-retrieval-authority-visual",
+   "kind": "nodes",
+   "title": "Which collections may answer",
+   "alt": "A shared drive of six collections feeds a search index; an inventory then marks each as citable, context-only or excluded, and a test shows the draft refused.",
+   "caption": "The inventory decides what may answer before anything is indexed; the last state shows the rule being tested. Synthetic teaching example.",
+   "textEquivalent": "Everything on the shared drive indexed: Every folder is sent to the index, including revisions nobody should cite and notes nobody owns. Nodes: Approved manuals: Owner: maintenance lead; revision and effective date on every file. (selected); Plant procedures: One set per plant; each plant may read its own. (selected); Superseded folder: Rev 2 of the M7 manual still sits beside rev 3. (warning); Draft proposals: Unapproved: raise the M7 relief valve to 200 bar. (warning); Training notes: Explain concepts; own no values. (selected); Sensor-alarm notes: No owner, no version rule. (warning); Search index: Indexes whatever it is given. (selected). Relationships: Approved manuals → Search index: indexed; Plant procedures → Search index: indexed; Superseded folder → Search index: indexed; Draft proposals → Search index: indexed; Training notes → Search index: indexed; Sensor-alarm notes → Search index: indexed.\n\nThe inventory decides first: Each collection gets a decision, an owner and a version rule before indexing. Nodes: Approved manuals: Citable: current approved revision only. (selected); Plant procedures: Citable for the caller's own plant. (selected); Superseded folder: Kept for audit; never citable. (excluded); Draft proposals: Excluded until approved; refused if indexed. (excluded); Training notes: Context only: may explain, never cited for a value. (context); Sensor-alarm notes: Refused: nobody can say they are correct. (excluded); Search index: Holds approved collections with their metadata. (selected). Relationships: Approved manuals → Search index: citable; Plant procedures → Search index: citable per plant; Training notes → Search index: context only.\n\nThe rule is tested, not assumed: The relief-valve question from Lab L20 run twice: similarity alone, then admission before ranking. Nodes: Relief-valve question: 'What is the M7 press relief valve setting?' from a North technician. (selected); Similarity alone: 0.4054. The draft proposal ranks second. (warning); Governed retrieval: No draft chunk; the note ranks first, the answer third. (selected); Draft proposals: Refused as 'not approved' before scoring. (excluded). Relationships: Relief-valve question → Similarity alone: ranks; Relief-valve question → Governed retrieval: admits, then ranks; Draft proposals → Governed retrieval: refused.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction",
+    "dbxfe-retrieval-claim-lab"
+   ],
+   "states": [
+    {
+     "id": "everything",
+     "title": "Everything on the shared drive indexed",
+     "explanation": "Every folder is sent to the index, including revisions nobody should cite and notes nobody owns.",
+     "nodes": [
+      {
+       "id": "man",
+       "label": "Approved manuals",
+       "detail": "Owner: maintenance lead; revision and effective date on every file.",
+       "status": "selected"
+      },
+      {
+       "id": "proc",
+       "label": "Plant procedures",
+       "detail": "One set per plant; each plant may read its own.",
+       "status": "selected"
+      },
+      {
+       "id": "old",
+       "label": "Superseded folder",
+       "detail": "Rev 2 of the M7 manual still sits beside rev 3.",
+       "status": "warning"
+      },
+      {
+       "id": "draft",
+       "label": "Draft proposals",
+       "detail": "Unapproved: raise the M7 relief valve to 200 bar.",
+       "status": "warning"
+      },
+      {
+       "id": "notes",
+       "label": "Training notes",
+       "detail": "Explain concepts; own no values.",
+       "status": "selected"
+      },
+      {
+       "id": "alarms",
+       "label": "Sensor-alarm notes",
+       "detail": "No owner, no version rule.",
+       "status": "warning"
+      },
+      {
+       "id": "index",
+       "label": "Search index",
+       "detail": "Indexes whatever it is given.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "man",
+       "to": "index",
+       "label": "indexed"
+      },
+      {
+       "from": "proc",
+       "to": "index",
+       "label": "indexed"
+      },
+      {
+       "from": "old",
+       "to": "index",
+       "label": "indexed"
+      },
+      {
+       "from": "draft",
+       "to": "index",
+       "label": "indexed"
+      },
+      {
+       "from": "notes",
+       "to": "index",
+       "label": "indexed"
+      },
+      {
+       "from": "alarms",
+       "to": "index",
+       "label": "indexed"
+      }
+     ]
+    },
+    {
+     "id": "inventory",
+     "title": "The inventory decides first",
+     "explanation": "Each collection gets a decision, an owner and a version rule before indexing.",
+     "nodes": [
+      {
+       "id": "man",
+       "label": "Approved manuals",
+       "detail": "Citable: current approved revision only.",
+       "status": "selected"
+      },
+      {
+       "id": "proc",
+       "label": "Plant procedures",
+       "detail": "Citable for the caller's own plant.",
+       "status": "selected"
+      },
+      {
+       "id": "old",
+       "label": "Superseded folder",
+       "detail": "Kept for audit; never citable.",
+       "status": "excluded"
+      },
+      {
+       "id": "draft",
+       "label": "Draft proposals",
+       "detail": "Excluded until approved; refused if indexed.",
+       "status": "excluded"
+      },
+      {
+       "id": "notes",
+       "label": "Training notes",
+       "detail": "Context only: may explain, never cited for a value.",
+       "status": "context"
+      },
+      {
+       "id": "alarms",
+       "label": "Sensor-alarm notes",
+       "detail": "Refused: nobody can say they are correct.",
+       "status": "excluded"
+      },
+      {
+       "id": "index",
+       "label": "Search index",
+       "detail": "Holds approved collections with their metadata.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "man",
+       "to": "index",
+       "label": "citable"
+      },
+      {
+       "from": "proc",
+       "to": "index",
+       "label": "citable per plant"
+      },
+      {
+       "from": "notes",
+       "to": "index",
+       "label": "context only"
+      }
+     ]
+    },
+    {
+     "id": "test",
+     "title": "The rule is tested, not assumed",
+     "explanation": "The relief-valve question from Lab L20 run twice: similarity alone, then admission before ranking.",
+     "nodes": [
+      {
+       "id": "q-node",
+       "label": "Relief-valve question",
+       "detail": "'What is the M7 press relief valve setting?' from a North technician.",
+       "status": "selected"
+      },
+      {
+       "id": "naive",
+       "label": "Similarity alone",
+       "detail": "The draft proposal ranks second.",
+       "status": "warning",
+       "value": "0.4054"
+      },
+      {
+       "id": "governed",
+       "label": "Governed retrieval",
+       "detail": "No draft chunk; the note ranks first, the answer third.",
+       "status": "selected"
+      },
+      {
+       "id": "draft",
+       "label": "Draft proposals",
+       "detail": "Refused as 'not approved' before scoring.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "q-node",
+       "to": "naive",
+       "label": "ranks"
+      },
+      {
+       "from": "q-node",
+       "to": "governed",
+       "label": "admits, then ranks"
+      },
+      {
+       "from": "draft",
+       "to": "governed",
+       "label": "refused"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-parsing-visual",
+   "kind": "nodes",
+   "title": "From file to elements",
+   "alt": "A manual page with a heading, a torque table, a figure and a footer is parsed twice: flat text loses the table's pairing, a structure-aware parse keeps rows, lineage and a page error.",
+   "caption": "Schematic of one parse: flat extraction versus typed elements with page lineage. Synthetic teaching example.",
+   "textEquivalent": "A manual page arrives: One page holds a heading, a two-row torque table, an exploded-view figure and a footer. Nodes: Manual page 12: Heading, one torque table, a figure, a footer. (selected); Torque table: M7 | 95 Nm; M8 | 120 Nm. Two rows, two columns. (selected); Exploded view: An image with no text layer. (pending); Footer: 'Cinderline internal, page 12' on every page. (context). Relationships: Manual page 12 → Torque table: contains; Manual page 12 → Exploded view: contains; Manual page 12 → Footer: contains.\n\nPlain extraction flattens it: The table becomes one line of tokens; the figure yields nothing; the footer repeats. Nodes: Extracted line: Machine Torque M7 95 M8 120 Nm. Row and column pairing lost. (warning); Exploded view: Nothing extracted; silently absent. (excluded); Footer: Repeated text inflates term counts. (warning); Chunk: Built from the flat line; 95 and 120 float free. (warning). Relationships: Extracted line → Chunk: chunked into; Footer → Chunk: leaks into.\n\nA structure-aware parse keeps evidence: Typed elements with page lineage; the failed page is recorded, not lost. Nodes: Section header: Die change. Element type and page 12 kept. (selected); Table rows: M7: 95 Nm | M8: 120 Nm. Each row stays a unit or becomes one sentence. (selected); Figure description: Generated description, marked as generated. (context); Page 13: Recorded as a page error; queued for reprocessing. (warning); Footer: Dropped as boilerplate. (excluded). Relationships: Section header → Table rows: heads; Page 13 → Section header: same document.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-parse",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "file",
+     "title": "A manual page arrives",
+     "explanation": "One page holds a heading, a two-row torque table, an exploded-view figure and a footer.",
+     "nodes": [
+      {
+       "id": "page",
+       "label": "Manual page 12",
+       "detail": "Heading, one torque table, a figure, a footer.",
+       "status": "selected"
+      },
+      {
+       "id": "table",
+       "label": "Torque table",
+       "detail": "Two rows, two columns.",
+       "status": "selected",
+       "value": "M7 | 95 Nm; M8 | 120 Nm"
+      },
+      {
+       "id": "figure",
+       "label": "Exploded view",
+       "detail": "An image with no text layer.",
+       "status": "pending"
+      },
+      {
+       "id": "footer",
+       "label": "Footer",
+       "detail": "'Cinderline internal, page 12' on every page.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "page",
+       "to": "table",
+       "label": "contains"
+      },
+      {
+       "from": "page",
+       "to": "figure",
+       "label": "contains"
+      },
+      {
+       "from": "page",
+       "to": "footer",
+       "label": "contains"
+      }
+     ]
+    },
+    {
+     "id": "flat",
+     "title": "Plain extraction flattens it",
+     "explanation": "The table becomes one line of tokens; the figure yields nothing; the footer repeats.",
+     "nodes": [
+      {
+       "id": "text",
+       "label": "Extracted line",
+       "detail": "Row and column pairing lost.",
+       "status": "warning",
+       "value": "Machine Torque M7 95 M8 120 Nm"
+      },
+      {
+       "id": "figure",
+       "label": "Exploded view",
+       "detail": "Nothing extracted; silently absent.",
+       "status": "excluded"
+      },
+      {
+       "id": "footer",
+       "label": "Footer",
+       "detail": "Repeated text inflates term counts.",
+       "status": "warning"
+      },
+      {
+       "id": "chunk",
+       "label": "Chunk",
+       "detail": "Built from the flat line; 95 and 120 float free.",
+       "status": "warning"
+      }
+     ],
+     "connections": [
+      {
+       "from": "text",
+       "to": "chunk",
+       "label": "chunked into"
+      },
+      {
+       "from": "footer",
+       "to": "chunk",
+       "label": "leaks into"
+      }
+     ]
+    },
+    {
+     "id": "elements",
+     "title": "A structure-aware parse keeps evidence",
+     "explanation": "Typed elements with page lineage; the failed page is recorded, not lost.",
+     "nodes": [
+      {
+       "id": "header",
+       "label": "Section header",
+       "detail": "Element type and page 12 kept.",
+       "status": "selected",
+       "value": "Die change"
+      },
+      {
+       "id": "rows",
+       "label": "Table rows",
+       "detail": "Each row stays a unit or becomes one sentence.",
+       "status": "selected",
+       "value": "M7: 95 Nm | M8: 120 Nm"
+      },
+      {
+       "id": "figure",
+       "label": "Figure description",
+       "detail": "Generated description, marked as generated.",
+       "status": "context"
+      },
+      {
+       "id": "error",
+       "label": "Page 13",
+       "detail": "Recorded as a page error; queued for reprocessing.",
+       "status": "warning"
+      },
+      {
+       "id": "footer",
+       "label": "Footer",
+       "detail": "Dropped as boilerplate.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "header",
+       "to": "rows",
+       "label": "heads"
+      },
+      {
+       "from": "error",
+       "to": "header",
+       "label": "same document"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-chunking-visual",
+   "kind": "table",
+   "title": "Two chunk sizes over the same library",
+   "alt": "Tables comparing 20-word and 80-word chunks in Lab L20: counts and sizes, recall and MRR, and what a 60-word context holds for the relief-valve question.",
+   "caption": "Large chunks score higher here but send nearly twice the words onward, and can spend the budget on the wrong chunk. Values from the executed Lab L20 run over synthetic documents.",
+   "textEquivalent": "What each size produces: Whole sentences are packed without crossing a section. Table columns: Size | Budget | Chunks | Mean words | Unit. Rows: small | 20 words | 48 | 16.1 | one sentence; large | 80 words | 26 | 29.73 | one section.\n\nGoverned retrieval, 12 graded questions: Same labels, same admission rules, same k. Table columns: Size | recall@1 | recall@3 | recall@5 | MRR@5 | Words in top 3. Rows: small | 0.7083 | 0.875 | 0.9583 | 0.8778 | 49.31; large | 0.8333 | 0.9167 | 1.0 | 0.8917 | 92.08.\n\nRelief-valve question in a 60-word context: Assembly stops at the first chunk that does not fit. Table columns: Size | Rank 1 | Rank 2 | Context holds | 180 bar reaches it? Rows: small | training note (20 words) | neighbour sentence (17) | note, neighbour, answer: 55 words | yes; large | training note (36) | M7 hydraulic section (54) | note only: 36 words | no.",
+   "provenance": "Original SpicyBrain authored visual; values from the executed local Lab L20 run (scikit-learn 1.9.1 TF-IDF on one machine) over synthetic documents; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-tfidf",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "units",
+     "title": "What each size produces",
+     "explanation": "Whole sentences are packed without crossing a section.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Size",
+       "Budget",
+       "Chunks",
+       "Mean words",
+       "Unit"
+      ],
+      "rows": [
+       [
+        "small",
+        "20 words",
+        "48",
+        "16.1",
+        "one sentence"
+       ],
+       [
+        "large",
+        "80 words",
+        "26",
+        "29.73",
+        "one section"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "scores",
+     "title": "Governed retrieval, 12 graded questions",
+     "explanation": "Same labels, same admission rules, same k.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Size",
+       "recall@1",
+       "recall@3",
+       "recall@5",
+       "MRR@5",
+       "Words in top 3"
+      ],
+      "rows": [
+       [
+        "small",
+        "0.7083",
+        "0.875",
+        "0.9583",
+        "0.8778",
+        "49.31"
+       ],
+       [
+        "large",
+        "0.8333",
+        "0.9167",
+        "1.0",
+        "0.8917",
+        "92.08"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "budget",
+     "title": "Relief-valve question in a 60-word context",
+     "explanation": "Assembly stops at the first chunk that does not fit.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Size",
+       "Rank 1",
+       "Rank 2",
+       "Context holds",
+       "180 bar reaches it?"
+      ],
+      "rows": [
+       [
+        "small",
+        "training note (20 words)",
+        "neighbour sentence (17)",
+        "note, neighbour, answer: 55 words",
+        "yes"
+       ],
+       [
+        "large",
+        "training note (36)",
+        "M7 hydraulic section (54)",
+        "note only: 36 words",
+        "no"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-metadata-visual",
+   "kind": "table",
+   "title": "One chunk record",
+   "alt": "Tables showing the columns of one chunk record, which rules fail when only text remains, and the difference between header text, filter columns and citations.",
+   "caption": "Text is scored; columns are filtered on; the citation is built from both. Values from the executed Lab L20 run over synthetic documents.",
+   "textEquivalent": "The record filters read: The answer sentence for the relief-valve question as Lab L20 stores it. Table columns: Column | Value. Rows: chunk_id | man-m7-r3:small:1.2; family | man-m7; version | 3; effective_date | 2026-06-01; region | all; audience | technician, lead, engineering; status | approved; body | Set the relief valve to 180 bar with the pump warm...\n\nText alone: Remove the columns and every admission rule loses its input; only scoring still runs. Table columns: Rule | Needs | Can still run? Rows: authority | status | no; effective date | effective_date | no; supersession | family, version | no; permission | region, audience | no; scoring | text | yes.\n\nHeader text versus columns: The header changes scores; a column changes admission; the citation shows both to a reader. Table columns: Part | Example | Changes. Rows: header | M7 press service manual. Hydraulic unit. | scores (text the index sees); column | effective_date = 2026-06-01 | which rows are admitted; citation | [2] man-m7-r3 §Hydraulic unit (v3, effective 2026-06-01) | what a reader can check.",
+   "provenance": "Original SpicyBrain authored visual; values from the executed local Lab L20 run (scikit-learn 1.9.1 TF-IDF on one machine) over synthetic documents; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "record",
+     "title": "The record filters read",
+     "explanation": "The answer sentence for the relief-valve question as Lab L20 stores it.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Column",
+       "Value"
+      ],
+      "rows": [
+       [
+        "chunk_id",
+        "man-m7-r3:small:1.2"
+       ],
+       [
+        "family",
+        "man-m7"
+       ],
+       [
+        "version",
+        "3"
+       ],
+       [
+        "effective_date",
+        "2026-06-01"
+       ],
+       [
+        "region",
+        "all"
+       ],
+       [
+        "audience",
+        "technician, lead, engineering"
+       ],
+       [
+        "status",
+        "approved"
+       ],
+       [
+        "body",
+        "Set the relief valve to 180 bar with the pump warm..."
+       ]
+      ]
+     }
+    },
+    {
+     "id": "stripped",
+     "title": "Text alone",
+     "explanation": "Remove the columns and every admission rule loses its input; only scoring still runs.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Rule",
+       "Needs",
+       "Can still run?"
+      ],
+      "rows": [
+       [
+        "authority",
+        "status",
+        "no"
+       ],
+       [
+        "effective date",
+        "effective_date",
+        "no"
+       ],
+       [
+        "supersession",
+        "family, version",
+        "no"
+       ],
+       [
+        "permission",
+        "region, audience",
+        "no"
+       ],
+       [
+        "scoring",
+        "text",
+        "yes"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "header",
+     "title": "Header text versus columns",
+     "explanation": "The header changes scores; a column changes admission; the citation shows both to a reader.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Part",
+       "Example",
+       "Changes"
+      ],
+      "rows": [
+       [
+        "header",
+        "M7 press service manual. Hydraulic unit.",
+        "scores (text the index sees)"
+       ],
+       [
+        "column",
+        "effective_date = 2026-06-01",
+        "which rows are admitted"
+       ],
+       [
+        "citation",
+        "[2] man-m7-r3 §Hydraulic unit (v3, effective 2026-06-01)",
+        "what a reader can check"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-permission-visual",
+   "kind": "nodes",
+   "title": "Who may see the lockout procedure",
+   "alt": "A North technician's lockout question ranked by similarity alone, by admission before ranking, and by post-filtering; then a contractor's question with the engineering-only procedure excluded.",
+   "caption": "Only admission before ranking keeps restricted chunks from ever being scored. Values from the executed Lab L20 run over synthetic documents.",
+   "textEquivalent": "Similarity alone: The South plant's procedure says 'clearing a jam', so it wins. Nodes: North technician's question: 'How do I lock out a press before clearing a jam?' (selected); South lockout 1.1: 0.6395. Best lexical match; another plant's procedure. (warning); South lockout 1.2: 0.2565. Returned second. (warning); North lockout 1.1: 0.1557. The caller's own procedure, fourth. (context). Relationships: North technician's question → South lockout 1.1: rank 1; North technician's question → South lockout 1.2: rank 2; North technician's question → North lockout 1.1: rank 4.\n\nAdmit, then rank: Region south fails the permission rule, so those rows are never scored. Nodes: North technician's question: Same question, same index. (selected); South lockout 1.1: Not permitted; never scored. (excluded); South lockout 1.2: Not permitted; never scored. (excluded); North lockout 1.1: 0.1836. Rank 1. (selected); North lockout 1.2: 0.1221. Rank 4; relevant. (selected). Relationships: North technician's question → North lockout 1.1: rank 1; North technician's question → North lockout 1.2: rank 4.\n\nRank, cut to 3, then drop: The shortcut scores everything, keeps three, then removes what the caller may not read. Nodes: North technician's question: Top 3 taken over all chunks. (selected); South lockout 1.1: Scored, ranked first, then dropped. (warning); South lockout 1.2: Scored, ranked second, then dropped. (warning); North lockout 1.1: The only result left of three. (selected); Across 13 questions: 1.85 of 3 results. recall@3 0.75 instead of 0.875. (warning). Relationships: North technician's question → South lockout 1.1: scored; North technician's question → South lockout 1.2: scored; North technician's question → North lockout 1.1: kept.\n\nThe contractor asks for an engineering procedure: The only answering document is engineering-only; the right outcome is no authorized answer. Nodes: Contractor's question: 'What is the hydraulic overpressure test procedure for the M7?' (selected); Engineering procedure: Audience engineering only; excluded before ranking. (excluded); Guarding notice: 0.1985. Returned first; does not answer. (context); Correct outcome: Say no authorized source answers; route to engineering. (selected). Relationships: Contractor's question → Engineering procedure: refused; Contractor's question → Guarding notice: rank 1; Guarding notice → Correct outcome: does not answer.",
+   "provenance": "Original SpicyBrain authored visual; values from the executed local Lab L20 run (scikit-learn 1.9.1 TF-IDF on one machine) over synthetic documents; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-fact-privileges",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "naive",
+     "title": "Similarity alone",
+     "explanation": "The South plant's procedure says 'clearing a jam', so it wins.",
+     "nodes": [
+      {
+       "id": "q-node",
+       "label": "North technician's question",
+       "detail": "'How do I lock out a press before clearing a jam?'",
+       "status": "selected"
+      },
+      {
+       "id": "s1-node",
+       "label": "South lockout 1.1",
+       "detail": "Best lexical match; another plant's procedure.",
+       "status": "warning",
+       "value": "0.6395"
+      },
+      {
+       "id": "s2-node",
+       "label": "South lockout 1.2",
+       "detail": "Returned second.",
+       "status": "warning",
+       "value": "0.2565"
+      },
+      {
+       "id": "n1-node",
+       "label": "North lockout 1.1",
+       "detail": "The caller's own procedure, fourth.",
+       "status": "context",
+       "value": "0.1557"
+      }
+     ],
+     "connections": [
+      {
+       "from": "q-node",
+       "to": "s1-node",
+       "label": "rank 1"
+      },
+      {
+       "from": "q-node",
+       "to": "s2-node",
+       "label": "rank 2"
+      },
+      {
+       "from": "q-node",
+       "to": "n1-node",
+       "label": "rank 4"
+      }
+     ]
+    },
+    {
+     "id": "governed",
+     "title": "Admit, then rank",
+     "explanation": "Region south fails the permission rule, so those rows are never scored.",
+     "nodes": [
+      {
+       "id": "q-node",
+       "label": "North technician's question",
+       "detail": "Same question, same index.",
+       "status": "selected"
+      },
+      {
+       "id": "s1-node",
+       "label": "South lockout 1.1",
+       "detail": "Not permitted; never scored.",
+       "status": "excluded"
+      },
+      {
+       "id": "s2-node",
+       "label": "South lockout 1.2",
+       "detail": "Not permitted; never scored.",
+       "status": "excluded"
+      },
+      {
+       "id": "n1-node",
+       "label": "North lockout 1.1",
+       "detail": "Rank 1.",
+       "status": "selected",
+       "value": "0.1836"
+      },
+      {
+       "id": "n2-node",
+       "label": "North lockout 1.2",
+       "detail": "Rank 4; relevant.",
+       "status": "selected",
+       "value": "0.1221"
+      }
+     ],
+     "connections": [
+      {
+       "from": "q-node",
+       "to": "n1-node",
+       "label": "rank 1"
+      },
+      {
+       "from": "q-node",
+       "to": "n2-node",
+       "label": "rank 4"
+      }
+     ]
+    },
+    {
+     "id": "post",
+     "title": "Rank, cut to 3, then drop",
+     "explanation": "The shortcut scores everything, keeps three, then removes what the caller may not read.",
+     "nodes": [
+      {
+       "id": "q-node",
+       "label": "North technician's question",
+       "detail": "Top 3 taken over all chunks.",
+       "status": "selected"
+      },
+      {
+       "id": "s1-node",
+       "label": "South lockout 1.1",
+       "detail": "Scored, ranked first, then dropped.",
+       "status": "warning"
+      },
+      {
+       "id": "s2-node",
+       "label": "South lockout 1.2",
+       "detail": "Scored, ranked second, then dropped.",
+       "status": "warning"
+      },
+      {
+       "id": "n1-node",
+       "label": "North lockout 1.1",
+       "detail": "The only result left of three.",
+       "status": "selected"
+      },
+      {
+       "id": "all",
+       "label": "Across 13 questions",
+       "detail": "recall@3 0.75 instead of 0.875.",
+       "status": "warning",
+       "value": "1.85 of 3 results"
+      }
+     ],
+     "connections": [
+      {
+       "from": "q-node",
+       "to": "s1-node",
+       "label": "scored"
+      },
+      {
+       "from": "q-node",
+       "to": "s2-node",
+       "label": "scored"
+      },
+      {
+       "from": "q-node",
+       "to": "n1-node",
+       "label": "kept"
+      }
+     ]
+    },
+    {
+     "id": "contractor",
+     "title": "The contractor asks for an engineering procedure",
+     "explanation": "The only answering document is engineering-only; the right outcome is no authorized answer.",
+     "nodes": [
+      {
+       "id": "cq-node",
+       "label": "Contractor's question",
+       "detail": "'What is the hydraulic overpressure test procedure for the M7?'",
+       "status": "selected"
+      },
+      {
+       "id": "eng",
+       "label": "Engineering procedure",
+       "detail": "Audience engineering only; excluded before ranking.",
+       "status": "excluded"
+      },
+      {
+       "id": "notice",
+       "label": "Guarding notice",
+       "detail": "Returned first; does not answer.",
+       "status": "context",
+       "value": "0.1985"
+      },
+      {
+       "id": "out",
+       "label": "Correct outcome",
+       "detail": "Say no authorized source answers; route to engineering.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "cq-node",
+       "to": "eng",
+       "label": "refused"
+      },
+      {
+       "from": "cq-node",
+       "to": "notice",
+       "label": "rank 1"
+      },
+      {
+       "from": "notice",
+       "to": "out",
+       "label": "does not answer"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-freshness-visual",
+   "kind": "timeline",
+   "title": "Which M7 revision answers on which date",
+   "alt": "A timeline of M7 manual revisions: rev 4 and rev 5 loaded on 10 September answer only from their effective dates; a May question gets rev 2.",
+   "caption": "Effective date, not load date, decides which revision answers. Values from the executed Lab L20 run over synthetic documents.",
+   "textEquivalent": "10 September: rev 4 loaded, not yet in force: Rev 4 and rev 5 are loaded together; rev 3 still answers. Nodes: Rev 3: 200 hours. Effective 1 June; current. (selected); Rev 4: 150 hours. Loaded today; effective 15 September. (pending); Rev 5: 120 hours. Loaded today; effective 1 November. (pending). Relationships: Rev 3 → Rev 4: replaced on 15 Sep; Rev 4 → Rev 5: replaced on 1 Nov.\n\n20 September: rev 4 answers: Rev 3 is superseded and never enters the context. Nodes: Rev 3: 200 hours. Superseded; excluded before ranking. (excluded); Rev 4: 150 hours. Current; first result. (selected); Rev 5: 120 hours. Still waiting for 1 November. (pending). Relationships: Rev 3 → Rev 4: replaced; Rev 4 → Rev 5: replaced on 1 Nov.\n\n5 November: rev 5 answers: Both earlier revisions are superseded. Nodes: Rev 3: 200 hours. Superseded. (excluded); Rev 4: 150 hours. Superseded. (excluded); Rev 5: 120 hours. Current; first result. (selected). Relationships: Rev 3 → Rev 4: replaced; Rev 4 → Rev 5: replaced.\n\nAsked on 1 May: rev 2 answers: Similarity alone ranks rev 3 first although it was not in force yet. Nodes: Rev 2: 250 hours. Effective 1 March 2025; current on 1 May. (selected); Rev 3: 200 hours. Ranked first by similarity; in force only from 1 June. (warning). Relationships: Rev 2 → Rev 3: replaced on 1 Jun.",
+   "provenance": "Original SpicyBrain authored visual; values from the executed local Lab L20 run (scikit-learn 1.9.1 TF-IDF on one machine) over synthetic documents; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "sep10",
+     "title": "10 September: rev 4 loaded, not yet in force",
+     "explanation": "Rev 4 and rev 5 are loaded together; rev 3 still answers.",
+     "nodes": [
+      {
+       "id": "r3-node",
+       "label": "Rev 3",
+       "detail": "Effective 1 June; current.",
+       "status": "selected",
+       "value": "200 hours"
+      },
+      {
+       "id": "r4-node",
+       "label": "Rev 4",
+       "detail": "Loaded today; effective 15 September.",
+       "status": "pending",
+       "value": "150 hours"
+      },
+      {
+       "id": "r5-node",
+       "label": "Rev 5",
+       "detail": "Loaded today; effective 1 November.",
+       "status": "pending",
+       "value": "120 hours"
+      }
+     ],
+     "connections": [
+      {
+       "from": "r3-node",
+       "to": "r4-node",
+       "label": "replaced on 15 Sep"
+      },
+      {
+       "from": "r4-node",
+       "to": "r5-node",
+       "label": "replaced on 1 Nov"
+      }
+     ]
+    },
+    {
+     "id": "sep20",
+     "title": "20 September: rev 4 answers",
+     "explanation": "Rev 3 is superseded and never enters the context.",
+     "nodes": [
+      {
+       "id": "r3-node",
+       "label": "Rev 3",
+       "detail": "Superseded; excluded before ranking.",
+       "status": "excluded",
+       "value": "200 hours"
+      },
+      {
+       "id": "r4-node",
+       "label": "Rev 4",
+       "detail": "Current; first result.",
+       "status": "selected",
+       "value": "150 hours"
+      },
+      {
+       "id": "r5-node",
+       "label": "Rev 5",
+       "detail": "Still waiting for 1 November.",
+       "status": "pending",
+       "value": "120 hours"
+      }
+     ],
+     "connections": [
+      {
+       "from": "r3-node",
+       "to": "r4-node",
+       "label": "replaced"
+      },
+      {
+       "from": "r4-node",
+       "to": "r5-node",
+       "label": "replaced on 1 Nov"
+      }
+     ]
+    },
+    {
+     "id": "nov05",
+     "title": "5 November: rev 5 answers",
+     "explanation": "Both earlier revisions are superseded.",
+     "nodes": [
+      {
+       "id": "r3-node",
+       "label": "Rev 3",
+       "detail": "Superseded.",
+       "status": "excluded",
+       "value": "200 hours"
+      },
+      {
+       "id": "r4-node",
+       "label": "Rev 4",
+       "detail": "Superseded.",
+       "status": "excluded",
+       "value": "150 hours"
+      },
+      {
+       "id": "r5-node",
+       "label": "Rev 5",
+       "detail": "Current; first result.",
+       "status": "selected",
+       "value": "120 hours"
+      }
+     ],
+     "connections": [
+      {
+       "from": "r3-node",
+       "to": "r4-node",
+       "label": "replaced"
+      },
+      {
+       "from": "r4-node",
+       "to": "r5-node",
+       "label": "replaced"
+      }
+     ]
+    },
+    {
+     "id": "may01",
+     "title": "Asked on 1 May: rev 2 answers",
+     "explanation": "Similarity alone ranks rev 3 first although it was not in force yet.",
+     "nodes": [
+      {
+       "id": "r2-node",
+       "label": "Rev 2",
+       "detail": "Effective 1 March 2025; current on 1 May.",
+       "status": "selected",
+       "value": "250 hours"
+      },
+      {
+       "id": "r3-node",
+       "label": "Rev 3",
+       "detail": "Ranked first by similarity; in force only from 1 June.",
+       "status": "warning",
+       "value": "200 hours"
+      }
+     ],
+     "connections": [
+      {
+       "from": "r2-node",
+       "to": "r3-node",
+       "label": "replaced on 1 Jun"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-lexical-visual",
+   "kind": "equation",
+   "title": "TF-IDF, one term at a time",
+   "alt": "Three equations: the idf of 'setting' and 'the' in a 48-chunk index, the unit weight of 'setting' in the training note, and each cosine as a sum of per-term contributions.",
+   "caption": "A score is a sum of shared-token contributions; rare shared tokens dominate. Values from the executed Lab L20 run over synthetic documents.",
+   "textEquivalent": "Rarity weight: Governed small index, n = 48 chunks, header text included. Equation: idf(t) = ln((1 + n) / (1 + df(t))) + 1;   setting: df 6 → ln(49/7) + 1 = 2.9459;   the: df 48 → ln(49/49) + 1 = 1.0\n\nCount, weight, unit length: The training note says 'setting' twice; its whole vector has length 15.912. Equation: note, 'setting': 2 × 2.9459 = 5.8918;   5.8918 / 15.912 = 0.3703;   × question weight 0.4576 = 0.1694\n\nThe score is a sum: Per-term contributions, rounded to four places; the totals are the unrounded sums. Equation: note: 0.1694 + 0.1309 + 0.0681 + 0.0607 + 0.0488 + 0.0414 → 0.5192;   answer: 0.0797 + 0.0740 + 0.0504 + 0.0357 + 0.0276 → 0.2674",
+   "provenance": "Original SpicyBrain authored visual; values from the executed local Lab L20 run (scikit-learn 1.9.1 TF-IDF on one machine) over synthetic documents; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-tfidf",
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "idf",
+     "title": "Rarity weight",
+     "explanation": "Governed small index, n = 48 chunks, header text included.",
+     "nodes": [],
+     "connections": [],
+     "equation": "idf(t) = ln((1 + n) / (1 + df(t))) + 1;   setting: df 6 → ln(49/7) + 1 = 2.9459;   the: df 48 → ln(49/49) + 1 = 1.0"
+    },
+    {
+     "id": "weight",
+     "title": "Count, weight, unit length",
+     "explanation": "The training note says 'setting' twice; its whole vector has length 15.912.",
+     "nodes": [],
+     "connections": [],
+     "equation": "note, 'setting': 2 × 2.9459 = 5.8918;   5.8918 / 15.912 = 0.3703;   × question weight 0.4576 = 0.1694"
+    },
+    {
+     "id": "cosine",
+     "title": "The score is a sum",
+     "explanation": "Per-term contributions, rounded to four places; the totals are the unrounded sums.",
+     "nodes": [],
+     "connections": [],
+     "equation": "note: 0.1694 + 0.1309 + 0.0681 + 0.0607 + 0.0488 + 0.0414 → 0.5192;   answer: 0.0797 + 0.0740 + 0.0504 + 0.0357 + 0.0276 → 0.2674"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-wrongchunk-visual",
+   "kind": "table",
+   "title": "Why the wrong chunk wins",
+   "alt": "Tables for the relief-valve question: the governed ranking, per-term contributions of the note and the answer, the ranking without admission rules, and the large-chunk context.",
+   "caption": "The training note shares more of the question's words than the answer does. Values from the executed Lab L20 run over synthetic documents.",
+   "textEquivalent": "Governed ranking, small chunks: The answer is third behind a note and its own neighbour. Table columns: Rank | Chunk | Holds the value? | Score. Rows: 1 | Training note: 'the correct setting differs...' | no | 0.5192; 2 | Manual: 'Record the relief valve setting...' | no | 0.4209; 3 | Manual: 'Set the relief valve to 180 bar...' | yes | 0.2674.\n\nWhere the points come from: 'setting' alone gives the note more than any term gives the answer. Table columns: Term | Note | Answer. Rows: setting | 0.1694 | 0; relief | 0.1309 | 0.0797; press | 0.0681 | 0.0276; valve | 0.0607 | 0.0740; the | 0.0488 | 0.0357; m7 | 0.0414 | 0.0504.\n\nWithout admission rules: Similarity alone also ranks the unapproved draft and the superseded revision. Table columns: Rank | Chunk | Status | Score. Rows: 1 | Training note | approved | 0.5664; 2 | Draft: 'raise ... to 200 bar' | draft | 0.4054; 3 | Manual rev 3: 'Record ... setting' | approved | 0.3907; 4 | Manual rev 2: 'Record ... setting' | superseded | 0.3907.\n\nLarge chunks, 60-word context: The section holding the value ranks second and no longer fits. Table columns: Rank | Chunk | Words | In context? Rows: 1 | Training note section | 36 | yes; 2 | M7 hydraulic section (holds 180 bar) | 54 | no: 36 + 54 passes 60.",
+   "provenance": "Original SpicyBrain authored visual; values from the executed local Lab L20 run (scikit-learn 1.9.1 TF-IDF on one machine) over synthetic documents; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-tfidf",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "ranking",
+     "title": "Governed ranking, small chunks",
+     "explanation": "The answer is third behind a note and its own neighbour.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Rank",
+       "Chunk",
+       "Holds the value?",
+       "Score"
+      ],
+      "rows": [
+       [
+        "1",
+        "Training note: 'the correct setting differs...'",
+        "no",
+        "0.5192"
+       ],
+       [
+        "2",
+        "Manual: 'Record the relief valve setting...'",
+        "no",
+        "0.4209"
+       ],
+       [
+        "3",
+        "Manual: 'Set the relief valve to 180 bar...'",
+        "yes",
+        "0.2674"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "terms",
+     "title": "Where the points come from",
+     "explanation": "'setting' alone gives the note more than any term gives the answer.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Term",
+       "Note",
+       "Answer"
+      ],
+      "rows": [
+       [
+        "setting",
+        "0.1694",
+        "0"
+       ],
+       [
+        "relief",
+        "0.1309",
+        "0.0797"
+       ],
+       [
+        "press",
+        "0.0681",
+        "0.0276"
+       ],
+       [
+        "valve",
+        "0.0607",
+        "0.0740"
+       ],
+       [
+        "the",
+        "0.0488",
+        "0.0357"
+       ],
+       [
+        "m7",
+        "0.0414",
+        "0.0504"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "naive",
+     "title": "Without admission rules",
+     "explanation": "Similarity alone also ranks the unapproved draft and the superseded revision.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Rank",
+       "Chunk",
+       "Status",
+       "Score"
+      ],
+      "rows": [
+       [
+        "1",
+        "Training note",
+        "approved",
+        "0.5664"
+       ],
+       [
+        "2",
+        "Draft: 'raise ... to 200 bar'",
+        "draft",
+        "0.4054"
+       ],
+       [
+        "3",
+        "Manual rev 3: 'Record ... setting'",
+        "approved",
+        "0.3907"
+       ],
+       [
+        "4",
+        "Manual rev 2: 'Record ... setting'",
+        "superseded",
+        "0.3907"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "large",
+     "title": "Large chunks, 60-word context",
+     "explanation": "The section holding the value ranks second and no longer fits.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Rank",
+       "Chunk",
+       "Words",
+       "In context?"
+      ],
+      "rows": [
+       [
+        "1",
+        "Training note section",
+        "36",
+        "yes"
+       ],
+       [
+        "2",
+        "M7 hydraulic section (holds 180 bar)",
+        "54",
+        "no: 36 + 54 passes 60"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-vector-visual",
+   "kind": "comparison",
+   "title": "Lexical and vector retrieval by question type",
+   "alt": "Tables comparing measured TF-IDF results by question type with what an embedding retriever should be tested for, and what an embedding index adds to operate.",
+   "caption": "The lexical column is measured in Lab L20; the vector column lists expectations to test, not results.",
+   "textEquivalent": "Measured: TF-IDF in Lab L20: Where the answer ranked for four kinds of question. Table columns: Question type | Example | Where the answer ranked. Rows: exact code | Which machine does the QX-417 seal kit fit? | 1st; paraphrase | Why does the belt line shake after start-up? | 5th; second sentence missing; word form | 'setting' asked, 'Set' written | 3rd; permission | contractor asks for an engineering-only test | refused before ranking.\n\nWhat to test with embeddings (not executed): Expected strengths and the risk each one must be tested for. Table columns: Question type | Expected | Test for. Rows: exact code | can be weaker: a code may read as ordinary text | QX-417 against a near code; paraphrase | stronger: shared meaning | neighbours from other machines; word form | stronger | still needs version and permission rules; permission | unchanged: a rule, not a score | the same restricted-chunk case.\n\nWhat an embedding index adds to operate: Dependencies that TF-IDF never had. Table columns: Item | Why it matters. Rows: embedding model version | vectors from two versions are not comparable; recompute | a model change re-embeds every chunk; query path | text for managed embeddings, a vector for self-managed ones; evaluation | same labels, filters and k as the lexical baseline.",
+   "provenance": "Original SpicyBrain authored visual; values from the executed local Lab L20 run (scikit-learn 1.9.1 TF-IDF on one machine) over synthetic documents; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "lexical",
+     "title": "Measured: TF-IDF in Lab L20",
+     "explanation": "Where the answer ranked for four kinds of question.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Question type",
+       "Example",
+       "Where the answer ranked"
+      ],
+      "rows": [
+       [
+        "exact code",
+        "Which machine does the QX-417 seal kit fit?",
+        "1st"
+       ],
+       [
+        "paraphrase",
+        "Why does the belt line shake after start-up?",
+        "5th; second sentence missing"
+       ],
+       [
+        "word form",
+        "'setting' asked, 'Set' written",
+        "3rd"
+       ],
+       [
+        "permission",
+        "contractor asks for an engineering-only test",
+        "refused before ranking"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "vector",
+     "title": "What to test with embeddings (not executed)",
+     "explanation": "Expected strengths and the risk each one must be tested for.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Question type",
+       "Expected",
+       "Test for"
+      ],
+      "rows": [
+       [
+        "exact code",
+        "can be weaker: a code may read as ordinary text",
+        "QX-417 against a near code"
+       ],
+       [
+        "paraphrase",
+        "stronger: shared meaning",
+        "neighbours from other machines"
+       ],
+       [
+        "word form",
+        "stronger",
+        "still needs version and permission rules"
+       ],
+       [
+        "permission",
+        "unchanged: a rule, not a score",
+        "the same restricted-chunk case"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "ops",
+     "title": "What an embedding index adds to operate",
+     "explanation": "Dependencies that TF-IDF never had.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Item",
+       "Why it matters"
+      ],
+      "rows": [
+       [
+        "embedding model version",
+        "vectors from two versions are not comparable"
+       ],
+       [
+        "recompute",
+        "a model change re-embeds every chunk"
+       ],
+       [
+        "query path",
+        "text for managed embeddings, a vector for self-managed ones"
+       ],
+       [
+        "evaluation",
+        "same labels, filters and k as the lexical baseline"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-hybrid-visual",
+   "kind": "table",
+   "title": "Fusing two ranked lists",
+   "alt": "Tables for the belt-line question: lexical ranks from Lab L20 beside synthetic vector ranks, the reciprocal-rank-fusion sums with k = 60, and the short list a reranker would receive.",
+   "caption": "Lexical ranks are from Lab L20; vector ranks are invented to show the arithmetic. Synthetic teaching example.",
+   "textEquivalent": "Two lists for the belt-line question: The lexical list favours 'belt'; a vector list might favour meaning. Table columns: Chunk | Lexical rank (Lab L20) | Vector rank (synthetic). Rows: C4 belt tension 1.2 | 1 | 6; C4 belt tension 1.1 | 2 | 7; C4 vibration 2.1 | 5 | 1; C4 vibration 2.2 | not returned | 2.\n\nReciprocal rank fusion, k = 60: Each list adds 1/(60 + rank); ranks, not scores, are combined. Table columns: Chunk | Sum of 1/(60 + rank) | Fused rank. Rows: C4 vibration 2.1 | 1/65 + 1/61 = 0.0318 | 1; C4 belt tension 1.2 | 1/61 + 1/66 = 0.0315 | 2; C4 belt tension 1.1 | 1/62 + 1/67 = 0.0311 | 3; C4 vibration 2.2 | 1/62 = 0.0161 | 4.\n\nA reranker sees only the top three: It reorders what it is given; the fourth chunk is never read. Table columns: Fused rank | Chunk | Sent to the reranker? Rows: 1 | C4 vibration 2.1 | yes; 2 | C4 belt tension 1.2 | yes; 3 | C4 belt tension 1.1 | yes; 4 | C4 vibration 2.2 | no: cannot be recovered.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-query",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "lists",
+     "title": "Two lists for the belt-line question",
+     "explanation": "The lexical list favours 'belt'; a vector list might favour meaning.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Chunk",
+       "Lexical rank (Lab L20)",
+       "Vector rank (synthetic)"
+      ],
+      "rows": [
+       [
+        "C4 belt tension 1.2",
+        "1",
+        "6"
+       ],
+       [
+        "C4 belt tension 1.1",
+        "2",
+        "7"
+       ],
+       [
+        "C4 vibration 2.1",
+        "5",
+        "1"
+       ],
+       [
+        "C4 vibration 2.2",
+        "not returned",
+        "2"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "fused",
+     "title": "Reciprocal rank fusion, k = 60",
+     "explanation": "Each list adds 1/(60 + rank); ranks, not scores, are combined.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Chunk",
+       "Sum of 1/(60 + rank)",
+       "Fused rank"
+      ],
+      "rows": [
+       [
+        "C4 vibration 2.1",
+        "1/65 + 1/61 = 0.0318",
+        "1"
+       ],
+       [
+        "C4 belt tension 1.2",
+        "1/61 + 1/66 = 0.0315",
+        "2"
+       ],
+       [
+        "C4 belt tension 1.1",
+        "1/62 + 1/67 = 0.0311",
+        "3"
+       ],
+       [
+        "C4 vibration 2.2",
+        "1/62 = 0.0161",
+        "4"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "rerank",
+     "title": "A reranker sees only the top three",
+     "explanation": "It reorders what it is given; the fourth chunk is never read.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Fused rank",
+       "Chunk",
+       "Sent to the reranker?"
+      ],
+      "rows": [
+       [
+        "1",
+        "C4 vibration 2.1",
+        "yes"
+       ],
+       [
+        "2",
+        "C4 belt tension 1.2",
+        "yes"
+       ],
+       [
+        "3",
+        "C4 belt tension 1.1",
+        "yes"
+       ],
+       [
+        "4",
+        "C4 vibration 2.2",
+        "no: cannot be recovered"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-context-visual",
+   "kind": "nodes",
+   "title": "From ranked hits to a cited context",
+   "alt": "Ranked chunks fill a 60-word context with labelled entries; a citation check accepts the in-context citation and rejects the superseded and restricted ones; large chunks leave one entry.",
+   "caption": "Labels keep machines and revisions apart; the check catches citations from outside the context. Values from the executed Lab L20 run over synthetic documents.",
+   "textEquivalent": "60 words, in rank order: Filter-interval question, governed small chunks. Nodes: [1] man-m7-r3 §Hydraulic unit: 19 words. 200 operating hours; v3, effective 2026-06-01. (selected); [2] man-m8-r1 §Hydraulic unit: 17 words. The M8's 300 hours, labelled as the M8 manual. (context); [3] note-press-hydraulics §Filters: 16 words. Explains intervals; no value. (context); Rank 4 chunk: 52 + 17 passes 60; assembly stops. (excluded). Relationships: [1] man-m7-r3 §Hydraulic unit → [2] man-m8-r1 §Hydraulic unit: then; [2] man-m8-r1 §Hydraulic unit → [3] note-press-hydraulics §Filters: then; [3] note-press-hydraulics §Filters → Rank 4 chunk: budget spent.\n\nCitations checked against the context: A deterministic check: is each cited chunk in the context? Nodes: Cites man-m7-r3:small:1.1: In the context: accepted. (selected); Cites man-m7-r2:small:1.1: Superseded 250 hours; not in the context: rejected. (excluded); Contractor cites the engineering test: Never in the contractor's context: rejected. (excluded); Citation check: Catches out-of-context citations; says nothing about support. (selected). Relationships: Cites man-m7-r3:small:1.1 → Citation check: checked by; Cites man-m7-r2:small:1.1 → Citation check: checked by; Contractor cites the engineering test → Citation check: checked by.\n\nLarge chunks: one entry: Relief-valve question with whole-section chunks. Nodes: [1] note-press-hydraulics §Relief valves: 36 words. The only entry; gives no value. (context); M7 hydraulic section: 54 words. Holds 180 bar; 36 + 54 passes 60, so it never enters. (excluded). Relationships: [1] note-press-hydraulics §Relief valves → M7 hydraulic section: budget spent.",
+   "provenance": "Original SpicyBrain authored visual; values from the executed local Lab L20 run (scikit-learn 1.9.1 TF-IDF on one machine) over synthetic documents; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-scorers",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "assemble",
+     "title": "60 words, in rank order",
+     "explanation": "Filter-interval question, governed small chunks.",
+     "nodes": [
+      {
+       "id": "h1-node",
+       "label": "[1] man-m7-r3 §Hydraulic unit",
+       "detail": "200 operating hours; v3, effective 2026-06-01.",
+       "status": "selected",
+       "value": "19 words"
+      },
+      {
+       "id": "h2-node",
+       "label": "[2] man-m8-r1 §Hydraulic unit",
+       "detail": "The M8's 300 hours, labelled as the M8 manual.",
+       "status": "context",
+       "value": "17 words"
+      },
+      {
+       "id": "h3-node",
+       "label": "[3] note-press-hydraulics §Filters",
+       "detail": "Explains intervals; no value.",
+       "status": "context",
+       "value": "16 words"
+      },
+      {
+       "id": "h4-node",
+       "label": "Rank 4 chunk",
+       "detail": "52 + 17 passes 60; assembly stops.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "h1-node",
+       "to": "h2-node",
+       "label": "then"
+      },
+      {
+       "from": "h2-node",
+       "to": "h3-node",
+       "label": "then"
+      },
+      {
+       "from": "h3-node",
+       "to": "h4-node",
+       "label": "budget spent"
+      }
+     ]
+    },
+    {
+     "id": "check",
+     "title": "Citations checked against the context",
+     "explanation": "A deterministic check: is each cited chunk in the context?",
+     "nodes": [
+      {
+       "id": "a-node",
+       "label": "Cites man-m7-r3:small:1.1",
+       "detail": "In the context: accepted.",
+       "status": "selected"
+      },
+      {
+       "id": "b-node",
+       "label": "Cites man-m7-r2:small:1.1",
+       "detail": "Superseded 250 hours; not in the context: rejected.",
+       "status": "excluded"
+      },
+      {
+       "id": "cc-node",
+       "label": "Contractor cites the engineering test",
+       "detail": "Never in the contractor's context: rejected.",
+       "status": "excluded"
+      },
+      {
+       "id": "v-node",
+       "label": "Citation check",
+       "detail": "Catches out-of-context citations; says nothing about support.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "a-node",
+       "to": "v-node",
+       "label": "checked by"
+      },
+      {
+       "from": "b-node",
+       "to": "v-node",
+       "label": "checked by"
+      },
+      {
+       "from": "cc-node",
+       "to": "v-node",
+       "label": "checked by"
+      }
+     ]
+    },
+    {
+     "id": "large",
+     "title": "Large chunks: one entry",
+     "explanation": "Relief-valve question with whole-section chunks.",
+     "nodes": [
+      {
+       "id": "note",
+       "label": "[1] note-press-hydraulics §Relief valves",
+       "detail": "The only entry; gives no value.",
+       "status": "context",
+       "value": "36 words"
+      },
+      {
+       "id": "sect",
+       "label": "M7 hydraulic section",
+       "detail": "Holds 180 bar; 36 + 54 passes 60, so it never enters.",
+       "status": "excluded",
+       "value": "54 words"
+      }
+     ],
+     "connections": [
+      {
+       "from": "note",
+       "to": "sect",
+       "label": "budget spent"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-evaluation-visual",
+   "kind": "table",
+   "title": "Recall@k and reciprocal rank by hand",
+   "alt": "Tables and an equation computing recall@k and reciprocal rank for the lockout question, the governed means over twelve questions, and what retrieval metrics cannot see.",
+   "caption": "Retrieval metrics need labels; answer quality needs a separate review. Values from the executed Lab L20 run over synthetic documents.",
+   "textEquivalent": "Lockout question: two relevant chunks: Governed small ranking for the North technician. Table columns: Rank | Chunk | Relevant? Rows: 1 | North lockout 1.1 | yes; 2 | Guarding notice 1.2 | no; 3 | M8 manual 1.2 | no; 4 | North lockout 1.2 | yes; 5 | North pre-start 1.1 | no.\n\nComputed from the list: Two relevant chunks, first one at rank 1. Equation: recall@1 = 1/2 = 0.5;   recall@3 = 1/2 = 0.5;   recall@5 = 2/2 = 1.0;   reciprocal rank = 1/1 = 1.0\n\nTwelve graded questions, governed small: The contractor's unanswerable question is reported as a safety count, not averaged. Table columns: Metric | Value. Rows: recall@1 | 0.7083; recall@3 | 0.875; recall@5 | 0.9583; MRR@5 | 0.8778; restricted chunks returned | 0.\n\nWhat retrieval metrics cannot see: Groundedness needs an answer, its context and a reviewer. Nodes: Relevance labels: Written before any run; binary here. (selected); Retrieved context: Graded by recall@k and MRR against the labels. (selected); Generated answer: Not produced in Lab L20. (pending); Groundedness review: A person, or a judge calibrated against people. (pending). Relationships: Relevance labels → Retrieved context: grade; Retrieved context → Generated answer: supports?; Generated answer → Groundedness review: reviewed by.",
+   "provenance": "Original SpicyBrain authored visual; values from the executed local Lab L20 run (scikit-learn 1.9.1 TF-IDF on one machine) over synthetic documents; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-scorers",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "q05",
+     "title": "Lockout question: two relevant chunks",
+     "explanation": "Governed small ranking for the North technician.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Rank",
+       "Chunk",
+       "Relevant?"
+      ],
+      "rows": [
+       [
+        "1",
+        "North lockout 1.1",
+        "yes"
+       ],
+       [
+        "2",
+        "Guarding notice 1.2",
+        "no"
+       ],
+       [
+        "3",
+        "M8 manual 1.2",
+        "no"
+       ],
+       [
+        "4",
+        "North lockout 1.2",
+        "yes"
+       ],
+       [
+        "5",
+        "North pre-start 1.1",
+        "no"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "q05m",
+     "title": "Computed from the list",
+     "explanation": "Two relevant chunks, first one at rank 1.",
+     "nodes": [],
+     "connections": [],
+     "equation": "recall@1 = 1/2 = 0.5;   recall@3 = 1/2 = 0.5;   recall@5 = 2/2 = 1.0;   reciprocal rank = 1/1 = 1.0"
+    },
+    {
+     "id": "mean",
+     "title": "Twelve graded questions, governed small",
+     "explanation": "The contractor's unanswerable question is reported as a safety count, not averaged.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Metric",
+       "Value"
+      ],
+      "rows": [
+       [
+        "recall@1",
+        "0.7083"
+       ],
+       [
+        "recall@3",
+        "0.875"
+       ],
+       [
+        "recall@5",
+        "0.9583"
+       ],
+       [
+        "MRR@5",
+        "0.8778"
+       ],
+       [
+        "restricted chunks returned",
+        "0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "beyond",
+     "title": "What retrieval metrics cannot see",
+     "explanation": "Groundedness needs an answer, its context and a reviewer.",
+     "nodes": [
+      {
+       "id": "labels",
+       "label": "Relevance labels",
+       "detail": "Written before any run; binary here.",
+       "status": "selected"
+      },
+      {
+       "id": "ctx",
+       "label": "Retrieved context",
+       "detail": "Graded by recall@k and MRR against the labels.",
+       "status": "selected"
+      },
+      {
+       "id": "ans",
+       "label": "Generated answer",
+       "detail": "Not produced in Lab L20.",
+       "status": "pending"
+      },
+      {
+       "id": "judge",
+       "label": "Groundedness review",
+       "detail": "A person, or a judge calibrated against people.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "labels",
+       "to": "ctx",
+       "label": "grade"
+      },
+      {
+       "from": "ctx",
+       "to": "ans",
+       "label": "supports?"
+      },
+      {
+       "from": "ans",
+       "to": "judge",
+       "label": "reviewed by"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-managed-visual",
+   "kind": "nodes",
+   "title": "Lab pipeline and AI Search",
+   "alt": "The lab's local pipeline, its AI Search counterparts read from Databricks-published code, and the decisions that stay with the team.",
+   "caption": "AI Search executes the rules it is given; the inventory, metadata, labels and pass bar stay with the team. Synthetic teaching example.",
+   "textEquivalent": "Lab L20 on one machine: Every stage is local and inspectable. Nodes: Parsed sentences: fixtures/documents.json, already split. (selected); Chunk table: Text plus family, version, date, region, audience, status. (selected); TF-IDF index: scikit-learn 1.9.1; lexical only. (selected); Admission rules: Run before scoring. (selected); Evaluation: recall@k, MRR, safety counts. (selected). Relationships: Parsed sentences → Chunk table: packed into; Chunk table → TF-IDF index: indexed; Admission rules → TF-IDF index: filter; TF-IDF index → Evaluation: graded.\n\nAI Search counterparts: Read from the databricks-ai-search client and the Databricks SDK for Python. Nodes: ai_parse_document: Files in a Unity Catalog volume to pages and elements. (context); Source Delta table: Chunk rows and metadata columns. (selected); Delta Sync index: TRIGGERED or CONTINUOUS. Or a Direct Access index written through the API. (selected); Embeddings: From a text column via a model endpoint, or self-managed vectors. (context); Query: ANN, HYBRID or FULL_TEXT. Filters and an optional reranker. (selected). Relationships: ai_parse_document → Source Delta table: rows for; Source Delta table → Delta Sync index: syncs; Embeddings → Delta Sync index: vectors for; Query → Delta Sync index: searches.\n\nWhat stays yours: The service runs rules; it does not choose them. Nodes: Source inventory: Which collections may answer. (warning); Metadata correctness: A wrong audience value is a leak. (warning); Relevance labels: Written before any run. (warning); Pass bar: Zero restricted chunks; per-question recall. (warning); AI Search: Executes the rules it is given. (context). Relationships: Source inventory → AI Search: configures; Metadata correctness → AI Search: filters read; Relevance labels → Pass bar: measure; Pass bar → AI Search: accepts or rejects.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-retrieval-claim-name",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-claim-query",
+    "dbxfe-retrieval-claim-parse",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "states": [
+    {
+     "id": "lab",
+     "title": "Lab L20 on one machine",
+     "explanation": "Every stage is local and inspectable.",
+     "nodes": [
+      {
+       "id": "parsed",
+       "label": "Parsed sentences",
+       "detail": "fixtures/documents.json, already split.",
+       "status": "selected"
+      },
+      {
+       "id": "chunks",
+       "label": "Chunk table",
+       "detail": "Text plus family, version, date, region, audience, status.",
+       "status": "selected"
+      },
+      {
+       "id": "tfidf",
+       "label": "TF-IDF index",
+       "detail": "scikit-learn 1.9.1; lexical only.",
+       "status": "selected"
+      },
+      {
+       "id": "rules",
+       "label": "Admission rules",
+       "detail": "Run before scoring.",
+       "status": "selected"
+      },
+      {
+       "id": "evalx",
+       "label": "Evaluation",
+       "detail": "recall@k, MRR, safety counts.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "parsed",
+       "to": "chunks",
+       "label": "packed into"
+      },
+      {
+       "from": "chunks",
+       "to": "tfidf",
+       "label": "indexed"
+      },
+      {
+       "from": "rules",
+       "to": "tfidf",
+       "label": "filter"
+      },
+      {
+       "from": "tfidf",
+       "to": "evalx",
+       "label": "graded"
+      }
+     ]
+    },
+    {
+     "id": "managed",
+     "title": "AI Search counterparts",
+     "explanation": "Read from the databricks-ai-search client and the Databricks SDK for Python.",
+     "nodes": [
+      {
+       "id": "parse",
+       "label": "ai_parse_document",
+       "detail": "Files in a Unity Catalog volume to pages and elements.",
+       "status": "context"
+      },
+      {
+       "id": "delta",
+       "label": "Source Delta table",
+       "detail": "Chunk rows and metadata columns.",
+       "status": "selected"
+      },
+      {
+       "id": "index",
+       "label": "Delta Sync index",
+       "detail": "Or a Direct Access index written through the API.",
+       "status": "selected",
+       "value": "TRIGGERED or CONTINUOUS"
+      },
+      {
+       "id": "embed",
+       "label": "Embeddings",
+       "detail": "From a text column via a model endpoint, or self-managed vectors.",
+       "status": "context"
+      },
+      {
+       "id": "query",
+       "label": "Query",
+       "detail": "Filters and an optional reranker.",
+       "status": "selected",
+       "value": "ANN, HYBRID or FULL_TEXT"
+      }
+     ],
+     "connections": [
+      {
+       "from": "parse",
+       "to": "delta",
+       "label": "rows for"
+      },
+      {
+       "from": "delta",
+       "to": "index",
+       "label": "syncs"
+      },
+      {
+       "from": "embed",
+       "to": "index",
+       "label": "vectors for"
+      },
+      {
+       "from": "query",
+       "to": "index",
+       "label": "searches"
+      }
+     ]
+    },
+    {
+     "id": "yours",
+     "title": "What stays yours",
+     "explanation": "The service runs rules; it does not choose them.",
+     "nodes": [
+      {
+       "id": "inventory",
+       "label": "Source inventory",
+       "detail": "Which collections may answer.",
+       "status": "warning"
+      },
+      {
+       "id": "meta",
+       "label": "Metadata correctness",
+       "detail": "A wrong audience value is a leak.",
+       "status": "warning"
+      },
+      {
+       "id": "labels",
+       "label": "Relevance labels",
+       "detail": "Written before any run.",
+       "status": "warning"
+      },
+      {
+       "id": "bar",
+       "label": "Pass bar",
+       "detail": "Zero restricted chunks; per-question recall.",
+       "status": "warning"
+      },
+      {
+       "id": "service",
+       "label": "AI Search",
+       "detail": "Executes the rules it is given.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "inventory",
+       "to": "service",
+       "label": "configures"
+      },
+      {
+       "from": "meta",
+       "to": "service",
+       "label": "filters read"
+      },
+      {
+       "from": "labels",
+       "to": "bar",
+       "label": "measure"
+      },
+      {
+       "from": "bar",
+       "to": "service",
+       "label": "accepts or rejects"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-retrieval-parsing-question",
+   "revision": "1",
+   "prompt": "A torque table with the rows 'M7 | 95 Nm' and 'M8 | 120 Nm' is extracted as the single line 'Machine Torque M7 95 M8 120 Nm' and then chunked. What has been lost that no later stage can recover?",
+   "options": [
+    {
+     "id": "dbxfe-retrieval-parsing-question-a",
+     "text": "The numbers themselves, because TF-IDF discards digits.",
+     "rationale": "The default token pattern keeps tokens of two or more letters or digits, so '95' and '120' are indexed; the problem is their pairing, not their presence."
+    },
+    {
+     "id": "dbxfe-retrieval-parsing-question-b",
+     "text": "The pairing between each machine and its torque, because rows and columns became one token stream.",
+     "rationale": "Correct: once the row structure is gone, a chunk holds four free-floating values, and nothing downstream knows which number belongs to which machine."
+    },
+    {
+     "id": "dbxfe-retrieval-parsing-question-c",
+     "text": "The document's audience, because a table cannot carry permission columns.",
+     "rationale": "Permission lives on the document and chunk record, not inside the table text; flattening the table leaves those columns untouched."
+    },
+    {
+     "id": "dbxfe-retrieval-parsing-question-d",
+     "text": "Nothing, because a reranker can rebuild the table from the flattened line.",
+     "rationale": "A reranker reorders candidate chunks; it never restores structure the parse destroyed, so the ambiguity remains."
+    }
+   ],
+   "correctOptionId": "dbxfe-retrieval-parsing-question-b",
+   "conceptIds": [
+    "dbxfe-retrieval-parsing-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-parse",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-chunking-question",
+   "revision": "1",
+   "prompt": "With whole-section chunks, the relief-valve question ranks the training note first (36 words) and the M7 hydraulic section second (54 words). The context budget is 60 words and assembly stops at the first chunk that does not fit. What does the context contain?",
+   "options": [
+    {
+     "id": "dbxfe-retrieval-chunking-question-a",
+     "text": "The note and the M7 section, because both are in the top two.",
+     "rationale": "Rank alone does not guarantee entry: 36 + 54 = 90 words exceeds the 60-word budget."
+    },
+    {
+     "id": "dbxfe-retrieval-chunking-question-b",
+     "text": "Only the M7 section, because the note does not contain an answer.",
+     "rationale": "Assembly follows rank order and the budget; it does not judge whether a chunk answers, which is why the note enters first."
+    },
+    {
+     "id": "dbxfe-retrieval-chunking-question-c",
+     "text": "Only the training note, so the 180 bar value never reaches the context.",
+     "rationale": "Correct: 36 words fit, and adding the 54-word section would make 90, so assembly stops there; the value sits in the chunk left out."
+    },
+    {
+     "id": "dbxfe-retrieval-chunking-question-d",
+     "text": "The note plus the first sentence of the M7 section.",
+     "rationale": "Chunks are the unit of assembly; the policy never splits a chunk to fill leftover budget."
+    }
+   ],
+   "correctOptionId": "dbxfe-retrieval-chunking-question-c",
+   "conceptIds": [
+    "dbxfe-retrieval-chunk-concept",
+    "dbxfe-retrieval-context-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-metadata-question",
+   "revision": "1",
+   "prompt": "A team builds its chunk table with only chunk_id and text, dropping version and effective_date to save space. Which rule can no longer run before ranking?",
+   "options": [
+    {
+     "id": "dbxfe-retrieval-metadata-question-a",
+     "text": "Supersession and the effective-date check, because both compare values the record no longer carries.",
+     "rationale": "Correct: without version and effective date there is no way to tell rev 2 from rev 3 or a revision not yet in force, except by guessing from the text."
+    },
+    {
+     "id": "dbxfe-retrieval-metadata-question-b",
+     "text": "TF-IDF scoring, because idf needs each chunk's version.",
+     "rationale": "IDF is computed from how many chunks contain a token; versions play no part in the arithmetic."
+    },
+    {
+     "id": "dbxfe-retrieval-metadata-question-c",
+     "text": "Deduplication of repeated text, because duplicates are found by version.",
+     "rationale": "Repeated text is detected by comparing the text itself, which is still present."
+    },
+    {
+     "id": "dbxfe-retrieval-metadata-question-d",
+     "text": "Citation numbering, because a citation cannot exist without a date.",
+     "rationale": "Entries can still be numbered by position; they lose the date a reader would check, but numbering itself still works."
+    }
+   ],
+   "correctOptionId": "dbxfe-retrieval-metadata-question-a",
+   "conceptIds": [
+    "dbxfe-retrieval-metadata-concept",
+    "dbxfe-retrieval-supersession-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-permission-question",
+   "revision": "1",
+   "prompt": "A North technician's lockout question is served by 'score every chunk, keep the top 3, then drop what the caller may not read'. The top 3 over all chunks are two South-plant chunks and one North chunk. What does the caller get, and what else happened?",
+   "options": [
+    {
+     "id": "dbxfe-retrieval-permission-question-a",
+     "text": "Three chunks, because the filter backfills from rank 4 downward.",
+     "rationale": "This post-filter does not backfill; and even a backfilling version would still have scored and ranked the restricted chunks first."
+    },
+    {
+     "id": "dbxfe-retrieval-permission-question-b",
+     "text": "No chunks, because one unauthorized chunk in the top 3 fails the whole query.",
+     "rationale": "Only the restricted chunks are removed; the North chunk survives."
+    },
+    {
+     "id": "dbxfe-retrieval-permission-question-c",
+     "text": "Three chunks including the South ones, because the model is told not to use them.",
+     "rationale": "That describes the prompt-only shortcut, which delivers restricted text; the post-filter removes it, but too late."
+    },
+    {
+     "id": "dbxfe-retrieval-permission-question-d",
+     "text": "One chunk; the two South chunks were scored and ranked before being dropped, so restricted text passed through retrieval.",
+     "rationale": "Correct, and it is what Lab L20's post-filter shortcut returns: a starved list and restricted rows that were scored, ranked and present in any trace of the step."
+    }
+   ],
+   "correctOptionId": "dbxfe-retrieval-permission-question-d",
+   "conceptIds": [
+    "dbxfe-retrieval-admission-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-fact-privileges",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-freshness-question",
+   "revision": "1",
+   "prompt": "M7 revision 4 (effective 2026-09-15) and revision 5 (effective 2026-11-01) are both approved and were loaded on 2026-09-10. Which revision answers a question asked on 2026-10-01?",
+   "options": [
+    {
+     "id": "dbxfe-retrieval-freshness-question-a",
+     "text": "Revision 5, because it is the highest version in the index.",
+     "rationale": "Being loaded does not make a revision effective; the effective date, not the load date, decides."
+    },
+    {
+     "id": "dbxfe-retrieval-freshness-question-b",
+     "text": "Revision 4: the highest approved version whose effective date is on or before the question's date.",
+     "rationale": "Correct: revision 5 is loaded but not yet in force, and revision 3 was superseded on 15 September."
+    },
+    {
+     "id": "dbxfe-retrieval-freshness-question-c",
+     "text": "Revision 3, because nothing loaded after the last evaluation run may answer.",
+     "rationale": "No such rule exists; evaluation runs record what was tested, they do not freeze the library."
+    },
+    {
+     "id": "dbxfe-retrieval-freshness-question-d",
+     "text": "Whichever revision scores higher for the question's wording.",
+     "rationale": "Supersession is a rule applied before ranking; similarity cannot tell 150 hours from 200 hours reliably, as the lab's near-identical scores show."
+    }
+   ],
+   "correctOptionId": "dbxfe-retrieval-freshness-question-b",
+   "conceptIds": [
+    "dbxfe-retrieval-supersession-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-lexical-question",
+   "revision": "1",
+   "prompt": "An index holds 48 chunks. The token 'setting' appears in 6 of them and 'the' in all 48. With idf(t) = ln((1 + n)/(1 + df(t))) + 1, which pair of weights is right?",
+   "options": [
+    {
+     "id": "dbxfe-retrieval-lexical-question-a",
+     "text": "setting 1.9459, the 0.0",
+     "rationale": "This drops the +1, which would make a token that appears everywhere count for nothing; the documented formula keeps it at 1.0."
+    },
+    {
+     "id": "dbxfe-retrieval-lexical-question-b",
+     "text": "setting 3.0794, the 1.0",
+     "rationale": "3.0794 is ln(48/6) + 1, the unsmoothed form; scikit-learn's default adds one to both counts."
+    },
+    {
+     "id": "dbxfe-retrieval-lexical-question-c",
+     "text": "setting 2.9459, the 1.0",
+     "rationale": "Correct: ln(49/7) + 1 = ln 7 + 1 = 2.9459, and ln(49/49) + 1 = 0 + 1 = 1.0."
+    },
+    {
+     "id": "dbxfe-retrieval-lexical-question-d",
+     "text": "setting 0.125, the 1.0",
+     "rationale": "0.125 is df/n, the document frequency as a fraction; IDF inverts and logs it, so rarer tokens weigh more."
+    }
+   ],
+   "correctOptionId": "dbxfe-retrieval-lexical-question-c",
+   "conceptIds": [
+    "dbxfe-retrieval-tfidf-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-tfidf",
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-vector-question",
+   "revision": "1",
+   "prompt": "Which labelled question from Lab L20 is the best candidate to improve by adding a vector retriever, measured on the same labels?",
+   "options": [
+    {
+     "id": "dbxfe-retrieval-vector-question-a",
+     "text": "'Which machine does the QX-417 seal kit fit?', which TF-IDF already ranked first.",
+     "rationale": "An exact code is a lexical strength; embeddings may even blur near codes, so this is a regression test, not the improvement target."
+    },
+    {
+     "id": "dbxfe-retrieval-vector-question-b",
+     "text": "The contractor's request for the engineering-only overpressure test.",
+     "rationale": "This is a permission case: no retriever should return that procedure to a contractor, so ranking changes cannot be the fix."
+    },
+    {
+     "id": "dbxfe-retrieval-vector-question-c",
+     "text": "The filter-interval question asked on 2026-05-01.",
+     "rationale": "That question is decided by the version and effective-date rule, not by similarity."
+    },
+    {
+     "id": "dbxfe-retrieval-vector-question-d",
+     "text": "'Why does the belt line shake after start-up?', whose relevant vibration sentence ranked fifth under TF-IDF.",
+     "rationale": "Correct: a paraphrase with almost no shared tokens is exactly where semantic matching can help; the test is whether its rank improves without harming other classes."
+    }
+   ],
+   "correctOptionId": "dbxfe-retrieval-vector-question-d",
+   "conceptIds": [
+    "dbxfe-retrieval-vector-concept",
+    "dbxfe-retrieval-mismatch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-hybrid-question",
+   "revision": "1",
+   "prompt": "With reciprocal rank fusion and k = 60, chunk A is ranked 1 by lexical search and does not appear in the vector list; chunk B is ranked 3 by both. Which ranks higher after fusion?",
+   "options": [
+    {
+     "id": "dbxfe-retrieval-hybrid-question-a",
+     "text": "Chunk B, because it collects a contribution from both lists.",
+     "rationale": "Correct: 1/63 + 1/63 = 0.0317 exceeds chunk A's 1/61 = 0.0164; fusion adds a contribution from every list a chunk appears in, so steady presence beats a single first place."
+    },
+    {
+     "id": "dbxfe-retrieval-hybrid-question-b",
+     "text": "Chunk A, because a first place outweighs two third places.",
+     "rationale": "Fusion sums contributions; one list's first place is worth 1/61, less than two contributions of 1/63."
+    },
+    {
+     "id": "dbxfe-retrieval-hybrid-question-c",
+     "text": "Neither: they tie, because fusion keeps only each chunk's best rank.",
+     "rationale": "RRF sums over all lists; it does not take the maximum, so the two chunks do not tie."
+    },
+    {
+     "id": "dbxfe-retrieval-hybrid-question-d",
+     "text": "It cannot be computed without the raw similarity scores.",
+     "rationale": "Rank fusion uses ranks precisely because the two retrievers' scores are on different scales."
+    }
+   ],
+   "correctOptionId": "dbxfe-retrieval-hybrid-question-a",
+   "conceptIds": [
+    "dbxfe-retrieval-hybrid-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-query",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-evaluation-question",
+   "revision": "1",
+   "prompt": "A question's relevant chunks are {X, Y}. The retriever returns [P, X, Q, R, Y]. What are recall@3 and the reciprocal rank?",
+   "options": [
+    {
+     "id": "dbxfe-retrieval-evaluation-question-a",
+     "text": "recall@3 = 1.0 and reciprocal rank = 0.5",
+     "rationale": "Y is at rank 5, outside the first three, so it does not count toward recall@3."
+    },
+    {
+     "id": "dbxfe-retrieval-evaluation-question-b",
+     "text": "recall@3 = 0.5 and reciprocal rank = 0.5",
+     "rationale": "Correct: only X is in the first three, one of two relevant chunks; the first relevant result is at rank 2."
+    },
+    {
+     "id": "dbxfe-retrieval-evaluation-question-c",
+     "text": "recall@3 = 0.5 and reciprocal rank = 0.2",
+     "rationale": "Reciprocal rank uses the first relevant result (rank 2), not the last one (rank 5)."
+    },
+    {
+     "id": "dbxfe-retrieval-evaluation-question-d",
+     "text": "recall@3 = 0.333 and reciprocal rank = 0.5",
+     "rationale": "0.333 is precision@3, one relevant result among three returned; recall divides by the two relevant chunks."
+    }
+   ],
+   "correctOptionId": "dbxfe-retrieval-evaluation-question-b",
+   "conceptIds": [
+    "dbxfe-retrieval-recall-concept",
+    "dbxfe-retrieval-mrr-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-scorers",
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-retrieval-authority-self",
+   "revision": "1",
+   "prompt": "Cinderline's shared drive holds approved manuals, a 'superseded' folder, draft proposals, training notes and a folder of sensor-alarm notes with no owner. Write the inventory decision for each collection and the test that would show each decision holds.",
+   "modelAnswer": "Approved manuals: citable, current approved revision only, owner the maintenance lead, version from revision number and effective date. Superseded folder: excluded from citation, kept for audit. Drafts: excluded, or indexed with status draft and refused at query time. Training notes: context only, never cited for a value. Sensor-alarm notes: refused until someone owns them. Tests: a question whose best lexical match is the draft must return no draft chunk; a question asked before and after a revision's effective date must cite the right revision; no answer may cite a training note for a setting.",
+   "reasoning": "Each decision becomes a rule that a labelled case can break, which is what makes it checkable; indexing drafts with a status flag instead of excluding them is acceptable only if the refusal is tested.",
+   "conceptIds": [
+    "dbxfe-retrieval-authority-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-wrongchunk-self",
+   "revision": "1",
+   "prompt": "The training note outranks the M7 manual's answer sentence for the relief-valve question. A colleague proposes adding the word 'setting' to the manual sentence. Explain why that is the wrong fix and propose two measured alternatives.",
+   "modelAnswer": "Editing the source to win one query hides the defect: the next paraphrase fails the same way, and the manual is no longer the approved text. The per-term contributions show the cause: the note repeats 'setting' and 'relief', and the answer says 'Set'. Alternatives: mark training notes context-only so they cannot be cited for values, then re-run the labels; or test a stemming analyzer or a hybrid retriever that can match 'setting' to 'Set', comparing recall@1 and MRR per question class with the same filters.",
+   "reasoning": "A good remedy targets a named cause and is judged on the whole labelled set, so it cannot quietly trade one question for another; a reranker over the top few is another acceptable alternative.",
+   "conceptIds": [
+    "dbxfe-retrieval-mismatch-concept",
+    "dbxfe-retrieval-tfidf-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-tfidf",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-context-self",
+   "revision": "1",
+   "prompt": "A 60-word context budget receives a 54-word section at rank 1 and a 12-word sentence holding the answer at rank 2. Neither 'stop at the first chunk that does not fit' nor 'skip it and continue' gets the answer in. Propose a change, state its cost, and say how you would test it.",
+   "modelAnswer": "Change the unit, not the assembly rule: chunk the section into sentences, or index both sizes and retrieve sentences first, expanding to the whole section only when the budget allows, so the 12-word answer sentence can enter. Another option trims a large chunk to its sentences before assembly. Cost: more chunks to index, label and cite, and sentences that lose their heading unless a contextual header carries it. Test: every labelled question keeps passing, and a check asserts that each question's answer-bearing chunk reaches the context within the budget with a citation that resolves to it.",
+   "reasoning": "Both assembly rules fail because the unit is too large for the budget, so the fix changes the unit and is judged on labels; raising the budget is also acceptable if its cost and distraction risk are stated.",
+   "conceptIds": [
+    "dbxfe-retrieval-context-concept",
+    "dbxfe-retrieval-chunk-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-retrieval-managed-self",
+   "revision": "1",
+   "prompt": "Your team will move Lab L20's pipeline to Databricks AI Search. List, in order, what you would verify in the current documentation and what you would re-run before trusting the managed index.",
+   "modelAnswer": "Verify: the endpoint type available in the region, index type and sync mode (TRIGGERED or CONTINUOUS), the embedding model and whether embeddings are managed, which query types the index subtype supports, filter syntax and how filters interact with top-k, reranker availability, Unity Catalog privileges needed to query, preview status and pricing. Re-run: the same 13 labelled questions with the same metadata and callers, including the restricted-chunk, draft and superseded-revision cases, recording recall@k, MRR and safety counts per question beside the lab baseline.",
+   "reasoning": "Verification precedes measurement because an unsupported option invalidates the comparison, and the safety cases are the pass bar; adding a latency and cost check is a reasonable extension.",
+   "conceptIds": [
+    "dbxfe-retrieval-aisearch-concept",
+    "dbxfe-retrieval-deltasync-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-name",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-claim-query",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-retrieval-authority",
+   "version": "1.0.0",
+   "title": "Decide which sources may answer before you index anything",
+   "outcome": "Write a source inventory that marks each collection as citable, context-only or excluded, with its owner and version rule.",
+   "explanation": "Retrieval can only return what was indexed, so the first engineering decision is [[dbxfe-retrieval-authority-concept|source authority]]: which collections may support an answer at all. Cinderline's shared drive holds approved manuals, plant procedures, a folder of superseded revisions, draft proposals, training notes and unowned sensor-alarm notes. Notice in the second state that the inventory excludes drafts, superseded revisions and unowned notes, keeps training notes as context only, and names an owner and version rule for everything that remains.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-authority",
+   "conceptIds": [
+    "dbxfe-retrieval-authority-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-authority-visual",
+   "questionIds": [
+    "dbxfe-retrieval-authority-self"
+   ],
+   "hint": "Start from who owns each folder and how its current version is identified; a collection without either is not a source yet.",
+   "handbook": {
+    "markdown": "### An inventory is the retrieval contract\nWrite one row per collection: owner, how the current version is identified, who may read it, how stale it may be, and whether it may be cited. The RAG evaluation plan field guide uses the same columns; here they become engineering inputs, because every later rule reads them.\n\nIn the fictional library the M7 manual has an owner (the maintenance lead), a revision number and an effective date, so a newer revision can replace an older one mechanically. The draft that proposes raising the relief valve to 200 bar has no approval, so it is either kept out of the index or indexed with `status = draft` and refused at query time; either is defensible if a test proves the refusal. Training notes explain concepts but own no values: mark them context-only so an answer cannot cite one for a setting.\n\n**Worked failure (Lab L20).** With no rules, the draft ranks second for 'What is the M7 press relief valve setting?' (0.4054), above the approved answer. Authority is not a ranking signal to be tuned; it is an admission rule.\n\n**What to inspect:** collections with no owner, folders that mix current and superseded files, versions that live only in filenames, and sources nobody can say are allowed. Refuse a collection rather than index it on hope.\n\n**Limit:** an inventory states intent. It proves nothing until labelled cases show that a draft or superseded chunk never reaches a context, and it needs an owner who re-reviews it when collections change.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-authority"
+    ]
+   },
+   "recap": "Authority is decided per collection before indexing: citable, context-only or excluded, each with an owner and a version rule.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-parsing",
+   "version": "1.0.0",
+   "title": "Parsing decides what text exists to be found",
+   "outcome": "Predict how a parsing choice changes the text a chunker receives, and name the evidence a parse must keep.",
+   "explanation": "[[dbxfe-retrieval-parsing-concept|Document parsing]] turns a PDF, slide deck or scan into text elements before any chunk exists. A table flattened into one line loses which torque belongs to which machine, and a page that fails produces no text at all, silently. Notice in the second state that plain extraction merges the M7 and M8 rows, and in the third that a structure-aware parse keeps table rows, the page number and a record of the page that failed.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-authority",
+   "conceptIds": [
+    "dbxfe-retrieval-parsing-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-parse",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-parsing-visual",
+   "questionIds": [
+    "dbxfe-retrieval-parsing-question"
+   ],
+   "handbook": {
+    "markdown": "### Parse into elements, keep the evidence\nTreat parsing as its own stage with its own output table: one row per element (heading, paragraph, table, figure description) with source file, page and element type. Chunking then works from elements rather than from a character stream, and a failed page can be reprocessed instead of being rediscovered by a technician who cannot find a procedure.\n\n**On Databricks.** The Databricks SDK for Python 0.141.0, generated from the REST specification and read in this build, defines `ai_parse_document`: it takes a file path in a Unity Catalog volume, accepts PDF, DOCX, DOC, PPTX, PPT, JPG, JPEG, PNG and TIFF, and returns a document of pages and elements, with a per-page error list when individual pages fail while the request succeeds. Check the current documentation for limits, versions and availability before designing around it; generated field names are not entitlements.\n\n**Worked example (schematic).** A torque table with rows `M7 | 95 Nm` and `M8 | 120 Nm` extracted as plain text becomes `Machine Torque M7 95 M8 120 Nm`. A chunk built from that line can answer 'M8 torque?' with 95. Keeping the table as rows, or rendering each row as a sentence ('M7 die clamp bolts: 95 Nm'), keeps the pairing that retrieval and citation need.\n\n**What to inspect:** pages with errors or no elements, tables whose cell count changed, headers and footers repeated on every page (they inflate term counts), scans whose text is only an image, and generated figure descriptions, which must be marked as generated text.\n\n**Limit:** Lab L20 starts from already parsed sentences; no parser is executed in this course.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-authority"
+    ]
+   },
+   "recap": "Parse into typed elements with file and page lineage; a flattened table or a silent page failure corrupts every later stage.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-chunking",
+   "version": "1.0.0",
+   "title": "Chunk size trades precision against context",
+   "outcome": "Compare two chunk sizes on recall, MRR and the words they send to the context, and say what the comparison can and cannot show.",
+   "explanation": "A [[dbxfe-retrieval-chunk-concept|chunk]] is the unit that gets scored, returned and cited. In Lab L20, 20-word chunks are single sentences and 80-word chunks are whole sections. Notice in the second table that large chunks score higher on recall@1 (0.8333 against 0.7083) but nearly double the words in the top three results, and in the last state that a large chunk lets a 60-word context fill up with a note that holds no value.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-chunks",
+   "conceptIds": [
+    "dbxfe-retrieval-chunk-concept",
+    "dbxfe-retrieval-context-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-tfidf",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-chunking-visual",
+   "questionIds": [
+    "dbxfe-retrieval-chunking-question"
+   ],
+   "handbook": {
+    "markdown": "### Two sizes, one library, executed\nLab L20 packs whole sentences into chunks without crossing a section: a 20-word budget gives 48 one-sentence chunks (mean 16.1 words), an 80-word budget 26 whole-section chunks (mean 29.73 words). Governed retrieval over the same 12 graded questions:\n\n| Size | recall@1 | recall@3 | recall@5 | MRR@5 | words in top 3 |\n|---|---|---|---|---|---|\n| small | 0.7083 | 0.875 | 0.9583 | 0.8778 | 49.31 |\n| large | 0.8333 | 0.9167 | 1.0 | 0.8917 | 92.08 |\n\nTwo cautions before choosing. The units differ: four questions have two relevant sentences but one relevant section, so small chunks cannot reach recall@1 = 1 on them. And a bigger chunk spends more of the context budget: for the relief-valve question the section holding 180 bar ranks second behind a training note, and a 60-word context holds only the note (36 words) because the 54-word section no longer fits.\n\n```python\ndef chunk_document(document, size):\n    budget = SIZES[size]          # 20 or 80 body words\n    # pack whole sentences, never split one, never cross a section;\n    # ids are <doc_id>:<size>:<section>.<chunk>\n```\n\n**Choosing:** start from the answer unit (one instruction, one table row, one list of steps), keep headings and qualifiers with it, then measure recall@k, MRR and context words on labelled questions. Overlap between neighbouring chunks trades duplicate text for fewer cut-off answers; it is not tested in the lab.\n\n**Limit:** 13 questions over 18 documents cannot choose a size for another library; they show how to decide.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-chunks"
+    ]
+   },
+   "recap": "Chunk size is measured, not assumed: small units are precise and cheap in context, large ones keep context but crowd the budget.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-metadata",
+   "version": "1.0.0",
+   "title": "Metadata travels with every chunk or the filters have nothing to read",
+   "outcome": "Specify the chunk record fields that admission, freshness and citation need, and separate header text from filter columns.",
+   "explanation": "Each chunk record carries [[dbxfe-retrieval-metadata-concept|metadata]] columns (family, version, effective date, region, audience, status) beside its text. Rules read the columns; the score reads the text. Notice that the second state strips the columns and every admission rule loses its input, and that the third separates the contextual header, 'M7 press service manual. Hydraulic unit.', which the index scores, from a column, which only decides admission.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-chunks",
+   "conceptIds": [
+    "dbxfe-retrieval-metadata-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-metadata-visual",
+   "questionIds": [
+    "dbxfe-retrieval-metadata-question"
+   ],
+   "handbook": {
+    "markdown": "### One record per chunk\nA chunk table looks like any fact table: a stable key, the text, and the attributes later stages filter on.\n\n| Column | Read by |\n|---|---|\n| `chunk_id` (`man-m7-r3:small:1.2`) | citations, evaluation labels, deduplication |\n| `family`, `version`, `effective_date`, `status` | supersession, effective-date and authority rules |\n| `region`, `audience` | the permission rule |\n| `doc_type` | the freshness preference (bulletins only in the lab) |\n| `title`, `heading` | the contextual header and the citation label |\n\n**Header versus column.** Prepending `title. heading.` to the indexed text lets a sentence that never names its machine still match 'M7'. It changes scores, so it is re-evaluated like any ranking change. A column changes no score; it lets a rule include or exclude a chunk exactly. Use the header for findability and columns for decisions; never parse a version out of the text at query time.\n\n**SQL bridge.** Admission is a `WHERE` clause over these columns applied before the `ORDER BY score`; a missing column is a `WHERE` you cannot write.\n\n**What to inspect:** null metadata, versions stored only in filenames, audiences copied from a parent folder that was later restricted, and chunk ids that change on every re-ingestion, which silently break evaluation labels.\n\n**On Databricks:** the AI Search client lets a Delta Sync index sync selected columns from its source table (`columns_to_sync`); which columns a filter may use, and its syntax, are checked in the current documentation.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-chunks"
+    ]
+   },
+   "recap": "Text is for scoring; columns are for rules. A chunk without family, version, date, region and audience cannot be governed.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-permission",
+   "version": "1.0.0",
+   "title": "Filter by permission before ranking, not after",
+   "outcome": "Show why admission must run before scoring and diagnose what post-filtering and prompt-only permission do instead.",
+   "explanation": "[[dbxfe-retrieval-admission-concept|Admission before ranking]] means a chunk the caller may not read is never scored. A North technician asks how to lock out a press before clearing a jam. Notice the South plant's procedure winning on similarity alone, excluded in the governed state, and in the post-filter state scored, ranked and then dropped, leaving one result of three. The last state shows a contractor's question with the engineering-only procedure excluded.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-admission",
+   "conceptIds": [
+    "dbxfe-retrieval-admission-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-fact-privileges",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-permission-visual",
+   "questionIds": [
+    "dbxfe-retrieval-permission-question"
+   ],
+   "samajh": {
+    "text": "Board exam hall socho. Invigilator darwaaze pe hi hall ticket check karta hai; jiska centre alag hai, woh andar hi nahi aata. Agar sabko baitha do, paper likhwa lo, aur copy jaanchte waqt 'galat centre' waalon ki copies hata do, to paper toh unhone dekh hi liya, aur unki wajah se sahi students ki seats bhi bhar gayi thi. Retrieval mein bhi check darwaaze pe hota hai, ranking se pehle.",
+    "mapping": "The hall-ticket check at the door is admission before ranking; seating and marking are scoring and ranking; removing copies afterwards is post-filtering.",
+    "boundary": "A hall ticket is one yes-or-no document; real admission combines status, version, effective date and permission, and a wrong metadata value can refuse a legitimate chunk."
+   },
+   "handbook": {
+    "markdown": "### Three places to enforce, one correct\n**Before ranking (governed).** Candidate rows are those that pass status, effective date, current version and permission; only they are scored. For the North technician the first result is the North procedure (0.1836) and no South chunk appears.\n\n**After ranking (post-filter).** Score everything, keep the top k, then drop what the caller may not read. With k = 3 the top three are both South chunks and one North chunk, and one result survives. Across 13 questions the list averages 1.85 of 3, recall@3 falls from 0.875 to 0.75, and a South technician loses a relevant pre-start check. Restricted text was also scored and ranked, so it existed in the retrieval output and in any trace of it: the RAG evaluation plan field guide calls this enforcement at the wrong stage.\n\n**In the prompt.** Retrieve by similarity and tell the model not to use restricted passages. The contractor's context then contains 'holds the M7 hydraulic circuit at 220 bar for ten minutes' beside the instruction. Nothing was enforced.\n\n```python\nrows = [i for i, c in enumerate(index.chunks)\n        if admission(c, user, as_of, current) is None]\nscores = index.cosine(query, rows)   # restricted rows are never scored\n```\n\n**On Databricks:** an AI Search index is named by a Unity Catalog table name and queries accept filters (read in the Databricks-published client and SDK), and reading governed data needs Unity Catalog privileges. Whether a filter applies before or during the nearest-neighbour search, and how many results survive a selective filter, are behaviours to confirm in the documentation and to test with a restricted chunk that matches strongly.\n\n**Limit:** the lab's IDF statistics still include restricted chunks; separate indexes per audience avoid even that.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-admission"
+    ]
+   },
+   "recap": "Admit, then rank: post-filtering scores restricted text and starves the list, and a prompt instruction enforces nothing.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-freshness",
+   "version": "1.0.0",
+   "title": "A newer version replaces the old one; it does not join it",
+   "outcome": "Apply supersession and effective dates to decide which revision answers on a given date, and scope a freshness preference.",
+   "explanation": "[[dbxfe-retrieval-supersession-concept|Supersession]] is a rule, not a score: in each document family only the highest approved version effective on the question's date may answer. Notice in the timeline that revision 4 is loaded on 10 September but answers only from 15 September, and revision 5 waits until 1 November. A separate [[dbxfe-retrieval-freshness-concept|freshness preference]] only nudges recent bulletins that have no version link.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-admission",
+   "conceptIds": [
+    "dbxfe-retrieval-supersession-concept",
+    "dbxfe-retrieval-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-freshness-visual",
+   "questionIds": [
+    "dbxfe-retrieval-freshness-question"
+   ],
+   "samajh": {
+    "text": "Society ke notice board pe naya notice lagta hai: 'Paani ki timing 15 tareekh se subah 6 se 8.' Notice 10 tareekh ko lag gaya, par 12 tareekh ko purani timing hi chalegi. Aur agar saath mein 1 tareekh se lagu hone waala ek aur notice bhi chipka hai, woh tab tak kaam ka nahi. Board pe kab laga, yeh matter nahi karta; kab se lagu hai, woh karta hai.",
+    "mapping": "The notice board is the index, the day a notice was pinned is the load date, and 'from the 15th' is the effective date that decides which revision answers.",
+    "boundary": "Society notices rarely come in families; document revisions also need an approved status and a version number, and an index can lag behind the source."
+   },
+   "handbook": {
+    "markdown": "### Versions are rules; recency is a preference\n**Supersession.** Rev 3 of the M7 manual changed one number: the filter interval went from 250 to 200 hours. Similarity cannot separate them (0.4694 against 0.4651 in the naive ranking), so both reach the context unless a rule removes the older one. The rule: the highest approved version of the family whose effective date is on or before the question's date, computed independently of the caller.\n\n**Effective date, not load date.** With revisions 4 (150 hours, effective 2026-09-15) and 5 (120 hours, effective 2026-11-01) loaded together, the same question answers 200 hours on 10 September, 150 on 20 September and 120 on 5 November. Asked on 1 May it gets revision 2, while similarity alone put revision 3, not yet in force, first.\n\n**Index freshness is a third clock.** In AI Search a Delta Sync index follows a source Delta table with a TRIGGERED pipeline, which stops after one refresh using the data available when it started, or a CONTINUOUS one, which processes new data as it arrives (Databricks SDK). Between a source update and the next triggered sync the index still answers from older rows; record the sync time beside every evaluation run.\n\n**Freshness preference.** Two valid bulletins have no version link: weekly coolant checks (2023) and a temporary every-shift instruction (2026). A +0.05 bonus for bulletins effective within 365 days moves the 2026 bulletin from rank 3 to 1. Applied to every document type, the same bonus lifts a recent safety notice above the lockout procedure. Scope it, measure it, and never let it override a rule.\n\n**Limit:** two questions cannot tune 0.05 or 365 days; they show that the scope matters.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-admission"
+    ]
+   },
+   "recap": "The newest effective approved revision answers; a load date, a similarity score or a recency bonus never decides that.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-lexical",
+   "version": "1.0.0",
+   "title": "TF-IDF rewards rare shared words and nothing else",
+   "outcome": "Compute an IDF weight and read a cosine score as the sum of per-term contributions.",
+   "explanation": "[[dbxfe-retrieval-tfidf-concept|TF-IDF]] weights each token by how often it appears in a chunk times how rare it is across chunks, scales each vector to unit length, and scores by cosine similarity. Notice in the first state that 'setting' appears in 6 of 48 chunks and weighs 2.9459 while 'the', in all 48, weighs 1.0, and in the last state that a score is simply the sum of the shared tokens' contributions.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-ranking",
+   "conceptIds": [
+    "dbxfe-retrieval-tfidf-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-tfidf",
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-lexical-visual",
+   "questionIds": [
+    "dbxfe-retrieval-lexical-question"
+   ],
+   "samajh": {
+    "text": "Kirana dukaan pe parchi do: 'ek packet haldi, ek packet namak, ek packet Surf'. Bhaiya ko 'packet' se kuch pata nahi chalta, har cheez packet mein hi aati hai; 'haldi' aur 'Surf' se turant samajh aata hai kya chahiye. Par agar aapne 'washing powder' likha aur shelf pe sirf 'Surf' likha hai, toh sirf shabd milaane waala tareeka wahan atak jaata hai.",
+    "mapping": "Words on the slip are query tokens; common words like 'packet' get a low IDF, rare ones like 'haldi' a high IDF, and 'washing powder' against 'Surf' is the vocabulary mismatch TF-IDF cannot bridge.",
+    "boundary": "A shopkeeper understands synonyms and intent; TF-IDF only counts shared tokens, so the 'understanding' in the picture belongs to vector retrieval, not to TF-IDF."
+   },
+   "handbook": {
+    "markdown": "### The arithmetic, with the lab's numbers\nscikit-learn's `TfidfVectorizer` defaults, read in this build from the installed 1.9.1 docstrings: lower-case the text, keep tokens of two or more letters or digits, weight = count × idf with `idf(t) = ln((1 + n) / (1 + df(t))) + 1`, then scale each vector to length 1 so that cosine similarity is a dot product.\n\nIn the governed small index (n = 48): `setting` has df 6, so idf = ln(49/7) + 1 = 2.9459; `relief` 2.5892; `valve` 2.4939; `m7` 2.0586; `press` 1.5245; `the` 1.0. The training note contains `setting` twice: 2 × 2.9459 = 5.8918, divided by the note's vector length 15.912, is 0.3703; times the question's `setting` weight, 0.4576, that is 0.1694 of the note's 0.5192.\n\n```python\nfrom sklearn.feature_extraction.text import TfidfVectorizer\nvectorizer = TfidfVectorizer()                  # documented defaults\nmatrix = vectorizer.fit_transform(chunk_texts)  # rows have unit length\nscores = (matrix @ vectorizer.transform([question]).T).toarray().ravel()\n```\n\n**What the arithmetic implies.** No stemming: 'setting' and 'Set' are different tokens. Punctuation splits identifiers: 'QX-417' becomes 'qx' and '417', so the M8 manual's '417 mm' also matches. IDF is corpus-relative: 'is' occurs in only three chunks here and weighs 3.5055, more than any content word. Repetition helps: a note that says 'setting' twice outscores the sentence that holds the value.\n\n**Diagnostics:** print per-term contributions (`explain()` in Lab L20) before changing anything; a surprising winner usually shows one rare shared token. BM25, the other widely used lexical scorer, weights term frequency and chunk length differently and is not computed here.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-ranking"
+    ]
+   },
+   "recap": "A TF-IDF score is a sum of shared-token contributions; rare shared tokens and repetition win, meaning does not.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-wrongchunk",
+   "version": "1.0.0",
+   "title": "The wrong chunk wins by sharing more of the question's words",
+   "outcome": "Diagnose a wrong top result from per-term contributions and choose a remedy that addresses the cause.",
+   "explanation": "For 'What is the M7 press relief valve setting?' the training note (0.5192) and the answer's neighbour, 'Record the relief valve setting...' (0.4209), both outrank the answer, 'Set the relief valve to 180 bar...' (0.2674). This is [[dbxfe-retrieval-mismatch-concept|vocabulary mismatch]] plus repetition. Notice in the contribution table that 'setting' alone gives the note 0.1694 and the answer nothing, and in the last state that large chunks leave only the note in a 60-word context.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-ranking",
+   "conceptIds": [
+    "dbxfe-retrieval-mismatch-concept",
+    "dbxfe-retrieval-tfidf-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-tfidf",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-wrongchunk-visual",
+   "questionIds": [
+    "dbxfe-retrieval-wrongchunk-self"
+   ],
+   "hint": "Look for the one term that appears in the winner and not in the answer, then ask why the answer does not contain it.",
+   "handbook": {
+    "markdown": "### Read the contributions, then choose the remedy\n| Term | Note | Answer |\n|---|---|---|\n| setting | 0.1694 | — |\n| relief | 0.1309 | 0.0797 |\n| press | 0.0681 | 0.0276 |\n| valve | 0.0607 | 0.0740 |\n| the | 0.0488 | 0.0357 |\n| m7 | 0.0414 | 0.0504 |\n| **cosine** | **0.5192** | **0.2674** |\n\nThree causes are visible: the answer uses a different form of the key word ('Set'), the note repeats the question's terms, and the answer's neighbour carries 'setting' because it tells you to record the setting. Without admission rules a fourth appears: the unapproved draft ranks second.\n\nRemedies, matched to causes:\n- **Wrong kind of source:** mark training notes context-only in the inventory so they cannot be cited for values.\n- **Word form:** a stemming analyzer, or a vector or hybrid retriever, can match 'setting' to 'Set'; measure it on the same labels.\n- **Answer split from its cue:** a larger chunk keeps both sentences together (the section ranks second), but check the budget: at 60 words only the note fits.\n- **Short list order:** a reranker that reads the question with each candidate can reorder the top few; it cannot recover a chunk retrieval never returned.\n\n**What not to do:** add 'setting' to the manual text, lift the answer by hand for this one question, or accept the note because it is 'about' relief valves. Each hides the defect from the next evaluation.\n\n**Test:** keep this question in the labelled set. Its reciprocal rank is 1/3 with small chunks and 1/2 with large ones; a remedy is real when that number rises and no other question falls.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-ranking"
+    ]
+   },
+   "recap": "When the wrong chunk wins, read the per-term contributions and fix the cause: authority, word form, chunk boundary or reranking.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-vector",
+   "version": "1.0.0",
+   "title": "Embeddings match meaning and can miss an exact code",
+   "outcome": "Predict which questions favour lexical and which favour vector retrieval, and state what an embedding index adds to operate.",
+   "explanation": "[[dbxfe-retrieval-vector-concept|Vector retrieval]] embeds chunks and questions with a model and returns nearest neighbours, so 'shake after start-up' can reach 'vibrates hard during run-up'. Lab L20's TF-IDF could not: the vibration sentence ranked fifth behind the belt-tension section. Notice in the comparison that the same lexical index put part QX-417 first, where an embedding may treat a code as ordinary text. The vector column states what to test, not an executed result.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-ranking",
+   "conceptIds": [
+    "dbxfe-retrieval-vector-concept",
+    "dbxfe-retrieval-mismatch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-vector-visual",
+   "questionIds": [
+    "dbxfe-retrieval-vector-question"
+   ],
+   "handbook": {
+    "markdown": "### What changes when you add embeddings\nAn embedding model maps text to a dense vector so that similar meanings land near each other. Retrieval becomes nearest-neighbour search over those vectors, usually approximate (ANN) at scale, which trades a little recall for speed.\n\n**Where it helps, from the lab's failures.** 'Why does the belt line shake after start-up?' shares only 'belt' and function words with the C4 manual; the relevant vibration sentence is fifth and its second sentence is not returned (recall@5 = 0.5). A paraphrase like this is the classic case for semantic matching.\n\n**Where lexical stays strong.** Exact identifiers and codes: 'Which machine does the QX-417 seal kit fit?' ranks the K1 unloader sentence first. An embedding may or may not separate QX-417 from a near code; test identifiers explicitly.\n\n**What you now operate.** The embedding model is a dependency with a version: change it and every vector must be recomputed, and vectors from two versions are not comparable. On Databricks, the AI Search client and SDK read in this build show a Delta Sync index computing embeddings from a source text column through a model serving endpoint, or accepting self-managed vectors in a column, and a Direct Access index taking vectors written through the API. Queries to a managed-embedding index send text; self-managed ones send a vector.\n\n**Evaluate the same way:** same labels, same admission rules, same k. Compare recall@k and MRR per question class (identifiers, paraphrases, settings), not one average.\n\n**Limit:** no embedding model is run in this course; the vector column in the visual lists what to test.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-ranking"
+    ]
+   },
+   "recap": "Vectors help paraphrases and lexical scoring holds exact codes; measure both per question class with the same filters and labels.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-hybrid",
+   "version": "1.0.0",
+   "title": "Hybrid search fuses two ranked lists; a reranker reorders a short one",
+   "outcome": "Compute a reciprocal-rank-fusion score and place a reranker correctly after retrieval.",
+   "explanation": "[[dbxfe-retrieval-hybrid-concept|Hybrid search]] runs a lexical and a vector retriever and merges their lists; reciprocal rank fusion adds 1/(k + rank) from each list, so it needs ranks, not comparable scores. Notice in the second table that the vibration chunk, fifth lexically and first by vectors, fuses to first. A [[dbxfe-retrieval-rerank-concept|reranker]] then reads the question with each of the top few and reorders them; the last state shows it never sees the fourth.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-ranking",
+   "conceptIds": [
+    "dbxfe-retrieval-hybrid-concept",
+    "dbxfe-retrieval-rerank-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-query",
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-hybrid-visual",
+   "questionIds": [
+    "dbxfe-retrieval-hybrid-question"
+   ],
+   "samajh": {
+    "text": "Do teachers ne ek hi class ki merit list banayi: ek ne sau mein se marks diye, doosre ne sirf A, B, C grade. Marks aur grade ko jodna bekaar hai, scale hi alag hai. Isliye dono list mein rank dekho: jo dono mein upar hai, woh aage. Phir principal top teen ki copies khud padh ke final order tay karti hain; jo top teen mein aaya hi nahi, uski copy woh dekhti bhi nahi.",
+    "mapping": "The two teachers are the lexical and vector retrievers with incomparable scores; combining ranks is reciprocal rank fusion; the principal reading the top three is the reranker.",
+    "boundary": "Every student appears in both merit lists, but a retriever may miss a chunk entirely, and fusion weights, unlike a principal, never read the text."
+   },
+   "handbook": {
+    "markdown": "### Fusion, worked\nReciprocal rank fusion (RRF) scores each chunk as the sum of 1/(k + rank) over the lists it appears in; k is a constant that damps the top ranks, and 60 is a common choice. With k = 60, lexical ranks from Lab L20's belt-line question and vector ranks invented to show the arithmetic:\n\n| Chunk | Lexical | Vector | RRF |\n|---|---|---|---|\n| C4 vibration 2.1 | 5 | 1 | 1/65 + 1/61 = 0.0318 |\n| C4 belt tension 1.2 | 1 | 6 | 1/61 + 1/66 = 0.0315 |\n| C4 belt tension 1.1 | 2 | 7 | 1/62 + 1/67 = 0.0311 |\n| C4 vibration 2.2 | not returned | 2 | 1/62 = 0.0161 |\n\nFusion lifts the vibration chunk to first because it is strong in one list and present in the other.\n\n**Rerank after fusion.** A reranker, often a cross-encoder, scores each (question, chunk) pair jointly, which is slower and usually sharper than either retriever, so it runs on the top N only. It reorders; it cannot rescue a chunk that neither retriever returned, and a score threshold applied before reranking decides what it ever sees.\n\n**On Databricks** (Databricks-published client 0.78 and SDK 0.141.0): an AI Search query sets `query_type` to ANN (the default), HYBRID or FULL_TEXT and can pass a reranker with the columns to rerank; the client documents that a score threshold is applied before reranking. How the service fuses and scores is the provider's documented behaviour; check it, and check which query types your endpoint and index subtype support.\n\n**Measure:** compare lexical, vector, hybrid and hybrid-plus-reranker on the same labels and filters, and keep the per-question table as well as the means.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-ranking"
+    ]
+   },
+   "recap": "Fuse ranks from lexical and vector lists, then rerank a short list; neither step can return what retrieval never found.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-context",
+   "version": "1.0.0",
+   "title": "Context assembly spends a budget and keeps the citation keys",
+   "outcome": "Assemble a budgeted, deduplicated context in rank order and reject citations that point outside it.",
+   "explanation": "[[dbxfe-retrieval-context-concept|Context assembly]] turns a ranked list into the passages an answer may use: in rank order, skipping repeated text, until a word budget is spent, each entry labelled with document, section, version and effective date. Notice that the M8 interval enters beside the M7 answer, labelled, and that a [[dbxfe-retrieval-citation-concept|citation check]] rejects a citation to the superseded revision because it was never in the context.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-context",
+   "conceptIds": [
+    "dbxfe-retrieval-context-concept",
+    "dbxfe-retrieval-citation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-claim-scorers",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-context-visual",
+   "questionIds": [
+    "dbxfe-retrieval-context-self"
+   ],
+   "handbook": {
+    "markdown": "### Assemble, label, then check\nLab L20 builds each context from the governed top five within 60 body words:\n\n```python\nfor hit in hits:                               # rank order\n    if hit.chunk.body in seen: continue          # repeated text\n    if used + hit.chunk.words > budget: break    # stop; never promote a weaker chunk\n    entries.append({'n': n, 'chunk_id': hit.chunk_id, 'citation': label(hit.chunk, n)})\n```\n\nFor 'How many operating hours between M7 hydraulic filter changes?' the context is 52 words: `[1] man-m7-r3 §Hydraulic unit (v3, effective 2026-06-01)` with 200 hours, `[2] man-m8-r1 §Hydraulic unit (v1, effective 2024-05-01)` with the M8's 300 hours, and `[3]` a training note. The labels are what let an answer, or a reviewer, keep the machines apart.\n\n**Stop or skip?** Stopping at the first chunk that does not fit keeps rank order honest; skipping to a smaller lower-ranked chunk fills the budget with weaker evidence. Either is a policy to test, not a default to inherit.\n\n**Citations are keys, not decoration.** Carry `chunk_id` into the answer's citations and check each against the context: citing `man-m7-r2:small:1.1` (the superseded 250-hour sentence) is rejected for this context, as is the engineering procedure in the contractor's. This deterministic check catches invented and out-of-context citations; whether the cited passage supports the sentence is groundedness, which needs a person or a calibrated judge.\n\n**Budget:** a larger budget raises the chance that the answer is present and the chance of distraction and cost; order and labels matter more as it grows.\n\n**Limit:** no answer is generated in the lab; the check is demonstrated on citation lists.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-context"
+    ]
+   },
+   "recap": "Spend the budget in rank order, label every entry, and reject any citation that is not in the context you assembled.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-evaluation",
+   "version": "1.0.0",
+   "title": "Recall@k and MRR grade retrieval; groundedness grades the answer",
+   "outcome": "Compute recall@k and reciprocal rank from a ranked list and relevance labels, and state what each cannot measure.",
+   "explanation": "[[dbxfe-retrieval-recall-concept|Recall@k]] is the share of a question's relevant chunks found in the first k results; [[dbxfe-retrieval-mrr-concept|MRR]] averages 1 over the rank of the first relevant chunk. Both need labelled chunk ids written before any run. Notice in the first two states that the lockout question scores recall@3 = 0.5 but reciprocal rank 1, and in the last that [[dbxfe-retrieval-groundedness-concept|groundedness]] needs an answer and a reviewer these metrics never see.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-evaluation",
+   "conceptIds": [
+    "dbxfe-retrieval-recall-concept",
+    "dbxfe-retrieval-mrr-concept",
+    "dbxfe-retrieval-groundedness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-scorers",
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-evaluation-visual",
+   "questionIds": [
+    "dbxfe-retrieval-evaluation-question"
+   ],
+   "handbook": {
+    "markdown": "### Retrieval metrics first, answer checks separately\nFor one question: recall@k = |relevant ∩ top k| / |relevant|; reciprocal rank = 1 / (rank of the first relevant chunk), or 0 if none appears within the cutoff. Average over the questions that have a relevant chunk.\n\n**Worked.** The North technician's lockout question returns its two relevant sentences at ranks 1 and 4: recall@1 = 0.5, recall@3 = 0.5, recall@5 = 1.0, reciprocal rank = 1. The relief-valve question returns its answer third: recall@1 = 0, recall@3 = 1, reciprocal rank = 1/3. Over the 12 graded questions the governed small pipeline scores recall@1 0.7083, recall@3 0.875, recall@5 0.9583 and MRR@5 0.8778.\n\n**Keep unanswerable questions separate.** The contractor asking for an engineering-only procedure has no relevant chunk. Averaging it into recall would hide the property that matters: zero restricted chunks returned. Report safety counts beside the means: across the 13 questions, similarity alone returned 12 chunks the caller may not read, 7 superseded, 1 draft and 1 not yet in force; governed retrieval returned none.\n\n**What these metrics cannot see.** Whether an answer written from the context is supported by it. Groundedness needs the answer, the retrieved context and a reviewer: a person, or a model-based judge whose agreement with people has been measured. Read in this build, MLflow 3.16.1 ships judge-based scorers for retrieval groundedness, chunk relevance and sufficiency, and marks its older `recall_at_k` metric deprecated in favour of GenAI evaluation. The RAG evaluation plan field guide and the GenAI evaluation module take it from here.\n\n**Limit:** binary labels written by one author; graded relevance and labeller disagreement are not modelled.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-evaluation"
+    ]
+   },
+   "recap": "Grade retrieval with labelled recall@k, MRR and safety counts; grade answers separately for groundedness.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-retrieval-managed",
+   "version": "1.0.0",
+   "title": "AI Search is the managed index; your rules still decide what it may return",
+   "outcome": "Map each stage of the lab pipeline to a current AI Search capability and list what stays your responsibility.",
+   "explanation": "[[dbxfe-retrieval-aisearch-concept|Databricks AI Search]], the current name of the service formerly called Vector Search, hosts indexes on endpoints, keeps a [[dbxfe-retrieval-deltasync-concept|Delta Sync index]] in step with a source Delta table or accepts writes to a Direct Access index, and answers ANN, HYBRID or FULL_TEXT queries with filters and an optional reranker. Notice in the last state that the inventory, metadata, labels and pass bar stay yours: the service executes rules; it does not choose them.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-managed",
+   "conceptIds": [
+    "dbxfe-retrieval-aisearch-concept",
+    "dbxfe-retrieval-deltasync-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-name",
+    "dbxfe-retrieval-claim-overview",
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-claim-query",
+    "dbxfe-retrieval-claim-subtype",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "visualId": "dbxfe-retrieval-managed-visual",
+   "questionIds": [
+    "dbxfe-retrieval-managed-self"
+   ],
+   "handbook": {
+    "markdown": "### What was verified, and how\nNames and capabilities here were read in this build from Databricks-published code: the `databricks-ai-search` 0.78 client on PyPI (summary 'Databricks AI Search Client (formerly Vector Search)'; the legacy `databricks-vectorsearch` package is a deprecated shim) and the Databricks SDK for Python 0.141.0, generated from the REST specification. The documentation page could not be fetched from this sandbox; check it for regions, preview status, limits and pricing.\n\n| Lab L20 stage | AI Search counterpart | Still yours |\n|---|---|---|\n| Parsed sentences | a Delta table, optionally from `ai_parse_document` | parse checks and page errors |\n| Chunk table | source Delta table; `columns_to_sync` | the columns and their correctness |\n| TF-IDF index | Delta Sync (TRIGGERED or CONTINUOUS) or Direct Access; subtype HYBRID or FULL_TEXT | sync schedule and lag |\n| Embeddings | from a text column via a model endpoint, or self-managed | model version; recompute on change |\n| Admission rules | query filters; Unity Catalog privileges | which rules, where applied, tested |\n| Ranking | `query_type` ANN (default), HYBRID, FULL_TEXT; optional reranker | which wins on your labels |\n| Evaluation | MLflow evaluation and retrieval scorers | labels, safety cases, judgement |\n\n**Endpoint types** are STANDARD and STORAGE_OPTIMIZED. The client marks the index subtype as beta and FULL_TEXT as storage-optimized only, and the SDK notes that storage-optimized endpoints accept only TRIGGERED sync. Treat each as a verification item.\n\n**Proving it works:** rerun the lab's labelled questions against the managed index with the same metadata and callers, including the restricted, draft and superseded cases, and compare per question. A managed index that scores higher on average but returns one restricted chunk has failed.\n\n**Limit:** nothing in this course creates an endpoint or index, and no managed result is claimed.",
+    "sourceSectionIds": [
+     "dbxfe-retrieval-l01-managed"
+    ]
+   },
+   "recap": "AI Search executes indexing, sync, query types, filters and reranking; authority, metadata, labels and the pass bar remain yours.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-retrieval-l01-card1",
+   "beatId": "dbxfe-retrieval-authority"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card2",
+   "beatId": "dbxfe-retrieval-parsing"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card3",
+   "beatId": "dbxfe-retrieval-chunking"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card4",
+   "beatId": "dbxfe-retrieval-metadata"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card5",
+   "beatId": "dbxfe-retrieval-permission"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card6",
+   "beatId": "dbxfe-retrieval-permission"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card7",
+   "beatId": "dbxfe-retrieval-freshness"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card8",
+   "beatId": "dbxfe-retrieval-lexical"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card9",
+   "beatId": "dbxfe-retrieval-wrongchunk"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card10",
+   "beatId": "dbxfe-retrieval-vector"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card11",
+   "beatId": "dbxfe-retrieval-hybrid"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card12",
+   "beatId": "dbxfe-retrieval-context"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card13",
+   "beatId": "dbxfe-retrieval-evaluation"
+  },
+  {
+   "cardId": "dbxfe-retrieval-l01-card14",
+   "beatId": "dbxfe-retrieval-managed"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-retrieval-extension-sync-lag",
+   "revision": "1",
+   "prompt": "When can a new M7 manual revision still be missing from a Delta Sync index after it lands in the source table?",
+   "answer": "Between the source update and the next triggered sync, because a TRIGGERED pipeline refreshes once per run.",
+   "explanation": "The Databricks SDK describes a TRIGGERED pipeline as one that stops after refreshing the source table once, using the data available when the update started, and a CONTINUOUS pipeline as one that processes new data as it arrives. A revision written at 09:00 is therefore invisible to a triggered index until the next run; with a continuous pipeline, read the index's reported status rather than assume it is current. Record the index's last sync time beside every evaluation run, schedule a sync after each approved revision, and include a question that must return the newest revision so a stale index fails a test instead of a technician. The SDK also notes that storage-optimized endpoints accept only TRIGGERED sync, which makes the schedule part of the design.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-admission",
+   "conceptIds": [
+    "dbxfe-retrieval-extension-sync-lag-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-index",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "beatId": "dbxfe-retrieval-freshness",
+   "whyItMatters": "It separates index freshness from the version rule, a third clock that similarity and supersession cannot fix."
+  },
+  {
+   "id": "dbxfe-retrieval-extension-threshold",
+   "revision": "1",
+   "prompt": "Why does a score threshold applied before reranking limit what the reranker can rescue?",
+   "answer": "The reranker only sees candidates that survive the threshold, so anything cut first is never reranked.",
+   "explanation": "The databricks-ai-search client documents that when a reranker is used, the score threshold is applied before reranking. A threshold tuned for plain retrieval can therefore remove a low-scoring chunk that the reranker, reading the question and passage together, would have placed first. Lab L20 shows why thresholds are fragile: the correct answer to the lockout question scores 0.1836 while the best chunk returned to the contractor's unanswerable question scores 0.1985, so no single cut-off separates them. Tune any threshold together with the reranker on labelled questions, and prefer explicit abstention cases over a guessed score.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-ranking",
+   "conceptIds": [
+    "dbxfe-retrieval-extension-threshold-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-query",
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "beatId": "dbxfe-retrieval-hybrid",
+   "whyItMatters": "It shows how two reasonable settings interact, so a reranker cannot be evaluated without the threshold beside it."
+  },
+  {
+   "id": "dbxfe-retrieval-extension-page-errors",
+   "revision": "1",
+   "prompt": "What should an ingestion job do when ai_parse_document reports failed pages but the request succeeds?",
+   "answer": "Record the failed pages, keep the document out of the citable set or mark it partial, and reprocess before indexing.",
+   "explanation": "The SDK defines ai_parse_document's response with a per-page error list that is present when the request succeeds but individual pages fail. Treating that response as a complete document silently removes whatever those pages held, and the gap surfaces later as an unanswerable question or, worse, an answer from an older revision that still has the page. Store the error list with the parse output, block or flag the document in the inventory until the pages are reprocessed, and add a check that counts elements per page so an empty page is visible before chunking.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-authority",
+   "conceptIds": [
+    "dbxfe-retrieval-extension-page-errors-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-parse",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "beatId": "dbxfe-retrieval-parsing",
+   "whyItMatters": "It turns a partial success into an explicit data-quality state instead of a hidden hole in the index."
+  },
+  {
+   "id": "dbxfe-retrieval-extension-full-text",
+   "revision": "1",
+   "prompt": "When is a keyword-only FULL_TEXT index a reasonable first choice in AI Search?",
+   "answer": "When questions are dominated by exact codes and identifiers, and as a lexical baseline for a later hybrid comparison.",
+   "explanation": "The databricks-ai-search client describes index subtype FULL_TEXT as keyword search without embeddings, marks the subtype parameter as beta, and supports FULL_TEXT only on STORAGE_OPTIMIZED endpoints; the default HYBRID subtype uses embeddings for similarity and hybrid search. For a part catalogue queried by codes such as QX-417, lexical matching was already the strength in Lab L20, so a keyword index avoids an embedding model to operate. The same labelled set can then measure whether HYBRID improves paraphrase questions enough to justify it. Confirm current availability, endpoint support and pricing before choosing.",
+   "lessonId": "dbxfe-retrieval-l01",
+   "sectionId": "dbxfe-retrieval-l01-managed",
+   "conceptIds": [
+    "dbxfe-retrieval-extension-full-text-concept"
+   ],
+   "claimIds": [
+    "dbxfe-retrieval-claim-subtype",
+    "dbxfe-retrieval-claim-lab",
+    "dbxfe-retrieval-guidance",
+    "dbxfe-retrieval-fiction"
+   ],
+   "beatId": "dbxfe-retrieval-managed",
+   "whyItMatters": "It connects the lab's lexical baseline to a concrete managed option instead of assuming embeddings are always needed."
+  }
+ ],
+ "recap": {
+  "title": "Decide, admit, rank, cite, measure",
+  "markdown": "**Retrieval is a pipeline of decisions made before any answer is written.** An inventory decides which collections may answer; parsing and chunking decide what text exists and in what units; metadata lets rules read version, effective date, region and audience; admission runs before ranking so restricted, superseded and draft chunks are never scored; TF-IDF, vectors, hybrid fusion and reranking each fix different misses; context assembly spends a budget and keeps citation keys; and recall@k, MRR and safety counts grade retrieval before anyone judges an answer. Databricks AI Search executes these rules; it does not choose them. **Transfer challenge:** a retail chain's returns assistant must answer from country-specific policies that change on set dates, for store staff who may see only their country's rules. Write its chunk record, its four admission rules and three labelled questions that would catch a leak, a stale policy and a paraphrase.",
+  "visualId": "dbxfe-retrieval-managed-visual"
+ },
+ "appliedTask": {
+  "title": "Plan the retrieval rerun for a third plant",
+  "prompt": "Cinderline's East plant joins the assistant with its own lockout and pre-start procedures, a new bulletin series, and a contractor audience limited to site rules. The platform team will build on AI Search. Using the lab's design, specify the chunk record, the admission rules and where they run, how new revisions and bulletins are handled, the labelled questions you add, the metrics and pass bar, and the AI Search behaviours you must verify before trusting the results.",
+  "modelAnswer": "Chunk record: chunk_id, body, title, heading, doc_type, family, version, effective_date, status, region (now north, south, east or all) and audience. Admission before ranking: approved status, effective on or before the question date, highest approved version of the family, region match or 'all', and a caller group in the audience; contractors see only site rules. Revisions supersede by family and effective date; new bulletins get the scoped freshness bonus only. Labelled additions: an East technician's lockout question whose best lexical match is the North procedure (must return only East chunks), a revision question dated either side of an East effective date, a contractor question that only an engineering document answers (must return nothing restricted), and a paraphrase. Report recall@1, recall@3 and MRR@5 per question class and safety counts, which must be zero. Verify on AI Search: endpoint type and region, TRIGGERED or CONTINUOUS sync and its lag, filter syntax and how filters interact with the top-k, query types for the index subtype, reranker availability, Unity Catalog privileges, preview status and pricing.",
+  "reasoning": "The answer carries every lab rule into the new setting, adds labelled cases that would break each rule, keeps safety counts as the pass bar, and turns managed-service behaviour into verification items rather than assumptions.",
+  "beatIds": [
+   "dbxfe-retrieval-metadata",
+   "dbxfe-retrieval-permission",
+   "dbxfe-retrieval-freshness",
+   "dbxfe-retrieval-evaluation",
+   "dbxfe-retrieval-managed"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-retrieval-scenario"
+ ]
+}
