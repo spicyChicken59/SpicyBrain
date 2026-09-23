@@ -1,0 +1,193 @@
+{
+  "exposed": [
+    {
+      "name": "search_manuals",
+      "effect": "read",
+      "description": "Find approved manual sections for one machine.",
+      "permission": "manuals:read",
+      "entity_arg": "machine_id",
+      "key_required": false,
+      "approval": "never",
+      "timeout_ms": 2000,
+      "max_attempts": 3,
+      "backoff_ms": 500,
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "query",
+          "machine_id"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "machine_id": {
+            "type": "string",
+            "pattern": "^[A-Z][0-9]{1,3}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_maintenance_draft",
+      "effect": "internal-write",
+      "description": "Save a draft maintenance note for a supervisor to review; never a work order.",
+      "permission": "drafts:write",
+      "entity_arg": "machine_id",
+      "key_required": true,
+      "approval": "never",
+      "timeout_ms": 2000,
+      "max_attempts": 3,
+      "backoff_ms": 500,
+      "effect_collection": "drafts",
+      "effect_prefix": "D",
+      "effect_fields": [
+        "machine_id",
+        "manual_section",
+        "note"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "machine_id",
+          "manual_section",
+          "note"
+        ],
+        "properties": {
+          "machine_id": {
+            "type": "string",
+            "pattern": "^[A-Z][0-9]{1,3}$"
+          },
+          "manual_section": {
+            "type": "string",
+            "pattern": "^[A-Z][0-9]{1,3}-[0-9]+\\.[0-9]+$"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "close_maintenance_draft",
+      "effect": "internal-write",
+      "description": "Close a draft after review.",
+      "permission": "drafts:close",
+      "entity_arg": "machine_id",
+      "key_required": true,
+      "approval": "never",
+      "timeout_ms": 2000,
+      "max_attempts": 3,
+      "backoff_ms": 500,
+      "effect_collection": "closures",
+      "effect_prefix": "X",
+      "effect_fields": [
+        "draft_id",
+        "machine_id"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "draft_id",
+          "machine_id"
+        ],
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "pattern": "^D[0-9]+$"
+          },
+          "machine_id": {
+            "type": "string",
+            "pattern": "^[A-Z][0-9]{1,3}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "request_spare_part",
+      "effect": "external-effect",
+      "description": "Send a spare-part request to the supplier outbox after a supervisor approves it.",
+      "permission": "parts:request",
+      "entity_arg": "machine_id",
+      "key_required": true,
+      "approval": "always",
+      "approve_permission": "parts:approve",
+      "timeout_ms": 2000,
+      "max_attempts": 3,
+      "backoff_ms": 500,
+      "effect_collection": "purchase_requests",
+      "effect_prefix": "PR",
+      "effect_fields": [
+        "part_number",
+        "quantity",
+        "machine_id"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "part_number",
+          "quantity",
+          "machine_id"
+        ],
+        "properties": {
+          "part_number": {
+            "type": "string",
+            "pattern": "^P-[0-9]{4}$"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "machine_id": {
+            "type": "string",
+            "pattern": "^[A-Z][0-9]{1,3}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ],
+  "advertised": [
+    {
+      "name": "search_manuals",
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "create_maintenance_draft",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "close_maintenance_draft",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "request_spare_part",
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "delete_work_order",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "note": "Listed by the plant's tool server with a misleading read-only hint; the application does not expose it."
+    }
+  ]
+}
