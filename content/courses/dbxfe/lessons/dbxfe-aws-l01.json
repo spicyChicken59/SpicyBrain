@@ -1,0 +1,641 @@
+{
+  "id": "dbxfe-aws-l01",
+  "title": "AWS deployment and network boundaries",
+  "summary": "Place Cinderline's Databricks account, AWS account and two compute planes correctly, trace one query across its trust boundaries, and run ordered diagnoses for a denied and an unreachable request.",
+  "contentVersion": "1.0.0",
+  "teachingFormat": "flexible",
+  "estimatedMinutes": 16,
+  "objectives": [
+    "Place the control plane, the classic compute plane and the serverless compute plane in the account that owns each, and name what differs on AWS.",
+    "Trace one query across author, control, execution and storage paths and name the control at each boundary.",
+    "Run an ordered diagnosis for a denied request and for an unreachable request, and assemble a permissions and network evidence checklist without provisioning anything."
+  ],
+  "prerequisiteIds": [],
+  "tags": [
+    "Governance and cloud architecture",
+    "AWS",
+    "VPC",
+    "PrivateLink",
+    "Unity Catalog",
+    "KMS",
+    "Substantive technical topic"
+  ],
+  "bodyFile": "lessons/dbxfe-aws-l01.md",
+  "sections": [
+    {
+      "id": "dbxfe-aws-l01-outcome",
+      "kind": "outcome",
+      "title": "What you will be able to do",
+      "conceptIds": [
+        "dbxfe-aws-l01-plane-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-start",
+      "kind": "prerequisites",
+      "title": "Before the AWS diagram",
+      "conceptIds": [
+        "dbxfe-aws-l01-plane-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-planes",
+      "kind": "mechanism",
+      "title": "Account, workspace and two compute planes",
+      "conceptIds": [
+        "dbxfe-aws-l01-plane-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-workspace"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-classic",
+      "kind": "mechanism",
+      "title": "Classic compute in your VPC",
+      "conceptIds": [
+        "dbxfe-aws-l01-vpc-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-vpc"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-storage",
+      "kind": "mechanism",
+      "title": "Two storage identities and one key",
+      "conceptIds": [
+        "dbxfe-aws-l01-credential-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-storage",
+        "dbxfe-aws-course-claim-profile",
+        "dbxfe-aws-course-claim-keys"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-serverless",
+      "kind": "mechanism",
+      "title": "Serverless connectivity is configured, not built",
+      "conceptIds": [
+        "dbxfe-aws-l01-ncc-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-egress"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-private",
+      "kind": "mechanism",
+      "title": "PrivateLink: three directions, one DNS rule",
+      "conceptIds": [
+        "dbxfe-aws-l01-privatelink-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-privatelink",
+        "dbxfe-aws-course-claim-vpc"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-example",
+      "kind": "example",
+      "title": "Two failures on the same table",
+      "conceptIds": [
+        "dbxfe-aws-l01-diagnosis-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-storage",
+        "dbxfe-aws-course-claim-keys",
+        "dbxfe-aws-course-claim-vpc",
+        "dbxfe-aws-course-claim-privatelink"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-task",
+      "kind": "exercise",
+      "title": "Diagnose a changed case",
+      "conceptIds": [
+        "dbxfe-aws-l01-diagnosis-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-storage",
+        "dbxfe-aws-course-claim-egress"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-solution",
+      "kind": "solution",
+      "title": "A bounded diagnosis",
+      "conceptIds": [
+        "dbxfe-aws-l01-diagnosis-concept",
+        "dbxfe-aws-l01-ncc-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-storage",
+        "dbxfe-aws-course-claim-keys",
+        "dbxfe-aws-course-claim-egress"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-limits",
+      "kind": "mistakes",
+      "title": "What this diagram cannot claim",
+      "conceptIds": [
+        "dbxfe-aws-l01-plane-concept",
+        "dbxfe-aws-l01-privatelink-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-egress",
+        "dbxfe-aws-course-claim-keys"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-sources",
+      "kind": "sources",
+      "title": "Sources and verification scope",
+      "conceptIds": [
+        "dbxfe-aws-l01-plane-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-workspace",
+        "dbxfe-aws-course-claim-vpc",
+        "dbxfe-aws-course-claim-storage",
+        "dbxfe-aws-course-claim-profile",
+        "dbxfe-aws-course-claim-privatelink",
+        "dbxfe-aws-course-claim-keys",
+        "dbxfe-aws-course-claim-egress"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-links",
+      "kind": "related",
+      "title": "Where this connects",
+      "conceptIds": [
+        "dbxfe-aws-l01-diagnosis-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-aws-l01-revisit",
+      "kind": "revisit",
+      "title": "Check your understanding",
+      "conceptIds": [
+        "dbxfe-aws-l01-diagnosis-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-aws-l01-q1",
+      "revision": "1",
+      "prompt": "A serverless SQL warehouse query on the external table returns PERMISSION_DENIED: job-nightly does not have SELECT. Which boundary rejected the request?",
+      "options": [
+        {
+          "id": "dbxfe-aws-l01-q1-a",
+          "text": "The Unity Catalog privilege check for the acting principal.",
+          "rationale": "The catalog names the principal and the privilege; no storage or key was consulted yet."
+        },
+        {
+          "id": "dbxfe-aws-l01-q1-b",
+          "text": "The storage credential's IAM role permissions.",
+          "rationale": "A role refusal arrives from AWS as AccessDenied, and only after the catalog has agreed."
+        },
+        {
+          "id": "dbxfe-aws-l01-q1-c",
+          "text": "The subnet route table in Cinderline's VPC.",
+          "rationale": "A route problem produces a timeout, and serverless compute does not use Cinderline's route tables."
+        },
+        {
+          "id": "dbxfe-aws-l01-q1-d",
+          "text": "The KMS key policy for the bucket's key.",
+          "rationale": "A key refusal names KMS and comes after S3 has allowed the object read."
+        }
+      ],
+      "correctOptionId": "dbxfe-aws-l01-q1-a",
+      "conceptIds": [
+        "dbxfe-aws-l01-diagnosis-concept",
+        "dbxfe-aws-l01-credential-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-storage"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-q2",
+      "revision": "1",
+      "prompt": "A classic cluster in the customer-managed VPC times out at start after a network change; nothing changed in Unity Catalog. What is the first supported check?",
+      "options": [
+        {
+          "id": "dbxfe-aws-l01-q2-a",
+          "text": "DNS answer, subnet route table and security group outbound rules from the cluster subnet toward the control plane.",
+          "rationale": "A launch depends on the outbound path from the subnet; no permission layer has been reached."
+        },
+        {
+          "id": "dbxfe-aws-l01-q2-b",
+          "text": "Grant the cluster's user SELECT on the tables it will read.",
+          "rationale": "A privilege cannot be exercised by a node that never connected, and the error is a timeout, not a denial."
+        },
+        {
+          "id": "dbxfe-aws-l01-q2-c",
+          "text": "Rotate the workspace storage KMS key.",
+          "rationale": "A key change addresses decrypt refusals, which are replies from a reached service."
+        },
+        {
+          "id": "dbxfe-aws-l01-q2-d",
+          "text": "Attach a network connectivity configuration to the workspace.",
+          "rationale": "An NCC governs the serverless plane; classic compute uses Cinderline's VPC routing."
+        }
+      ],
+      "correctOptionId": "dbxfe-aws-l01-q2-a",
+      "conceptIds": [
+        "dbxfe-aws-l01-vpc-concept",
+        "dbxfe-aws-l01-diagnosis-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-vpc"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-q3",
+      "revision": "1",
+      "prompt": "Security states that enabling back-end PrivateLink means analysts' browsers no longer touch the public internet. Which statement is accurate?",
+      "options": [
+        {
+          "id": "dbxfe-aws-l01-q3-a",
+          "text": "Front-end (inbound) connectivity is a separate configuration; back-end covers classic compute to the control plane only.",
+          "rationale": "The documentation names three separately configured directions, each with its own endpoint and DNS."
+        },
+        {
+          "id": "dbxfe-aws-l01-q3-b",
+          "text": "Back-end PrivateLink covers browsers, compute and serverless in one setting.",
+          "rationale": "One direction does not enable the others; each has its own endpoint registration."
+        },
+        {
+          "id": "dbxfe-aws-l01-q3-c",
+          "text": "The network connectivity configuration already makes browser traffic private.",
+          "rationale": "An NCC governs serverless outbound connectivity, not users reaching the workspace."
+        }
+      ],
+      "correctOptionId": "dbxfe-aws-l01-q3-a",
+      "conceptIds": [
+        "dbxfe-aws-l01-privatelink-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-privatelink"
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "id": "dbxfe-aws-l01-card1",
+      "revision": "1",
+      "prompt": "Which resources does a classic workspace place in Cinderline's own AWS account?",
+      "answer": "Compute nodes in the customer VPC, the workspace storage bucket, and the IAM role Databricks assumes to launch them.",
+      "explanation": "The control plane stays in the Databricks account. A classic workspace's network configuration names Cinderline's VPC, subnets and security group, its storage configuration names a bucket in Cinderline's account, and a cross-account role lets Databricks provision EC2 compute there. Those are the objects Cinderline operates and diagnoses.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-planes",
+      "conceptIds": [
+        "dbxfe-aws-l01-plane-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-workspace"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card2",
+      "revision": "1",
+      "prompt": "What runs in the serverless compute plane and who operates it?",
+      "answer": "Serverless compute in the Databricks account, in the workspace's region, operated by Databricks; Cinderline provisions no VPC for it.",
+      "explanation": "Because the plane is Databricks-managed, Cinderline cannot attach route tables or security groups to it. Its levers are the network connectivity configuration, network policies where available, Unity Catalog credentials, bucket policies and key policies. Control-plane traffic to the plane stays on the cloud backbone.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-planes",
+      "conceptIds": [
+        "dbxfe-aws-l01-plane-concept",
+        "dbxfe-aws-l01-ncc-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card3",
+      "revision": "1",
+      "prompt": "What must a customer-managed VPC provide before a classic workspace can use it?",
+      "answer": "At least two subnets and at least one security group, named at workspace creation, with DNS and network ACL settings the current page lists.",
+      "explanation": "The VPC is specified when the workspace is first created. Secure cluster connectivity means nodes have no public IP addresses and no inbound ports are opened, so the outbound route, DNS and the security group's outbound rules are what a launch depends on. Read the current requirement list before designing anything.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-classic",
+      "conceptIds": [
+        "dbxfe-aws-l01-vpc-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-vpc"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card4",
+      "revision": "1",
+      "prompt": "Why do inbound security group rules drop out of a classic launch diagnosis?",
+      "answer": "Secure cluster connectivity has nodes dial out to the control plane relay; nothing connects in, so only outbound rules matter.",
+      "explanation": "A node with no public IP initiates the connection to the relay and keeps it for commands. A launch that times out is therefore a route, DNS, outbound rule or firewall question. Adding inbound rules changes nothing and widens exposure for no benefit.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-classic",
+      "conceptIds": [
+        "dbxfe-aws-l01-vpc-concept",
+        "dbxfe-aws-l01-diagnosis-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-vpc"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card5",
+      "revision": "1",
+      "prompt": "What does an instance profile carry to S3, and what can still refuse the read?",
+      "answer": "The IAM role the cluster's EC2 instances assumed; the bucket policy and, for SSE-KMS objects, the KMS key policy can still refuse.",
+      "explanation": "Code on a classic cluster obtains temporary credentials for the instance profile role and signs S3 requests with them. S3 evaluates the role policy and the bucket policy; KMS then evaluates the key policy for decrypt. A refusal names the service that said no, and that word decides the next check.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-storage",
+      "conceptIds": [
+        "dbxfe-aws-l01-credential-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-profile",
+        "dbxfe-aws-course-claim-keys"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card6",
+      "revision": "1",
+      "prompt": "How do a storage credential and an external location divide the storage question?",
+      "answer": "The credential wraps the IAM role Databricks assumes; the location binds an S3 path to that credential and carries its own privileges.",
+      "explanation": "Several locations may share one credential. A table read is checked first in the catalog for USE CATALOG, USE SCHEMA and SELECT, then Databricks assumes the credential's role for the location's prefix. The role must live in the bucket's AWS account. PERMISSION_DENIED and AccessDenied therefore come from different owners.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-storage",
+      "conceptIds": [
+        "dbxfe-aws-l01-credential-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-storage"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card7",
+      "revision": "1",
+      "prompt": "Name the two customer-managed key use cases on AWS and what each covers.",
+      "answer": "Managed services covers control-plane data such as notebooks, secrets, SQL query data and default storage; workspace storage covers the workspace bucket and classic EBS volumes.",
+      "explanation": "One KMS key may serve both, it must be in the workspace's region, and the feature requires the Enterprise tier. A data bucket's own SSE-KMS key is a separate matter whose policy must admit every reading identity, including the storage credential's role. Copy principals from the current configuration page.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-storage",
+      "conceptIds": [
+        "dbxfe-aws-l01-credential-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-keys"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card8",
+      "revision": "1",
+      "prompt": "What is a network connectivity configuration and what does it attach to?",
+      "answer": "An account-level, regional Databricks object attached to one or more workspaces that governs how the serverless plane reaches customer resources.",
+      "explanation": "An account admin creates it, attaches it to workspaces in that region, and adds private endpoint rules to AWS-managed services or to a VPC endpoint service Cinderline exposes, which the AWS side must accept. It replaces the subnet and route table that classic compute would have used. Availability and charges are verified per region.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-serverless",
+      "conceptIds": [
+        "dbxfe-aws-l01-ncc-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card9",
+      "revision": "1",
+      "prompt": "Which three PrivateLink directions exist on AWS, and why does enabling one not cover the others?",
+      "answer": "Inbound front-end for users, classic back-end for compute to control plane, and serverless outbound to customer resources; each has its own endpoint, registration and DNS.",
+      "explanation": "The documentation names the three types separately. Back-end needs a customer-managed VPC and interface endpoints for the control plane's APIs and relay; front-end needs a corporate-side endpoint and a private access setting; serverless outbound needs NCC private endpoint rules. A design that enabled one has not made the others private.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-private",
+      "conceptIds": [
+        "dbxfe-aws-l01-privatelink-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-privatelink"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card10",
+      "revision": "1",
+      "prompt": "Why can a correct route table still leave a private endpoint unreachable?",
+      "answer": "Because the hostname must first resolve to the endpoint's private address; a public DNS answer sends traffic down a path that may not exist.",
+      "explanation": "Private DNS on the interface endpoint or a private hosted zone makes the workspace URL or relay name resolve privately from the source network. Check the DNS answer from the actual subnet before the route, then the endpoint's security group, policy and registration. DNS, route and policy are three separate layers.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-private",
+      "conceptIds": [
+        "dbxfe-aws-l01-privatelink-concept",
+        "dbxfe-aws-l01-diagnosis-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-privatelink",
+        "dbxfe-aws-course-claim-vpc"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card11",
+      "revision": "1",
+      "prompt": "Which evidence distinguishes a denied request from an unreachable one?",
+      "answer": "A denial is a reply that names a service, principal and often an action; an unreachable request has no reply at all, only a timeout.",
+      "explanation": "PERMISSION_DENIED from the catalog or AccessDenied from S3 or KMS proves the request arrived and tells you which layer refused. A timeout proves nothing about permission and sends you to DNS, route, security group, endpoint policy and firewall from the source subnet. The two failures have different ordered diagnoses.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-example",
+      "conceptIds": [
+        "dbxfe-aws-l01-diagnosis-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-storage",
+        "dbxfe-aws-course-claim-vpc"
+      ]
+    },
+    {
+      "id": "dbxfe-aws-l01-card12",
+      "revision": "1",
+      "prompt": "What does an egress restriction on classic compute typically break first, and how does it show?",
+      "answer": "Destinations nobody allowlisted, such as a package index or a partner API; the symptom is a timeout while S3 and the control plane keep working.",
+      "explanation": "S3 usually rides a gateway endpoint and the control plane hostnames are allowlisted, so reads succeed. A library install or an external call that was never listed is dropped by the firewall. Keep an allowlist ledger with the reason for each entry, and read the firewall's dropped-connection log first.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-classic",
+      "conceptIds": [
+        "dbxfe-aws-l01-vpc-concept",
+        "dbxfe-aws-l01-diagnosis-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-vpc"
+      ]
+    }
+  ]
+}

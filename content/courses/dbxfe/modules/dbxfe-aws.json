@@ -1,0 +1,309 @@
+{
+  "module": {
+    "id": "dbxfe-aws",
+    "title": "AWS deployment and network boundaries",
+    "summary": "Place the account, workspace, control plane and both compute planes on AWS, trace one query across its trust boundaries, and diagnose a denied and an unreachable request in order.",
+    "objectives": [
+      "Draw Cinderline's AWS deployment with each resource in the account that owns it and name what differs on AWS.",
+      "Trace author, control, execution and storage paths for one query on classic and on serverless compute.",
+      "Run ordered diagnoses for a denied and an unreachable request and assemble a permissions and network evidence checklist."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m03"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-aws-l01.json"
+    ],
+    "scenarioId": "dbxfe-aws-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-aws-scenario",
+      "title": "Write Cinderline's AWS deployment note for security review",
+      "context": "Fictional Cinderline Components runs a classic workspace in a customer-managed VPC and is adding a serverless workspace in the same region. Sources: an SSE-KMS bucket in Cinderline's account, a supplier-owned bucket in another AWS account, and an RDS database on a private IP in Cinderline's VPC. Security requires no public egress from compute, private user access, and named evidence for every boundary. Region, tier and feature entitlement are unconfirmed.",
+      "task": "Produce a one-page deployment note for the security specialist: the accounts and planes as drawn, one query's request path per plane, the storage identity and key chain for each source, the private connectivity directions required, the two diagnostic sequences the operations team will follow, and an explicit list of unknowns.",
+      "requirements": [
+        "Place every resource in the account that owns it and name what differs on AWS from a generic cloud picture.",
+        "Give each source its identity, bucket policy and key policy chain, including the same-account rule for the supplier's role.",
+        "Separate the denied-request sequence from the unreachable-request sequence, with evidence rows.",
+        "Mark region, workspace type, tier, preview status and charges as unknown until verified; provision nothing."
+      ],
+      "model": "### Accounts and planes\nControl plane: Databricks account. Classic workspace cinderline-prod: compute in Cinderline's VPC (two private subnets, one security group, no public IPs, outbound only), workspace storage bucket and cross-account role in Cinderline's AWS account. Serverless workspace cinderline-sls: compute and default storage in the Databricks account, same region, reached through an NCC.\n\n### Request paths\nBoth planes: browser to workspace URL, control plane to compute, Unity Catalog privilege check, then storage. Classic adds Cinderline's route tables, DNS and security groups on the execution and storage paths; serverless adds none of them.\n\n### Storage chains\nCinderline bucket: storage credential cinderline-lake-cred (role in Cinderline's account), external location for the prefix, bucket policy admitting the role, key policy for alias/cinderline-lake granting kms:Decrypt. Supplier bucket: role created in the supplier's account with the documented trust policy, supplier bucket and key policies admitting it, Cinderline credential pointing at that role ARN. RDS: a VPC endpoint service in front of the database, an NCC private endpoint rule accepted on the AWS side; classic reaches it through VPC routing instead.\n\n### Private connectivity\nFront-end: corporate interface endpoint, private access setting, private DNS. Back-end: interface endpoints for the control plane APIs and relay in the customer-managed VPC. Serverless outbound: NCC rules. Egress: firewall allowlist for classic; serverless egress control policy in dry-run first, then enforced, if available.\n\n### Diagnosis\nDenied: record the error, confirm the run-as principal, check USE CATALOG, USE SCHEMA, SELECT, then credential role and bucket policy, then key policy, rerun as the same principal, write the row. Unreachable: classify, DNS from the subnet, route, security group and NACL, endpoint policy and private access, firewall or NCC rule and egress policy log, retest.\n\n### Unknowns\nRegion availability of private endpoint rules and egress control, workspace type, Enterprise tier, the supplier's consent to its key policy change, networking charges, and the exact current requirement lists. Nothing in this note is provisioned.",
+      "reasoning": "The note keeps the two accounts apart, gives each source a complete identity chain with the account that owns each policy, separates the two failure shapes so the operations team never applies a permission fix to a network fault, and turns every feature into a verification item rather than a promise.",
+      "rubric": [
+        {
+          "id": "dbxfe-aws-scenario-rubric-1",
+          "criterion": "Account and plane placement",
+          "weak": "One box labelled Databricks; planes and accounts merged.",
+          "partial": "Planes named but resources placed in the wrong account or Azure terms used.",
+          "strong": "Every resource in its owning account, AWS constructs named, serverless drawn without a customer VPC."
+        },
+        {
+          "id": "dbxfe-aws-scenario-rubric-2",
+          "criterion": "Storage identity and key chain",
+          "weak": "A single grant is treated as access.",
+          "partial": "Credential and bucket policy covered; key policy or the same-account rule missing.",
+          "strong": "Role, bucket policy and key policy per source, with the supplier's role in the supplier's account and the reading principals named."
+        },
+        {
+          "id": "dbxfe-aws-scenario-rubric-3",
+          "criterion": "Diagnostic separation",
+          "weak": "One generic troubleshooting list.",
+          "partial": "Denied and unreachable named but steps mixed or unordered.",
+          "strong": "Two ordered sequences with the first evidence object per step and the rerun as the same principal."
+        },
+        {
+          "id": "dbxfe-aws-scenario-rubric-4",
+          "criterion": "Honest unknowns",
+          "weak": "Preview or regional features stated as available.",
+          "partial": "Some caveats, but tier, region or charges omitted.",
+          "strong": "Every conditional feature listed with what verifies it, and nothing claimed as provisioned."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Is the supplier willing to change its KMS key policy for our role?",
+          "response": "Unknown; the supplier's security contact has not answered. Until they do, the supplier bucket is marked unreadable in the design."
+        },
+        {
+          "question": "Is serverless egress control available for our region and tier?",
+          "response": "It was announced as Public Preview on AWS in January 2025 and requires the Enterprise tier; the account's entitlement and the current status have not been confirmed, so the design uses dry-run and names the check as open."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-aws-l01"
+      ],
+      "claimIds": [
+        "dbxfe-fact-architecture",
+        "dbxfe-fact-serverless-network",
+        "dbxfe-fact-classic-network",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-aws-course-claim-workspace",
+        "dbxfe-aws-course-claim-vpc",
+        "dbxfe-aws-course-claim-storage",
+        "dbxfe-aws-course-claim-profile",
+        "dbxfe-aws-course-claim-privatelink",
+        "dbxfe-aws-course-claim-keys",
+        "dbxfe-aws-course-claim-egress"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-aws-course-source-workspace",
+      "title": "Create a workspace",
+      "url": "https://docs.databricks.com/aws/en/admin/workspace/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; serverless and classic workspace types and admin roles.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Workspace type availability and entitlement vary by account and region; no workspace is created. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-aws-course-source-vpc",
+      "title": "Configure a customer-managed VPC",
+      "url": "https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; classic compute plane in a customer-provided VPC.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Subnet, security-group, DNS and network-ACL requirements are version-specific and must be read from the current page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-aws-course-source-storage",
+      "title": "Connect to cloud object storage using Unity Catalog",
+      "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; storage credentials and external locations for S3.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Trust-policy templates and same-account role placement are on the S3 subpages; no role or location is created. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-aws-course-source-profile",
+      "title": "Manage instance profiles in Databricks",
+      "url": "https://docs.databricks.com/aws/en/admin/workspace-settings/manage-instance-profiles",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; IAM roles carried by classic compute instances.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Classic compute only; minimum S3 actions are quoted from the tutorial and must be checked against the current text. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-aws-course-source-privatelink",
+      "title": "Configure classic private connectivity to Databricks",
+      "url": "https://docs.databricks.com/aws/en/security/network/classic/privatelink",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; back-end PrivateLink with links to front-end and serverless private connectivity.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Endpoint service names, private access settings and DNS steps are region-specific and change. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-aws-course-source-keys",
+      "title": "Data security and encryption",
+      "url": "https://docs.databricks.com/aws/en/security/keys",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; customer-managed keys for managed services and workspace storage, and KMS for S3.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Enterprise tier; key policy principals must be copied from the current configuration page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-aws-course-source-egress",
+      "title": "What is serverless egress control?",
+      "url": "https://docs.databricks.com/aws/en/security/network/serverless-network-security/network-policies",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; network policies for serverless outbound connections.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Announced as Public Preview on AWS in January 2025 and requiring the Enterprise tier; verify current status, products and region. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-aws-course-claim-workspace",
+      "description": "A serverless workspace is pre-configured with serverless compute and default storage in the Databricks account; a classic workspace provisions storage and compute in the customer's AWS account; account admins own workspace creation and workspace admins own in-workspace settings.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-aws-course-source-workspace"
+      ],
+      "context": "Workspace types on AWS; entitlement varies."
+    },
+    {
+      "id": "dbxfe-aws-course-claim-vpc",
+      "description": "A customer-managed VPC is named at workspace creation with at least two subnets and one security group; secure cluster connectivity gives nodes no public IP and opens no inbound ports; back-end and front-end PrivateLink on classic workspaces require a customer-managed VPC.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-aws-course-source-vpc"
+      ],
+      "context": "Classic compute plane networking on AWS."
+    },
+    {
+      "id": "dbxfe-aws-course-claim-storage",
+      "description": "A storage credential wraps an IAM role, an external location binds an S3 path to a credential, several locations may share one credential, catalog privileges govern the credential's use, and the role must live in the bucket's AWS account.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-aws-course-source-storage"
+      ],
+      "context": "Unity Catalog cloud storage on AWS."
+    },
+    {
+      "id": "dbxfe-aws-course-claim-profile",
+      "description": "An instance profile is an IAM role attached to classic compute's EC2 instances, registered in the workspace by an admin, with ListBucket and GetObject as minimum read actions and PutObject and DeleteObject used by Delta writes.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-aws-course-source-profile"
+      ],
+      "context": "Classic compute only on AWS."
+    },
+    {
+      "id": "dbxfe-aws-course-claim-privatelink",
+      "description": "Three private connectivity types exist on AWS: inbound (front-end) users to workspace, outbound (serverless) to customer resources, and classic (back-end) compute to the control plane's APIs and relay, which requires a customer-managed VPC.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-aws-course-source-privatelink"
+      ],
+      "context": "PrivateLink on AWS; region-specific steps."
+    },
+    {
+      "id": "dbxfe-aws-course-claim-keys",
+      "description": "Customer-managed keys cover managed services (control-plane data including default storage) and workspace storage (workspace bucket and classic EBS volumes); one KMS key may serve both, must be in the workspace's region, and the feature requires the Enterprise tier.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-aws-course-source-keys"
+      ],
+      "context": "AWS KMS with Databricks."
+    },
+    {
+      "id": "dbxfe-aws-course-claim-egress",
+      "description": "Serverless egress control uses network policies defining allowed outbound destinations with deny-by-default options, enforced or dry-run modes and system-table logging; it requires the Enterprise tier and was announced as Public Preview on AWS in January 2025.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-aws-course-source-egress"
+      ],
+      "context": "Preview-status feature; verify availability."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-aws-l01-plane-concept",
+      "term": "compute plane (AWS)",
+      "aliases": [
+        "classic compute plane",
+        "serverless compute plane"
+      ],
+      "definition": "The network where Databricks compute runs: the customer's AWS account for classic, the Databricks account for serverless.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-planes"
+    },
+    {
+      "id": "dbxfe-aws-l01-vpc-concept",
+      "term": "customer-managed VPC",
+      "aliases": [
+        "secure cluster connectivity"
+      ],
+      "definition": "A customer-provided VPC named at classic workspace creation whose subnets, routes, security groups and DNS govern compute nodes that have no public IP.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-classic"
+    },
+    {
+      "id": "dbxfe-aws-l01-credential-concept",
+      "term": "storage identity",
+      "aliases": [
+        "instance profile",
+        "storage credential",
+        "external location",
+        "KMS key policy"
+      ],
+      "definition": "The IAM role by which compute reaches S3, carried by the instance on classic or assumed by Databricks through a Unity Catalog storage credential, judged by role, bucket and key policies.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-storage"
+    },
+    {
+      "id": "dbxfe-aws-l01-ncc-concept",
+      "term": "network connectivity configuration",
+      "aliases": [
+        "NCC",
+        "serverless egress control",
+        "network policy"
+      ],
+      "definition": "An account-level regional object attached to workspaces that governs how the serverless compute plane reaches customer resources.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-serverless"
+    },
+    {
+      "id": "dbxfe-aws-l01-privatelink-concept",
+      "term": "PrivateLink direction",
+      "aliases": [
+        "front-end PrivateLink",
+        "back-end PrivateLink",
+        "private access settings"
+      ],
+      "definition": "One of three separately configured private connections on AWS, each requiring DNS to resolve to its endpoint's private address.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-private"
+    },
+    {
+      "id": "dbxfe-aws-l01-diagnosis-concept",
+      "term": "boundary diagnosis",
+      "aliases": [
+        "denied request",
+        "unreachable request",
+        "evidence checklist"
+      ],
+      "definition": "An ordered check of the layers a request crosses, one sequence for a refusal that names its layer and another for a timeout that names none.",
+      "lessonId": "dbxfe-aws-l01",
+      "sectionId": "dbxfe-aws-l01-example"
+    }
+  ]
+}
