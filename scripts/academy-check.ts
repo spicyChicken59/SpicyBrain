@@ -11,7 +11,7 @@
  * missing checks, thin handbooks and duplicated prompts. Editorial review
  * still decides whether a beat teaches.
  */
-import { readFile, writeFile, mkdir, access } from "node:fs/promises";
+import { readFile, writeFile, mkdir, access, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -316,6 +316,24 @@ const exists = (p: string) =>
 async function readJson<T>(p: string): Promise<T> {
   return JSON.parse(await readFile(p, "utf8")) as T;
 }
+/** Editorial no-video decisions: the shared register plus one file per module. */
+async function mediaDecisions(): Promise<Record<string, unknown>> {
+  const shared = join(root, "docs/academy/MEDIA-DECISIONS.json");
+  const decisions: Record<string, unknown> = (await exists(shared))
+    ? await readJson<Record<string, unknown>>(shared)
+    : {};
+  const directory = join(root, "docs/academy/media-decisions");
+  if (await exists(directory))
+    for (const name of (await readdir(directory)).filter((n) =>
+      n.endsWith(".json"),
+    )) {
+      const record = await readJson<{ moduleId?: string }>(
+        join(directory, name),
+      );
+      if (record.moduleId) decisions[record.moduleId] = record;
+    }
+  return decisions;
+}
 
 export async function checkModules(moduleIds: string[]) {
   const courseDir = join(root, "content/courses/dbxfe");
@@ -331,13 +349,7 @@ export async function checkModules(moduleIds: string[]) {
     extraModuleFiles: { dbxfe: extra },
   });
   const course = courses.find((c) => c.id === "dbxfe")!;
-  const decisions = (await exists(
-    join(root, "docs/academy/MEDIA-DECISIONS.json"),
-  ))
-    ? await readJson<Record<string, unknown>>(
-        join(root, "docs/academy/MEDIA-DECISIONS.json"),
-      )
-    : {};
+  const decisions = await mediaDecisions();
   const contract = (await exists(join(courseDir, "academy.json")))
     ? await readJson<Contract>(join(courseDir, "academy.json"))
     : undefined;
@@ -394,13 +406,7 @@ export async function checkCourse(write = false) {
   const teaching = await loadTeaching(courses);
   const courseDir = join(root, "content/courses/dbxfe");
   const contract = await readJson<Contract>(join(courseDir, "academy.json"));
-  const decisions = (await exists(
-    join(root, "docs/academy/MEDIA-DECISIONS.json"),
-  ))
-    ? await readJson<Record<string, unknown>>(
-        join(root, "docs/academy/MEDIA-DECISIONS.json"),
-      )
-    : {};
+  const decisions = await mediaDecisions();
   const findings: Finding[] = [];
   const modules: Record<string, Record<string, number | string>> = {};
   const contractModules = contract.tracks.flatMap((t) => t.modules);
