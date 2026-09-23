@@ -1,0 +1,3485 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-apps",
+ "title": "Databricks Apps and application architecture",
+ "summary": "One request, three trust boundaries: a Databricks App's front end, back end and data path, the identity chosen at each hop, and where state, secrets and checks must live before anything is deployed.",
+ "outcomes": [
+  "Trace a request from browser to data, model or tool through a Databricks App's front end and back end, naming the trust boundary and identity at each hop.",
+  "Choose app authorization or user authorization per request, bind resources and secrets without credentials in code, and read user context only from the platform's headers.",
+  "Place every piece of application state where it must survive, pin dependencies, and assign each rule to its enforcement point with request validation first.",
+  "Assign incident ownership by evidence, and write mocked contract tests and a deployment guide that state exactly what they prove and label what was not deployed."
+ ],
+ "startingAssumptions": [
+  "The cloud bridge and the trust-boundary lesson have covered DNS, identity and authorization on one request.",
+  "Unity Catalog privileges are familiar from the governance module, and basic Python and HTTP request and response ideas are familiar."
+ ],
+ "lessonIds": [
+  "dbxfe-apps-l01"
+ ],
+ "optionalBridgeLessonIds": [
+  "dbxfe-cloud-bridge"
+ ],
+ "editorialRationale": "Application teaching fails when it starts from a framework or a database, so the module follows one fictional request through its three trust boundaries, makes the identity at each hop a per-request decision, then treats resources, secrets and user context as separate facts before placing state by class. Runtime, dependencies, validation, enforcement points, operations and deployment follow in the order an architecture review asks for them, and the module ends on what a local mock can and cannot prove. Every platform detail that could not be re-confirmed in this build is marked for verification rather than stated as settled.",
+ "sources": [
+  {
+   "id": "dbxfe-apps-source-overview",
+   "title": "What is Databricks Apps?",
+   "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; overview of Databricks Apps: hosting model, platform integrations and the supported Python and Node.js frameworks; entry page of the Apps documentation set.",
+   "caveat": "Framework support, feature status, regional availability and pricing change. The forwarded-header list and the app environment (runtime versions, compute size, pre-installed libraries, the port variable) sit on pages linked from this overview whose own URLs were not confirmed in this build, so details from them are marked for verification rather than quoted as settled.",
+   "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list and as previously read; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: Databricks Apps lets developers build and host data and AI applications on the Databricks platform; apps run on serverless compute that Databricks manages and integrate with Unity Catalog data, SQL warehouses, model serving and Lakebase; supported frameworks include Streamlit, Dash, Gradio, Flask and FastAPI for Python and React, Angular, Svelte and Express for Node.js; users open an app at its URL after signing in; the linked pages on HTTP headers and the app environment describe the identity headers forwarded to the app (including X-Forwarded-Email and X-Forwarded-User) and the variables the platform sets in the process."
+  },
+  {
+   "id": "dbxfe-apps-source-auth",
+   "title": "Configure authorization in a Databricks app",
+   "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/auth",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; app authorization with the app's dedicated service principal and user authorization (on-behalf-of-user) bounded by declared scopes.",
+   "caveat": "User authorization has carried a Public Preview label and may need to be enabled for the workspace; scope names and the APIs each scope covers must be read from the current page before an app is designed around them. No app was configured.",
+   "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list and as previously read; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: each Databricks app has a dedicated service principal that is unique to the app and cannot be reused by another app; Databricks injects its OAuth credentials into the app environment as DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET; with app authorization, calls are evaluated against that principal's permissions whoever the signed-in user is; with user authorization, the platform forwards the user's access token in the X-Forwarded-Access-Token header, calls made with it are evaluated with the user's own permissions, and the app declares scopes such as sql that restrict what it can do on the user's behalf, with access outside approved scopes blocked even when the user holds broader permissions."
+  },
+  {
+   "id": "dbxfe-apps-source-resources",
+   "title": "Add resources to a Databricks app",
+   "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/resources",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; resources an app uses (SQL warehouse, model serving endpoint, secret, Lakebase database and others), the permission granted to the app's service principal, and resource keys referenced from app.yaml.",
+   "caveat": "Resource types and the permission choices offered for each type change between releases; confirm them on the current page and grant the narrowest permission listed.",
+   "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list and as previously read; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: resources connect an app to workspace objects such as SQL warehouses, model serving endpoints, secrets, jobs, Unity Catalog volumes and Lakebase databases without hard-coding IDs or credentials; adding a resource grants the app's service principal the permission chosen for it, for example Can use on a SQL warehouse or Can query on a serving endpoint; each resource has a key, and app.yaml maps an environment variable to that key with valueFrom."
+  },
+  {
+   "id": "dbxfe-apps-source-deploy",
+   "title": "Deploy a Databricks app",
+   "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; deploying an app from its source files through the UI or the Databricks CLI, and the steps a deployment runs.",
+   "caveat": "CLI flags, the handling of combined Python and Node.js projects and other deployment sources change between releases; read the current page and CLI reference before scripting a deployment. Nothing in this module was deployed.",
+   "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list and as previously read; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: deploying builds the app, installs its dependencies and runs it with the configuration in the project files; source files synced to a workspace folder, for example with databricks sync, are deployed through the UI or with databricks apps deploy and a source code path; the deployment installs Python packages from requirements.txt and Node.js packages from package.json, runs a build script when package.json defines one, then runs the command set in app.yaml; bundles, then named Databricks Asset Bundles, are named as another way to define and deploy apps."
+  },
+  {
+   "id": "dbxfe-apps-source-lakebase",
+   "title": "Add a Lakebase resource to a Databricks app",
+   "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/lakebase",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Databricks Apps with a Lakebase database resource.",
+   "caveat": "Role naming, granted privileges and injected variable names are as documented at review time; tables the app did not create still need their own grants, and Lakebase availability must be confirmed for the workspace's region.",
+   "reviewedEvidence": "Title and URL confirmed by web search in this build on 2026-09-23 and recorded in the Lakebase module's source record; no new search was run for this record because the session's search budget was exhausted; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: adding Lakebase as an app resource gives the app's service principal a matching Postgres role named after its client ID (reusing one that exists), grants CONNECT and CREATE on the selected database, and injects connection details such as PGHOST into the app as environment variables."
+  },
+  {
+   "id": "dbxfe-apps-source-agents",
+   "title": "Authentication for agents",
+   "url": "https://docs.databricks.com/aws/en/agents/custom-agents/agent-authentication",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-19",
+   "publishedAt": null,
+   "context": "Databricks on AWS; agents deployed on Databricks Apps; app identity versus user identity.",
+   "caveat": "User authorization was marked Public Preview at that review; helper behaviour and prerequisites must be rechecked for the version in use.",
+   "reviewedEvidence": "Reviewed for the GenAI module on 2026-09-19 and recorded in that module's source record; not re-searched or re-read for this record because the session's search budget was exhausted and the documentation host is blocked by the sandbox egress proxy. Passage relied on, as recorded there: app identity and user identity differ; user authorization is marked Public Preview; a missing forwarded user token can fall back to app identity, so testing with several callers is recommended."
+  },
+  {
+   "id": "dbxfe-apps-source-masks",
+   "title": "Row filters and column masks",
+   "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-20",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Unity Catalog row filters and column masks as query-time controls.",
+   "caveat": "Supported access paths and compute have explicit limits; a filter is a visibility control evaluated for the principal that runs the query, not an encryption or universal protection.",
+   "reviewedEvidence": "Reviewed for the Unity Catalog module on 2026-09-20 and recorded in that module's source record; not re-searched or re-read for this record because the session's search budget was exhausted and the documentation host is blocked by the sandbox egress proxy. Passage relied on, as recorded there: row filters restrict the rows a query returns and column masks return original or masked column values at query time; supported access paths and runtimes have explicit limits."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-apps-claim-overview",
+   "description": "Databricks Apps hosts data and AI web applications on serverless compute that Databricks provisions and manages, integrated with workspace resources such as SQL warehouses, model serving endpoints and Lakebase databases; the documented frameworks include Streamlit, Dash, Gradio, Flask and FastAPI for Python and React, Angular, Svelte and Express for Node.js, and users reach an app at its URL after signing in.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-apps-source-overview"
+   ],
+   "context": "Databricks on AWS; framework list and features as previously read, not re-confirmed in this build."
+  },
+  {
+   "id": "dbxfe-apps-claim-headers",
+   "description": "The platform forwards the signed-in user's identity to the app in HTTP request headers, including X-Forwarded-Email and X-Forwarded-User, which the back end reads per request.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-apps-source-overview"
+   ],
+   "context": "Header names as previously read on a page linked from the Apps overview; that page's URL was not confirmed in this build, so verify the current list before relying on a name."
+  },
+  {
+   "id": "dbxfe-apps-claim-principal",
+   "description": "Each Databricks app has a dedicated service principal, unique to the app and not reusable by another app; Databricks injects its OAuth credentials into the app environment as DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET, and under app authorization every call made with them is evaluated against that principal's permissions, whoever is signed in.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-apps-source-auth"
+   ],
+   "context": "App authorization in Databricks Apps on AWS."
+  },
+  {
+   "id": "dbxfe-apps-claim-user",
+   "description": "User authorization (on-behalf-of-user) forwards the signed-in user's access token to the app in the X-Forwarded-Access-Token header; calls made with it are evaluated with the user's own permissions, bounded by scopes the app declares, such as sql, and access outside approved scopes is blocked even when the user's permissions are broader. The agent authentication page marked it Public Preview and warned that a missing forwarded token can fall back to app identity.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-apps-source-auth",
+    "dbxfe-apps-source-agents"
+   ],
+   "context": "User authorization status must be verified for the workspace; scope names are read from the current page."
+  },
+  {
+   "id": "dbxfe-apps-claim-resources",
+   "description": "An app's resources, such as a SQL warehouse, a model serving endpoint, a secret or a Lakebase database, are each added with a chosen permission for the app's service principal (for example Can use on a warehouse, Can query on an endpoint) and a resource key that app.yaml maps to an environment variable with valueFrom, so no ID or credential is hard-coded.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-apps-source-resources"
+   ],
+   "context": "App resources on Databricks on AWS; permission choices vary by type and release."
+  },
+  {
+   "id": "dbxfe-apps-claim-lakebase",
+   "description": "Adding a Lakebase database as an app resource gives the app's service principal a matching Postgres role named after its client ID, grants CONNECT and CREATE on the chosen database and injects connection details such as PGHOST as environment variables; privileges on tables the app did not create are granted separately.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-apps-source-lakebase"
+   ],
+   "context": "Databricks Apps with a Lakebase resource; Lakebase availability varies by region."
+  },
+  {
+   "id": "dbxfe-apps-claim-deploy",
+   "description": "Deploying an app builds and starts it from its source files: files synced to a workspace folder are deployed through the UI or with databricks apps deploy and a source code path; the deployment installs Python packages from requirements.txt and Node.js packages from package.json, runs a build script when one is defined, and then runs the start command given in app.yaml.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-apps-source-deploy"
+   ],
+   "context": "Deployment on Databricks on AWS; CLI flags are checked against the current reference."
+  },
+  {
+   "id": "dbxfe-apps-claim-bundles",
+   "description": "Declarative Automation Bundles (formerly Databricks Asset Bundles) are a documented way to define an app and its resources as configuration and deploy it per target.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-apps-source-deploy"
+   ],
+   "context": "As previously read; bundle keys and commands must be checked against the current bundle reference before use."
+  },
+  {
+   "id": "dbxfe-apps-claim-masks",
+   "description": "Unity Catalog row filters restrict the rows a query returns and column masks return original or masked values at query time, evaluated for the principal that runs the query, with documented limits on supported access paths.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-apps-source-masks"
+   ],
+   "context": "Reviewed for the Unity Catalog module on 2026-09-20."
+  },
+  {
+   "id": "dbxfe-apps-guidance",
+   "kind": "guidance",
+   "sourceIds": [],
+   "description": "Original SpicyBrain design reasoning for Databricks Apps: per-request identity choices, state classification, validation order, enforcement points, incident ownership, test design and deployment guides; not a Databricks runbook.",
+   "context": "Independent curriculum; adapt to the actual workspace, documentation release and security review."
+  },
+  {
+   "id": "dbxfe-apps-fiction",
+   "kind": "fictional",
+   "sourceIds": [],
+   "description": "Cinderline Components, its quality exception review app, reviewers, plants, inspection keys, tables, resource keys, secret names, log lines, timings and outcomes are synthetic teaching records.",
+   "context": "No app, resource, secret or query was created, run or tested in a workspace; nothing was deployed and nothing is added to SpicyBrain's own runtime."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-apps-app-concept",
+   "term": "Databricks App",
+   "aliases": [
+    "Databricks Apps",
+    "app URL",
+    "hosted app"
+   ],
+   "definition": "A web application that Databricks hosts on managed serverless compute inside a workspace, reached at its own URL after the platform signs the user in.",
+   "example": "Cinderline's quality exception review app, a FastAPI back end serving a small front end to reviewers.",
+   "sourceIds": [
+    "dbxfe-apps-source-overview"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-path-concept",
+   "term": "application request path",
+   "aliases": [
+    "front end",
+    "back end",
+    "trust boundary"
+   ],
+   "definition": "The hops one request crosses: browser to the platform's sign-in, platform to the app's back end, and back end to each data, model or tool service.",
+   "example": "Claim: browser → sign-in → back end → Lakebase quality_ops, three boundaries.",
+   "sourceIds": [
+    "dbxfe-apps-source-overview"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-principal-concept",
+   "term": "app service principal",
+   "aliases": [
+    "app authorization",
+    "app identity",
+    "DATABRICKS_CLIENT_ID"
+   ],
+   "definition": "The dedicated, non-reusable identity Databricks creates for one app, whose permissions are evaluated for every call the app makes under app authorization.",
+   "example": "The queue query appears in query history under the quality app's principal, not under Leo.",
+   "sourceIds": [
+    "dbxfe-apps-source-auth"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-userauth-concept",
+   "term": "user authorization",
+   "aliases": [
+    "on-behalf-of-user authorization",
+    "OBO",
+    "X-Forwarded-Access-Token"
+   ],
+   "definition": "An app authorization mode in which the back end calls Databricks with the signed-in user's forwarded access token, so the user's own permissions apply.",
+   "example": "With user authorization, Imani's row filter on the quarantine table decides which rows her queue shows.",
+   "sourceIds": [
+    "dbxfe-apps-source-auth",
+    "dbxfe-apps-source-agents"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-scope-concept",
+   "term": "authorization scope",
+   "aliases": [
+    "user authorization scope",
+    "sql scope"
+   ],
+   "definition": "A declared limit on the Databricks APIs a user-authorized app may call on a user's behalf, enforced even when the user holds broader permissions.",
+   "example": "The quality app declares only sql, so it cannot read workspace files for Imani.",
+   "sourceIds": [
+    "dbxfe-apps-source-auth"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-context-concept",
+   "term": "user context",
+   "aliases": [
+    "forwarded identity headers",
+    "X-Forwarded-Email",
+    "X-Forwarded-User"
+   ],
+   "definition": "The identity facts the platform forwards with each request, read by the back end per request and never taken from the client-controlled body.",
+   "example": "X-Forwarded-Email: imani.q@cinderline.example becomes reviewer imani.q on the claim row.",
+   "sourceIds": [
+    "dbxfe-apps-source-overview"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-binding-concept",
+   "term": "app resource",
+   "aliases": [
+    "resource binding",
+    "resource key",
+    "valueFrom"
+   ],
+   "definition": "A workspace object added to an app with a permission for the app's service principal and a key that app.yaml maps to an environment variable.",
+   "example": "Key sql-warehouse, permission Can use, variable QUALITY_WAREHOUSE_ID.",
+   "sourceIds": [
+    "dbxfe-apps-source-resources"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-secret-concept",
+   "term": "secret resource",
+   "aliases": [
+    "secret scope",
+    "bound secret"
+   ],
+   "definition": "A secret added to an app as a resource so the process receives its value through an environment variable instead of from source or configuration.",
+   "example": "quality-app/manuals-token reaches the process as MANUALS_TOKEN.",
+   "sourceIds": [
+    "dbxfe-apps-source-resources"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-state-concept",
+   "term": "application state class",
+   "aliases": [
+    "per-request state",
+    "session state",
+    "operational state",
+    "derived analytical state",
+    "cache"
+   ],
+   "definition": "A classification of each value an app holds by what must be true after the request ends, which decides where it may live.",
+   "example": "A claim is operational and lives in Lakebase; a filter is session state and may live in the browser.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-apps-runtime-concept",
+   "term": "managed app runtime",
+   "aliases": [
+    "app process",
+    "serverless app compute",
+    "restart"
+   ],
+   "definition": "The platform-managed compute that runs the app's start command as a process, which a deployment or restart replaces with a new one.",
+   "example": "Deployment 8 starts a new process with empty memory while Lakebase keeps every claim.",
+   "sourceIds": [
+    "dbxfe-apps-source-overview",
+    "dbxfe-apps-source-deploy"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-dependency-concept",
+   "term": "dependency manifest",
+   "aliases": [
+    "requirements.txt",
+    "package.json",
+    "pinned version"
+   ],
+   "definition": "The files a deployment reads to install the app's packages, which decide the versions the running app actually gets.",
+   "example": "qa-rules==1.4 in requirements.txt makes the build install the tested version.",
+   "sourceIds": [
+    "dbxfe-apps-source-deploy"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-validation-concept",
+   "term": "request validation",
+   "aliases": [
+    "schema validation",
+    "bound parameter",
+    "injection"
+   ],
+   "definition": "The checks a back end applies to a request's body and parameters before any handler runs under a privileged identity.",
+   "example": "inspection_key must match ^[A-Z]-\\d{4}$, so A-2031' OR '1'='1 is refused with a 422.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-apps-enforcement-concept",
+   "term": "enforcement point",
+   "aliases": [
+    "handler authorization",
+    "database constraint",
+    "defence in depth"
+   ],
+   "definition": "The one place in the request path that is responsible for refusing a particular rule, chosen by who can see the facts the rule needs.",
+   "example": "The plant rule is enforced in the handler; one active claim is enforced by Lakebase.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-apps-ownership-concept",
+   "term": "operational responsibility",
+   "aliases": [
+    "incident ownership",
+    "first evidence",
+    "handover"
+   ],
+   "definition": "The agreed split of which team owns which failure, decided by which layer's evidence shows the fault.",
+   "example": "A failed install is the app team's; a query queued behind a refresh is the warehouse owner's.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-apps-deployment-concept",
+   "term": "app deployment",
+   "aliases": [
+    "workspace-folder deployment",
+    "databricks apps deploy",
+    "not deployed"
+   ],
+   "definition": "The replayable sequence that turns synced source files into the running app: deploy, build, start, verify and share.",
+   "example": "Sync the folder, deploy it, read the install step, open the URL, share with the reviewers' group.",
+   "sourceIds": [
+    "dbxfe-apps-source-deploy"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-bundle-concept",
+   "term": "Declarative Automation Bundles",
+   "aliases": [
+    "Databricks Asset Bundles",
+    "DABs",
+    "bundle"
+   ],
+   "definition": "Configuration that declares an app and the resources it uses so the same deployment repeats per target, such as development and production.",
+   "example": "A bundle target dev binds wh-quality-dev; target prod binds wh-quality.",
+   "sourceIds": [
+    "dbxfe-apps-source-deploy"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-mock-concept",
+   "term": "mocked contract test",
+   "aliases": [
+    "local mock",
+    "contract test",
+    "fake dependency"
+   ],
+   "definition": "A local test that drives the real handler with fakes in place of its dependencies to prove its request, response and error contract, and nothing about a deployment.",
+   "example": "FakeClaims returns claimed then conflict while a test client posts two claims.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-apps-extension-lakebase-role-concept",
+   "term": "app Postgres role",
+   "aliases": [
+    "Lakebase app role",
+    "CONNECT and CREATE"
+   ],
+   "definition": "The Postgres role a Lakebase binding gives an app's service principal, with database-level privileges but no automatic rights on existing tables.",
+   "example": "The quality app's role can connect to quality_ops but needs grants on tables created by the migration job.",
+   "sourceIds": [
+    "dbxfe-apps-source-lakebase"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-extension-row-filters-concept",
+   "term": "row filter under user authorization",
+   "aliases": [
+    "row filter",
+    "column mask",
+    "per-user visibility"
+   ],
+   "definition": "A Unity Catalog row filter evaluated for whichever principal runs the query, which becomes the signed-in user once the app calls with the forwarded token.",
+   "example": "Imani's P2 filter shows her only P2 rows when the queue read uses her token.",
+   "sourceIds": [
+    "dbxfe-apps-source-masks",
+    "dbxfe-apps-source-auth"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-extension-node-build-concept",
+   "term": "front-end build at deployment",
+   "aliases": [
+    "npm build",
+    "package.json build script"
+   ],
+   "definition": "The deployment step that installs a Node.js front end's packages and runs its build script before the app's start command runs.",
+   "example": "A React front end is compiled during deployment instead of being committed as built files.",
+   "sourceIds": [
+    "dbxfe-apps-source-deploy"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-extension-local-identity-concept",
+   "term": "local developer identity",
+   "aliases": [
+    "local run",
+    "developer credentials",
+    "unified authentication"
+   ],
+   "definition": "The identity a locally run app uses when no app credentials are injected, usually the developer's own login, whose grants differ from the app's.",
+   "example": "Locally the queue loads as the developer; deployed, the same query is refused for the app's principal.",
+   "sourceIds": [
+    "dbxfe-apps-source-auth"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-apps-path-visual",
+   "kind": "nodes",
+   "title": "Front end, back end and the data path",
+   "alt": "Front end, back end and the data path. Imani opens the app. The platform signs her in, then the back end serves the front end files, which run in her browser. No data service is touched.",
+   "caption": "The browser talks only to the app URL; the back end is the only caller of data, model and tool services. Synthetic teaching example.",
+   "textEquivalent": "Page load: Imani opens the app. The platform signs her in, then the back end serves the front end files, which run in her browser. No data service is touched. Nodes: Reviewer's browser: Runs the front end; holds no data credential. (selected); Platform sign-in: boundary 1. Authenticates Imani before any app code runs. (selected); App back end: boundary 2. FastAPI process; returns HTML and JavaScript. (selected); Lakebase quality_ops: boundary 3. Not called for a page load. (excluded); SQL warehouse: Not called for a page load. (excluded); Manuals service: Not called for a page load. (excluded). Relationships: Reviewer's browser → Platform sign-in: GET app URL; Platform sign-in → App back end: forwards request and identity; App back end → Reviewer's browser: front end files.\n\nClaim call: Imani presses Claim. The front end posts JSON to the back end, which decides and writes one row. The browser never meets Lakebase or the warehouse. Nodes: Reviewer's browser: Front end script posts /v1/claims. (selected); Platform sign-in: boundary 1. Session already established; identity forwarded again. (selected); App back end: boundary 2. Validates, checks the plant, writes as the app. (selected); Lakebase quality_ops: boundary 3. Receives one claim insert. (selected); SQL warehouse: Not needed for a claim. (context); Manuals service: Not needed for a claim. (context). Relationships: Reviewer's browser → Platform sign-in: POST /v1/claims; Platform sign-in → App back end: forwards body and headers; App back end → Lakebase quality_ops: insert as the app; App back end → Reviewer's browser: claimed.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-overview",
+    "dbxfe-apps-claim-headers",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "page",
+     "title": "Page load",
+     "explanation": "Imani opens the app. The platform signs her in, then the back end serves the front end files, which run in her browser. No data service is touched.",
+     "nodes": [
+      {
+       "id": "browser",
+       "label": "Reviewer's browser",
+       "detail": "Runs the front end; holds no data credential.",
+       "status": "selected"
+      },
+      {
+       "id": "signin",
+       "label": "Platform sign-in",
+       "detail": "Authenticates Imani before any app code runs.",
+       "status": "selected",
+       "value": "boundary 1"
+      },
+      {
+       "id": "backend",
+       "label": "App back end",
+       "detail": "FastAPI process; returns HTML and JavaScript.",
+       "status": "selected",
+       "value": "boundary 2"
+      },
+      {
+       "id": "lakebase",
+       "label": "Lakebase quality_ops",
+       "detail": "Not called for a page load.",
+       "status": "excluded",
+       "value": "boundary 3"
+      },
+      {
+       "id": "warehouse",
+       "label": "SQL warehouse",
+       "detail": "Not called for a page load.",
+       "status": "excluded"
+      },
+      {
+       "id": "tool",
+       "label": "Manuals service",
+       "detail": "Not called for a page load.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "browser",
+       "to": "signin",
+       "label": "GET app URL"
+      },
+      {
+       "from": "signin",
+       "to": "backend",
+       "label": "forwards request and identity"
+      },
+      {
+       "from": "backend",
+       "to": "browser",
+       "label": "front end files"
+      }
+     ]
+    },
+    {
+     "id": "claim",
+     "title": "Claim call",
+     "explanation": "Imani presses Claim. The front end posts JSON to the back end, which decides and writes one row. The browser never meets Lakebase or the warehouse.",
+     "nodes": [
+      {
+       "id": "browser",
+       "label": "Reviewer's browser",
+       "detail": "Front end script posts /v1/claims.",
+       "status": "selected"
+      },
+      {
+       "id": "signin",
+       "label": "Platform sign-in",
+       "detail": "Session already established; identity forwarded again.",
+       "status": "selected",
+       "value": "boundary 1"
+      },
+      {
+       "id": "backend",
+       "label": "App back end",
+       "detail": "Validates, checks the plant, writes as the app.",
+       "status": "selected",
+       "value": "boundary 2"
+      },
+      {
+       "id": "lakebase",
+       "label": "Lakebase quality_ops",
+       "detail": "Receives one claim insert.",
+       "status": "selected",
+       "value": "boundary 3"
+      },
+      {
+       "id": "warehouse",
+       "label": "SQL warehouse",
+       "detail": "Not needed for a claim.",
+       "status": "context"
+      },
+      {
+       "id": "tool",
+       "label": "Manuals service",
+       "detail": "Not needed for a claim.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "browser",
+       "to": "signin",
+       "label": "POST /v1/claims"
+      },
+      {
+       "from": "signin",
+       "to": "backend",
+       "label": "forwards body and headers"
+      },
+      {
+       "from": "backend",
+       "to": "lakebase",
+       "label": "insert as the app"
+      },
+      {
+       "from": "backend",
+       "to": "browser",
+       "label": "claimed"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-identity-visual",
+   "kind": "nodes",
+   "title": "One request under two identities",
+   "alt": "One request under two identities. The back end reads Imani from the forwarded headers but queries as the app's service principal. The warehouse evaluates the app, so a row filter written for Imani is never consulted.",
+   "caption": "The same queue request crosses three trust boundaries; only the identity at the data hop changes. Synthetic teaching example.",
+   "textEquivalent": "App identity: The back end reads Imani from the forwarded headers but queries as the app's service principal. The warehouse evaluates the app, so a row filter written for Imani is never consulted. Nodes: Reviewer's browser: Holds the page and a platform session only. (context); Platform sign-in: boundary 1. Authenticates Imani. (selected); App back end: boundary 2. Knows Imani from headers; calls as the app. (selected); SQL warehouse: principal: app. Evaluates the app's grants on quality.raw.quarantine. (selected); Lakebase quality_ops: principal: app. App's Postgres role writes claims. (selected); Manuals service: External tool; token from a bound secret. (context); Imani's row filter: Not evaluated: the query does not run as Imani. (excluded). Relationships: Reviewer's browser → Platform sign-in: HTTPS; Platform sign-in → App back end: identity headers; App back end → SQL warehouse: app credentials; App back end → Lakebase quality_ops: app credentials; App back end → Manuals service: secret token.\n\nUser identity: With user authorization the back end passes Imani's forwarded token to the warehouse call, bounded by the sql scope. The warehouse evaluates Imani and her row filter applies; Lakebase and the tool still see the app. Nodes: Reviewer's browser: Holds the page and a platform session only. (context); Platform sign-in: boundary 1. Authenticates Imani; forwards her token. (selected); App back end: boundary 2. Uses Imani's token for the queue read only. (selected); SQL warehouse: principal: Imani. Evaluates Imani within the sql scope. (selected); Lakebase quality_ops: principal: app. Still the app's Postgres role. (selected); Manuals service: Unchanged; the user token is not sent here. (context); Imani's row filter: Applies: the warehouse sees Imani. (selected). Relationships: Reviewer's browser → Platform sign-in: HTTPS; Platform sign-in → App back end: identity headers and token; App back end → SQL warehouse: Imani's token, sql scope; App back end → Lakebase quality_ops: app credentials; App back end → Manuals service: secret token; Imani's row filter → SQL warehouse: restricts rows.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-principal",
+    "dbxfe-apps-claim-user",
+    "dbxfe-apps-claim-masks",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "app-identity",
+     "title": "App identity",
+     "explanation": "The back end reads Imani from the forwarded headers but queries as the app's service principal. The warehouse evaluates the app, so a row filter written for Imani is never consulted.",
+     "nodes": [
+      {
+       "id": "browser",
+       "label": "Reviewer's browser",
+       "detail": "Holds the page and a platform session only.",
+       "status": "context"
+      },
+      {
+       "id": "signin",
+       "label": "Platform sign-in",
+       "detail": "Authenticates Imani.",
+       "status": "selected",
+       "value": "boundary 1"
+      },
+      {
+       "id": "backend",
+       "label": "App back end",
+       "detail": "Knows Imani from headers; calls as the app.",
+       "status": "selected",
+       "value": "boundary 2"
+      },
+      {
+       "id": "warehouse",
+       "label": "SQL warehouse",
+       "detail": "Evaluates the app's grants on quality.raw.quarantine.",
+       "status": "selected",
+       "value": "principal: app"
+      },
+      {
+       "id": "lakebase",
+       "label": "Lakebase quality_ops",
+       "detail": "App's Postgres role writes claims.",
+       "status": "selected",
+       "value": "principal: app"
+      },
+      {
+       "id": "tool",
+       "label": "Manuals service",
+       "detail": "External tool; token from a bound secret.",
+       "status": "context"
+      },
+      {
+       "id": "filter",
+       "label": "Imani's row filter",
+       "detail": "Not evaluated: the query does not run as Imani.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "browser",
+       "to": "signin",
+       "label": "HTTPS"
+      },
+      {
+       "from": "signin",
+       "to": "backend",
+       "label": "identity headers"
+      },
+      {
+       "from": "backend",
+       "to": "warehouse",
+       "label": "app credentials"
+      },
+      {
+       "from": "backend",
+       "to": "lakebase",
+       "label": "app credentials"
+      },
+      {
+       "from": "backend",
+       "to": "tool",
+       "label": "secret token"
+      }
+     ]
+    },
+    {
+     "id": "user-identity",
+     "title": "User identity",
+     "explanation": "With user authorization the back end passes Imani's forwarded token to the warehouse call, bounded by the sql scope. The warehouse evaluates Imani and her row filter applies; Lakebase and the tool still see the app.",
+     "nodes": [
+      {
+       "id": "browser",
+       "label": "Reviewer's browser",
+       "detail": "Holds the page and a platform session only.",
+       "status": "context"
+      },
+      {
+       "id": "signin",
+       "label": "Platform sign-in",
+       "detail": "Authenticates Imani; forwards her token.",
+       "status": "selected",
+       "value": "boundary 1"
+      },
+      {
+       "id": "backend",
+       "label": "App back end",
+       "detail": "Uses Imani's token for the queue read only.",
+       "status": "selected",
+       "value": "boundary 2"
+      },
+      {
+       "id": "warehouse",
+       "label": "SQL warehouse",
+       "detail": "Evaluates Imani within the sql scope.",
+       "status": "selected",
+       "value": "principal: Imani"
+      },
+      {
+       "id": "lakebase",
+       "label": "Lakebase quality_ops",
+       "detail": "Still the app's Postgres role.",
+       "status": "selected",
+       "value": "principal: app"
+      },
+      {
+       "id": "tool",
+       "label": "Manuals service",
+       "detail": "Unchanged; the user token is not sent here.",
+       "status": "context"
+      },
+      {
+       "id": "filter",
+       "label": "Imani's row filter",
+       "detail": "Applies: the warehouse sees Imani.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "browser",
+       "to": "signin",
+       "label": "HTTPS"
+      },
+      {
+       "from": "signin",
+       "to": "backend",
+       "label": "identity headers and token"
+      },
+      {
+       "from": "backend",
+       "to": "warehouse",
+       "label": "Imani's token, sql scope"
+      },
+      {
+       "from": "backend",
+       "to": "lakebase",
+       "label": "app credentials"
+      },
+      {
+       "from": "backend",
+       "to": "tool",
+       "label": "secret token"
+      },
+      {
+       "from": "filter",
+       "to": "warehouse",
+       "label": "restricts rows"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-scopes-visual",
+   "kind": "table",
+   "title": "Identity chosen per request",
+   "alt": "Identity chosen per request. Today the quarantine table has no per-plant row filter, so every data hop runs as the app and the handler narrows to the reviewer's plants.",
+   "caption": "The identity at the data hop is chosen for each request, and changes only where the data carries per-user rules. Synthetic teaching example.",
+   "textEquivalent": "Row filters absent: Today the quarantine table has no per-plant row filter, so every data hop runs as the app and the handler narrows to the reviewer's plants. Table columns: Request | Data hop | Identity there | Who narrows to the plant. Rows: View queue | Warehouse and Lakebase | App service principal | Handler / Claim item | Lakebase | App service principal | Handler / Record disposition | Lakebase | App service principal | Handler and claimant check / Manual text | Manuals service | Bound secret token | Not user-specific / Suggestion (later) | Serving endpoint | App service principal | Handler.\n\nRow filters on quality.raw.quarantine: Once the data lead adds a per-plant row filter, only the queue read moves to Imani's token with the sql scope; writes stay with the app because reviewers hold no Lakebase grants. Table columns: Request | Data hop | Identity there | Who narrows to the plant. Rows: View queue | Warehouse | Imani, sql scope | Unity Catalog row filter / View queue | Lakebase claims | App service principal | Handler / Claim item | Lakebase | App service principal | Handler / Record disposition | Lakebase | App service principal | Handler and claimant check / Manual text | Manuals service | Bound secret token | Not user-specific.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-user",
+    "dbxfe-apps-claim-masks",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "no-filters",
+     "title": "Row filters absent",
+     "explanation": "Today the quarantine table has no per-plant row filter, so every data hop runs as the app and the handler narrows to the reviewer's plants.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Request",
+       "Data hop",
+       "Identity there",
+       "Who narrows to the plant"
+      ],
+      "rows": [
+       [
+        "View queue",
+        "Warehouse and Lakebase",
+        "App service principal",
+        "Handler"
+       ],
+       [
+        "Claim item",
+        "Lakebase",
+        "App service principal",
+        "Handler"
+       ],
+       [
+        "Record disposition",
+        "Lakebase",
+        "App service principal",
+        "Handler and claimant check"
+       ],
+       [
+        "Manual text",
+        "Manuals service",
+        "Bound secret token",
+        "Not user-specific"
+       ],
+       [
+        "Suggestion (later)",
+        "Serving endpoint",
+        "App service principal",
+        "Handler"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "filters",
+     "title": "Row filters on quality.raw.quarantine",
+     "explanation": "Once the data lead adds a per-plant row filter, only the queue read moves to Imani's token with the sql scope; writes stay with the app because reviewers hold no Lakebase grants.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Request",
+       "Data hop",
+       "Identity there",
+       "Who narrows to the plant"
+      ],
+      "rows": [
+       [
+        "View queue",
+        "Warehouse",
+        "Imani, sql scope",
+        "Unity Catalog row filter"
+       ],
+       [
+        "View queue",
+        "Lakebase claims",
+        "App service principal",
+        "Handler"
+       ],
+       [
+        "Claim item",
+        "Lakebase",
+        "App service principal",
+        "Handler"
+       ],
+       [
+        "Record disposition",
+        "Lakebase",
+        "App service principal",
+        "Handler and claimant check"
+       ],
+       [
+        "Manual text",
+        "Manuals service",
+        "Bound secret token",
+        "Not user-specific"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-context-visual",
+   "kind": "nodes",
+   "title": "Header versus body",
+   "alt": "Header versus body. Imani's body names her as reviewer. The handler takes the reviewer from the header, finds the body agrees and writes the claim.",
+   "caption": "The reviewer recorded on a row comes from the header the platform sets, never from the body the client writes. Synthetic teaching example.",
+   "textEquivalent": "Honest request: Imani's body names her as reviewer. The handler takes the reviewer from the header, finds the body agrees and writes the claim. Nodes: X-Forwarded-Email: imani.q@cinderline.example. Set by the platform after sign-in. (selected); Body reviewer: imani.q. Optional; must match the header. (context); Claim handler: Reviewer taken from the header. (selected); Claim row: reviewer = imani.q (selected). Relationships: X-Forwarded-Email → Claim handler: identity; Body reviewer → Claim handler: agrees; Claim handler → Claim row: insert.\n\nForged body: A test client signed in as Imani sends reviewer leo.d. The header still says Imani, the handler refuses with 403, reason reviewer, and nothing is written. Nodes: X-Forwarded-Email: imani.q@cinderline.example. Still Imani; the client cannot change it. (selected); Body reviewer: leo.d. Client-controlled and disagrees. (warning); Claim handler: Refuses: 403, reason reviewer. (warning); Claim row: Nothing written. (excluded). Relationships: X-Forwarded-Email → Claim handler: identity; Body reviewer → Claim handler: disagrees; Claim handler → Claim row: no write.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-headers",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "honest",
+     "title": "Honest request",
+     "explanation": "Imani's body names her as reviewer. The handler takes the reviewer from the header, finds the body agrees and writes the claim.",
+     "nodes": [
+      {
+       "id": "header",
+       "label": "X-Forwarded-Email",
+       "detail": "Set by the platform after sign-in.",
+       "status": "selected",
+       "value": "imani.q@cinderline.example"
+      },
+      {
+       "id": "body",
+       "label": "Body reviewer",
+       "detail": "Optional; must match the header.",
+       "status": "context",
+       "value": "imani.q"
+      },
+      {
+       "id": "handler",
+       "label": "Claim handler",
+       "detail": "Reviewer taken from the header.",
+       "status": "selected"
+      },
+      {
+       "id": "row",
+       "label": "Claim row",
+       "detail": "reviewer = imani.q",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "header",
+       "to": "handler",
+       "label": "identity"
+      },
+      {
+       "from": "body",
+       "to": "handler",
+       "label": "agrees"
+      },
+      {
+       "from": "handler",
+       "to": "row",
+       "label": "insert"
+      }
+     ]
+    },
+    {
+     "id": "forged",
+     "title": "Forged body",
+     "explanation": "A test client signed in as Imani sends reviewer leo.d. The header still says Imani, the handler refuses with 403, reason reviewer, and nothing is written.",
+     "nodes": [
+      {
+       "id": "header",
+       "label": "X-Forwarded-Email",
+       "detail": "Still Imani; the client cannot change it.",
+       "status": "selected",
+       "value": "imani.q@cinderline.example"
+      },
+      {
+       "id": "body",
+       "label": "Body reviewer",
+       "detail": "Client-controlled and disagrees.",
+       "status": "warning",
+       "value": "leo.d"
+      },
+      {
+       "id": "handler",
+       "label": "Claim handler",
+       "detail": "Refuses: 403, reason reviewer.",
+       "status": "warning"
+      },
+      {
+       "id": "row",
+       "label": "Claim row",
+       "detail": "Nothing written.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "header",
+       "to": "handler",
+       "label": "identity"
+      },
+      {
+       "from": "body",
+       "to": "handler",
+       "label": "disagrees"
+      },
+      {
+       "from": "handler",
+       "to": "row",
+       "label": "no write"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-resources-visual",
+   "kind": "table",
+   "title": "The quality app's resource table",
+   "alt": "The quality app's resource table. Four resources, each with a key, the permission granted to the app's service principal and the variable the code reads.",
+   "caption": "Each resource is one grant to the app's principal plus one injected variable; promotion changes values, not code. Synthetic teaching example.",
+   "textEquivalent": "Bindings for the quality app: Four resources, each with a key, the permission granted to the app's service principal and the variable the code reads. Table columns: Resource | Key | Permission for the app | Variable | Used by. Rows: SQL warehouse wh-quality | sql-warehouse | Can use | QUALITY_WAREHOUSE_ID | View queue / Lakebase database quality_ops | quality-db | CONNECT and CREATE | PGHOST and related | Claim, disposition / Secret quality-app/manuals-token | manuals-token | Can read | MANUALS_TOKEN | Manual text / Serving endpoint disposition-suggest | suggest-endpoint | Can query | SUGGEST_ENDPOINT | Suggestion, later.\n\nPromoted to production: The same keys point at production objects. app.yaml and the code are unchanged; only what each key resolves to differs. Table columns: Key | Development value | Production value | Code change. Rows: sql-warehouse | wh-quality-dev | wh-quality | None / quality-db | quality_ops_dev | quality_ops | None / manuals-token | quality-app-dev/manuals-token | quality-app/manuals-token | None / suggest-endpoint | not bound | not bound | Feature off.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-resources",
+    "dbxfe-apps-claim-lakebase",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "bound",
+     "title": "Bindings for the quality app",
+     "explanation": "Four resources, each with a key, the permission granted to the app's service principal and the variable the code reads.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Resource",
+       "Key",
+       "Permission for the app",
+       "Variable",
+       "Used by"
+      ],
+      "rows": [
+       [
+        "SQL warehouse wh-quality",
+        "sql-warehouse",
+        "Can use",
+        "QUALITY_WAREHOUSE_ID",
+        "View queue"
+       ],
+       [
+        "Lakebase database quality_ops",
+        "quality-db",
+        "CONNECT and CREATE",
+        "PGHOST and related",
+        "Claim, disposition"
+       ],
+       [
+        "Secret quality-app/manuals-token",
+        "manuals-token",
+        "Can read",
+        "MANUALS_TOKEN",
+        "Manual text"
+       ],
+       [
+        "Serving endpoint disposition-suggest",
+        "suggest-endpoint",
+        "Can query",
+        "SUGGEST_ENDPOINT",
+        "Suggestion, later"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "promoted",
+     "title": "Promoted to production",
+     "explanation": "The same keys point at production objects. app.yaml and the code are unchanged; only what each key resolves to differs.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Key",
+       "Development value",
+       "Production value",
+       "Code change"
+      ],
+      "rows": [
+       [
+        "sql-warehouse",
+        "wh-quality-dev",
+        "wh-quality",
+        "None"
+       ],
+       [
+        "quality-db",
+        "quality_ops_dev",
+        "quality_ops",
+        "None"
+       ],
+       [
+        "manuals-token",
+        "quality-app-dev/manuals-token",
+        "quality-app/manuals-token",
+        "None"
+       ],
+       [
+        "suggest-endpoint",
+        "not bound",
+        "not bound",
+        "Feature off"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-secrets-visual",
+   "kind": "timeline",
+   "title": "A secret from scope to request",
+   "alt": "A secret from scope to request. The token sits in a secret scope, reaches the process as MANUALS_TOKEN at 09:00 and is sent only in the outbound call's header.",
+   "caption": "The process reads a bound secret when it starts, so a rotation reaches it only through a restart or redeploy. Synthetic teaching example.",
+   "textEquivalent": "Bound and read at start: The token sits in a secret scope, reaches the process as MANUALS_TOKEN at 09:00 and is sent only in the outbound call's header. Nodes: Secret scope: 08:30. quality-app/manuals-token stored. (selected); Resource manuals-token: 08:40. App's principal granted Can read. (selected); Process start: 09:00. Environment receives MANUALS_TOKEN. (selected); Manuals call: 09:12. Token sent in the outbound header; 200. (selected); App log: 09:12. Writes 'manual fetched A-2031', not the token. (selected). Relationships: Secret scope → Resource manuals-token: bound; Resource manuals-token → Process start: injected; Process start → Manuals call: used; Manuals call → App log: recorded.\n\nRotated while running: At 10:00 the owner stores a new token. The running process still holds the 09:00 value, so the 10:05 call fails; the 10:20 redeploy starts a process that reads the new one. Nodes: Secret scope: 10:00. New value stored. (selected); Resource manuals-token: Unchanged; still Can read. (selected); Process start: 09:00. Still holds the 09:00 value. (warning); Manuals call: 10:05. 401 from the manuals service. (warning); App log: 10:05. Records the 401 and the key name only. (selected); Redeploy: 10:20. New process reads the new value; 200. (pending). Relationships: Secret scope → Resource manuals-token: bound; Resource manuals-token → Process start: not re-read; Process start → Manuals call: old value; Manuals call → App log: recorded; Redeploy → Manuals call: new value.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-resources",
+    "dbxfe-apps-claim-principal",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "bound",
+     "title": "Bound and read at start",
+     "explanation": "The token sits in a secret scope, reaches the process as MANUALS_TOKEN at 09:00 and is sent only in the outbound call's header.",
+     "nodes": [
+      {
+       "id": "scope",
+       "label": "Secret scope",
+       "detail": "quality-app/manuals-token stored.",
+       "status": "selected",
+       "value": "08:30"
+      },
+      {
+       "id": "bind",
+       "label": "Resource manuals-token",
+       "detail": "App's principal granted Can read.",
+       "status": "selected",
+       "value": "08:40"
+      },
+      {
+       "id": "start",
+       "label": "Process start",
+       "detail": "Environment receives MANUALS_TOKEN.",
+       "status": "selected",
+       "value": "09:00"
+      },
+      {
+       "id": "call",
+       "label": "Manuals call",
+       "detail": "Token sent in the outbound header; 200.",
+       "status": "selected",
+       "value": "09:12"
+      },
+      {
+       "id": "log",
+       "label": "App log",
+       "detail": "Writes 'manual fetched A-2031', not the token.",
+       "status": "selected",
+       "value": "09:12"
+      }
+     ],
+     "connections": [
+      {
+       "from": "scope",
+       "to": "bind",
+       "label": "bound"
+      },
+      {
+       "from": "bind",
+       "to": "start",
+       "label": "injected"
+      },
+      {
+       "from": "start",
+       "to": "call",
+       "label": "used"
+      },
+      {
+       "from": "call",
+       "to": "log",
+       "label": "recorded"
+      }
+     ]
+    },
+    {
+     "id": "rotated",
+     "title": "Rotated while running",
+     "explanation": "At 10:00 the owner stores a new token. The running process still holds the 09:00 value, so the 10:05 call fails; the 10:20 redeploy starts a process that reads the new one.",
+     "nodes": [
+      {
+       "id": "scope",
+       "label": "Secret scope",
+       "detail": "New value stored.",
+       "status": "selected",
+       "value": "10:00"
+      },
+      {
+       "id": "bind",
+       "label": "Resource manuals-token",
+       "detail": "Unchanged; still Can read.",
+       "status": "selected"
+      },
+      {
+       "id": "start",
+       "label": "Process start",
+       "detail": "Still holds the 09:00 value.",
+       "status": "warning",
+       "value": "09:00"
+      },
+      {
+       "id": "call",
+       "label": "Manuals call",
+       "detail": "401 from the manuals service.",
+       "status": "warning",
+       "value": "10:05"
+      },
+      {
+       "id": "log",
+       "label": "App log",
+       "detail": "Records the 401 and the key name only.",
+       "status": "selected",
+       "value": "10:05"
+      },
+      {
+       "id": "redeploy",
+       "label": "Redeploy",
+       "detail": "New process reads the new value; 200.",
+       "status": "pending",
+       "value": "10:20"
+      }
+     ],
+     "connections": [
+      {
+       "from": "scope",
+       "to": "bind",
+       "label": "bound"
+      },
+      {
+       "from": "bind",
+       "to": "start",
+       "label": "not re-read"
+      },
+      {
+       "from": "start",
+       "to": "call",
+       "label": "old value"
+      },
+      {
+       "from": "call",
+       "to": "log",
+       "label": "recorded"
+      },
+      {
+       "from": "redeploy",
+       "to": "call",
+       "label": "new value"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-state-visual",
+   "kind": "table",
+   "title": "Where each piece of state lives",
+   "alt": "Where each piece of state lives. Everything kept in process A's dictionaries: process B sees none of it, and the next deployment starts empty.",
+   "caption": "Placing state by class decides what a second process and a redeploy can see. Synthetic teaching example.",
+   "textEquivalent": "Held in process memory: Everything kept in process A's dictionaries: process B sees none of it, and the next deployment starts empty. Table columns: State | Class | Held in | Process B sees it | After redeploy. Rows: Queue filter | Session | Process A memory | No | Lost / Claim A-2031 rev 2 | Operational | Process A memory | No | Lost / Disposition | Operational | Process A memory | No | Lost / Manual text | Cache | Process A memory | Own copy | Rebuilt / Reviewer token | Per-request | Process A memory | No | Lost; leak risk.\n\nPlaced by class: Each class goes where it must survive: operational records in Lakebase, the summary in a Delta table, the filter in the browser, the token nowhere. Table columns: State | Class | Held in | Process B sees it | After redeploy. Rows: Queue filter | Session | Browser | Not needed | May reset / Claim A-2031 rev 2 | Operational | Lakebase quality_ops | Yes | Kept / Disposition | Operational, append-only | Lakebase quality_ops | Yes | Kept / Morning summary | Derived analytical | Delta table via warehouse | Yes | As of 07:00 / Manual text | Cache | Process memory, expiry | Own copy | Rebuilt / Reviewer token | Per-request | Request header only | Never stored | Never kept.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "memory",
+     "title": "Held in process memory",
+     "explanation": "Everything kept in process A's dictionaries: process B sees none of it, and the next deployment starts empty.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "State",
+       "Class",
+       "Held in",
+       "Process B sees it",
+       "After redeploy"
+      ],
+      "rows": [
+       [
+        "Queue filter",
+        "Session",
+        "Process A memory",
+        "No",
+        "Lost"
+       ],
+       [
+        "Claim A-2031 rev 2",
+        "Operational",
+        "Process A memory",
+        "No",
+        "Lost"
+       ],
+       [
+        "Disposition",
+        "Operational",
+        "Process A memory",
+        "No",
+        "Lost"
+       ],
+       [
+        "Manual text",
+        "Cache",
+        "Process A memory",
+        "Own copy",
+        "Rebuilt"
+       ],
+       [
+        "Reviewer token",
+        "Per-request",
+        "Process A memory",
+        "No",
+        "Lost; leak risk"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "placed",
+     "title": "Placed by class",
+     "explanation": "Each class goes where it must survive: operational records in Lakebase, the summary in a Delta table, the filter in the browser, the token nowhere.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "State",
+       "Class",
+       "Held in",
+       "Process B sees it",
+       "After redeploy"
+      ],
+      "rows": [
+       [
+        "Queue filter",
+        "Session",
+        "Browser",
+        "Not needed",
+        "May reset"
+       ],
+       [
+        "Claim A-2031 rev 2",
+        "Operational",
+        "Lakebase quality_ops",
+        "Yes",
+        "Kept"
+       ],
+       [
+        "Disposition",
+        "Operational, append-only",
+        "Lakebase quality_ops",
+        "Yes",
+        "Kept"
+       ],
+       [
+        "Morning summary",
+        "Derived analytical",
+        "Delta table via warehouse",
+        "Yes",
+        "As of 07:00"
+       ],
+       [
+        "Manual text",
+        "Cache",
+        "Process memory, expiry",
+        "Own copy",
+        "Rebuilt"
+       ],
+       [
+        "Reviewer token",
+        "Per-request",
+        "Request header only",
+        "Never stored",
+        "Never kept"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-runtime-visual",
+   "kind": "nodes",
+   "title": "What survives a new process",
+   "alt": "What survives a new process. Deployment 7 runs the app.yaml command as one process on compute Databricks manages. Its memory holds a manual-text cache; Lakebase holds twelve open claims.",
+   "caption": "A deployment or restart replaces the process and empties its memory; external stores keep their rows. Synthetic teaching example.",
+   "textEquivalent": "Running: Deployment 7 runs the app.yaml command as one process on compute Databricks manages. Its memory holds a manual-text cache; Lakebase holds twelve open claims. Nodes: Serverless compute: Provisioned and restarted by Databricks. (context); App process: deployment 7. Runs the app.yaml start command. (selected); Process memory: Manual-text cache, 40 entries. (selected); Lakebase claims: 12 rows. Twelve open claims. (selected); App team: Owns code, dependencies, command and state placement. (context). Relationships: Serverless compute → App process: runs; App process → Process memory: holds; App process → Lakebase claims: reads and writes; App team → App process: defines.\n\nAfter a redeploy: Deployment 8 starts a new process. Its memory is empty and the cache refills on demand; the twelve claims are untouched because they never lived in the process. Any second process would start empty too. Nodes: Serverless compute: Started the new process. (context); App process: deployment 8. New process from the deploy. (selected); Process memory: 0 entries. Empty; cache refills on demand. (warning); Lakebase claims: 12 rows. Still twelve open claims. (selected); Any second process: Starts empty; shares only external stores. (pending); App team: Owns code, dependencies, command and state placement. (context). Relationships: Serverless compute → App process: runs; App process → Process memory: holds nothing yet; App process → Lakebase claims: reads and writes; Any second process → Lakebase claims: reads and writes; App team → App process: defines.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-overview",
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "running",
+     "title": "Running",
+     "explanation": "Deployment 7 runs the app.yaml command as one process on compute Databricks manages. Its memory holds a manual-text cache; Lakebase holds twelve open claims.",
+     "nodes": [
+      {
+       "id": "compute",
+       "label": "Serverless compute",
+       "detail": "Provisioned and restarted by Databricks.",
+       "status": "context"
+      },
+      {
+       "id": "proc",
+       "label": "App process",
+       "detail": "Runs the app.yaml start command.",
+       "status": "selected",
+       "value": "deployment 7"
+      },
+      {
+       "id": "memory",
+       "label": "Process memory",
+       "detail": "Manual-text cache, 40 entries.",
+       "status": "selected"
+      },
+      {
+       "id": "lakebase",
+       "label": "Lakebase claims",
+       "detail": "Twelve open claims.",
+       "status": "selected",
+       "value": "12 rows"
+      },
+      {
+       "id": "team",
+       "label": "App team",
+       "detail": "Owns code, dependencies, command and state placement.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "compute",
+       "to": "proc",
+       "label": "runs"
+      },
+      {
+       "from": "proc",
+       "to": "memory",
+       "label": "holds"
+      },
+      {
+       "from": "proc",
+       "to": "lakebase",
+       "label": "reads and writes"
+      },
+      {
+       "from": "team",
+       "to": "proc",
+       "label": "defines"
+      }
+     ]
+    },
+    {
+     "id": "redeployed",
+     "title": "After a redeploy",
+     "explanation": "Deployment 8 starts a new process. Its memory is empty and the cache refills on demand; the twelve claims are untouched because they never lived in the process. Any second process would start empty too.",
+     "nodes": [
+      {
+       "id": "compute",
+       "label": "Serverless compute",
+       "detail": "Started the new process.",
+       "status": "context"
+      },
+      {
+       "id": "proc",
+       "label": "App process",
+       "detail": "New process from the deploy.",
+       "status": "selected",
+       "value": "deployment 8"
+      },
+      {
+       "id": "memory",
+       "label": "Process memory",
+       "detail": "Empty; cache refills on demand.",
+       "status": "warning",
+       "value": "0 entries"
+      },
+      {
+       "id": "lakebase",
+       "label": "Lakebase claims",
+       "detail": "Still twelve open claims.",
+       "status": "selected",
+       "value": "12 rows"
+      },
+      {
+       "id": "other",
+       "label": "Any second process",
+       "detail": "Starts empty; shares only external stores.",
+       "status": "pending"
+      },
+      {
+       "id": "team",
+       "label": "App team",
+       "detail": "Owns code, dependencies, command and state placement.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "compute",
+       "to": "proc",
+       "label": "runs"
+      },
+      {
+       "from": "proc",
+       "to": "memory",
+       "label": "holds nothing yet"
+      },
+      {
+       "from": "proc",
+       "to": "lakebase",
+       "label": "reads and writes"
+      },
+      {
+       "from": "other",
+       "to": "lakebase",
+       "label": "reads and writes"
+      },
+      {
+       "from": "team",
+       "to": "proc",
+       "label": "defines"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-dependencies-visual",
+   "kind": "comparison",
+   "title": "Laptop versus deployment build",
+   "alt": "Laptop versus deployment build. The laptop ran tests on qa-rules 1.4. The build resolves 2.0, which removed parse_key, and the start command fails with an ImportError.",
+   "caption": "An unpinned manifest resolves whatever is current when the build runs; a pinned one installs what the tests used. Synthetic packages and versions.",
+   "textEquivalent": "Unpinned requirements: The laptop ran tests on qa-rules 1.4. The build resolves 2.0, which removed parse_key, and the start command fails with an ImportError. Table columns: requirements.txt line | Laptop | Build resolves | At start. Rows: qa-rules | 1.4, tested | 2.0 | ImportError: parse_key / cinder-units | 3.2, tested | 3.3 | Untested combination.\n\nPinned requirements: Each line names the tested version, so the build installs exactly what the tests exercised and the start command runs. Table columns: requirements.txt line | Laptop | Build resolves | At start. Rows: qa-rules==1.4 | 1.4, tested | 1.4 | Starts / cinder-units==3.2 | 3.2, tested | 3.2 | Starts.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "unpinned",
+     "title": "Unpinned requirements",
+     "explanation": "The laptop ran tests on qa-rules 1.4. The build resolves 2.0, which removed parse_key, and the start command fails with an ImportError.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "requirements.txt line",
+       "Laptop",
+       "Build resolves",
+       "At start"
+      ],
+      "rows": [
+       [
+        "qa-rules",
+        "1.4, tested",
+        "2.0",
+        "ImportError: parse_key"
+       ],
+       [
+        "cinder-units",
+        "3.2, tested",
+        "3.3",
+        "Untested combination"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "pinned",
+     "title": "Pinned requirements",
+     "explanation": "Each line names the tested version, so the build installs exactly what the tests exercised and the start command runs.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "requirements.txt line",
+       "Laptop",
+       "Build resolves",
+       "At start"
+      ],
+      "rows": [
+       [
+        "qa-rules==1.4",
+        "1.4, tested",
+        "1.4",
+        "Starts"
+       ],
+       [
+        "cinder-units==3.2",
+        "3.2, tested",
+        "3.2",
+        "Starts"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-validation-visual",
+   "kind": "timeline",
+   "title": "An injection attempt, second by second",
+   "alt": "An injection attempt, second by second. The injected key passes sign-in untouched, fails the schema pattern and returns 422 naming the field. The warehouse and Lakebase are never called.",
+   "caption": "Sign-in does not inspect content; the schema refuses the injected key before any grant is spent. Synthetic teaching example.",
+   "textEquivalent": "Validated: The injected key passes sign-in untouched, fails the schema pattern and returns 422 naming the field. The warehouse and Lakebase are never called. Nodes: POST /v1/claims: 08:02:11.000. inspection_key is A-2031' OR '1'='1. (warning); Platform sign-in: 08:02:11.004. Imani authenticated; body not inspected. (selected); Schema check: 08:02:11.006. Pattern ^[A-Z]-\\d{4}$ fails. (warning); 422 response: 08:02:11.007. Names body.inspection_key; no handler code ran. (selected); Warehouse and Lakebase: Never called; no grant spent. (excluded). Relationships: POST /v1/claims → Platform sign-in: arrives; Platform sign-in → Schema check: forwarded; Schema check → 422 response: refused; Schema check → Warehouse and Lakebase: blocked.\n\nConcatenated SQL: Without validation, string concatenation widens the predicate. The warehouse runs it as the app and returns every plant's rows: the app's reach, not Imani's. Nodes: POST /v1/claims: 08:02:11.000. inspection_key is A-2031' OR '1'='1. (warning); Platform sign-in: 08:02:11.004. Imani authenticated; body not inspected. (selected); String concatenation: 08:02:11.006. WHERE inspection_key = 'A-2031' OR '1'='1' (warning); Warehouse as the app: 08:02:11.300. Runs the widened predicate with the app's grant. (warning); Every plant's rows: 08:02:11.900. Returned to Imani; 412 rows, synthetic. (warning). Relationships: POST /v1/claims → Platform sign-in: arrives; Platform sign-in → String concatenation: forwarded; String concatenation → Warehouse as the app: widened query; Warehouse as the app → Every plant's rows: returns.\n\nParameterized only: With a bound parameter but no schema, the whole string is one literal value. Nothing leaks, but the client gets an empty result instead of a field error. Nodes: POST /v1/claims: 08:02:11.000. inspection_key is A-2031' OR '1'='1. (warning); Platform sign-in: 08:02:11.004. Imani authenticated; body not inspected. (selected); Bound parameter: 08:02:11.006. The string is compared as one key. (selected); Warehouse as the app: 08:02:11.250. Matches no key; zero rows. (context); Empty result: 08:02:11.260. Safe but silent: no field named. (context). Relationships: POST /v1/claims → Platform sign-in: arrives; Platform sign-in → Bound parameter: forwarded; Bound parameter → Warehouse as the app: literal value; Warehouse as the app → Empty result: no rows.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "validated",
+     "title": "Validated",
+     "explanation": "The injected key passes sign-in untouched, fails the schema pattern and returns 422 naming the field. The warehouse and Lakebase are never called.",
+     "nodes": [
+      {
+       "id": "post",
+       "label": "POST /v1/claims",
+       "detail": "inspection_key is A-2031' OR '1'='1.",
+       "status": "warning",
+       "value": "08:02:11.000"
+      },
+      {
+       "id": "signin",
+       "label": "Platform sign-in",
+       "detail": "Imani authenticated; body not inspected.",
+       "status": "selected",
+       "value": "08:02:11.004"
+      },
+      {
+       "id": "schema",
+       "label": "Schema check",
+       "detail": "Pattern ^[A-Z]-\\d{4}$ fails.",
+       "status": "warning",
+       "value": "08:02:11.006"
+      },
+      {
+       "id": "reply",
+       "label": "422 response",
+       "detail": "Names body.inspection_key; no handler code ran.",
+       "status": "selected",
+       "value": "08:02:11.007"
+      },
+      {
+       "id": "data",
+       "label": "Warehouse and Lakebase",
+       "detail": "Never called; no grant spent.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "post",
+       "to": "signin",
+       "label": "arrives"
+      },
+      {
+       "from": "signin",
+       "to": "schema",
+       "label": "forwarded"
+      },
+      {
+       "from": "schema",
+       "to": "reply",
+       "label": "refused"
+      },
+      {
+       "from": "schema",
+       "to": "data",
+       "label": "blocked"
+      }
+     ]
+    },
+    {
+     "id": "concatenated",
+     "title": "Concatenated SQL",
+     "explanation": "Without validation, string concatenation widens the predicate. The warehouse runs it as the app and returns every plant's rows: the app's reach, not Imani's.",
+     "nodes": [
+      {
+       "id": "post",
+       "label": "POST /v1/claims",
+       "detail": "inspection_key is A-2031' OR '1'='1.",
+       "status": "warning",
+       "value": "08:02:11.000"
+      },
+      {
+       "id": "signin",
+       "label": "Platform sign-in",
+       "detail": "Imani authenticated; body not inspected.",
+       "status": "selected",
+       "value": "08:02:11.004"
+      },
+      {
+       "id": "concat",
+       "label": "String concatenation",
+       "detail": "WHERE inspection_key = 'A-2031' OR '1'='1'",
+       "status": "warning",
+       "value": "08:02:11.006"
+      },
+      {
+       "id": "data",
+       "label": "Warehouse as the app",
+       "detail": "Runs the widened predicate with the app's grant.",
+       "status": "warning",
+       "value": "08:02:11.300"
+      },
+      {
+       "id": "rows",
+       "label": "Every plant's rows",
+       "detail": "Returned to Imani; 412 rows, synthetic.",
+       "status": "warning",
+       "value": "08:02:11.900"
+      }
+     ],
+     "connections": [
+      {
+       "from": "post",
+       "to": "signin",
+       "label": "arrives"
+      },
+      {
+       "from": "signin",
+       "to": "concat",
+       "label": "forwarded"
+      },
+      {
+       "from": "concat",
+       "to": "data",
+       "label": "widened query"
+      },
+      {
+       "from": "data",
+       "to": "rows",
+       "label": "returns"
+      }
+     ]
+    },
+    {
+     "id": "parameterized",
+     "title": "Parameterized only",
+     "explanation": "With a bound parameter but no schema, the whole string is one literal value. Nothing leaks, but the client gets an empty result instead of a field error.",
+     "nodes": [
+      {
+       "id": "post",
+       "label": "POST /v1/claims",
+       "detail": "inspection_key is A-2031' OR '1'='1.",
+       "status": "warning",
+       "value": "08:02:11.000"
+      },
+      {
+       "id": "signin",
+       "label": "Platform sign-in",
+       "detail": "Imani authenticated; body not inspected.",
+       "status": "selected",
+       "value": "08:02:11.004"
+      },
+      {
+       "id": "param",
+       "label": "Bound parameter",
+       "detail": "The string is compared as one key.",
+       "status": "selected",
+       "value": "08:02:11.006"
+      },
+      {
+       "id": "data",
+       "label": "Warehouse as the app",
+       "detail": "Matches no key; zero rows.",
+       "status": "context",
+       "value": "08:02:11.250"
+      },
+      {
+       "id": "reply",
+       "label": "Empty result",
+       "detail": "Safe but silent: no field named.",
+       "status": "context",
+       "value": "08:02:11.260"
+      }
+     ],
+     "connections": [
+      {
+       "from": "post",
+       "to": "signin",
+       "label": "arrives"
+      },
+      {
+       "from": "signin",
+       "to": "param",
+       "label": "forwarded"
+      },
+      {
+       "from": "param",
+       "to": "data",
+       "label": "literal value"
+      },
+      {
+       "from": "data",
+       "to": "reply",
+       "label": "no rows"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-handler-visual",
+   "kind": "nodes",
+   "title": "Three checks, three places",
+   "alt": "Three checks, three places. A P2 reviewer claims a P2 item that nobody holds. Every check passes and one claim row is written.",
+   "caption": "The schema judges shape, the handler judges permission, Lakebase judges uniqueness. Synthetic teaching example.",
+   "textEquivalent": "Imani claims first: A P2 reviewer claims a P2 item that nobody holds. Every check passes and one claim row is written. Nodes: Schema check: Body well formed. (selected); Plant check: Imani is a P2 reviewer; item is P2. (selected); One-claim rule: No active claim on A-2031 rev 2. (selected); Claim row: reviewer = imani.q; status claimed. (selected). Relationships: Schema check → Plant check: passes; Plant check → One-claim rule: passes; One-claim rule → Claim row: insert.\n\nTomas from P1: Tomas's body is valid, but he is not a P2 reviewer. The handler refuses with 403, reason plant; Lakebase is never asked. Nodes: Schema check: Body well formed. (selected); Plant check: Tomas belongs to P1 only: 403. (warning); One-claim rule: Never reached. (excluded); Claim row: Nothing written. (excluded). Relationships: Schema check → Plant check: passes; Plant check → One-claim rule: refused.\n\nLeo claims second: Leo is a P2 reviewer, so shape and permission pass. The store's one-claim rule rejects the insert and the handler returns conflict as a normal answer. Nodes: Schema check: Body well formed. (selected); Plant check: Leo is a P2 reviewer. (selected); One-claim rule: Active claim by imani.q exists. (warning); Claim row: Response: conflict, claimed_by imani.q. (context). Relationships: Schema check → Plant check: passes; Plant check → One-claim rule: passes; One-claim rule → Claim row: conflict.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-lakebase",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "first",
+     "title": "Imani claims first",
+     "explanation": "A P2 reviewer claims a P2 item that nobody holds. Every check passes and one claim row is written.",
+     "nodes": [
+      {
+       "id": "schema",
+       "label": "Schema check",
+       "detail": "Body well formed.",
+       "status": "selected"
+      },
+      {
+       "id": "plant",
+       "label": "Plant check",
+       "detail": "Imani is a P2 reviewer; item is P2.",
+       "status": "selected"
+      },
+      {
+       "id": "unique",
+       "label": "One-claim rule",
+       "detail": "No active claim on A-2031 rev 2.",
+       "status": "selected"
+      },
+      {
+       "id": "row",
+       "label": "Claim row",
+       "detail": "reviewer = imani.q; status claimed.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "schema",
+       "to": "plant",
+       "label": "passes"
+      },
+      {
+       "from": "plant",
+       "to": "unique",
+       "label": "passes"
+      },
+      {
+       "from": "unique",
+       "to": "row",
+       "label": "insert"
+      }
+     ]
+    },
+    {
+     "id": "other-plant",
+     "title": "Tomas from P1",
+     "explanation": "Tomas's body is valid, but he is not a P2 reviewer. The handler refuses with 403, reason plant; Lakebase is never asked.",
+     "nodes": [
+      {
+       "id": "schema",
+       "label": "Schema check",
+       "detail": "Body well formed.",
+       "status": "selected"
+      },
+      {
+       "id": "plant",
+       "label": "Plant check",
+       "detail": "Tomas belongs to P1 only: 403.",
+       "status": "warning"
+      },
+      {
+       "id": "unique",
+       "label": "One-claim rule",
+       "detail": "Never reached.",
+       "status": "excluded"
+      },
+      {
+       "id": "row",
+       "label": "Claim row",
+       "detail": "Nothing written.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "schema",
+       "to": "plant",
+       "label": "passes"
+      },
+      {
+       "from": "plant",
+       "to": "unique",
+       "label": "refused"
+      }
+     ]
+    },
+    {
+     "id": "second",
+     "title": "Leo claims second",
+     "explanation": "Leo is a P2 reviewer, so shape and permission pass. The store's one-claim rule rejects the insert and the handler returns conflict as a normal answer.",
+     "nodes": [
+      {
+       "id": "schema",
+       "label": "Schema check",
+       "detail": "Body well formed.",
+       "status": "selected"
+      },
+      {
+       "id": "plant",
+       "label": "Plant check",
+       "detail": "Leo is a P2 reviewer.",
+       "status": "selected"
+      },
+      {
+       "id": "unique",
+       "label": "One-claim rule",
+       "detail": "Active claim by imani.q exists.",
+       "status": "warning"
+      },
+      {
+       "id": "row",
+       "label": "Claim row",
+       "detail": "Response: conflict, claimed_by imani.q.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "schema",
+       "to": "plant",
+       "label": "passes"
+      },
+      {
+       "from": "plant",
+       "to": "unique",
+       "label": "passes"
+      },
+      {
+       "from": "unique",
+       "to": "row",
+       "label": "conflict"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-operations-visual",
+   "kind": "table",
+   "title": "Symptom, first evidence, owner",
+   "alt": "Symptom, first evidence, owner. Each symptom points at one layer's evidence first, and that layer's owner opens it.",
+   "caption": "An incident moves between owners only when the evidence moves. Synthetic teaching example; timings are invented.",
+   "textEquivalent": "Ownership matrix: Each symptom points at one layer's evidence first, and that layer's owner opens it. Table columns: Symptom | First evidence | Owner. Rows: Deployment fails | Deployment log, install step | App team / App starts, then exits | App log, last lines | App team / Denial naming the app | Grants on the named object | Data owner / Queue slow | Handler timing, then query history | App team, then warehouse owner / Sign-in or platform down | Workspace status, support case | Platform team.\n\nQueue slow at 08:55: One incident read step by step: the handler timing moves it to the warehouse owner, the query history shows why, and the app team verifies the fix. Table columns: Step | Evidence read | Result | Next owner. Rows: 1 | Handler timing in the app log | 4.1 s inside the warehouse call | Warehouse owner / 2 | Warehouse query history | Queued 3.6 s behind a refresh job | Warehouse owner / 3 | Refresh schedule | Moved to 06:30 | Warehouse owner / 4 | Next morning's handler timing | 0.4 s | App team closes.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "matrix",
+     "title": "Ownership matrix",
+     "explanation": "Each symptom points at one layer's evidence first, and that layer's owner opens it.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Symptom",
+       "First evidence",
+       "Owner"
+      ],
+      "rows": [
+       [
+        "Deployment fails",
+        "Deployment log, install step",
+        "App team"
+       ],
+       [
+        "App starts, then exits",
+        "App log, last lines",
+        "App team"
+       ],
+       [
+        "Denial naming the app",
+        "Grants on the named object",
+        "Data owner"
+       ],
+       [
+        "Queue slow",
+        "Handler timing, then query history",
+        "App team, then warehouse owner"
+       ],
+       [
+        "Sign-in or platform down",
+        "Workspace status, support case",
+        "Platform team"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "incident",
+     "title": "Queue slow at 08:55",
+     "explanation": "One incident read step by step: the handler timing moves it to the warehouse owner, the query history shows why, and the app team verifies the fix.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Step",
+       "Evidence read",
+       "Result",
+       "Next owner"
+      ],
+      "rows": [
+       [
+        "1",
+        "Handler timing in the app log",
+        "4.1 s inside the warehouse call",
+        "Warehouse owner"
+       ],
+       [
+        "2",
+        "Warehouse query history",
+        "Queued 3.6 s behind a refresh job",
+        "Warehouse owner"
+       ],
+       [
+        "3",
+        "Refresh schedule",
+        "Moved to 06:30",
+        "Warehouse owner"
+       ],
+       [
+        "4",
+        "Next morning's handler timing",
+        "0.4 s",
+        "App team closes"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-deploy-visual",
+   "kind": "timeline",
+   "title": "Deployment as a replayable sequence",
+   "alt": "Deployment as a replayable sequence. Sync changes files only; the deploy builds and starts the new code. Verification and sharing come after the app answers.",
+   "caption": "Every step names its evidence; every step here is marked not deployed. Synthetic teaching example.",
+   "textEquivalent": "From a workspace folder: Sync changes files only; the deploy builds and starts the new code. Verification and sharing come after the app answers. Nodes: Local folder: step 1. server.py, app.yaml, requirements.txt, static files. (pending); Sync to workspace: step 2. Files land in the workspace folder; nothing runs yet. (pending); Deploy: step 3. UI or databricks apps deploy with the source path. (pending); Build: step 4. Installs requirements; runs a build script if defined. (pending); Start command: step 5. app.yaml command runs; first log lines. (pending); Verify: step 6. URL opens; one named reviewer's test claim. (pending); Share: step 7. Reviewers' group may use the app. (pending). Relationships: Local folder → Sync to workspace: then; Sync to workspace → Deploy: then; Deploy → Build: then; Build → Start command: then; Start command → Verify: then; Verify → Share: then.\n\nFrom a bundle: A bundle declares the app and its resources per target, so development and production repeat the same steps with different bindings. Nodes: Bundle configuration: step 1. App, source path and resources per target. (pending); Validate: step 2. Configuration checked before anything changes. (pending); Deploy to target: step 3. Creates or updates the app for dev or prod. (pending); Start command: step 4. The app's deployment runs the build and command. (pending); Verify: step 5. Same checks as the folder path. (pending). Relationships: Bundle configuration → Validate: then; Validate → Deploy to target: then; Deploy to target → Start command: then; Start command → Verify: then.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-claim-bundles",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "folder",
+     "title": "From a workspace folder",
+     "explanation": "Sync changes files only; the deploy builds and starts the new code. Verification and sharing come after the app answers.",
+     "nodes": [
+      {
+       "id": "files",
+       "label": "Local folder",
+       "detail": "server.py, app.yaml, requirements.txt, static files.",
+       "status": "pending",
+       "value": "step 1"
+      },
+      {
+       "id": "sync",
+       "label": "Sync to workspace",
+       "detail": "Files land in the workspace folder; nothing runs yet.",
+       "status": "pending",
+       "value": "step 2"
+      },
+      {
+       "id": "deploy",
+       "label": "Deploy",
+       "detail": "UI or databricks apps deploy with the source path.",
+       "status": "pending",
+       "value": "step 3"
+      },
+      {
+       "id": "build",
+       "label": "Build",
+       "detail": "Installs requirements; runs a build script if defined.",
+       "status": "pending",
+       "value": "step 4"
+      },
+      {
+       "id": "start",
+       "label": "Start command",
+       "detail": "app.yaml command runs; first log lines.",
+       "status": "pending",
+       "value": "step 5"
+      },
+      {
+       "id": "verify",
+       "label": "Verify",
+       "detail": "URL opens; one named reviewer's test claim.",
+       "status": "pending",
+       "value": "step 6"
+      },
+      {
+       "id": "share",
+       "label": "Share",
+       "detail": "Reviewers' group may use the app.",
+       "status": "pending",
+       "value": "step 7"
+      }
+     ],
+     "connections": [
+      {
+       "from": "files",
+       "to": "sync",
+       "label": "then"
+      },
+      {
+       "from": "sync",
+       "to": "deploy",
+       "label": "then"
+      },
+      {
+       "from": "deploy",
+       "to": "build",
+       "label": "then"
+      },
+      {
+       "from": "build",
+       "to": "start",
+       "label": "then"
+      },
+      {
+       "from": "start",
+       "to": "verify",
+       "label": "then"
+      },
+      {
+       "from": "verify",
+       "to": "share",
+       "label": "then"
+      }
+     ]
+    },
+    {
+     "id": "bundle",
+     "title": "From a bundle",
+     "explanation": "A bundle declares the app and its resources per target, so development and production repeat the same steps with different bindings.",
+     "nodes": [
+      {
+       "id": "config",
+       "label": "Bundle configuration",
+       "detail": "App, source path and resources per target.",
+       "status": "pending",
+       "value": "step 1"
+      },
+      {
+       "id": "validate",
+       "label": "Validate",
+       "detail": "Configuration checked before anything changes.",
+       "status": "pending",
+       "value": "step 2"
+      },
+      {
+       "id": "bdeploy",
+       "label": "Deploy to target",
+       "detail": "Creates or updates the app for dev or prod.",
+       "status": "pending",
+       "value": "step 3"
+      },
+      {
+       "id": "start",
+       "label": "Start command",
+       "detail": "The app's deployment runs the build and command.",
+       "status": "pending",
+       "value": "step 4"
+      },
+      {
+       "id": "verify",
+       "label": "Verify",
+       "detail": "Same checks as the folder path.",
+       "status": "pending",
+       "value": "step 5"
+      }
+     ],
+     "connections": [
+      {
+       "from": "config",
+       "to": "validate",
+       "label": "then"
+      },
+      {
+       "from": "validate",
+       "to": "bdeploy",
+       "label": "then"
+      },
+      {
+       "from": "bdeploy",
+       "to": "start",
+       "label": "then"
+      },
+      {
+       "from": "start",
+       "to": "verify",
+       "label": "then"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-apps-mock-visual",
+   "kind": "comparison",
+   "title": "What a green mocked suite proves",
+   "alt": "What a green mocked suite proves. Five tests pass against fakes. The contract is proved; everything the fakes replaced remains unproven.",
+   "caption": "The mocked suite covers the handler's contract; grants, headers, the build and concurrency stay unproven until a deployment. Synthetic teaching example.",
+   "textEquivalent": "Proved locally: Five tests pass against fakes. The contract is proved; everything the fakes replaced remains unproven. Nodes: Response contract: claimed, then conflict with claimed_by. (selected); Field rules: Injected key gets 422 naming the field. (selected); Plant refusal: Tomas gets 403, reason plant. (selected); App's grants: Fakes replaced the warehouse and Lakebase. (excluded); Platform headers: Tests set them by hand. (excluded); Build and start: No deployment ran. (excluded); Concurrent claims: Fake store is single-threaded. (excluded). Relationships: Response contract → Field rules: same client; Field rules → Plant refusal: same client.\n\nWhat a deployment check would add: Each unproven item gets its own evidence from a real environment; until then the review note lists them as open. Nodes: Response contract: Already proved locally. (selected); Field rules: Already proved locally. (selected); Plant refusal: Already proved locally. (selected); App's grants: Query history naming the app principal. (pending); Platform headers: Log line showing the forwarded reviewer. (pending); Build and start: Install step and first log lines. (pending); Concurrent claims: Constraint test on a real Postgres. (pending). Relationships: App's grants → Platform headers: then; Platform headers → Build and start: then; Build and start → Concurrent claims: then.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "states": [
+    {
+     "id": "proved",
+     "title": "Proved locally",
+     "explanation": "Five tests pass against fakes. The contract is proved; everything the fakes replaced remains unproven.",
+     "nodes": [
+      {
+       "id": "contract",
+       "label": "Response contract",
+       "detail": "claimed, then conflict with claimed_by.",
+       "status": "selected"
+      },
+      {
+       "id": "fields",
+       "label": "Field rules",
+       "detail": "Injected key gets 422 naming the field.",
+       "status": "selected"
+      },
+      {
+       "id": "plant",
+       "label": "Plant refusal",
+       "detail": "Tomas gets 403, reason plant.",
+       "status": "selected"
+      },
+      {
+       "id": "grants",
+       "label": "App's grants",
+       "detail": "Fakes replaced the warehouse and Lakebase.",
+       "status": "excluded"
+      },
+      {
+       "id": "headers",
+       "label": "Platform headers",
+       "detail": "Tests set them by hand.",
+       "status": "excluded"
+      },
+      {
+       "id": "build",
+       "label": "Build and start",
+       "detail": "No deployment ran.",
+       "status": "excluded"
+      },
+      {
+       "id": "race",
+       "label": "Concurrent claims",
+       "detail": "Fake store is single-threaded.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "contract",
+       "to": "fields",
+       "label": "same client"
+      },
+      {
+       "from": "fields",
+       "to": "plant",
+       "label": "same client"
+      }
+     ]
+    },
+    {
+     "id": "after-deploy",
+     "title": "What a deployment check would add",
+     "explanation": "Each unproven item gets its own evidence from a real environment; until then the review note lists them as open.",
+     "nodes": [
+      {
+       "id": "contract",
+       "label": "Response contract",
+       "detail": "Already proved locally.",
+       "status": "selected"
+      },
+      {
+       "id": "fields",
+       "label": "Field rules",
+       "detail": "Already proved locally.",
+       "status": "selected"
+      },
+      {
+       "id": "plant",
+       "label": "Plant refusal",
+       "detail": "Already proved locally.",
+       "status": "selected"
+      },
+      {
+       "id": "grants",
+       "label": "App's grants",
+       "detail": "Query history naming the app principal.",
+       "status": "pending"
+      },
+      {
+       "id": "headers",
+       "label": "Platform headers",
+       "detail": "Log line showing the forwarded reviewer.",
+       "status": "pending"
+      },
+      {
+       "id": "build",
+       "label": "Build and start",
+       "detail": "Install step and first log lines.",
+       "status": "pending"
+      },
+      {
+       "id": "race",
+       "label": "Concurrent claims",
+       "detail": "Constraint test on a real Postgres.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "grants",
+       "to": "headers",
+       "label": "then"
+      },
+      {
+       "from": "headers",
+       "to": "build",
+       "label": "then"
+      },
+      {
+       "from": "build",
+       "to": "race",
+       "label": "then"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-apps-path-question",
+   "revision": "1",
+   "prompt": "Imani's browser developer tools show one request for her claim, POST /v1/claims to the app URL, and nothing else. Where did the Lakebase insert for that claim come from?",
+   "options": [
+    {
+     "id": "dbxfe-apps-path-question-a",
+     "text": "From the app's back end process, after the request arrived; the browser only ever talks to the app URL.",
+     "rationale": "Correct: the back end is the only party that calls data services, using an identity the app is configured with."
+    },
+    {
+     "id": "dbxfe-apps-path-question-b",
+     "text": "From the browser, through a second request that developer tools hide.",
+     "rationale": "Developer tools show every request the page makes; a browser holding a database connection would also hold a credential."
+    },
+    {
+     "id": "dbxfe-apps-path-question-c",
+     "text": "From the platform's sign-in service, which writes the body to Lakebase itself.",
+     "rationale": "Sign-in authenticates and forwards; it has no knowledge of the app's tables or rules."
+    },
+    {
+     "id": "dbxfe-apps-path-question-d",
+     "text": "From Lakebase, which polls the app for pending claims.",
+     "rationale": "Databases answer connections; they do not poll applications for work."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-path-question-a",
+   "conceptIds": [
+    "dbxfe-apps-path-concept",
+    "dbxfe-apps-app-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-overview",
+    "dbxfe-apps-claim-headers",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-identity-question",
+   "revision": "1",
+   "prompt": "Leo holds no grant on quality.raw.quarantine, yet under app authorization the queue page shows him open items. What explains this, and what must the design add?",
+   "options": [
+    {
+     "id": "dbxfe-apps-identity-question-a",
+     "text": "The query runs as the app's service principal, which holds SELECT; the handler must narrow results to Leo's plants because Unity Catalog never evaluates Leo.",
+     "rationale": "Correct: under app authorization the principal at the data hop is the app, so per-reviewer narrowing is the app's job."
+    },
+    {
+     "id": "dbxfe-apps-identity-question-b",
+     "text": "Leo inherited the app owner's grants when he opened the app, so nothing needs adding.",
+     "rationale": "An app's reach is its own service principal's grants; the owner's personal grants never travel with it."
+    },
+    {
+     "id": "dbxfe-apps-identity-question-c",
+     "text": "The platform grants SELECT to every user who may open an app, so row filters will narrow it.",
+     "rationale": "Permission to open an app grants nothing on data, and a filter is evaluated for the app's principal here."
+    },
+    {
+     "id": "dbxfe-apps-identity-question-d",
+     "text": "The warehouse replays results cached from Imani's session, so clearing the cache fixes it.",
+     "rationale": "Results are computed per query under the calling principal; a cache is not the cause of this behaviour."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-identity-question-a",
+   "conceptIds": [
+    "dbxfe-apps-principal-concept",
+    "dbxfe-apps-userauth-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-principal",
+    "dbxfe-apps-claim-user",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-context-question",
+   "revision": "1",
+   "prompt": "The application state design guide's ClaimRequest example carries a reviewer field. In the running app, which source should decide the reviewer recorded on the claim row?",
+   "options": [
+    {
+     "id": "dbxfe-apps-context-question-a",
+     "text": "The identity header the platform forwards after sign-in; a body value that disagrees is refused.",
+     "rationale": "Correct: the platform sets the header after authentication, while any client can write any body."
+    },
+    {
+     "id": "dbxfe-apps-context-question-b",
+     "text": "The body's reviewer field, because it is part of the versioned contract.",
+     "rationale": "A contract field describes the record; it cannot prove who sent the request, since the client writes it."
+    },
+    {
+     "id": "dbxfe-apps-context-question-c",
+     "text": "A cookie the front end sets when the page loads.",
+     "rationale": "A cookie written by front end code is client-controlled, exactly like the body."
+    },
+    {
+     "id": "dbxfe-apps-context-question-d",
+     "text": "The reviewer of the previous request, kept in a module-level variable.",
+     "rationale": "Concurrent requests from different reviewers share module-level variables, so this records the wrong person."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-context-question-a",
+   "conceptIds": [
+    "dbxfe-apps-context-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-headers",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-resources-question",
+   "revision": "1",
+   "prompt": "In production every queue request fails with PERMISSION_DENIED naming the app's principal on quality.raw.quarantine. The warehouse is bound as a resource with Can use. What is missing?",
+   "options": [
+    {
+     "id": "dbxfe-apps-resources-question-a",
+     "text": "Unity Catalog privileges for the app's service principal on the catalog, schema and table; Can use on a warehouse grants compute, not data.",
+     "rationale": "Correct: the binding lets the app run queries on the warehouse; reading the table still needs its own grants."
+    },
+    {
+     "id": "dbxfe-apps-resources-question-b",
+     "text": "A second warehouse binding with Can manage, which includes data access.",
+     "rationale": "Managing a warehouse governs the compute resource, never the tables queried through it."
+    },
+    {
+     "id": "dbxfe-apps-resources-question-c",
+     "text": "Imani's SELECT grant, because the app runs every query as the signed-in user.",
+     "rationale": "The error names the app's principal, so the query ran under app authorization."
+    },
+    {
+     "id": "dbxfe-apps-resources-question-d",
+     "text": "The warehouse ID pasted into app.yaml as a literal value instead of valueFrom.",
+     "rationale": "How the ID reaches the process does not change which grants the principal holds."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-resources-question-a",
+   "conceptIds": [
+    "dbxfe-apps-binding-concept",
+    "dbxfe-apps-principal-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-resources",
+    "dbxfe-apps-claim-principal",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-secrets-question",
+   "revision": "1",
+   "prompt": "Five minutes after the manuals token was rotated, manual text fails with 401 while claims and the queue still work. What is the most likely cause and the next step?",
+   "options": [
+    {
+     "id": "dbxfe-apps-secrets-question-a",
+     "text": "The running process still holds the value it read at start; restart or redeploy the app and confirm with the next manual request.",
+     "rationale": "Correct: an injected environment variable is read once per process, so a rotation needs a new process."
+    },
+    {
+     "id": "dbxfe-apps-secrets-question-b",
+     "text": "The rotation removed the resource's Can read permission; add the secret resource again.",
+     "rationale": "Storing a new value in the scope does not change the app's permission on that secret."
+    },
+    {
+     "id": "dbxfe-apps-secrets-question-c",
+     "text": "Imani's forwarded token expired; ask her to sign in again.",
+     "rationale": "The manuals call uses the bound secret, not the reviewer's token, and other requests still work."
+    },
+    {
+     "id": "dbxfe-apps-secrets-question-d",
+     "text": "The warehouse is overloaded; increase its size.",
+     "rationale": "The failing call goes to the manuals service and returns 401, an authentication answer, not a capacity one."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-secrets-question-a",
+   "conceptIds": [
+    "dbxfe-apps-secret-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-resources",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-state-question",
+   "revision": "1",
+   "prompt": "The team redeployed a fix at 12:00. At 12:05 Leo claims A-2031 revision 2 successfully, although Imani claimed it at 11:40. Where was Imani's claim most likely stored?",
+   "options": [
+    {
+     "id": "dbxfe-apps-state-question-a",
+     "text": "In a dictionary in the app process's memory, which the redeploy replaced with an empty one.",
+     "rationale": "Correct: a deployment starts a new process, and process memory is never carried across."
+    },
+    {
+     "id": "dbxfe-apps-state-question-b",
+     "text": "In Lakebase, which the redeploy truncated.",
+     "rationale": "Deploying an app changes its code and process, not the rows in a separate database."
+    },
+    {
+     "id": "dbxfe-apps-state-question-c",
+     "text": "In the browser's local storage, which Leo's browser shares.",
+     "rationale": "Browser storage belongs to one browser profile; Leo's browser cannot read Imani's."
+    },
+    {
+     "id": "dbxfe-apps-state-question-d",
+     "text": "In the morning summary table, which refreshes hourly.",
+     "rationale": "The summary is derived from operational records; it is never where a claim is written."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-state-question-a",
+   "conceptIds": [
+    "dbxfe-apps-state-concept",
+    "dbxfe-apps-runtime-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-dependencies-question",
+   "revision": "1",
+   "prompt": "The app runs on a laptop, but the deployment log ends with ImportError: cannot import name 'parse_key' from 'qa_rules'. requirements.txt lists qa-rules with no version. What is the best first fix?",
+   "options": [
+    {
+     "id": "dbxfe-apps-dependencies-question-a",
+     "text": "Pin qa-rules to the version the tests ran against and redeploy; the build resolved a newer release.",
+     "rationale": "Correct: the deployment installs from the manifest, so an unpinned line takes whatever is current that day."
+    },
+    {
+     "id": "dbxfe-apps-dependencies-question-b",
+     "text": "Copy the laptop's site-packages folder into the app folder.",
+     "rationale": "Installed packages are platform-specific and bypass the manifest the build reads; the build still decides."
+    },
+    {
+     "id": "dbxfe-apps-dependencies-question-c",
+     "text": "Grant the app's service principal Can manage on the SQL warehouse.",
+     "rationale": "An ImportError happens before any warehouse call; permissions cannot change which package was installed."
+    },
+    {
+     "id": "dbxfe-apps-dependencies-question-d",
+     "text": "Add qa_rules to the env list in app.yaml.",
+     "rationale": "The env list sets environment variables; it does not install or select Python packages."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-dependencies-question-a",
+   "conceptIds": [
+    "dbxfe-apps-dependency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-validation-question",
+   "revision": "1",
+   "prompt": "Suppose the schema check were removed but the queue query still binds inspection_key as a parameter. What does the injected body A-2031' OR '1'='1 produce?",
+   "options": [
+    {
+     "id": "dbxfe-apps-validation-question-a",
+     "text": "No rows and no field error: the whole string is compared as one literal key value.",
+     "rationale": "Correct: a bound parameter is never parsed as SQL, so the quote and OR clause are just characters."
+    },
+    {
+     "id": "dbxfe-apps-validation-question-b",
+     "text": "Every plant's rows, because parameters are pasted into the text before execution.",
+     "rationale": "That describes concatenation; binding sends the value separately from the statement text."
+    },
+    {
+     "id": "dbxfe-apps-validation-question-c",
+     "text": "A 422 naming inspection_key, because the warehouse validates key patterns.",
+     "rationale": "The warehouse knows nothing of the app's contract; only the removed schema produced a 422."
+    },
+    {
+     "id": "dbxfe-apps-validation-question-d",
+     "text": "A 401, because the platform's sign-in detects injection attempts.",
+     "rationale": "Sign-in authenticates the reviewer and does not inspect request bodies at all."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-validation-question-a",
+   "conceptIds": [
+    "dbxfe-apps-validation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-handler-question",
+   "revision": "1",
+   "prompt": "Imani and Leo press Claim on A-2031 revision 2 within the same 50 milliseconds, and the two requests reach different processes. Which check guarantees that only one of them succeeds?",
+   "options": [
+    {
+     "id": "dbxfe-apps-handler-question-a",
+     "text": "The database's one-active-claim rule, because only the store sees both writes.",
+     "rationale": "Correct: each process sees only its own request; the store serializes the two inserts against one rule."
+    },
+    {
+     "id": "dbxfe-apps-handler-question-b",
+     "text": "The handler's in-memory check that the item is unclaimed, because it runs first.",
+     "rationale": "Each process has its own memory, so both checks can see 'unclaimed' at the same moment."
+    },
+    {
+     "id": "dbxfe-apps-handler-question-c",
+     "text": "The schema check, because the second body duplicates the first.",
+     "rationale": "Both bodies are individually valid; a schema judges one request's shape, never other requests."
+    },
+    {
+     "id": "dbxfe-apps-handler-question-d",
+     "text": "The platform's sign-in, which serializes requests for each app.",
+     "rationale": "Sign-in authenticates each request independently and imposes no ordering on writes."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-handler-question-a",
+   "conceptIds": [
+    "dbxfe-apps-enforcement-concept",
+    "dbxfe-apps-state-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-lakebase",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-mock-question",
+   "revision": "1",
+   "prompt": "The five mocked contract tests pass. Which statement can the team put in the architecture review note without overclaiming?",
+   "options": [
+    {
+     "id": "dbxfe-apps-mock-question-a",
+     "text": "The handler returns claimed, conflict, 422 and 403 as specified when its dependencies behave like the fakes.",
+     "rationale": "Correct: that is exactly what driving the real handler against fakes demonstrates, and no more."
+    },
+    {
+     "id": "dbxfe-apps-mock-question-b",
+     "text": "The app's service principal can read quality.raw.quarantine.",
+     "rationale": "The warehouse was replaced by a fake, so no grant was exercised."
+    },
+    {
+     "id": "dbxfe-apps-mock-question-c",
+     "text": "Two concurrent claims on the same item cannot both succeed in Lakebase.",
+     "rationale": "The fake store runs one request at a time; concurrency needs a real database test."
+    },
+    {
+     "id": "dbxfe-apps-mock-question-d",
+     "text": "The platform forwards X-Forwarded-Email to this app.",
+     "rationale": "The tests set that header themselves; only a deployed app shows what the platform sends."
+    }
+   ],
+   "correctOptionId": "dbxfe-apps-mock-question-a",
+   "conceptIds": [
+    "dbxfe-apps-mock-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-apps-scopes-self",
+   "revision": "1",
+   "prompt": "The data lead confirms that a per-plant row filter now exists on quality.raw.quarantine. Rewrite the view-queue trace, say what the handler no longer has to do, what it still must do, and what you would test before release.",
+   "modelAnswer": "The queue read now calls the warehouse with Imani's forwarded token and only the sql scope, so Unity Catalog's row filter limits the quarantine rows to her plants and the handler no longer filters those rows. The handler still reads claims from Lakebase as the app and must narrow them to her plants, still checks plant membership before a claim, and must never cache query results across reviewers. Test with two reviewers from different plants and one with no grant, read the principal in query history, and confirm a missing token is refused rather than silently falling back to the app.",
+   "reasoning": "The trace changes only at the hop whose data carries per-user rules; writes keep the app's identity because reviewers hold no Lakebase grants. Checking the principal in query history catches a silent fallback, which the agent authentication page warns about; keeping handler filtering as defence in depth is an acceptable alternative.",
+   "conceptIds": [
+    "dbxfe-apps-scope-concept",
+    "dbxfe-apps-userauth-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-user",
+    "dbxfe-apps-claim-masks",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-runtime-self",
+   "revision": "1",
+   "prompt": "A colleague argues that because the quality app runs as a single process today, keeping active claims in a dictionary is acceptable. Give two events that break it without any change to scaling, and say what you would read in the documentation before accepting any in-memory state.",
+   "modelAnswer": "A redeploy starts a new process with empty memory, so every open claim disappears and a second reviewer can claim the same item; a restart after a crash or a platform-initiated restart does the same, with no deployment at all. Before accepting in-memory state I would read the current environment and compute documentation for how processes are started, restarted and sized, and whether more than one can serve an app, and I would still keep claims in Lakebase because the design must be correct in every case.",
+   "reasoning": "The argument fails on process lifetime, not only on instance count: any event that replaces the process loses memory. Naming a crash restart and a deployment is enough; mentioning a future second process is an acceptable third reason.",
+   "conceptIds": [
+    "dbxfe-apps-runtime-concept",
+    "dbxfe-apps-state-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-overview",
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-operations-self",
+   "revision": "1",
+   "prompt": "Reviewers report a blank queue since 09:10. Write the first three evidence items you would read, in order, and name the owner after each.",
+   "modelAnswer": "First, the deployment history and app log around 09:10: a deployment or restart at that moment makes it the app team's. Second, the app log's queue requests: an exception, a 401 or 403 from a data call, or an empty result with no error. Third, if a data call was refused, the grant on the named object and the principal it names, which hands it to the data owner; if the call was slow or empty, the warehouse's query history, which hands it to the warehouse owner.",
+   "reasoning": "The order starts at the layer the team controls and moves outward only on evidence, so no owner is paged on a guess. Starting with the warehouse query history is acceptable when the app log already shows the time spent there.",
+   "conceptIds": [
+    "dbxfe-apps-ownership-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-apps-deploy-self",
+   "revision": "1",
+   "prompt": "Write the deployment guide for the quality app as numbered steps, each with the evidence that proves it happened, and state the label the guide carries before anyone runs it.",
+   "modelAnswer": "1. Create the app and bind sql-warehouse, quality-db and manuals-token with their permissions: evidence, the app's resource list. 2. Sync the folder: evidence, the files in the workspace folder. 3. Deploy: evidence, a new deployment in the history. 4. Build: evidence, the install step listing the pinned versions. 5. Start: evidence, the first app log lines. 6. Verify: evidence, the URL opens and Imani's test claim appears in Lakebase. 7. Share with the reviewers' group. The guide is labelled not deployed until someone runs it and records each result.",
+   "reasoning": "Each step is paired with evidence a second person can check, so the guide is replayable and its status is honest; ordering resource bindings after the first deploy is an acceptable alternative if the first deploy only serves a health page.",
+   "conceptIds": [
+    "dbxfe-apps-deployment-concept",
+    "dbxfe-apps-bundle-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-claim-bundles",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-apps-path",
+   "version": "1.0.0",
+   "title": "A browser reaches the app URL, never the warehouse",
+   "outcome": "Trace one request through the browser, the platform's sign-in, the app's front end and back end, and the data, model or tool it calls.",
+   "explanation": "A [[dbxfe-apps-app-concept|Databricks App]] is a web application the platform hosts on managed serverless compute beside the data. Its front end runs in the reviewer's browser: pages and scripts that hold no data credential. Its back end is the server process your code defines, and it alone calls the SQL warehouse, Lakebase, a serving endpoint or an outside tool. Notice in the second state that a claim travels browser, sign-in, back end, Lakebase, and the browser never meets a data service.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-path",
+   "conceptIds": [
+    "dbxfe-apps-app-concept",
+    "dbxfe-apps-path-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-overview",
+    "dbxfe-apps-claim-headers",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-path-visual",
+   "questionIds": [
+    "dbxfe-apps-path-question"
+   ],
+   "handbook": {
+    "markdown": "The documentation lists Python frameworks (Streamlit, Dash, Gradio, Flask, FastAPI) and Node.js frameworks (React, Angular, Svelte, Express). They differ in where the page is assembled, not in where your code runs. Streamlit, Dash and Gradio build the page from Python and keep a live connection to the server; a React or plain HTML front end is a set of static files that call JSON endpoints. Either way the code that holds credentials runs in the back end process on Databricks-managed compute.\n\nThree boundaries sit on every request, and each has a different owner:\n\n| Boundary | Who is checked | What decides |\n|---|---|---|\n| Browser → platform | the reviewer | the platform's sign-in and the app's permission |\n| Platform → back end | nothing new | the platform forwards identity headers |\n| Back end → data, model, tool | the identity the app chooses | grants on that object |\n\n```python\n# Synthetic teaching example; not executed.\n@app.get(\"/v1/queue\")\ndef queue(request: Request):\n    reviewer = reviewer_of(request)          # from the forwarded headers\n    items = deps.open_items(plants=deps.plants_of(reviewer))\n    return {\"reviewer\": reviewer, \"items\": items}\n```\n\n**Why use it:** the data stays in the workspace, sign-in is the workspace's own, and resources are bound with permissions rather than pasted credentials. **When not:** a public audience with no Databricks identity, long-running batch computation (a job owns that), or a question a dashboard or Genie space already answers without custom code.\n\n**What to inspect:** the browser's network panel shows requests only to the app URL; the warehouse's query history shows which principal ran each query. If a browser ever holds a token for a data service, the path is wrong.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-path"
+    ]
+   },
+   "recap": "The browser reaches the app; only the back end reaches data, models and tools.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-identity",
+   "version": "1.0.0",
+   "title": "Under app authorization the warehouse sees the app, not the reviewer",
+   "outcome": "Say which principal a data service evaluates under app authorization and under user authorization, and what that means for a reviewer without grants.",
+   "explanation": "Every app gets a dedicated [[dbxfe-apps-principal-concept|app service principal]], unique to that app, and the platform injects its credentials into the process. Under app authorization the warehouse and Lakebase evaluate that principal, so Leo, who holds no grant on the quarantine table, sees whatever the app's grant returns unless the handler narrows it. Under [[dbxfe-apps-userauth-concept|user authorization]] the back end forwards Imani's token and the warehouse evaluates Imani. Notice that the row-filter node moves from excluded to applied between the two states.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-identity",
+   "conceptIds": [
+    "dbxfe-apps-principal-concept",
+    "dbxfe-apps-userauth-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-principal",
+    "dbxfe-apps-claim-user",
+    "dbxfe-apps-claim-masks",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-identity-visual",
+   "samajh": {
+    "text": "Socho ek society building hai. Maintenance staff ke paas society ki master key hai. Imani staff ko bolti hai 'mera parcel store room se laa do'; staff society ki key se darwaza kholta hai, isliye staff ko khud dekhna padta hai ki Imani ko woh parcel lene ka haq hai ya nahi. Doosra tareeka: Imani apni flat ki chaabi deti hai, sirf is ek kaam ke liye. Tab darwaza wahi khulega jo Imani ke liye khulta hai, usse zyada nahi.",
+    "mapping": "The society's master key is the app's service principal, the resident's own key lent for one errand is the forwarded user token, and 'only this errand' is the declared scope.",
+    "boundary": "A token expires and is scoped by the app's declaration, not by the resident's wish; and unlike a key, it must never be copied, stored or reused for another resident."
+   },
+   "questionIds": [
+    "dbxfe-apps-identity-question"
+   ],
+   "handbook": {
+    "markdown": "The service principal is created with the app and cannot be reused by another app. Databricks injects its OAuth credentials as `DATABRICKS_CLIENT_ID` and `DATABRICKS_CLIENT_SECRET`; the Databricks SDK and connectors inside the app pick them up without code. Grants are made to that principal like any other: warehouse permission through the app's resources, Unity Catalog privileges on the tables it reads, a Postgres role on Lakebase.\n\n```python\n# Synthetic teaching example; not executed. Check the current connector and SDK docs.\nfrom databricks import sql\nfrom databricks.sdk.core import Config\ncfg = Config()   # inside the app: host and the app's injected credentials\n\ndef query_as_app(http_path, statement, params):\n    with sql.connect(server_hostname=cfg.host, http_path=http_path,\n                     credentials_provider=lambda: cfg.authenticate) as conn:\n        with conn.cursor() as cur:\n            cur.execute(statement, params)\n            return cur.fetchall()\n\ndef query_as_user(request, http_path, statement, params):\n    token = request.headers.get(\"x-forwarded-access-token\")  # user authorization only\n    with sql.connect(server_hostname=cfg.host, http_path=http_path,\n                     access_token=token) as conn:\n        with conn.cursor() as cur:\n            cur.execute(statement, params)\n            return cur.fetchall()\n```\n\n**Consequences.** Under app authorization the audit trail at the data hop names the app, so the app must record the reviewer itself: on the claim row and in its own log line with the request. Row filters and column masks are evaluated for whichever principal runs the query; written for reviewers, they do nothing for the app's principal. Under user authorization the reviewer's grants, filters and masks apply, and a reviewer without SELECT gets a permission error, which the front end must present plainly.\n\n**What to inspect:** the principal column of the warehouse's query history for one queue request. If it names the app when you expected Imani, the forwarded token was not used.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-identity"
+    ]
+   },
+   "recap": "App authorization makes the app the caller; user authorization makes the reviewer the caller.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-scopes",
+   "version": "1.0.0",
+   "title": "User authorization is bounded by the reviewer's grants and the app's scopes",
+   "outcome": "Choose app or user authorization per request, name the scope a user-authorized call needs, and state how the forwarded token must be handled.",
+   "explanation": "User authorization narrows twice. The warehouse applies Imani's own grants, and the app may act for her only within the [[dbxfe-apps-scope-concept|scopes]] it declared, such as sql; anything outside them is blocked even if Imani could do it in a notebook. Choose per request, not per app: in the table, the queue read moves to Imani's token only once a row filter exists, while claims and dispositions stay with the app. The forwarded token lives for one request: never store it, log it or share it.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-identity",
+   "conceptIds": [
+    "dbxfe-apps-scope-concept",
+    "dbxfe-apps-userauth-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-user",
+    "dbxfe-apps-claim-masks",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-scopes-visual",
+   "questionIds": [
+    "dbxfe-apps-scopes-self"
+   ],
+   "handbook": {
+    "markdown": "**Status first.** The agent authentication page reviewed for this course marked user authorization Public Preview, and the authorization page describes it as something the app declares with scopes. Before designing on it, confirm its current status and whether it must be enabled for the workspace; if it is unavailable, the app-identity design with handler filtering is the fallback, not an afterthought.\n\n**Scopes bound the app, not the person.** A scope such as `sql` lets the app run warehouse queries as the user. Adding a feature that needs another API means declaring another scope, which widens what the app can do on everyone's behalf; review it as a permission change, not a code change.\n\n**Token handling rules** (original guidance):\n\n- Read `X-Forwarded-Access-Token` from the current request and pass it straight to the call that needs it.\n- Never write it to a log, a database, a cache key or a module-level variable; one global holding \"the current token\" serves one reviewer's rights to another reviewer's concurrent request.\n- If the header is missing on a request that must run as the user, refuse with 401. The agent authentication page warns that a missing token can fall back to app identity; a silent fallback turns a per-user read into the app's wider read.\n- Never cache user-authorized results under a key that ignores the user.\n\n**Mixing is normal.** One app can read with the user's token where the data carries per-user rules and write with its own identity where reviewers hold no grants. Write the choice per request in the design note, as the table does, with the enforcement point beside it.\n\n**What to inspect:** the app's declared scopes, the principal in query history for one request per reviewer, and a test with a reviewer who holds no grant: she must see an error, not the app's rows.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-identity"
+    ]
+   },
+   "recap": "Choose the identity per request; a user token is bounded by the user's grants and the app's scopes.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-context",
+   "version": "1.0.0",
+   "title": "Who is asking comes from the platform's headers, never from the body",
+   "outcome": "Read the reviewer's identity from forwarded headers, refuse a body that names someone else, and record the reviewer on the rows the app writes.",
+   "explanation": "After sign-in, the platform forwards the reviewer's [[dbxfe-apps-context-concept|user context]] to the back end in request headers such as X-Forwarded-Email. The browser controls the JSON body, so a body field naming a reviewer is an assertion, not evidence. The application state design guide's ClaimRequest carries reviewer; the back end fills it from the header and refuses a body value that disagrees. Notice in the forged state that the handler refuses before any row is written, and that the header did not change.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-resources",
+   "conceptIds": [
+    "dbxfe-apps-context-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-headers",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-context-visual",
+   "questionIds": [
+    "dbxfe-apps-context-question"
+   ],
+   "handbook": {
+    "markdown": "The header names used here, `X-Forwarded-Email` and `X-Forwarded-User`, are as previously read on the Apps documentation's header page, whose URL was not confirmed in this build: read the current list before relying on a name, and confirm there that the platform replaces a same-named header a client tries to send.\n\n```python\n# Synthetic teaching example; not executed.\nfrom fastapi import HTTPException, Request\n\ndef reviewer_of(request: Request) -> str:\n    email = request.headers.get(\"x-forwarded-email\")\n    if not email:\n        raise HTTPException(status_code=401, detail={\"reason\": \"identity\"})\n    return email.split(\"@\")[0]          # imani.q\n\n@app.post(\"/v1/claims\")\ndef claim(body: ClaimRequest, request: Request):\n    reviewer = reviewer_of(request)\n    if body.reviewer not in (None, reviewer):\n        raise HTTPException(status_code=403, detail={\"reason\": \"reviewer\"})\n    ...\n```\n\n**Three rules for user context** (original guidance):\n\n1. **Per request.** Read it inside the handler every time. A module-level `CURRENT_REVIEWER` in a server that handles concurrent requests records one reviewer's claim under another's name.\n2. **From the platform.** Headers the platform sets after authentication are the only identity evidence the back end has. The body, query string, cookies and front end state are all written by the client.\n3. **Recorded.** Under app authorization the data services see the app, so the reviewer, the request id and the time go on the row and in the log line. Without them, the audit trail ends at \"the app did it\".\n\nLocally there is no platform in front of the app, so tests set these headers by hand. That proves the handler reads them correctly and nothing about whether the platform sends them; the mock beat returns to that gap.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-resources"
+    ]
+   },
+   "recap": "Identity comes from platform headers per request; the body can only agree or be refused.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-resources",
+   "version": "1.0.0",
+   "title": "A resource binding is a grant plus an injected value",
+   "outcome": "Write the resource table for an app: each resource, its key, the permission for the app's principal and the variable the code reads.",
+   "explanation": "Adding an [[dbxfe-apps-binding-concept|app resource]] does two things at once: it grants the app's service principal a chosen permission on a workspace object, and it gives that object a key that app.yaml maps to an environment variable with valueFrom. The code reads QUALITY_WAREHOUSE_ID, never a pasted ID or credential. Notice in the second state that promotion to production changes only what four keys resolve to; app.yaml and the code stay the same.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-resources",
+   "conceptIds": [
+    "dbxfe-apps-binding-concept",
+    "dbxfe-apps-principal-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-resources",
+    "dbxfe-apps-claim-lakebase",
+    "dbxfe-apps-claim-principal",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-resources-visual",
+   "questionIds": [
+    "dbxfe-apps-resources-question"
+   ],
+   "handbook": {
+    "markdown": "The resources page lists the object types an app can use, including SQL warehouses, model serving endpoints, secrets, jobs, Unity Catalog volumes and Lakebase databases, and the permission choices for each; pick the narrowest one that works, such as *Can use* for a warehouse the app only queries and *Can query* for an endpoint it only calls.\n\n```yaml\n# app.yaml; synthetic teaching example, keys checked against the current page. Not deployed.\ncommand: [\"uvicorn\", \"server:app\"]      # plus the host and port options the environment page specifies\nenv:\n  - name: QUALITY_WAREHOUSE_ID\n    valueFrom: sql-warehouse\n  - name: MANUALS_TOKEN\n    valueFrom: manuals-token\n```\n\n**A binding is not every grant.** Can use on the warehouse lets the app's principal run statements on that compute; reading `quality.raw.quarantine` still needs Unity Catalog privileges on the catalog, schema and table (the Unity Catalog module teaches that privilege model). A Lakebase binding gives the principal a matching Postgres role with CONNECT and CREATE on the chosen database and injects connection variables such as `PGHOST`; tables the app did not create need their own grants, which the module *Lakebase, Postgres and operational state* designs.\n\n**Why keys and not IDs:** the same app.yaml runs in development and production because each workspace binds its own objects to the same keys, and nobody pastes a warehouse path or a password into configuration.\n\n**Diagnosis order for a denial:** read which principal the error names; list the app's resources and their permissions; then list the grants on the object the error names. A denial naming the app is a grant question, never a code question.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-resources"
+    ]
+   },
+   "recap": "Bind each resource once, with the narrowest permission, and read it through its key.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-secrets",
+   "version": "1.0.0",
+   "title": "A secret is bound, read at start and never printed",
+   "outcome": "Keep a credential out of source, app.yaml and logs, and predict what a rotation does to a running app.",
+   "explanation": "The manuals service needs a token. It lives in a secret scope and reaches the app as a [[dbxfe-apps-secret-concept|secret resource]]: the app's principal gets read permission and app.yaml maps MANUALS_TOKEN to the resource key. The process reads it from its environment when it starts. Notice in the second state what that implies: after the 10:00 rotation the running process still sends the old value and the call fails until a restart or redeploy starts a process that reads the new one.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-resources",
+   "conceptIds": [
+    "dbxfe-apps-secret-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-resources",
+    "dbxfe-apps-claim-principal",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-secrets-visual",
+   "samajh": {
+    "text": "Guest ghar aaya, toh aapne darwaze par hi Wi-Fi ka password ek card par likh ke de diya. Woh poori shaam wahi password use karta hai. Beech mein aapne router ka password badal diya, toh guest ka phone baar baar fail hoga, jab tak koi use naya card na de. Aur card ki photo kisi group mein post ho gayi, toh password sabka ho gaya.",
+    "mapping": "The card handed over at the door is the environment variable read at process start, changing the router password is a rotation, handing a new card is a restart, and the posted photo is a secret printed to a log.",
+    "boundary": "A process cannot ask for a new card on its own; only a restart or redeploy re-reads the value, and the platform, not a person, hands it over."
+   },
+   "questionIds": [
+    "dbxfe-apps-secrets-question"
+   ],
+   "handbook": {
+    "markdown": "**Where a credential may appear:** in the secret scope, and in the memory of the process that uses it. Nowhere else: not in source, Git history, app.yaml `value:` entries, the front end, error pages or logs.\n\n```python\n# Synthetic teaching example; not executed.\nimport logging, os, httpx\nlog = logging.getLogger(\"quality\")\nMANUALS_TOKEN = os.environ[\"MANUALS_TOKEN\"]      # read once, at process start\n\ndef manual_text(key: str) -> str:\n    r = httpx.get(f\"https://manuals.cinderline.example/v1/{key}\",\n                  headers={\"Authorization\": f\"Bearer {MANUALS_TOKEN}\"}, timeout=5)\n    log.info(\"manual fetch\", extra={\"key\": key, \"status\": r.status_code})  # never the token\n    r.raise_for_status()\n    return r.text\n```\n\n**The environment holds more than your secret.** Databricks also injects `DATABRICKS_CLIENT_ID` and `DATABRICKS_CLIENT_SECRET`, the app's own credentials. A start-up line that prints `os.environ`, or an error page that dumps settings, publishes the app's identity to everyone who can read the logs. Log key names, never values.\n\n**Rotation is a deployment event** (original guidance): because the value is read at start, rotating a secret is complete only when every process serving the app has restarted. Plan it: store the new value, restart or redeploy, watch the next outbound call succeed, then revoke the old value at the service. Revoking first causes exactly the 401 in the timeline.\n\n**When not to use a secret resource:** for the app's own access to Databricks objects. The app's principal and its resource permissions already cover that; a personal access token stored as a secret would make the app act as a person and bypass the design.\n\n**What to inspect:** the app's resource list (is the secret bound with read permission?), a search of the repository and app.yaml for the literal value, and the log lines around the first outbound call after a rotation.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-resources"
+    ]
+   },
+   "recap": "Bind secrets, read them at start, log names not values, and restart after rotation.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-state",
+   "version": "1.0.0",
+   "title": "Process memory belongs to one process and one deployment",
+   "outcome": "Classify each value the app holds and place it where it must survive, naming what breaks on a second process or after a redeploy.",
+   "explanation": "Classify [[dbxfe-apps-state-concept|state]] by what must be true after the request ends. A claim must be visible to every reviewer, on any process serving the app, after any redeploy, so it belongs in Lakebase, the store the module Lakebase, Postgres and operational state designs. A filter may live in the browser; manual text may be a cache with expiry; a token is never stored. Notice in the first state that a claim in process A's memory is invisible to process B and gone at the next deployment.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-state",
+   "conceptIds": [
+    "dbxfe-apps-state-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-state-visual",
+   "samajh": {
+    "text": "Office mein do ek jaise meeting rooms hain. Imani Room A ke whiteboard par likhti hai 'A-2031 maine le liya'. Leo Room B mein baitha hai, usse kuch nahi dikhta, aur raat ko safai wale dono boards mita dete hain. Agar wahi baat corridor ke shared notice board par likhi hoti, toh dono rooms se dikhti aur agle din bhi rehti.",
+    "mapping": "Each meeting room's whiteboard is one process's memory, the nightly cleaning is a redeploy or restart, and the shared corridor notice board is the operational store in Lakebase.",
+    "boundary": "A notice board only displays; Lakebase also enforces rules such as one active claim per item, so two people cannot both write 'mine' at the same moment."
+   },
+   "questionIds": [
+    "dbxfe-apps-state-question"
+   ],
+   "handbook": {
+    "markdown": "The five classes come from the application state design guide, and only one of them needs transactions:\n\n| Class | Example | Needs transactions | Store |\n|---|---|---|---|\n| Per-request | forwarded token, request id | No | the request only |\n| Session | queue filter | No | browser or session cache |\n| Operational | claims, dispositions | Yes | Lakebase `quality_ops` |\n| Derived analytical | morning summary | No | Delta table, refreshed hourly |\n| Cache | manual text | No | process memory with expiry |\n\n**Operational state carries invariants,** and the store, not the handler, must enforce them: at most one active claim per inspection key and revision; a disposition only by the current claimant, changing the disposition and the item's status together; dispositions appended, never updated. The module *Lakebase, Postgres and operational state* turns those into constraints and tests them against a real Postgres; this module only decides that they live there.\n\n**Why memory fails even with one process** (original guidance): a deployment starts a new process, a restart does the same, and if more than one process ever serves the app, each has its own memory. Whatever the current documentation says about instance counts, a design that is correct only while exactly one long-lived process exists is wrong.\n\n**Synchronization is stated, not implied.** Dispositions reach the analytical table hourly; the dashboard prints \"dispositions as of 07:00\", and a reviewer who needs the live queue uses the app.\n\n**Caches are safe only when losing them costs a recompute.** Key a cache by everything its value depends on; under user authorization that includes the user, or the cache serves one reviewer's rows to another.\n\n**What to inspect:** search the code for module-level dictionaries, lists and globals written by handlers; each one is either a cache with an expiry or a bug.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-state"
+    ]
+   },
+   "recap": "Put each value where it must survive: claims in Lakebase, filters in the browser, tokens nowhere.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-runtime",
+   "version": "1.0.0",
+   "title": "The platform runs the process; the team owns what it runs",
+   "outcome": "Separate what the managed runtime provides from what the app team owns, and predict what survives a restart or redeploy.",
+   "explanation": "Databricks Apps runs your app on serverless compute that Databricks provisions and manages: nobody on the team sizes a cluster or patches a machine. What runs there is yours: the start command, the [[dbxfe-apps-runtime-concept|process]] it starts, its dependencies and where its state goes. Notice in the second state that a redeploy starts a new process whose memory is empty while Lakebase still holds twelve open claims. Compute size and any scaling options are read from the current documentation; the design must be correct either way.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-runtime",
+   "conceptIds": [
+    "dbxfe-apps-runtime-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-overview",
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-runtime-visual",
+   "questionIds": [
+    "dbxfe-apps-runtime-self"
+   ],
+   "handbook": {
+    "markdown": "**What the platform provides:** the compute the app runs on, the sign-in in front of the app URL, the injected identity and resource variables, and starting the process with your command at each deployment.\n\n**What the team owns:** the code, the command in app.yaml, the dependency manifest, request validation, the handler's authorization checks, where each piece of state lives, what the app logs and how failures are reported to reviewers.\n\n**Read, do not assume, the environment.** The app environment page, linked from the overview and not confirmed in this build, documents the operating system and language versions, pre-installed libraries, the compute size choices and the variables the platform sets, including the port the app must serve on (`DATABRICKS_APP_PORT`, as previously read). These change between releases; record the values on the date you read them.\n\n**Design rule** (original guidance): correctness must not depend on the lifetime or number of processes. Test it by asking three questions of every value a handler writes:\n\n1. If this process restarts now, what is lost?\n2. If a second process served the next request, would it see this?\n3. If the next deployment happens mid-shift, what do reviewers notice?\n\nOperational records fail all three in memory, which is why they live in Lakebase.\n\n**When not to use an app process:** heavy or long computations such as recomputing the morning summary for every plant. Run those as a job on a schedule and let the app read the result; a request should finish in seconds, and a page waiting on a batch computation fails whenever the process is replaced.\n\n**What to inspect:** the deployment history (when was the process last replaced?), the app log's first lines after each start, and whether any reviewer-visible behaviour changed at that moment.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-runtime"
+    ]
+   },
+   "recap": "Databricks runs and replaces the process; the team owns the command, the code and where state lives.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-dependencies",
+   "version": "1.0.0",
+   "title": "Dependencies are resolved at deployment, not copied from a laptop",
+   "outcome": "Write the manifest and app.yaml so the deployed build installs the versions you tested and starts the command you intend.",
+   "explanation": "Packages installed on a laptop never travel with the app. At deployment the build installs what requirements.txt lists, or package.json for Node.js, runs a build script if one is defined, then runs the start command from app.yaml. An unpinned line resolves to whatever is current on the day. Notice in the first state that qa-rules resolved to 2.0 while the tests ran on 1.4, so the start fails; pinning in the second state makes the build install the tested [[dbxfe-apps-dependency-concept|dependencies]].",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-runtime",
+   "conceptIds": [
+    "dbxfe-apps-dependency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-dependencies-visual",
+   "questionIds": [
+    "dbxfe-apps-dependencies-question"
+   ],
+   "handbook": {
+    "markdown": "The deployment page describes what a deployment runs: Python packages from `requirements.txt` and Node.js packages from `package.json` are installed, a build script runs when `package.json` defines one, and then the command given in app.yaml starts the app. Two files therefore decide what runs: the manifest decides the versions, app.yaml decides the command.\n\n```text\n# requirements.txt; synthetic teaching example. Pin every direct dependency\n# (fastapi, pydantic, databricks-sdk, databricks-sql-connector, httpx) to the\n# version your tests ran against, in the same form as these two:\nqa-rules==1.4\ncinder-units==3.2\n```\n\n```yaml\n# app.yaml; synthetic teaching example, checked against the current page. Not deployed.\ncommand: [\"uvicorn\", \"server:app\"]   # plus the host and port options the environment page specifies\nenv:\n  - name: QUALITY_WAREHOUSE_ID\n    valueFrom: sql-warehouse\n```\n\n**Pinning rules** (original guidance): pin every direct dependency to the version the tests used; add a transitive dependency only when a failure proves it matters; keep test-only packages out of the app's manifest; change a pin in its own commit, run the tests, then redeploy.\n\n**The environment ships its own libraries.** The app environment page lists pre-installed packages and the language versions; what your manifest pins is what your code should rely on. A package that happened to be pre-installed can change version with the environment.\n\n**Where the evidence is:** the deployment log's install step shows what was resolved and installed, and the first lines after it show the start command running or failing. An ImportError, a missing module or a version conflict at this point is always a manifest question for the app team, never a permission question.\n\n**Front end builds** follow the same logic: the Node.js packages and the build script run during deployment, so the lockfile the tests used belongs in the repository.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-runtime"
+    ]
+   },
+   "recap": "Pin what you tested; the deployment installs the manifest, not your laptop.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-validation",
+   "version": "1.0.0",
+   "title": "Validation refuses an injected key before any grant is spent",
+   "outcome": "Order the checks a request passes, predict what an injection attempt does with and without them, and write the rule for each field.",
+   "explanation": "The app's principal holds grants the reviewer lacks, so every body is a lever on those grants. [[dbxfe-apps-validation-concept|Request validation]] runs before the handler: a schema with a pattern per field, allowed values, a size limit and no unknown fields; then every value reaches SQL as a bound parameter. Notice in the timeline that sign-in lets the injected key through untouched, the schema refuses it with a 422 naming the field, and neither the warehouse nor Lakebase is called.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-validation",
+   "conceptIds": [
+    "dbxfe-apps-validation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-validation-visual",
+   "samajh": {
+    "text": "Bank mein cheque pehle counter par aata hai. Clerk date, amount aur signature ki jagah dekhta hai; agar amount kaat-peet ke likha hai toh cheque wahin wapas, locker tak koi jaata hi nahi. Aur agar cheque theek bhi ho, toh cashier amount ko bas ek number ki tarah padhta hai, us par likhi kisi 'aur bhi de do' wali line ko nahi maanta.",
+    "mapping": "The counter check is request validation with a named reason, the untouched locker is the grant never spent, and reading the amount only as a number is the bound parameter.",
+    "boundary": "The counter judges the cheque's form, not whether this customer may draw on that account; permission is the handler's separate check."
+   },
+   "questionIds": [
+    "dbxfe-apps-validation-question"
+   ],
+   "handbook": {
+    "markdown": "```python\n# Synthetic teaching example; not executed.\nfrom typing import Literal\nfrom pydantic import BaseModel, ConfigDict, Field\n\nclass ClaimRequest(BaseModel):\n    model_config = ConfigDict(extra=\"forbid\")          # unknown fields refused\n    inspection_key: str = Field(pattern=r\"^[A-Z]-\\d{4}$\")\n    revision: int = Field(ge=1, le=999)\n    reviewer: str | None = None                        # must match the header if sent\n\nclass DispositionRequest(ClaimRequest):\n    disposition: Literal[\"accepted\", \"corrected\", \"rejected\"]\n```\n\nFastAPI answers a body that fails these rules with 422 and a structured `detail` whose `loc` names the field, before the handler runs. Add a request size limit in front of the parser so a megabyte body is refused before anything reads it.\n\n```python\n# Parameterized: the value travels separately from the statement text.\ncur.execute(\"SELECT status FROM quality.raw.quarantine \"\n            \"WHERE inspection_key = :key AND revision = :rev\",\n            {\"key\": body.inspection_key, \"rev\": body.revision})\n```\n\n**Two layers, two jobs** (original guidance). The schema gives the client a precise refusal and keeps nonsense out of every downstream call; binding guarantees that a value can never become SQL even if a rule is missed. The third state of the timeline shows binding alone: safe, but the client learns nothing about what was wrong.\n\n**The same rule for models and tools.** Text sent to a serving endpoint is data, and a model's reply that proposes a disposition is a proposal: the reviewer still submits it through the same validated request. The tool-authorization module, *Tools, MCP and action authorization*, develops that boundary.\n\n**What to inspect:** a test that posts the injected body and asserts both the 422 and that no fake data service received a call.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-validation"
+    ]
+   },
+   "recap": "Validate shape first, bind every value, and let nothing reach a grant unchecked.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-handler",
+   "version": "1.0.0",
+   "title": "Shape, permission and uniqueness are checked in three different places",
+   "outcome": "Assign each rule to its enforcement point: the schema, the handler's authorization check, or the store's constraint.",
+   "explanation": "A body can be perfectly shaped and still not be allowed. The schema judges shape. The handler is the [[dbxfe-apps-enforcement-concept|enforcement point]] for permission: is this reviewer a member of the item's plant, since the Lakebase grant belongs to the app, not to Tomas. Lakebase judges uniqueness: one active claim per key and revision, even when two requests race. Notice across the three states which check stops each request, and that the conflict comes back as a normal answer, not an error.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-example",
+   "conceptIds": [
+    "dbxfe-apps-enforcement-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-lakebase",
+    "dbxfe-apps-claim-principal",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-handler-visual",
+   "questionIds": [
+    "dbxfe-apps-handler-question"
+   ],
+   "handbook": {
+    "markdown": "**Why each rule lives where it does** (original guidance): a rule belongs where the facts it needs are visible and cannot be bypassed.\n\n| Rule | Facts needed | Enforcement point |\n|---|---|---|\n| Key matches `^[A-Z]-\\d{4}$` | the body | schema |\n| Reviewer belongs to the item's plant | reviewer, plant roster, item | handler |\n| One active claim per key and revision | every concurrent write | Lakebase constraint |\n| Only the claimant records a disposition | the current claim | Lakebase, checked in the same transaction |\n| Dispositions are never updated | the table's grants | Lakebase grants on the app's role |\n\n```python\n# Synthetic teaching example; not executed.\n@app.post(\"/v1/claims\")\ndef claim(body: ClaimRequest, request: Request):\n    reviewer = reviewer_of(request)\n    if body.reviewer not in (None, reviewer):\n        raise HTTPException(403, {\"reason\": \"reviewer\"})\n    if deps.plant_of_item(body.inspection_key) not in deps.plants_of(reviewer):\n        raise HTTPException(403, {\"reason\": \"plant\"})\n    return deps.claims.claim(body.inspection_key, body.revision, reviewer)\n```\n\nThe store call returns `{\"status\": \"claimed\"}` or `{\"status\": \"conflict\", \"claimed_by\": \"imani.q\"}`; the application state design guide makes the conflict a normal response because two reviewers wanting one item is ordinary business, not a fault.\n\n**Things that are not enforcement points:** a hidden or disabled button (any client can post the body), a check-then-insert in the handler's memory (the race in the check), and a system prompt telling a model to respect plants (a prompt is not access control).\n\n**Unknown, owned:** whether per-reviewer rules could also be enforced inside the database for the app's role is the data lead's question; until it is answered, the handler is the enforcement point and the design note says so. The module *Lakebase, Postgres and operational state* designs and tests the constraints.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-example"
+    ]
+   },
+   "recap": "Schema for shape, handler for permission, the store for uniqueness.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-operations",
+   "version": "1.0.0",
+   "title": "An incident belongs to the layer whose evidence changed",
+   "outcome": "Match a symptom to its first evidence and owner, and write the order in which an app incident is handed on.",
+   "explanation": "[[dbxfe-apps-ownership-concept|Operational responsibility]] follows evidence. A failed install is in the deployment log and belongs to the app team; a crash after start is in the app's own log; a denial naming the app's principal is a grant for the data owner; a slow queue starts with the handler's timing and moves to the warehouse owner only when query history shows the wait there. Notice in the second state that the slow-queue incident changes hands once, on evidence, and returns to the app team to verify.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-operations",
+   "conceptIds": [
+    "dbxfe-apps-ownership-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-operations-visual",
+   "questionIds": [
+    "dbxfe-apps-operations-self"
+   ],
+   "handbook": {
+    "markdown": "**The owners** (original guidance; adapt the names to the organization):\n\n- **App team:** code, manifest, app.yaml, validation, handler checks, state placement, the app's log content, reviewer-facing errors, deployment and rollback.\n- **Data owner:** Unity Catalog grants, row filters and masks on the tables the app reads.\n- **Warehouse owner:** sizing, queuing and schedules on the warehouse the app shares.\n- **Lakebase owner:** capacity, backups and recovery of the operational store.\n- **Secret owner:** rotation of the manuals token, coordinated with the app team's restart.\n- **Platform team:** workspace, sign-in and the path to Databricks support.\n\n**Make the evidence exist before the incident.** The app writes one structured line per request: request id, reviewer, route, status and the time spent in each downstream call. Never a token, never a secret, never a whole body.\n\n```python\n# Synthetic teaching example; not executed.\n# rid: one id per request, set by the app's own middleware\nlog.info(\"request\", extra={\"rid\": rid, \"reviewer\": reviewer, \"route\": \"/v1/queue\",\n                           \"status\": 200, \"warehouse_ms\": 4100, \"lakebase_ms\": 12})\n```\n\n**Decide log retention deliberately.** Where the platform shows an app's logs and how long it keeps them is read from the current documentation; if an audit needs a record of who claimed what, that record is the claim row in Lakebase, not a log line.\n\n**Rollback is part of the runbook:** redeploy the last known good source and confirm with one named reviewer's claim. Record the time, the source revision and the result.\n\n**Why this order matters:** paging the warehouse owner for an ImportError, or rewriting code for a missing grant, spends hours on the wrong layer. Each row of the matrix names the first evidence, and the incident moves only when that evidence points elsewhere.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-operations"
+    ]
+   },
+   "recap": "Read the owning layer's evidence first; hand an incident on only when the evidence moves.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-deploy",
+   "version": "1.0.0",
+   "title": "A deployment is a replayable sequence, from a folder or a bundle",
+   "outcome": "Write the deployment sequence for an app from a workspace folder and from a bundle, and label a guide that has not been run as not deployed.",
+   "explanation": "Syncing files changes nothing a reviewer sees; the [[dbxfe-apps-deployment-concept|deployment]] is what builds and starts the new code. From a workspace folder the sequence is sync, deploy, build, start, verify, share. [[dbxfe-apps-bundle-concept|Declarative Automation Bundles]] declare the app and its resources per target, so the same steps repeat in development and production. Notice that each step in the timeline names its evidence, and that every step is marked pending: a guide nobody has run is labelled not deployed.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-deploy",
+   "conceptIds": [
+    "dbxfe-apps-deployment-concept",
+    "dbxfe-apps-bundle-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-claim-bundles",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-deploy-visual",
+   "questionIds": [
+    "dbxfe-apps-deploy-self"
+   ],
+   "handbook": {
+    "markdown": "```bash\n# Not executed in this build; check every flag against the current CLI reference first.\ndatabricks sync ./quality-review /Workspace/Users/<you>/quality-review\ndatabricks apps deploy quality-review \\\n  --source-code-path /Workspace/Users/<you>/quality-review\n```\n\nThe deployment page describes this workspace-folder path through the UI or the CLI, and names bundles as another way to define and deploy apps. A bundle is configuration kept beside the code; a schematic shape:\n\n```yaml\n# Schematic only: key names are checked against the current bundle reference. Not deployed.\nresources:\n  apps:\n    quality_review:\n      name: quality-review\n      source_code_path: ./app\ntargets:\n  dev:  {}   # binds wh-quality-dev, quality_ops_dev\n  prod: {}   # binds wh-quality, quality_ops\n```\n\nDeclarative Automation Bundles were formerly named Databricks Asset Bundles; CLI commands keep the `bundle` spelling. The value of a bundle is repetition: the same definition deploys to each target with that target's bindings, and the definition is reviewed like code.\n\n**Verification is part of the deployment** (original guidance): open the URL as a named reviewer, make one test claim, read it back from Lakebase, and read the app log's line for that request. Then share the app with the reviewers' group. Record the deployment id, the source revision and the time.\n\n**Rollback:** redeploy the previous source revision; the rows in Lakebase are untouched by a deployment, so a rollback of code never rolls back claims.\n\n**The label.** Until someone runs the guide and records each result, it is marked *not deployed*. In this course nothing was deployed, no command above was run, and nothing is added to SpicyBrain's own runtime.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-deploy"
+    ]
+   },
+   "recap": "Sync, deploy, build, start, verify, share; label it not deployed until it has run.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-apps-mock",
+   "version": "1.0.0",
+   "title": "A mocked contract test proves the contract, not the deployment",
+   "outcome": "Write local mocked contract tests for the app's handlers and state exactly what they prove and what they cannot.",
+   "explanation": "A [[dbxfe-apps-mock-concept|mocked contract test]] drives the real handler through a local test client with fakes standing in for Lakebase and the plant lookup. Green means the request, response and error contract holds: claimed, conflict, 422 naming the field, 403 for another plant or a mismatched reviewer. Notice which nodes stay excluded after the suite passes: the app's grants, the platform's headers, the build and Postgres under concurrency. A local mock is not a deployed app, and nothing here enters SpicyBrain's own runtime.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-solution",
+   "conceptIds": [
+    "dbxfe-apps-mock-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "visualId": "dbxfe-apps-mock-visual",
+   "samajh": {
+    "text": "Natak ki dress rehearsal mein sab dialogue, entry aur exit check ho jaate hain, par stage par gatte ke props hote hain aur hall ki lights asli show wali nahi. Rehearsal achhi gayi, iska matlab script aur timing theek hai. Iska matlab yeh nahi ki show ke din mic chalega ya audience ke liye seat tayyar hai.",
+    "mapping": "The rehearsal is the mocked contract suite, the cardboard props are the fakes, the script and timing are the handler's contract, and the real hall's mic and lights are the grants, headers and build that only a deployment exercises.",
+    "boundary": "A rehearsal can be repeated freely, while a deployment check touches shared resources and must be planned, recorded and labelled with what actually ran."
+   },
+   "questionIds": [
+    "dbxfe-apps-mock-question"
+   ],
+   "handbook": {
+    "markdown": "```python\n# test_contract.py; synthetic teaching example, shown and not executed in this build.\nimport pytest\nfrom fastapi.testclient import TestClient\nimport server\n\nclass FakeClaims:\n    def __init__(self):\n        self.rows = {}\n    def claim(self, key, revision, reviewer):\n        holder = self.rows.setdefault((key, revision), reviewer)\n        if holder != reviewer:\n            return {\"status\": \"conflict\", \"claimed_by\": holder}\n        return {\"status\": \"claimed\"}\n\n@pytest.fixture\ndef client():\n    server.deps.claims = FakeClaims()\n    server.deps.plants_of = lambda r: {\"P1\"} if r == \"tomas.b\" else {\"P2\"}\n    server.deps.plant_of_item = lambda key: \"P2\"\n    return TestClient(server.app)\n\ndef as_(name):\n    return {\"X-Forwarded-Email\": f\"{name}@cinderline.example\"}\n\nBODY = {\"inspection_key\": \"A-2031\", \"revision\": 2}\n\ndef test_claim_then_conflict(client):\n    assert client.post(\"/v1/claims\", json=BODY, headers=as_(\"imani.q\")).json() == {\"status\": \"claimed\"}\n    assert client.post(\"/v1/claims\", json=BODY, headers=as_(\"leo.d\")).json() == {\n        \"status\": \"conflict\", \"claimed_by\": \"imani.q\"}\n\ndef test_injected_key_refused_before_any_write(client):\n    bad = {\"inspection_key\": \"A-2031' OR '1'='1\", \"revision\": 2}\n    r = client.post(\"/v1/claims\", json=bad, headers=as_(\"imani.q\"))\n    assert r.status_code == 422 and r.json()[\"detail\"][0][\"loc\"] == [\"body\", \"inspection_key\"]\n    assert server.deps.claims.rows == {}\n\ndef test_other_plant_refused(client):\n    r = client.post(\"/v1/claims\", json=BODY, headers=as_(\"tomas.b\"))\n    assert r.status_code == 403 and r.json()[\"detail\"][\"reason\"] == \"plant\"\n\ndef test_body_cannot_name_another_reviewer(client):\n    r = client.post(\"/v1/claims\", json={**BODY, \"reviewer\": \"leo.d\"}, headers=as_(\"imani.q\"))\n    assert r.status_code == 403 and r.json()[\"detail\"][\"reason\"] == \"reviewer\"\n\ndef test_missing_identity_header(client):\n    assert client.post(\"/v1/claims\", json=BODY).status_code == 401\n```\n\n**Record what each fake replaced:** `FakeClaims` replaced Lakebase and its one-claim constraint; the lambdas replaced the plant roster; the hand-set header replaced the platform's sign-in. Each replacement is an open item for a deployment check, and the review note lists them.",
+    "sourceSectionIds": [
+     "dbxfe-apps-l01-solution"
+    ]
+   },
+   "recap": "Mocks prove the contract; grants, headers, the build and concurrency need a deployment.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-apps-l01-card1",
+   "beatId": "dbxfe-apps-path"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card2",
+   "beatId": "dbxfe-apps-identity"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card3",
+   "beatId": "dbxfe-apps-scopes"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card4",
+   "beatId": "dbxfe-apps-scopes"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card5",
+   "beatId": "dbxfe-apps-context"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card6",
+   "beatId": "dbxfe-apps-resources"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card7",
+   "beatId": "dbxfe-apps-secrets"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card8",
+   "beatId": "dbxfe-apps-state"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card9",
+   "beatId": "dbxfe-apps-runtime"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card10",
+   "beatId": "dbxfe-apps-dependencies"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card11",
+   "beatId": "dbxfe-apps-validation"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card12",
+   "beatId": "dbxfe-apps-handler"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card13",
+   "beatId": "dbxfe-apps-operations"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card14",
+   "beatId": "dbxfe-apps-deploy"
+  },
+  {
+   "cardId": "dbxfe-apps-l01-card15",
+   "beatId": "dbxfe-apps-mock"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-apps-extension-lakebase-role",
+   "revision": "1",
+   "prompt": "What does binding a Lakebase database give the app's service principal, and what does it leave for you to grant?",
+   "answer": "A matching Postgres role named after the principal's client ID, CONNECT and CREATE on the chosen database, and connection variables such as PGHOST; rights on tables it did not create are not included.",
+   "explanation": "The [[dbxfe-apps-extension-lakebase-role-concept|app Postgres role]] can connect and create objects, so tables the app creates itself are its own. Tables created by a migration job or a data engineer need explicit grants to that role, following the least-privilege grants the Lakebase module tests locally. If a role for the principal already exists the binding reuses it, so read its current grants rather than assuming a clean start. Lakebase availability in the workspace's region is a separate check with its own owner.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-resources",
+   "conceptIds": [
+    "dbxfe-apps-extension-lakebase-role-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-lakebase",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "beatId": "dbxfe-apps-resources",
+   "whyItMatters": "Explains why a working Lakebase binding can still meet a permission error on the first query, and which grants the team must add itself."
+  },
+  {
+   "id": "dbxfe-apps-extension-row-filters",
+   "revision": "1",
+   "prompt": "If the queue read moves to user authorization, what happens to a Unity Catalog row filter on the quarantine table?",
+   "answer": "It is evaluated for the signed-in reviewer, so each reviewer sees only the rows the filter admits; under app authorization the same filter is evaluated for the app's principal instead.",
+   "explanation": "A [[dbxfe-apps-extension-row-filters-concept|row filter under user authorization]] follows the principal that runs the query. Written as a per-plant rule, it narrows Imani's queue to P2 only when the warehouse call carries her token; under app authorization it must admit the app's principal or the app sees nothing, and the handler does the narrowing. Filters are query-time visibility controls with documented limits on supported access paths, so confirm the warehouse path is covered, test with reviewers from two plants and read the principal in query history.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-identity",
+   "conceptIds": [
+    "dbxfe-apps-extension-row-filters-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-masks",
+    "dbxfe-apps-claim-user",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "beatId": "dbxfe-apps-scopes",
+   "whyItMatters": "Shows how moving one request to user authorization changes where per-plant visibility is enforced, and what to test before trusting it."
+  },
+  {
+   "id": "dbxfe-apps-extension-node-build",
+   "revision": "1",
+   "prompt": "What does a deployment do with a Node.js front end whose package.json defines a build script?",
+   "answer": "It installs the Node.js packages listed in package.json and runs the build script before the app's start command runs, so the built front end comes from the deployment itself.",
+   "explanation": "A [[dbxfe-apps-extension-node-build-concept|front-end build at deployment]] lets a React or Svelte front end be compiled from source during each deployment instead of being committed as built files. A failing build ends that deployment before the start command runs, and the deployment log shows the failing step; check on the current page what the app serves while a deployment fails. Keep the lockfile your tests used in the repository, and read how combined Python and Node.js projects are ordered before relying on it.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-runtime",
+   "conceptIds": [
+    "dbxfe-apps-extension-node-build-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-deploy",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "beatId": "dbxfe-apps-dependencies",
+   "whyItMatters": "Connects the documented deployment steps to front-end frameworks, where a missing or failing build step is a common first-deployment surprise."
+  },
+  {
+   "id": "dbxfe-apps-extension-local-identity",
+   "revision": "1",
+   "prompt": "Why can a local run of the app read the quarantine table while the deployed app is refused?",
+   "answer": "Locally no app credentials are injected, so the SDK authenticates with the developer's own login; deployed, the injected app credentials make the app's service principal the caller, with its own grants.",
+   "explanation": "DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET are injected into the app's environment, not into a laptop. Locally the SDK falls back to the [[dbxfe-apps-extension-local-identity-concept|local developer identity]], usually a personal profile with broader grants than the app will ever hold, so a local success says nothing about the app's principal. Read the principal in query history for both runs, grant the app's principal exactly what the design needs, and treat the first deployed request as the real permission test.",
+   "lessonId": "dbxfe-apps-l01",
+   "sectionId": "dbxfe-apps-l01-identity",
+   "conceptIds": [
+    "dbxfe-apps-extension-local-identity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-apps-claim-principal",
+    "dbxfe-apps-guidance",
+    "dbxfe-apps-fiction"
+   ],
+   "beatId": "dbxfe-apps-identity",
+   "whyItMatters": "Explains the most common works-locally, fails-deployed permission surprise and the evidence that tells the two identities apart."
+  }
+ ],
+ "recap": {
+  "title": "One request, three boundaries, an identity per hop",
+  "markdown": "**A browser reaches the app; only the back end reaches data, models and tools.** Every hop has an identity: the reviewer at sign-in, the platform's forwarded headers as user context, and at each data hop either the app's own service principal or, under user authorization bounded by scopes, the reviewer's token. Resources bind a permission and a variable; secrets are read at start and never printed; state lives where it must survive, with operational records in Lakebase; request validation runs before any grant is spent, the handler enforces permission and the store enforces uniqueness. A mocked contract test proves the contract, and a guide nobody has run is labelled not deployed. **Transfer challenge:** redraw the identity table for a supplier-returns app whose suppliers hold no Databricks identity, marking which hops could use user authorization, where the supplier's identity would be recorded, and which facts you would verify before the design review.",
+  "visualId": "dbxfe-apps-identity-visual"
+ },
+ "appliedTask": {
+  "title": "Add suggestions and a second plant without moving state or trust",
+  "prompt": "Cinderline adds East Yard (P3) reviewers and wants the disposition-suggest serving endpoint to propose a disposition beside each queue item. The data lead has now added a per-plant row filter to quality.raw.quarantine, and the platform team says the app may run on more than one process. Update the blueprint: the identity at each hop for view queue, suggestion and record disposition; the new resource row; how a suggestion is validated and where it is kept, if anywhere; two new mocked contract tests shown as Python and labelled not executed here; and the changes to the deployment guide, labelled not deployed. Nothing is added to SpicyBrain's own runtime.",
+  "modelAnswer": "View queue: the warehouse read moves to the reviewer's forwarded token with the sql scope, so the new row filter decides which quarantine rows each reviewer sees, P3 reviewers included; claims still come from Lakebase as the app, narrowed by the handler, and a missing token is refused rather than falling back to the app. Suggestion: the back end calls disposition-suggest as the app's principal, bound with Can query and read through SUGGEST_ENDPOINT; the reply is data, checked against the allowed dispositions and shown labelled as a suggestion, never written as a disposition. Record disposition: unchanged, written by the app's role after the claimant check, with the reviewer taken from the header. Suggestions are a cache keyed by inspection key and revision with an expiry, so another process simply recomputes. Tests, shown and not executed here: a fake endpoint replying 'scrapped' is refused as outside the allowed values and nothing is shown; a P3 reviewer's claim on a P3 item succeeds while Tomas from P1 still receives 403. Guide changes, not deployed: bind the endpoint, confirm user authorization status and the row filter with their owners, deploy, and verify one P3 reviewer's queue by reading the principal in query history.",
+  "reasoning": "The answer changes identity only at the hop whose data now carries per-user rules, treats model output as untrusted data behind the same validation as a request, keeps every shared fact out of process memory so more processes change capacity rather than correctness, and labels tests and deployment honestly.",
+  "beatIds": [
+   "dbxfe-apps-scopes",
+   "dbxfe-apps-resources",
+   "dbxfe-apps-validation",
+   "dbxfe-apps-state",
+   "dbxfe-apps-mock",
+   "dbxfe-apps-deploy"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-apps-scenario"
+ ]
+}
