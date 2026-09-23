@@ -197,7 +197,9 @@ test("Each view fetches only the teaching files it needs; request counts are rec
   };
   await open("today", "#/", h1);
   await open("courseMap", "#/course/dbxfe", async () => {
-    await expect(page.locator(".teacher-module-map>li")).toHaveCount(16);
+    await expect(page.locator(".teacher-module-map>li")).toHaveCount(
+      index.filter((m) => m.courseId === "dbxfe").length,
+    );
   });
   await open("lesson", `#/lesson/${lesson}`, async () => {
     await expect(page.locator(".knowledge-check")).toHaveCount(

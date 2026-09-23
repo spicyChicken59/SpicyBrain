@@ -253,7 +253,13 @@ test("E scenario and complete capstone draft/model/rubric journey", async ({
   page,
 }) => {
   await ready(page, "/#/practice");
-  await expect(page.locator(".practice-row")).toHaveCount(13);
+  await expect(page.locator(".practice-row")).toHaveCount(
+    (
+      JSON.parse(await readFile("src/generated/catalog.json", "utf8")) as {
+        scenarios: unknown[];
+      }[]
+    ).reduce((n, c) => n + c.scenarios.length, 0),
+  );
   for (const id of ["dbxfe-m02-scenario", "dbxfe-capstone"]) {
     await nav(page, `#/practice/${id}`);
     await expect(

@@ -83,7 +83,7 @@ test("the academy keeps the sixteen retained modules and every canonical study i
     );
 });
 
-test("every authored beat has a real visual, explained check, canonical anchor and handbook teaching", () => {
+test("every authored beat has a real visual, explained check, canonical anchor and handbook teaching", async () => {
   for (const m of modules) {
     const owned = course.modules.find(
       (item) => item.id === m.moduleId,
@@ -180,7 +180,33 @@ test("every authored beat has a real visual, explained check, canonical anchor a
     const media = original.media.filter(
       (v) => v.courseId === m.courseId && v.moduleId === m.moduleId,
     );
-    assert.ok(media.length, `${m.moduleId} has reviewed media`);
+    // A module either places reviewed media, or carries a dated editorial
+    // decision record explaining why no placement is made (for example, the
+    // candidate could not be reviewed or played back). The record must name
+    // the beat it would serve, its reason and any leads, never a verified play.
+    if (!media.length) {
+      const decisionPath = `docs/academy/media-decisions/${m.moduleId}.json`;
+      const decision = JSON.parse(await readFile(decisionPath, "utf8")) as {
+        moduleId: string;
+        decision: string;
+        reason: string;
+        suggestedBeatId?: string;
+        candidates: { url: string; reviewed: boolean }[];
+      };
+      assert.equal(decision.moduleId, m.moduleId, `${decisionPath} identity`);
+      assert.equal(decision.decision, "no-placement");
+      assert.ok(decision.reason.trim().length > 40, `${decisionPath} reason`);
+      assert.ok(
+        !decision.suggestedBeatId ||
+          m.beats.some((b) => b.id === decision.suggestedBeatId),
+        `${decisionPath} names a real beat`,
+      );
+      for (const candidate of decision.candidates)
+        assert.ok(
+          candidate.url.startsWith("https://") && candidate.reviewed === false,
+          `${decisionPath} lists unreviewed leads only`,
+        );
+    }
     for (const item of media) {
       assert.ok(
         m.beats.some((b) => b.id === item.beatId),

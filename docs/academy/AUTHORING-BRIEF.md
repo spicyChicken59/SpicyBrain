@@ -8,6 +8,40 @@ with `content/courses/dbxfe/lessons/dbxfe-m03-l02.{json,md}`. The check
 `node --import tsx scripts/academy-check.ts --module <moduleId>` must print
 `PASS (no failing findings)` before a module is considered authored.
 
+**Read `docs/academy/KIT.md` first.** It holds real excerpts of the finished
+new-module exemplar (`dbxfe-aws`, D3): the module package, lesson JSON and
+Markdown body, one beat with its visual, a Samajh, objective and self checks,
+card links, an extension card, recap, applied task, sources/claims/concepts and
+a media decision record. Do not read the full exemplar files; if a shape is
+unclear, print only the element you need with a one-line python command.
+
+### Lessons from the pilot (apply them)
+
+- **Write with a generator.** Author each large JSON file from a Python
+  generator script in the scratch directory (`python3 gen_<module>.py`), then
+  parse-check it; fix findings with targeted edits rather than re-reading whole
+  files. Split the generator into parts if it grows past ~40 KB.
+- **Cross-module links.** Markdown links of the form `#/module/<id>` may target
+  only modules already registered in `content/courses/dbxfe/course.json`: the
+  sixteen retained modules and `dbxfe-aws`. Other academy modules are still
+  being written; name them by title in prose (e.g. "the streaming module"). The
+  course map and module recap provide navigation between modules. Teaching
+  JSON must not link to other modules at all (the runtime validates one module
+  at a time); lesson Markdown may link to the registered modules above and to
+  `#/lesson/<id>` of retained lessons.
+- **Partial work may already exist.** An earlier author may have been
+  interrupted. Before writing, list your assigned paths (and the scratch files
+  named in your assignment); keep anything correct and complete, finish or
+  replace the rest, and never leave a half-written file.
+- **Registration is the integrator's.** Never edit `course.json`, other
+  modules, `src/`, `scripts/`, `tests/` or shared docs. Your teaching file is
+  auto-discovered by the build once registered; until then only the isolated
+  check sees it.
+- **Honest sources.** Documentation hosts are blocked from this sandbox; use
+  WebSearch to confirm titles and URLs and record the limitation in
+  `reviewedEvidence` exactly as in the kit. Never invent a URL.
+
+
 ## 1. Files a new module owns
 
 For module id `dbxfe-<slug>` (already assigned in `content/courses/dbxfe/academy.json`):
