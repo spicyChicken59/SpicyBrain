@@ -74,7 +74,11 @@ design snapshot. The integrator registers the package in `course.json`.
   `dbxfe-<slug>-extension-<word>` with concept `…-extension-<word>-concept`.
 - Beat `version` "1.0.0"; card/question `revision` "1".
 
-## 3. The beat contract (8–16 beats; usually 10–13)
+## 3. The beat contract (11–16 beats; usually 11–13)
+
+The academy floor is 480 beats over 48 modules and the retained modules carry
+136, so every new module needs at least 11 beats; `academy-check --module`
+fails below that.
 
 Every beat teaches one idea or one reasoning step and has:
 

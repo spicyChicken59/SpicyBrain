@@ -107,9 +107,12 @@ export function auditModule(
     fail(m.moduleId, "applied task reasoning under 15 words");
   if (m.appliedTask.beatIds.length < 2)
     warn(m.moduleId, "applied task draws on fewer than two beats");
-  // Beats
-  if (m.beats.length < 8)
-    fail(m.moduleId, `only ${m.beats.length} beats (minimum 8)`);
+  // Beats. The academy floor is 480 beats over 48 modules; the 16 retained
+  // modules carry 136, so the 32 new modules need at least 344 (10.75 each).
+  // New modules therefore need 11; retained modules keep the release's 8.
+  const minBeats = legacy ? 8 : 11;
+  if (m.beats.length < minBeats)
+    fail(m.moduleId, `only ${m.beats.length} beats (minimum ${minBeats})`);
   if (m.beats.length > 16)
     warn(m.moduleId, `${m.beats.length} beats (more than 16 needs a reason)`);
   const titles = new Set<string>();
