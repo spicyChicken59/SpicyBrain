@@ -1,10 +1,8 @@
-# Lab L13 — A reproducible cost worksheet and a controlled cost experiment
-
 *Local-executed (R), plain CPython 3.12.3, standard library only. Nothing to
 install; nothing runs on Databricks or any cloud service. Every rate is a
 hypothetical rate, not a price, in hypothetical USD.*
 
-## What this lab is for
+### What this lab is for
 
 A sponsor's question, "what will the pilot cost?", sounds like it wants one
 number. This lab builds the answer the way the module *Compute choices, cost
@@ -16,7 +14,7 @@ answer most. A second part turns a file of synthetic run observations into
 cost per unit of work, and refuses the rows that cannot honestly be divided.
 The model refuses rather than guesses: every refusal has a named reason.
 
-## The worksheet
+### The worksheet
 
 | Driver | Unit | Period | Low | Base | High | Rate (hypothetical rate, not a price) |
 |---|---|---|---|---|---|---|
@@ -63,7 +61,7 @@ purpose. Dropping a driver from one alternative is refused too
 with no runs returns *unknown* with the reason `zero_denominator`, never
 `0.00` and never a crash.
 
-## The experiment
+### The experiment
 
 | run | configuration | work items | seconds | units | unit |
 |---|---|---|---|---|---|
@@ -89,7 +87,7 @@ and effort again swings most (780.00). Its run file has overlapping ranges
 (size-s 2.60 to 3.60, size-m 3.00 to 3.40), so the model declines to name a
 cheaper configuration.
 
-## The failure case
+### The failure case
 
 `starters/naive_model.py` prints a base month of 400.0 (weekly effort counted
 as monthly, 600.00 short), a "total" of 1163.0 units (five units added into
@@ -97,7 +95,7 @@ nothing), and then stops with `ZeroDivisionError` on r04, losing the three
 costs it had already computed. The tests assert each reason, including the
 failing row read from the traceback.
 
-## What the tests prove, and what they do not
+### What the tests prove, and what they do not
 
 Thirty tests compare the model with hand-authored literals, prove every
 fixture rate is labelled hypothetical, show the refusals by reason, run the
@@ -106,7 +104,7 @@ and assert the naive and starter failures. They prove the arithmetic and the
 refusals are right for these inputs. They do not prove any price, any saving,
 any real run time or which product is cheaper: the inputs are synthetic.
 
-## Setup and cleanup
+### Setup and cleanup
 
 Run `python3.12 run_tests.py --evidence local-evidence.json` from the lab
 directory (30 tests, 0 skipped). Nothing is written inside the lab directory;

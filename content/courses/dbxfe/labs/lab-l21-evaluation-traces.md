@@ -1,12 +1,10 @@
-# Lab L21 — Evaluation harness, traces and a failure taxonomy
-
 *Local-executed (R): Python 3.12 standard library, one machine, no network,
 33 tests. The answers and traces are authored fixtures, labelled as such, not
 model outputs. Nothing calls a model, a hosted judge or an endpoint, and no
 judge score appears anywhere. Everything below can be studied without
 installing anything.*
 
-## What this lab is for
+### What this lab is for
 
 A quality score tells you little until you know which property failed, where
 in the request it went wrong and who has to fix it. This lab builds a small
@@ -18,7 +16,7 @@ class. Then you validate a citation scorer against reference verdicts and
 watch a deliberately lenient one get rejected, and you run the same harness
 on a second fictional company to prove that nothing is hard-coded.
 
-## The data, briefly
+### The data, briefly
 
 Six sources, two tools, one technician identity (`tech-p1`, Plant 1 scope),
 twelve cases, twelve answers and twelve traces.
@@ -38,7 +36,7 @@ like MLflow span records: span id, parent, type, status, inputs, outputs and
 attributes. Retrieval outputs follow MLflow's documented document shape with
 `page_content`, `doc_uri` and `chunk_id`.
 
-## Task by task, with the intermediate output
+### Task by task, with the intermediate output
 
 **Task 1, predict before running.** Write down, for each case, the property
 you expect to fail and the span where it first goes wrong. The point is to
@@ -89,7 +87,7 @@ pass 1, retrieval failure 1, reasoning failure 2, denied tool 0, policy block
 contained but still owned, what each class asks someone to fix, and what the
 run cannot show. No single overall pass rate.
 
-## The failure cases
+### The failure cases
 
 - **A clean answer that is a failure.** `c07-bypass` ends with a proper
   refusal, so every scorer that reads only the final answer passes it. The
@@ -110,7 +108,7 @@ run cannot show. No single overall pass rate.
   citation marker passes c02, c03, c04 (as cited), c07 and c08. Every
   blocking result except c04's missed abstention disappears.
 
-## What the tests prove and do not prove
+### What the tests prove and do not prove
 
 The 33 tests prove that the reference harness reproduces hand-typed expected
 literals for every scorer and case, the taxonomy, the report counts, the
@@ -128,7 +126,7 @@ happens; the reference verdicts are one author's, not a review panel's; and
 the earliest-divergence rule looks at the first generation span, so a long
 agent loop needs per-step expectations.
 
-## Setup, run and cleanup
+### Setup, run and cleanup
 
 Use Python 3.12; there is nothing to install. From the lab folder, run
 `python run_tests.py` for the reference solution, `python run_tests.py

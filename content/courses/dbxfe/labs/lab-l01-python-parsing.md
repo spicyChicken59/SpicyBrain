@@ -1,9 +1,7 @@
-# Lab L01 — Python parsing under a contract
-
 *Local-executed (R), plain CPython 3.12.3, standard library only. Nothing to
 install; nothing runs on Databricks, Spark or any cloud service.*
 
-## What this lab is for
+### What this lab is for
 
 Before a Spark job, a notebook or a dashboard, somebody's Python reads a file.
 This lab is that moment done carefully. Two fictional Cinderline plants send
@@ -14,7 +12,7 @@ record into typed Python values under one small contract, or refuse it with a
 named reason and keep its raw input, so that `7 accepted + 18 rejected = 25
 received` is a checkable sentence rather than a hope.
 
-## The contract, briefly
+### The contract, briefly
 
 Six fields. `inspection_id` and `plant_id` are required text; `inspected_on`
 is a real calendar date written `YYYY-MM-DD`; `inspected_units` and
@@ -25,7 +23,7 @@ or blank), `null_` (a present `None`), `malformed_` (conversion refused),
 then `exact_duplicate` or `conflicting_duplicate` across records. The defect
 rate is `defective / inspected`, or `None` when nothing was inspected.
 
-## The deliveries and what happens to each record
+### The deliveries and what happens to each record
 
 | source | pos | what arrives | outcome |
 |---|---|---|---|
@@ -55,7 +53,7 @@ rate is `defective / inspected`, or `None` when nothing was inspected.
 Every value in `expected/primary.json` was derived by hand from this table
 before the solution was run; the lab's `DATA.md` shows each derivation.
 
-## Task 1 — what the readers hand you
+### Task 1 — what the readers hand you
 
 `csv.DictReader` returns one dictionary per row, keyed by the header, and
 every value is a `str`: CSV row 8 gives `' 15 '` with its spaces and `''` for
@@ -65,7 +63,7 @@ for a key that was never sent. A dictionary is a row keyed by column; a list
 of dictionaries is a result set without a schema. Nothing in either reader
 knows the contract.
 
-## Task 2 — the deliberately failing example
+### Task 2 — the deliberately failing example
 
 The naive parser trusts `int()`. Run on the CSV, it prints this to stderr and
 exits with status 1 (path shortened):
@@ -91,7 +89,7 @@ the same line raises `TypeError` for `CLS-002`, because `int(None)` is a type
 error; where it does not crash it is wrong: `True` becomes 1 unit and `12.5`
 becomes 12.
 
-## Tasks 3 and 4 — conversion policies
+### Tasks 3 and 4 — conversion policies
 
 | input | the constructor says | the contract says |
 |---|---|---|
@@ -108,7 +106,7 @@ A regular expression decides what text counts; the constructor only converts
 text that already passed. Every refusal becomes one exception type,
 `ValueError`, which the field check catches.
 
-## Tasks 5 to 7 — four states, one cross-field rule, duplicates
+### Tasks 5 to 7 — four states, one cross-field rule, duplicates
 
 `check_field` asks `name not in raw` (the key), then `raw[name] is None` (the
 value), never "is it falsy", so a zero reaches the converter and passes.
@@ -118,7 +116,7 @@ and do not collect it. Duplicates are found with a dictionary of lists keyed
 by `inspection_id` and a set of payload tuples: `CLN-001` has one distinct
 payload (keep position 1, reject 12); `CLN-008` has two (reject both).
 
-## Tasks 8 and 9 — script, module, transfer
+### Tasks 8 and 9 — script, module, transfer
 
 Run as a script, the solution prints one JSON document on stdout and eighteen
 lines such as `WARNING cinderline.parsing: rejected inspections.csv position
@@ -132,7 +130,7 @@ blank date and a cost of `abc`. The log lists positions 4, 5, 6, 7 and then
 units to 26 in a copy flips it to `defective_exceeds_inspected`: 1 accepted,
 8 rejected, and the original rows are untouched.
 
-## Task 10 — an assertion is not a validation
+### Task 10 — an assertion is not a validation
 
 `parse_delivery` ends with `assert len(accepted) + len(rejected) ==
 raw_count`. A deliberately lossy duplicate step that drops one record fails it
@@ -147,7 +145,7 @@ lets `KeyError: 'text'` crash with a traceback; a copy that catches
 `Exception` reports all 25 records as rejected with `malformed` ids and plants
 and never crashes, turning a code defect into a complaint about the plants.
 
-## What the tests prove and do not prove
+### What the tests prove and do not prove
 
 The final run executed 36 `unittest` tests with 0 failures, 0 errors and 0
 skipped under `/usr/bin/python3.12` (CPython 3.12.3); the evidence records the
@@ -161,7 +159,7 @@ hashes; that run is not the recorded evidence file. The
 tests do not prove anything about scale, other interpreters (the date and
 annotation behaviour needs 3.11 and 3.10), real plant data, or Databricks.
 
-## Setup and cleanup
+### Setup and cleanup
 
 From the unzipped package: `python3.12 run_tests.py --evidence
 local-evidence.json`, `python3.12 run_tests.py --starter`, `python3.12

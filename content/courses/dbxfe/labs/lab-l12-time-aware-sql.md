@@ -1,5 +1,3 @@
-# Lab L12 — Time-aware analytical SQL, with every answer written down first
-
 *Execution class R (local-executed): the reference portfolio ran on one machine with Apache
 Spark 4.0.4 (Spark SQL through PySpark 4.0.4), Python 3.12.3 and Java 21.0.10, `local[2]`, UI
 off, two shuffle partitions, ANSI mode at its Spark 4 default and `spark.sql.session.timeZone`
@@ -7,7 +5,7 @@ set explicitly to `America/New_York`. Nothing ran on Databricks, and the numbers
 illustrations, not benchmarks. You can study this page without installing anything; the
 package `lab-l12-time-aware-sql` holds the files if you want to run them.*
 
-## Purpose
+### Purpose
 
 The Advanced analytical SQL module (C2) claims that windows, membership questions, nested
 fields, safe casts and time zones each have one mechanism you can predict row by row. This lab
@@ -16,7 +14,7 @@ by hand, or for the time zone answers by an independent standard-library `zonein
 never touches Spark. Several checks are built to go wrong on purpose, and the test asserts the
 reason, not just the failure.
 
-## The fixtures
+### The fixtures
 
 Five small synthetic files describe the fictional Cinderline plant.
 
@@ -28,7 +26,7 @@ Five small synthetic files describe the fictional Cinderline plant.
 | machine_status | 19 | M1 has no row for 7 March; its last DOWN run touches the last day |
 | machine_events | 8 | stops and starts around the 8 March 2026 clock change and the March/April boundary |
 
-## Windows: the frame decides, and the plan shows which frame
+### Windows: the frame decides, and the plan shows which frame
 
 The running total per machine, ordered by `day, shift` with
 `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, reads 50, 90, 145, 190, 190, 240, 300, 330 for
@@ -52,7 +50,7 @@ Over four synthetic days (1, 2, 5 and 6 March with 10, 20, 50, 60 units) a three
 two-day `RANGE` frame agree until the gap: on 5 March they read 80 and 50, on 6 March 130 and
 110. "The last three rows" and "the last three days" are different questions.
 
-## Ranking, deduplication and islands
+### Ranking, deduplication and islands
 
 Totals 330, 300, 225, 225 give `RANK` 1, 2, 3, 3, `DENSE_RANK` 1, 2, 3, 3 and `ROW_NUMBER`
 1, 2, 3, 4 once `machine_id` breaks the tie. The latest-revision query goes from 10 rows to 9
@@ -68,7 +66,7 @@ with `DISTINCT` and to 6 with `ROW_NUMBER() = 1` over
 Three islands result: 2–3, 6, and 8–10 flagged open at the data end. The naive `GROUP BY` reports
 one six-day outage from 2 to 10 March, and a test asserts that this wrong answer is produced.
 
-## Membership, set operators, nested fields and casts
+### Membership, set operators, nested fields and casts
 
 A semi join returns M1 and M2 once each where the inner join returns 8 rows. `NOT EXISTS` and
 `LEFT ANTI JOIN` both find M4 and M5 never inspected; `NOT IN` returns nothing because the
@@ -81,7 +79,7 @@ a second branch listing `plant, machine_id` swaps the South rows without an erro
 `AVG` 6.25, while zero-filling gives 4.17. The edge cases: `' 8 '` becomes 8, while `'12.0'`,
 `'3000000000'` and the date `'2026-02-30'` become NULL.
 
-## Time: one instant, two clocks
+### Time: one instant, two clocks
 
 This query, copied from the executed portfolio, pairs each stop with the next start:
 
@@ -121,7 +119,7 @@ while 24 hours later is 13:00. The local string `2026-03-08 02:30:00` does not e
 to March in New York and April in UTC, and `ADD_MONTHS(DATE'2026-02-28', 1)` is 28 March, not a
 month end. March 2026 in `shift_output` is flagged incomplete: 4 of 31 days.
 
-## The failure cases and the dialect checks
+### The failure cases and the dialect checks
 
 Six tests execute nine statements that must fail and assert each error class: a union of an
 INT branch with a STRING branch and `CAST(raw_units AS INT)` over `'n/a'` raise `CAST_INVALID_INPUT`; division by
@@ -133,7 +131,7 @@ and −1 reversed), the unit form `DATEDIFF(DAY, start, end)` keeps T-SQL's orde
 23:30 to midnight because it counts whole days, and the two-argument form on the same two
 timestamps returns 1.
 
-## Transfer: altered inputs and altered settings
+### Transfer: altered inputs and altered settings
 
 Adding `M4 2026-03-03 D 30` ties M4 with M1: `RANK` 1, 1, 3, 3 and `DENSE_RANK` 1, 1, 2, 2.
 Adding `M1 2026-03-07 DOWN` merges 6–10 March into one five-day open island. After
@@ -142,7 +140,7 @@ Adding `M1 2026-03-07 DOWN` merges 6–10 March into one five-day open island. A
 silently: the union returns a STRING column of 24 values, the strict cast and the division
 return NULL, and both indexes past an empty array return NULL.
 
-## What the tests prove, and do not
+### What the tests prove, and do not
 
 `run_tests.py --evidence` ran 51 tests with 0 failures, 0 errors and 0 skips, hashing every
 fixture, expected file, solution, starter and collected output; the evidence file records the
@@ -153,7 +151,7 @@ settings move the answers as predicted. They do not prove Databricks Runtime or 
 behaviour (`QUALIFY` is documented there but rejected by this local parser), performance, or
 correctness on another data set.
 
-## Setup and cleanup
+### Setup and cleanup
 
 Create a Python 3.12 virtual environment, install `pyspark==4.0.4` and `py4j==0.10.9.9` from
 `requirements.txt`, point `JAVA_HOME` at a JDK 17 or 21 directory and run

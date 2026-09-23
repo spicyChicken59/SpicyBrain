@@ -1,10 +1,8 @@
-# Lab L18 — Point-in-time features
-
 *Local-executed (R), pandas 3.0.6 and numpy 2.5.3 on Python 3.12. Nothing
 runs on Databricks; everything below can be studied without installing
 anything.*
 
-## What this lab is for
+### What this lab is for
 
 A model is trained on rows that pretend to be past moments: "at 10:15, here
 is what we knew about press PR-02, and here is what happened next". If any
@@ -16,7 +14,7 @@ job that publishes two-hour window aggregates thirty minutes after each
 window closes, eleven labelled prediction times, two readings that arrive
 late, and a second model that wants to reuse the same features.
 
-## The data, briefly
+### The data, briefly
 
 Readings carry two times: when they were measured (`observed_at`) and when
 they landed (`ingested_at`, normally two minutes later). Windows are
@@ -32,7 +30,7 @@ The job runs at 08:30, 09:30, 10:30, 11:30 and 12:30. Each feature row
 carries `feature_time` (the window's end), `available_at` (the run that
 published it) and `source_max_ingested_at` (the latest arrival it used).
 
-## Task by task, with the intermediate output
+### Task by task, with the intermediate output
 
 **Windows and one run (gaps 1 and 2).** `window_end` rounds each observation
 time up to the even hour. At the 10:30 run the job publishes five rows,
@@ -71,7 +69,7 @@ test calls it at all eleven label times and requires every field to equal
 the training row. Eight rows are usable (feature `ok` and label known by the
 17:00 cutoff).
 
-## The failure cases, and why each fails
+### The failure cases, and why each fails
 
 - **Joining on the time a row describes.** `merge_asof` on `feature_time`
   gives PR-02 at 10:15 and PR-03 at 10:20 the 10:00 windows, published at
@@ -93,14 +91,14 @@ the training row. Eight rows are usable (feature `ok` and label known by the
   `available_at`) refuses the table; unchecked, three predictions would have
   used readings before they arrived.
 
-## The late rerun: what changes
+### The late rerun: what changes
 
 Two versions are appended and nothing is rewritten: PR-01's 10:00 window at
 11:30 (78.0, three readings) and PR-02's 08:00 window at 12:30 (66.0). Exactly
 one training row changes, PR-01 at 11:45, which now sees 78.0. PR-01 at
 11:00 still sees 77.0 because the late reading landed at 11:05.
 
-## Reuse by a second model
+### Reuse by a second model
 
 A handover model predicting at 10:00 and 12:00 reads the same table without
 recomputing it. Every usable row is 120 minutes old against its 90-minute
@@ -110,7 +108,7 @@ old) or shift the window grid so a window closes and is published just
 before each handover. Publishing sooner alone cannot help a decision made at
 the instant a window closes.
 
-## What the tests prove, and what they do not
+### What the tests prove, and what they do not
 
 The 25 tests show that the stated rules produce the hand-authored rows,
 that each wrong approach fails for the reason named, and that the six
@@ -119,7 +117,7 @@ failure (no model is trained), anything about scale or streaming, clock skew
 between systems, or how a Databricks feature table, Feature View or online
 store behaves; the module names those capabilities and their caveats.
 
-## Setup and cleanup
+### Setup and cleanup
 
 ```sh
 cd lab-l18-point-in-time-features

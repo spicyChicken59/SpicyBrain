@@ -1,9 +1,7 @@
-# Lab L06 — Record resolution: retained evidence, current state, publication
-
 *Local-executed (R), plain Python 3.12, standard library only. Nothing to
 install; nothing runs on Databricks.*
 
-## What this lab is for
+### What this lab is for
 
 Module B3 ends with one idea that is easy to nod at and hard to keep: a
 clean-looking table of "current" inspections is not evidence that the input
@@ -22,7 +20,7 @@ runner asserts that hash every run, and the file imports only `copy`,
 `hashlib`, `csv` and `json` — there is no Spark in it, which is why this lab
 needs only `/usr/bin/python3.12`.
 
-## The fixtures
+### The fixtures
 
 Cinderline, `fixtures/cinderline-baseline.json` (arrival order):
 
@@ -54,7 +52,7 @@ no usable inspection ID, and different quantities. Every expected value in
 `expected/` was written by hand from the contract; `DATA.md` shows the
 arithmetic and the raw-index bookkeeping.
 
-## Task 1 — one baseline, four outputs
+### Task 1 — one baseline, four outputs
 
 Resolving the Cinderline rows gives raw 5; quarantine `[(2,
 ['invalid_inspected_units', 'defective_exceeds_inspected'])]` — B fails twice,
@@ -63,7 +61,7 @@ since −3 is out of range and 1 > −3; accepted A v2 12/1 and C v1 8/0; totals
 The repeated ev1 is one delivery counted once; A v1 is superseded, not
 rejected. The report is accepted-only with a disclosed exclusion.
 
-## Task 2 — the flawed resolver
+### Task 2 — the flawed resolver
 
 `starters/resolver.py` drops invalid rows, keeps the last arrival per key and
 compares nothing. On baseline + an invalid A v3 it prints A **v2** 12/1 as
@@ -74,7 +72,7 @@ reversed — two answers for one history. The reference reports one
 `key_version` conflict for `["A", 2]` either way (raw indices [3, 5]
 forwards, [0, 2] reversed), and blocks A.
 
-## Task 3 — the preserved regressions
+### Task 3 — the preserved regressions
 
 Replay (`baseline + baseline`): raw 10, accepted rows, totals and the
 published snapshot identical, still one local effect. Late A v1 under a new
@@ -86,7 +84,7 @@ untouched. Invalid latest and unordered observation: the same blocked
 outcome with no conflict entry. A conflict in the very first ingest:
 `blocked_no_snapshot`, no report, no effect.
 
-## Task 4 — the gate that looks right
+### Task 4 — the gate that looks right
 
 `naive_gate` publishes whenever the unresolved list is empty. On the unkeyed
 pair it returns `True` while the resolver says `publication_allowed: false`,
@@ -96,7 +94,7 @@ perfectly plausible 22/1 **candidate** — and a blocked publication, the 20/1
 snapshot labelled `stale_previous`, one effect. The candidate is diagnostic
 output; it is not a report.
 
-## Task 5 — Northgate, predicted first
+### Task 5 — Northgate, predicted first
 
 `starters/northgate_predictions.py` is a prediction sheet checked against the
 hand-authored literals. Baseline: VS-1 v2 42/2, VS-2 v1 25/0, VS-4 v1 0/0,
@@ -108,7 +106,7 @@ VS-1 v2 = 43/2 blocks VS-1 and leaves 43/4 with conflicts at [4, 7]. The
 **publishable** — the gate asks whether the evidence contradicts itself, not
 whether it is worth publishing; a publisher needs a separate coverage check.
 
-## Task 6 — failure boundaries
+### Task 6 — failure boundaries
 
 Failing after `retained_raw` while ingesting the correction leaves raw 8,
 `stale_previous`, published 85/6 and one effect; recovery recomputes from the
@@ -116,7 +114,7 @@ eight rows and publishes 86/7 with two effects. Failing after
 `published_snapshot` leaves 86/7 current but one effect; two recoveries give
 exactly two, because the outbox is keyed by snapshot ID.
 
-## What the tests prove and do not prove
+### What the tests prove and do not prove
 
 Twenty-four `unittest` cases (0 skipped) hold the unchanged reference to the
 hand-authored literals for both plants, assert the copy's hash, and assert
@@ -128,7 +126,7 @@ The tests do not prove Delta MERGE behaviour, durable orchestration,
 exactly-once notification, scale, or complete source coverage; the pipeline
 is a Python dictionary and its notification is an entry in it.
 
-## Setup and cleanup
+### Setup and cleanup
 
 `python3.12 run_tests.py --evidence local-evidence.json` from the package
 directory; `python3.12 solutions/scenarios.py` prints every scenario. The

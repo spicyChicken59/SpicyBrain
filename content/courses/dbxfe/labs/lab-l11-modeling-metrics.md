@@ -1,5 +1,3 @@
-# Lab L11 — Model it, then contract the metric
-
 *Execution class R (local-executed): the reference solution ran on one
 machine with Apache Spark 4.0.4, Python 3.12.3 and Java 21.0.10, `local[2]`,
 UI off, two shuffle partitions, session time zone UTC, ANSI SQL mode at its
@@ -7,7 +5,7 @@ Spark 4 default. No Databricks workspace, Unity Catalog object or metric view
 was involved. This page is studyable without installing anything; the package
 `lab-l11-modeling-metrics` holds the files if you want to run it.*
 
-## Purpose
+### Purpose
 
 The data modeling module argues that a metric is only as good as the model
 under it. This lab makes the argument with one synthetic dataset. Twenty-two
@@ -20,7 +18,7 @@ queries then show what the model and the contract prevent, each asserted to
 fail for its stated reason. Every expected number was derived by hand before
 the code ran.
 
-## The fixtures
+### The fixtures
 
 The baseline covers Thursday 26 March to Wednesday 1 April 2026; the weekend
 of 28 and 29 March is not a business day. Quantities are shown in pieces after
@@ -46,7 +44,7 @@ of the last three business days of the plant calendar; `no_inspections` and
 `no_units` for empty cases, with no rate; line_sk -1 for unknown lines; the
 quality lead as owner.
 
-## Task 1 — the fact at its grain
+### Task 1 — the fact at its grain
 
 The fact resolves each inspection to the line version valid on its business
 day, once, at load (`valid_from` inclusive, `valid_to` exclusive), maps a line
@@ -56,7 +54,7 @@ version 101 (D. Varga), I-10 on version 102 (P. Nair), I-21 on line_sk -1,
 I-08 as 120 / 12 pieces. The model checks find no duplicate inspection, no
 overlapping versions and one current row per line; the only orphan is I-21.
 
-## Task 2 — one metric at three grains
+### Task 2 — one metric at three grains
 
 The line-day grid lists every line version on every business day plus every
 observed line-day, so silent days appear. Selected rows:
@@ -76,7 +74,7 @@ line-days, every plant-month the sum of its plant-days, and the months sum to
 2,440 / 65. Averaging instead gives North 3.5% on 27 March (against 3.0%) and
 2.125% for March (against 2.2%).
 
-## Task 3 — the five failures
+### Task 3 — the five failures
 
 | Broken query | Output | What it violates |
 |---|---|---|
@@ -92,7 +90,7 @@ parts, not only rates. And the history double count barely moves North's rate
 (2.13% against 2.16%) while inflating its pieces by 80%, so the test counts
 rows and pieces.
 
-## Task 4 — the transfer set and the negative cases
+### Task 4 — the transfer set and the negative cases
 
 The same SQL runs unchanged on an altered set: a 24-piece case, a supervisor
 change on S2 dated 30 April (the day of inspection T-09, which must go to the
@@ -103,7 +101,7 @@ would take 1 May instead of 29 April. A mutated line dimension whose versions
 overlap is caught by the overlap check before it can inflate the fact to 24
 rows, and five incomplete contracts are refused with named reasons.
 
-## What the tests prove, and do not
+### What the tests prove, and do not
 
 They prove that this Spark SQL, on these fixtures, matches hand-derived
 literals at every grain and that each broken approach fails for its stated
@@ -112,7 +110,7 @@ They do not prove the contract suits a real plant, say anything about
 performance (toy data, no benchmark), or exercise Databricks: the metric view
 sketch in the solutions is an unexecuted platform adaptation.
 
-## Setup and cleanup
+### Setup and cleanup
 
 Use Python 3.12 with the package's `requirements.txt` installed (PySpark 4.0.4,
 Py4J 0.10.9.9) and a Java 17 or 21 runtime, then run `python run_tests.py

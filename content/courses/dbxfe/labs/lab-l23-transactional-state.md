@@ -1,5 +1,3 @@
-# Lab L23 — Transactional state for a quality-review app
-
 *Execution class P (platform-guide): the SQL ran on a local PostgreSQL 16.13
 server that the test runner started in a temporary directory on one machine,
 listening on 127.0.0.1 only, and deleted afterwards; two `psql` processes were
@@ -9,7 +7,7 @@ used, and SQLite was not used as a stand-in. This page is studyable without
 installing anything; the package `lab-l23-transactional-state` holds the files
 if you want to run it.*
 
-## Purpose
+### Purpose
 
 The Lakebase module argues that an application's operational state belongs in a
 transactional database, guarded by constraints, changed by short transactions and
@@ -22,7 +20,7 @@ three of them demonstrating a wrong approach failing for the stated reason. A
 Lakebase adaptation guide, `ADAPTATION.md`, carries the design to the platform as
 documentation, clearly separated from what ran.
 
-## The fixture
+### The fixture
 
 Ten deliveries arrive in this order (all synthetic, 14 September 2026, UTC):
 
@@ -41,7 +39,7 @@ Ten deliveries arrive in this order (all synthetic, 14 September 2026, UTC):
 
 Four reviewers (R-101 to R-104) and three plants (P1 to P3) are reference data.
 
-## Task 1: constraints
+### Task 1: constraints
 
 The schema writes the state machine as a table CHECK: ready has no owner and no
 decision, claimed has an owner and no decision, decided has both. A partial
@@ -53,7 +51,7 @@ a missing part serial gives 23502; plant P9 gives 23503; a duplicate QR-0001 giv
 `review_item_one_open_claim`. A three-row INSERT whose third row has severity 9
 stores none of the three rows.
 
-## Task 2: idempotent intake
+### Task 2: idempotent intake
 
 The intake statement logs each `message_id` with `ON CONFLICT DO NOTHING` and
 lets an item change only for a newer `source_seq` while it is ready. Intermediate
@@ -66,7 +64,7 @@ seq 2. Replaying all ten deliveries returns ten skips and changes nothing.
 turns QR-0006 back into CRACK severity 3 at seq 1, and delivery 10 turns QR-0001
 back into POROSITY severity 3 at seq 1: stale messages overwrote newer facts.
 
-## Task 3: the work queue with two sessions
+### Task 3: the work queue with two sessions
 
 The claim is one UPDATE whose subquery picks the most urgent ready row with
 `FOR UPDATE SKIP LOCKED`. One reviewer claiming and deciding in turn gets
@@ -85,7 +83,7 @@ both sessions read QR-0001, both updates succeed, and the row ends claimed by
 R-102 at version 4. Session A believes it owns an item it lost, and no error was
 raised.
 
-## Task 4: the version check
+### Task 4: the version check
 
 R-101 claims QR-0001 at version 3. A supervisor reassigns it to R-103 with
 `WHERE version = 3`, making version 4. R-101's decision with version 3 updates no
@@ -94,7 +92,7 @@ item; R-103's decision returns `QR-0001 | decided | rework | 5`. Without a versi
 two supervisors editing QR-0003 both report one row updated and the first edit
 disappears.
 
-## Task 5: isolation on a timeline
+### Task 5: isolation on a timeline
 
 | Step | Read Committed | Repeatable Read |
 |---|---|---|
@@ -107,7 +105,7 @@ A third sequence shows the dangerous case: under Read Committed, A's update of
 QR-0005's severity succeeds after R-104 has claimed it, silently changing work in
 progress.
 
-## Task 6: identity and session state
+### Task 6: identity and session state
 
 The application role `qr_app` can do its job but DELETE, UPDATE of the intake log,
 TRUNCATE and DROP each fail with 42501; a wrong password fails at login (psql exit
@@ -117,13 +115,13 @@ only when A's connection closes. That is what a transaction-mode pooler or a
 closed idle connection takes away, which is why every write here is one
 transaction with schema-qualified names.
 
-## Transfer
+### Transfer
 
 A second stream adds a claim in the middle, a newer message for the claimed item
 (skipped), an out-of-order message, a redelivery and a three-way severity tie. The
 hand-derived order of the follow-up claims, QR-0104, QR-0101, QR-0103, matched.
 
-## What the tests prove and do not prove
+### What the tests prove and do not prove
 
 They prove that this SQL behaves as described on PostgreSQL 16.13, with real
 concurrent sessions and real error codes. They do not prove anything about
@@ -132,7 +130,7 @@ point-in-time restore, synced tables, Lakehouse Sync, performance or failover we
 not executed and are listed as such in the evidence file. The run time (under ten seconds here)
 describes one run, not a benchmark.
 
-## Setup and cleanup
+### Setup and cleanup
 
 Needs PostgreSQL 16 server binaries (`postgres`, `initdb`, `pg_ctl`, `psql`) and
 Python 3.12 with the standard library. Run `python3.12 run_tests.py --evidence

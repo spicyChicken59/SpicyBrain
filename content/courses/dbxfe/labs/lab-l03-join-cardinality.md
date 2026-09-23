@@ -1,5 +1,3 @@
-# Lab L03 — Join cardinality: the total that multiplied
-
 *Execution class R (local-executed): the reference solution ran on one
 machine with Apache Spark 4.0.4, Python 3.12.3 and Java 21.0.10, `local[2]`,
 UI off, two shuffle partitions, ANSI SQL mode at its Spark 4 default. No
@@ -7,7 +5,7 @@ Databricks workspace was involved. This page is studyable without
 installing anything; the package `lab-l03-join-cardinality` holds the
 files if you want to run it.*
 
-## Purpose
+### Purpose
 
 Module A3's join beat says a join returns matching row pairs and does not
 know what you meant. This lab lets you watch that produce a number a
@@ -22,7 +20,7 @@ drops a 0/0 inspection, and a LEFT JOIN whose `COUNT(*)` gives an empty
 plant one inspection. Every expected number was derived by hand in
 `DATA.md` before the code ran.
 
-## The fixtures
+### The fixtures
 
 Inspections (grain: one accepted current inspection; `inspection_id` unique):
 
@@ -52,13 +50,13 @@ P5 has no inspections; P9 has inspections and no row. The current-row rule
 is stated, not guessed: the greatest `valid_from` per plant, ties broken by
 `row_source` descending.
 
-## Task 1 — grain and the duplicate-key check
+### Task 1 — grain and the duplicate-key check
 
 Twenty facts, eight dimension rows. `GROUP BY plant_id HAVING COUNT(*) > 1`
 returns **P1 ×2, P2 ×3** in both APIs. This one aggregate is the whole
 diagnosis; everything after it is confirmation.
 
-## Task 2 — the plausible wrong total (the failure case)
+### Task 2 — the plausible wrong total (the failure case)
 
 The inner join multiplies each P1 inspection by two versions and each P2
 inspection by three, and drops P9: 5×2 + 5×3 + 5 + 3 = **33 rows**, **410
@@ -71,7 +69,7 @@ SE 10 / 100 / 10, S 5 / 50 / 5, W 3 / 71 / 8 — and no current plant is in
 SE. That phantom region is a symptom worth noticing and not relying on: the
 transfer fixture has none.
 
-## Task 3 — two non-repairs
+### Task 3 — two non-repairs
 
 Aggregating the facts to plant grain *first* and then joining the raw
 dimension gives 7 rows that still sum to 410: the duplication is on the
@@ -80,7 +78,7 @@ dimension side, so collapsing the fact side cannot reach it. Applying
 differs in manager, date or source. Distinct removes identical rows; the
 problem is a repeated key.
 
-## Task 4 — the repair
+### Task 4 — the repair
 
 `ROW_NUMBER() OVER (PARTITION BY plant_id ORDER BY valid_from DESC,
 row_source DESC) = 1` keeps one version per plant. The aggregate form —
@@ -96,7 +94,7 @@ which duplicate survives. Re-joined to the five current rows: inner
 I-16 and I-17 unmatched by `left_anti`, and `inner + unmatched = left` as an
 identity. Which join is the report is a grain decision, not a repair.
 
-## Task 5 — the region report in both APIs
+### Task 5 — the region report in both APIs
 
 | region | inspections | inspected | defective | defect_rate |
 |---|---|---|---|---|
@@ -108,7 +106,7 @@ identity. Which join is the report is a grain decision, not a repair.
 Sorted with nulls first, rows sum to 20; types string, bigint, bigint,
 bigint, double; the SQL and DataFrame schemas are equal objects.
 
-## Task 6 — the left-join null-count trap
+### Task 6 — the left-join null-count trap
 
 Start from the current dimension and LEFT JOIN inspections. P5 produces one
 row of nulls: `COUNT(*)` says 1, `COUNT(inspection_id)` says 0,
@@ -117,7 +115,7 @@ explicit policy. Column totals are 19 by `COUNT(*)` and 18 by
 `COUNT(inspection_id)` — neither is 20, because a dimension-driven report
 cannot see P9's inspections at all. Count the other side's key; never `*`.
 
-## Task 7 — weighted rate versus average of rates
+### Task 7 — weighted rate versus average of rates
 
 Per plant over the facts: P1 6/70 = 0.0857 weighted against 0.0752 for the
 mean of five row rates; P2 0.1 against 0.1067; P3 0.0816 against 0.0690;
@@ -130,7 +128,7 @@ division, `try_divide` returns NULL instead, and `AVG` ignores NULL, so the
 tolerance justified in `DATA.md`, while the weighted rates (one division of
 two integer sums) are compared exactly.
 
-## Task 8 — transfer: a different duplicate pattern
+### Task 8 — transfer: a different duplicate pattern
 
 `plants_transfer.json` has P3 ×3 (a rename to East Yard North and a move to
 region N), P4 ×3, P9 present, P6 empty. Naive join: 5 + 5 + 15 + 9 + 2 =
@@ -142,7 +140,7 @@ region W becomes P4 + P9 = 5 / 87 / 9; P6 is the empty plant with
 the naive total was 516; redoing it by hand gave 496, and the test would
 have refused the wrong one.
 
-## What the tests prove, and do not
+### What the tests prove, and do not
 
 Nine cases, zero skips, exit 0 on the pinned environment; three mutants on
 a scratch copy — a wrong literal, the dedup removed, `COUNT(*)` in place of
@@ -153,7 +151,7 @@ proved: Databricks Runtime behaviour, scale or performance; whether "latest
 valid_from" is the right business rule (the fixtures assume it); behaviour
 on ties, which the tie-break handles but no fixture exercises.
 
-## Setup and cleanup
+### Setup and cleanup
 
 Install Python 3.12 and a JDK (Java 21.0.10 was used), set `JAVA_HOME`,
 create a virtual environment, `pip install -r requirements.txt` (PySpark

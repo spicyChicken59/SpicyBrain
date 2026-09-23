@@ -1,12 +1,10 @@
-# Lab L20 — Retrieval quality on a governed lexical baseline
-
 *Local-executed (R): scikit-learn 1.9.1 `TfidfVectorizer` on Python 3.12,
 one machine, no network. This is lexical TF-IDF retrieval: not neural
 embeddings, not an approximate nearest-neighbour index and not Databricks AI
 Search (formerly Vector Search). Everything below can be studied without
 installing anything.*
 
-## What this lab is for
+### What this lab is for
 
 Before an assistant writes a word, a retrieval step has already decided which
 passages it may see. If that step returns a superseded revision, another
@@ -15,7 +13,7 @@ answering it, fluent writing cannot repair the result. The retrieval module
 teaches the mechanisms; this lab makes you build a small governed retriever,
 measure it with recall@k and MRR, and watch three failures happen on purpose.
 
-## The data, briefly
+### The data, briefly
 
 Eighteen fictional maintenance documents from Cinderline's North and South
 plants, already parsed into sections and sentences. Each carries a family, a
@@ -35,7 +33,7 @@ ask thirteen labelled questions.
 Two later M7 revisions (effective 15 September and 1 November) wait in a
 separate file for the altered-input test.
 
-## Task by task, with the intermediate output
+### Task by task, with the intermediate output
 
 **Chunking (gap 1).** Sentences are packed into chunks of at most 20 words
 (`small`) or 80 words (`large`) without crossing a section. Because every
@@ -75,7 +73,7 @@ repeated text is skipped, and each entry carries a citation such as
 `[1] man-m7-r3 §Hydraulic unit (v3, effective 2026-06-01)`. A citation check
 rejects any cited chunk that is not in the context.
 
-## The three failure cases
+### The three failure cases
 
 **The wrong chunk wins.** "What is the M7 press relief valve setting?" The
 training note scores 0.5192 and the answer's neighbouring sentence ("Record
@@ -101,7 +99,7 @@ South technician's relevant chunk. Asking the model to "not use" restricted
 passages leaves "holds the M7 hydraulic circuit at 220 bar" in the
 contractor's context.
 
-## What the tests prove and do not prove
+### What the tests prove and do not prove
 
 The 28 tests prove that the scikit-learn solution reproduces rankings, scores,
 metrics and contexts that an independent standard-library implementation wrote
@@ -115,7 +113,7 @@ managed service behaves, whether an answer written from these contexts would
 be grounded, or anything about a real question mix: thirteen authored
 questions are a teaching set, not a benchmark.
 
-## Setup, run and cleanup
+### Setup, run and cleanup
 
 Create a virtual environment outside the lab folder, install
 `requirements.txt` (scikit-learn 1.9.1 and its pinned dependencies), then from

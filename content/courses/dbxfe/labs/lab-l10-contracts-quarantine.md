@@ -1,9 +1,7 @@
-# Lab L10 — Data contracts and quarantine
-
 *Local-executed (R), plain Python 3.12, standard library only. Nothing to
 install; nothing runs on Databricks.*
 
-## What this lab is for
+### What this lab is for
 
 Modules B3 and C1 both lean on one habit: before a number is trusted, the
 rows behind it have to be admitted under a written contract, and every row
@@ -15,7 +13,7 @@ plants that breaks the contract differently and is nevertheless publishable.
 The point is not the CSV parsing. The point is the line between what one row
 can prove about itself and what only the whole delivery can prove.
 
-## The contract, briefly
+### The contract, briefly
 
 Eight fields. `event_id` identifies one delivery and must be unique;
 `plant_id` must exist exactly in the plant dimension; `inspection_id` is the
@@ -29,7 +27,7 @@ goes forwards; and the manifest's `delivered_rows` must equal what arrived.
 Rows fail with reasons into quarantine; contradictions and batch failures
 block publication; plain quarantine is disclosed and does not.
 
-## The primary delivery
+### The primary delivery
 
 | row | event | plant | key | ver | date | insp | def | outcome |
 |---|---|---|---|---|---|---|---|---|
@@ -57,13 +55,13 @@ block publication; plain quarantine is disclosed and does not.
 Every value in `expected/primary.json` was written by hand from that table
 (`DATA.md` shows each derivation) before the validator existed.
 
-## Task 1 — which rules need the whole delivery
+### Task 1 — which rules need the whole delivery
 
 Row-level: missing, invalid, below-minimum, unknown plant, defects over
 inspected, and the zero-denominator rate. Batch-level: duplicates, event
 conflicts, key/version uniqueness, time inversion, the manifest, the header.
 
-## Task 2 — predict, then run
+### Task 2 — predict, then run
 
 The validator reports raw 20, accepted 5 (rows 1, 4, 7, 18, 19), quarantined
 15, three contradictions (`e02` at rows 2 and 20; H v1 at 10 and 11; J at 13
@@ -72,13 +70,13 @@ false`. Row 7's rate is `null`, not `0.0`: nothing was inspected, so no rate
 was measured. Row 3 carries two reasons in contract order, the field rule
 before the cross-field rule.
 
-## Task 3 — the row-level starter
+### Task 3 — the row-level starter
 
 `starters/validator.py` has six marked gaps. Filling the first five gives
 `parse_field` and `check_row`; `row_checks_only` then reports twelve passing
 rows — 1, 2, 4, 7, 10, 11, 12, 13, 14, 18, 19, 20 — and eight failing.
 
-## Task 4 — the proof that row checks are not enough
+### Task 4 — the proof that row checks are not enough
 
 `check_row` returns `[]` for row 10 and for row 11. Both H rows are
 individually flawless; only side by side do they contradict. The same holds
@@ -88,7 +86,7 @@ that a row is missing. The test asserts precisely that: the twelve pass
 alone, seven of them are quarantined by the batch, and `sees_manifest` is
 false by construction.
 
-## Task 5 — the batch gap
+### Task 5 — the batch gap
 
 Duplicates are removed first so a repeat is not mistaken for a conflict;
 then event-ID conflicts; then `(inspection_id, version)` uniqueness, where
@@ -97,7 +95,7 @@ redundant; then the time inversion, which quarantines the whole inspection
 because neither row can be shown honest; then the manifest and the header.
 Only contradictions and batch failures block.
 
-## Task 6 — Tessmoor, and three alterations
+### Task 6 — Tessmoor, and three alterations
 
 Twelve rows, manifest agrees: accepted 1, 2, 3, 11, 12 (W v1 and v2 share a
 date, which is allowed), seven quarantined for seven different reasons — a
@@ -108,7 +106,7 @@ and blocks while every row stays the same; dropping `plant_id` is a
 `missing_column` failure; appending `t12` with Q v1's quantities under a new
 event is `redundant_key_version` and does not block.
 
-## Task 7 — the validator that passes everything
+### Task 7 — the validator that passes everything
 
 `starters/permissive_validator.py` accepts all twenty rows as text and says
 publish. The negative test does not stop at "different": it asserts the
@@ -116,7 +114,7 @@ fifteen wrongly accepted rows by number, that row 6's seven-of-five came
 through, and that the manifest mismatch went unreported. A gate that cannot
 say no is not a gate.
 
-## What the tests prove and do not prove
+### What the tests prove and do not prove
 
 Nineteen `unittest` cases, zero skipped, hold the validator to the
 hand-authored literals for both deliveries, prove the row-level limitation,
@@ -128,7 +126,7 @@ removed, and a wrong literal. The tests do not prove that a manifest count is
 sufficient completeness evidence, that these reason codes match any product's
 expectations feature, or anything about scale.
 
-## Setup and cleanup
+### Setup and cleanup
 
 `python3.12 run_tests.py --evidence local-evidence.json` in the package
 directory; `python3.12 solutions/validator.py` prints the primary result and
