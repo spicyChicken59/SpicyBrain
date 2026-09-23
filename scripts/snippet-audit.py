@@ -75,7 +75,7 @@ def main(argv: list[str]) -> int:
     contract = json.loads((COURSE / "academy.json").read_text())
     labs_for = {m["moduleId"]: m["labIds"] for t in contract["tracks"] for m in t["modules"]}
     registered = set(modules())
-    report = {"generatedBy": "python scripts/snippet-audit.py", "rule": __doc__.split("\n\n")[1].replace("\n", " "), "modules": [], "totals": {}}
+    report = {"generatedBy": "python scripts/snippet-audit.py", "rule": " ".join(" ".join(__doc__.split("\n\n")[2:]).split()), "modules": [], "totals": {}}
     totals = {"verbatim": 0, "lines": 0, "partial": 0, "illustrative": 0}
     for mid, lab_ids in labs_for.items():
         if mid not in registered or not lab_ids:
