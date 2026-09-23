@@ -1,6 +1,6 @@
 ### Who reports this and how
 
-The source is a post on the Delta Lake project blog at delta.io, titled "Rivian expands the Delta Lake ecosystem with Delta-Go". Search results also surface the public repository github.com/rivian/delta-go, which corroborates that the connector is real and open source. Authorship is not visible from the snippets: the post may be written by Rivian engineers on the community blog or by project maintainers describing Rivian's contribution, so this analysis labels the reporter as joint. Publication date: not stated in the available summary. The page body was not fetched in this build (egress blocked); only the title, URL and snippets were read.
+The source is a post on the Delta Lake project blog at delta.io, titled "Rivian expands the Delta Lake ecosystem with Delta-Go". Search results also list the public repository github.com/rivian/delta-go, recorded as a second source, which corroborates that the connector exists as a public project. Authorship is not visible from the snippets (Rivian engineers or project maintainers), so the reporter is recorded as the project blog with its author unverified. Publication date: not stated in the available summary. The page itself could not be opened when this analysis was written; only its search-result title, URL and snippets were read.
 
 ### The problem
 
@@ -8,11 +8,11 @@ Rivian, an electric-vehicle manufacturer, ingests packet captures (PCAP data tak
 
 ### Constraints
 
-As far as the summary states: the ingestion service is written in Go and needed to write Delta tables directly rather than through Spark; Spark jobs and the Go service write to the same tables, so concurrent commits had to be made safe; ingestion is event-driven from queue notifications; and the service runs on Kubernetes. AWS services (SQS, DynamoDB) are named, which implies object storage without native put-if-absent at the time. Not stated: retention, schema, downstream readers, latency targets.
+As far as the summary states: the ingestion service is written in Go and needed to write Delta tables directly rather than through Spark; Spark jobs and the Go service write to the same tables, so concurrent commits had to be made safe; ingestion is event-driven from queue notifications; and the service runs on Kubernetes. Two AWS services are named: SQS for the notifications and DynamoDB for the log store. Not stated: retention, schema, downstream readers, latency targets, the object store itself, and whether the Spark writers run on Databricks or on self-managed Spark.
 
 ### Architecture as described
 
-A Go application on Kubernetes consumes SQS notifications and writes directly into Delta tables through Delta-Go, reportedly reaching about 10 commits per second on the table. A DynamoDB-backed log store coordinates commits so that simultaneous writes from Spark and Delta-Go do not race each other. General analysis: this is the standard multi-writer pattern for Delta on S3, where an external lock or conditional-write service stands in for the atomic rename other stores provide.
+A Go application on Kubernetes consumes SQS notifications and writes directly into Delta tables through Delta-Go, reportedly reaching about 10 commits per second on the table. A DynamoDB-backed log store coordinates commits so that simultaneous writes from Spark and Delta-Go do not race each other. General analysis, not stated by the source: the snippets do not name S3, but a DynamoDB log store is the usual open-source way to coordinate several Delta writers on S3 when the object store cannot be relied on for an atomic put-if-absent write, which other stores provide. Whether that still applies depends on the store's current features and on the post's date, which is not verified.
 
 ### Evidence and its limits
 
@@ -24,4 +24,4 @@ Two writers on one Delta table need a coordination mechanism, and on S3 that is 
 
 ### Missing information
 
-Ask about typical file sizes and the OPTIMIZE cadence; which Delta protocol features the connector supports and refuses; how failed or partial commits are retried; who reads the tables and at what freshness; whether the 500-dollar estimate includes DynamoDB, SQS and Kubernetes costs; and who maintains the connector today.
+Ask about typical file sizes and the OPTIMIZE cadence; which Delta protocol features the connector supports and refuses; how failed or partial commits are retried; who reads the tables and at what freshness; whether the 500-dollar estimate includes DynamoDB, SQS and Kubernetes costs; which engine and commit coordination the Spark writers use, and whether that is compatible with the DynamoDB log store; and who maintains the connector today.

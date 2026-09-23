@@ -1,6 +1,6 @@
 ### Who reports this and how
 
-The source is the Data + AI Summit 2023 session page "Made in Italy: How Barilla Uses Databricks Lakehouse to Optimize Operations". The title centres the customer, so this is treated as a customer-presented conference talk; presenter names are not confirmed from the snippets. A separate vendor customer page about Barilla exists in search results and is not used as the source record. Session date: not stated in the summary beyond the 2023 event. The page body was not fetched in this build (egress blocked); the analysis rests on the abstract-level snippets.
+The source is the Data + AI Summit 2023 session page "Made in Italy: How Barilla Uses Databricks Lakehouse to Optimize Operations". The title centres the customer, so this is treated as a customer-presented conference talk; presenter names are not confirmed from the snippets. A separate vendor customer page about Barilla exists in search results and is not used as the source record. Session date: not stated in the summary beyond the 2023 event. The page itself could not be opened when this analysis was written; the analysis rests on its search-result title and abstract-level snippets.
 
 ### The problem
 
@@ -16,11 +16,11 @@ A Databricks-centred platform whose pipelines are built with metadata-driven and
 
 ### Evidence and its limits
 
-Scale descriptors (factories, hubs, consumers, pipelines) are counts reported by Barilla and describe scope, not results. The outcome claim, reported by Barilla, is savings of millions per year from reducing factory losses through analytics and machine learning. The summary does not say how losses are defined (scrap, downtime, yield, energy), how savings are attributed to the platform rather than to operational changes, or over what period. A skeptical reader cannot know the measurement method, the baseline, or which of the 50 use cases carry the value.
+Scale descriptors (factories, hubs, consumers, pipelines) are counts given in the session abstract and describe scope, not results. The outcome claim in the session abstract is savings of millions per year from reducing factory losses through analytics and machine learning. The summary does not say how losses are defined (scrap, downtime, yield, energy), how savings are attributed to the platform rather than to operational changes, or over what period. A skeptical reader cannot know the measurement method, the baseline, or which of the 50 use cases carry the value.
 
 ### What transfers
 
-Define the consumer personas before the pipelines; an executive dashboard and a line-side view need different grain and freshness. Metadata-driven pipelines are how 150 pipelines stay maintainable by a small team. Event-driven processing fits factories because the useful signal is the event, not the hour. Measure loss in the plant's own units first and convert to money second, so the claim survives an audit.
+Define the consumer personas before the pipelines; an executive dashboard and a line-side view need different grain and freshness. Metadata-driven pipelines are one way to keep 150 pipelines maintainable without a hand-built job per source; the source does not say how large the team is. Event-driven processing fits factories because the useful signal is the event, not the hour. Measure loss in the plant's own units first and convert to money second, so the claim survives an audit.
 
 ### Missing information
 

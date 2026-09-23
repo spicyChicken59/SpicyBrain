@@ -1,6 +1,6 @@
 ### Who reports this and how
 
-The source is the Data + AI Summit 2024 session page "AT&T's Migration of Billions of Events Processing From Hadoop". The title names the customer as the subject, so this is treated as a customer-presented conference talk; presenter names are not visible in the snippets. Search results also surface a vendor customer page and a cloud-provider customer story about a related AT&T migration, with different and larger figures; they are deliberately not used as the source record. Session date: not stated beyond the 2024 event. The page body was not fetched in this build (egress blocked).
+The source is the Data + AI Summit 2024 session page "AT&T's Migration of Billions of Events Processing From Hadoop". The title names the customer as the subject, so this is treated as a customer-presented conference talk; presenter names are not visible in the snippets. Search results also surface a vendor customer page and a cloud-provider customer story about a related AT&T migration, with different and larger figures; they are deliberately not used as the source record. Session date: not stated beyond the 2024 event. The page itself could not be opened when this analysis was written; only its search-result title and snippets were read.
 
 ### The problem
 
@@ -12,11 +12,11 @@ As far as the summary states, the migration meant converting MapReduce jobs into
 
 ### Architecture as described
 
-Hadoop MapReduce event-processing jobs rewritten as Spark jobs on Databricks. No further detail on ingestion, storage format, orchestration or serving appears in the available summary. General analysis: a MapReduce-to-Spark port usually changes the physical plan substantially, since Spark keeps intermediate data in memory and shuffles differently, which is where both the savings and the new failure modes come from.
+Hadoop MapReduce event-processing jobs rewritten as Spark jobs on Databricks. No further detail on ingestion, storage format, orchestration or serving appears in the available summary. General analysis: a MapReduce-to-Spark port usually changes the physical plan substantially. Spark chains narrow steps inside a stage and avoids writing each intermediate job's output to replicated HDFS, but its shuffles still write to local disk and read over the network (see "Distributed execution and reading Spark evidence" under Related modules). That is where both the savings and the new failure modes come from.
 
 ### Evidence and its limits
 
-The reported outcome, in the abstract, is a 30 percent reduction in compute costs, together with improved performance and scalability. The measurement is the presenters' own. The summary does not state the baseline, whether the figure covers compute only or also storage, licensing and operations, whether performance was quantified, or how many jobs had been converted at the time. The larger return-on-investment figures on the vendor and cloud-provider pages come from different marketing contexts and cannot be reconciled with this session from snippets alone.
+The reported outcome, in the abstract, is a 30 percent reduction in compute costs, together with improved performance and scalability. The measurement is the presenters' own. The figure is stated for compute costs; the summary says nothing about storage, licensing or operations costs, so the effect on total cost is unknown. Nor does it state the baseline, whether performance was quantified, or how many jobs had been converted at the time. The larger return-on-investment figures on the vendor and cloud-provider pages come from different marketing contexts and cannot be reconciled with this session from snippets alone.
 
 ### What transfers
 

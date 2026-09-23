@@ -1,6 +1,6 @@
 ### Who reports this and how
 
-The source is the Data + AI Summit 2024 session page "Building the World's Largest RAG for Knowledge Management @ CVS Health". Search results identify the presenter as a lead director of machine learning at CVS Health, so this is a customer-presented conference talk. A recording is reported to have been posted on YouTube on 23 July 2024; the session date is not stated in the summary. Only the abstract-level snippets were read; the page body and video were not fetched in this build (egress blocked).
+The source is the Data + AI Summit 2024 session page "Building the World's Largest RAG for Knowledge Management @ CVS Health". Search results for the session and for its recording (both recorded as sources) identify the presenter as a lead director of machine learning at CVS Health, so this is a customer-presented conference talk. Search results date the recording's YouTube listing 23 July 2024; the session day itself is not stated. Only abstract-level snippets were read; the page itself and the video could not be opened when this analysis was written.
 
 ### The problem
 

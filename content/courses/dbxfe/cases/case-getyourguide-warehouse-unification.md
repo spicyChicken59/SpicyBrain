@@ -1,6 +1,6 @@
 ### Who reports this and how
 
-The source is a post on "Inside GetYourGuide", the company's own engineering and careers blog, titled "From Snowflake to Databricks: Our cost-effective journey to a unified data warehouse". The reporter is the customer's engineering team (customer-authored). Publication date: not stated in the available summary. Search results also list a Databricks customer page and a Data + AI Summit session about the same company; neither is used as the source record here. The page body was not fetched in this build (egress blocked), so this analysis rests on the result title and snippets.
+The source is a post on "Inside GetYourGuide", the company's own engineering and careers blog, titled "From Snowflake to Databricks: Our cost-effective journey to a unified data warehouse". The reporter is the customer's engineering team (customer-authored). Publication date: not stated in the available summary. Search results also list a Databricks customer page and a Data + AI Summit session about the same company; neither is used as the source record here. The page itself could not be opened when this analysis was written, so this analysis rests on its search-result title and snippets.
 
 ### The problem
 
@@ -12,7 +12,7 @@ As far as the summary states, the migration ran as a proof of concept followed b
 
 ### Architecture as described
 
-Data processing centralised on the Databricks platform with the warehouse layer served from it. The related vendor page's title refers to Databricks SQL serverless, but the blog snippet itself does not name the compute type, so that detail is unconfirmed here. One snippet attached to the result mentions that serverless SQL compute runs in the vendor's account with its own IP range, which suggests network allow-listing was part of the work; treat that as a hint, not a documented step.
+Data processing centralised on the Databricks platform with the warehouse layer served from it. A snippet of the blog itself says that Databricks serverless compute, used for serverless SQL warehouses, runs in a compute layer within the Databricks account with its own IP range, and that the challenge was making the team's AWS VPC and the MySQL RDS database behind an external Hive metastore reachable from it. Network access for serverless compute was therefore part of the work; how it was configured is not visible in the snippets.
 
 ### Evidence and its limits
 

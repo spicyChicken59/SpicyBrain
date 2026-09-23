@@ -1,6 +1,6 @@
 ### Who reports this and how
 
-The source is the Data + AI Summit 2025 session page "Petrobras MLOps Transformation With MLflow and Databricks". Speaker pages surfaced by search name a presenter from Petrobras and a senior solutions architect from Databricks, so the reporter is joint: a customer story told with the vendor on stage. A recording is reported to have been posted on YouTube on 7 July 2025; the session date itself is not stated in the summary. Only the abstract-level snippets were available; the page body and the video were not fetched in this build (egress blocked).
+The source is the Data + AI Summit 2025 session page "Petrobras MLOps Transformation With MLflow and Databricks". Two speaker pages surfaced by search, recorded as sources, name a presenter from Petrobras and a senior solutions architect from Databricks, so the reporter is joint: a customer story told with the vendor on stage. Search results date the recording's YouTube listing 7 July 2025 (also recorded); the session day itself is not stated. Only abstract-level snippets were available; the page itself and the video could not be opened when this analysis was written.
 
 ### The problem
 
@@ -12,7 +12,7 @@ As far as the summary states, the redesign had to replace manual validation with
 
 ### Architecture as described
 
-Three named components: MLflow for experiment tracking and model lifecycle, Databricks Asset Bundles for deploying code and configuration as versioned artefacts, and Unity Catalog for governance of the registered models. Promotion is described as automated, metric-driven workflows. General analysis: this is a deployment-as-code pattern where a bundle defines jobs and environments, a registry in the catalog holds model versions with lineage, and a pipeline compares candidate metrics to thresholds before promotion.
+Three named components: MLflow for experiment tracking and model lifecycle, Databricks Asset Bundles (the name the 2025 session uses; the course teaches the product as Declarative Automation Bundles) for deploying code and configuration as versioned artefacts, and Unity Catalog for governance of the registered models. Promotion is described as automated, metric-driven workflows. General analysis: this is a deployment-as-code pattern where a bundle defines jobs and environments, a registry in the catalog holds model versions with lineage, and a pipeline compares candidate metrics to thresholds before promotion.
 
 ### Evidence and its limits
 
