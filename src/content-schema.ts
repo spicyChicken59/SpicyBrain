@@ -150,6 +150,80 @@ export const moduleSchema = z
     scenarioId: idSchema,
   })
   .strict();
+export const trackSchema = z
+  .object({
+    id: idSchema,
+    title: text,
+    summary: text,
+    moduleIds: ids.min(1),
+  })
+  .strict();
+export const labExecutionClasses = [
+  "local-executed",
+  "tabletop",
+  "platform-guide",
+] as const;
+export const labSchema = z
+  .object({
+    id: idSchema,
+    title: text,
+    summary: text,
+    outcome: text,
+    executionClass: z.enum(labExecutionClasses),
+    moduleIds: ids.min(1),
+    conceptIds: ids,
+    downloadId: idSchema.optional(),
+    environment: text,
+    evidence: text,
+    body: text,
+  })
+  .strict();
+export const guideSections = [
+  "action",
+  "example",
+  "template",
+  "limits",
+] as const;
+export const guideSchema = z
+  .object({
+    id: idSchema,
+    title: text,
+    question: text,
+    summary: text,
+    moduleIds: ids.min(1),
+    lessonIds: ids,
+    body: z
+      .object({ action: text, example: text, template: text, limits: text })
+      .strict(),
+  })
+  .strict();
+export const caseSchema = z
+  .object({
+    id: idSchema,
+    title: text,
+    domain: text,
+    summary: text,
+    reporter: text,
+    sourceIds: ids.min(1),
+    moduleIds: ids.min(1),
+    publishedAt: text.nullable(),
+    reviewedAt: date,
+    body: text,
+  })
+  .strict();
+export const crosswalkSchema = z
+  .object({
+    id: idSchema,
+    title: text,
+    url: z.url().refine((v) => v.startsWith("https://")),
+    publisher: text,
+    reviewedAt: date,
+    access: text,
+    prerequisites: text,
+    moduleIds: ids.min(1),
+    note: text,
+  })
+  .strict();
 export const courseSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -196,6 +270,11 @@ export const courseSchema = z
       .optional(),
     scenarios: z.array(scenarioSchema),
     capstoneId: idSchema.optional(),
+    tracks: z.array(trackSchema).optional(),
+    labs: z.array(labSchema).optional(),
+    guides: z.array(guideSchema).optional(),
+    cases: z.array(caseSchema).optional(),
+    crosswalk: z.array(crosswalkSchema).optional(),
     contract: z
       .object({
         modules: z.number().int().positive(),
@@ -216,6 +295,11 @@ export type Question = z.infer<typeof questionSchema>;
 export type Scenario = z.infer<typeof scenarioSchema>;
 export type Asset = z.infer<typeof assetSchema>;
 export type Download = NonNullable<Course["downloads"]>[number];
+export type Track = z.infer<typeof trackSchema>;
+export type Lab = z.infer<typeof labSchema>;
+export type Guide = z.infer<typeof guideSchema>;
+export type CaseAnalysis = z.infer<typeof caseSchema>;
+export type Crosswalk = z.infer<typeof crosswalkSchema>;
 
 export function safePath(path: string) {
   return (
@@ -274,6 +358,11 @@ export function validateCourses(input: unknown[]): Course[] {
       ...c.claims,
       ...c.assets,
       ...(c.downloads ?? []),
+      ...(c.tracks ?? []),
+      ...(c.labs ?? []),
+      ...(c.guides ?? []),
+      ...(c.cases ?? []),
+      ...(c.crosswalk ?? []),
     ];
     for (const item of items) {
       if (allIds.has(item.id)) fail(`Duplicate ID: ${item.id}`);
@@ -359,6 +448,42 @@ export function validateCourses(input: unknown[]): Course[] {
       if (!c.scenarios.some((s) => s.id === m.scenarioId && !s.isCapstone))
         fail(`Missing module scenario: ${m.id}`);
     }
+    const moduleIds = new Set(c.modules.map((m) => m.id)),
+      lessonIds = new Set(lessons.map((l) => l.id));
+    if (c.tracks) {
+      const placed = new Map<string, string>();
+      for (const track of c.tracks) {
+        refs(track.moduleIds, moduleIds, "track module");
+        for (const id of track.moduleIds) {
+          if (placed.has(id))
+            fail(
+              `Module ${id} appears in tracks ${placed.get(id)} and ${track.id}`,
+            );
+          placed.set(id, track.id);
+        }
+      }
+      for (const m of c.modules)
+        if (!placed.has(m.id)) fail(`Module ${m.id} belongs to no track`);
+    }
+    for (const lab of c.labs ?? []) {
+      refs(lab.moduleIds, moduleIds, "lab module");
+      refs(lab.conceptIds, concepts, "lab concept");
+      refs(
+        lab.downloadId ? [lab.downloadId] : [],
+        new Set((c.downloads ?? []).map((d) => d.id)),
+        "lab download",
+      );
+    }
+    for (const guide of c.guides ?? []) {
+      refs(guide.moduleIds, moduleIds, "guide module");
+      refs(guide.lessonIds, lessonIds, "guide lesson");
+    }
+    for (const item of c.cases ?? []) {
+      refs(item.moduleIds, moduleIds, "case module");
+      refs(item.sourceIds, sources, "case source");
+    }
+    for (const item of c.crosswalk ?? [])
+      refs(item.moduleIds, moduleIds, "crosswalk module");
     // A canonical applied scenario may support several instructional modules.
     // Its ID and learner draft stay singular; references must still resolve above.
     if (
@@ -399,17 +524,41 @@ export function validateCourses(input: unknown[]): Course[] {
       )
     )
       fail("Unsafe content URL or markup");
-    for (const s of sections)
-      for (const match of s.markdown.matchAll(/\]\(([^)]+)\)/g)) {
+    const bodies = [
+      ...sections.map((s) => s.markdown),
+      ...(c.labs ?? []).map((l) => l.body),
+      ...(c.guides ?? []).flatMap((g) => Object.values(g.body)),
+      ...(c.cases ?? []).map((item) => item.body),
+    ];
+    for (const markdown of bodies)
+      for (const match of markdown.matchAll(/\]\(([^)]+)\)/g)) {
         const url = match[1];
         if (
           !url.startsWith("https://") &&
-          !/^#\/(course|lesson|practice)\/[a-z0-9-/]+$/.test(url)
+          !/^#\/(course|lesson|practice|module)\/[a-z0-9-/]+$/.test(url)
         )
           fail(`Unsafe Markdown link: ${url}`);
         if (url.startsWith("#/")) {
           const parts = url.split("/"),
             id = parts[2];
+          if (parts[1] === "module") {
+            if (parts.length !== 3 || !moduleIds.has(id))
+              fail(`Broken module link: ${url}`);
+            continue;
+          }
+          if (parts[1] === "course" && parts.length === 5) {
+            const collection = {
+              labs: c.labs,
+              guides: c.guides,
+              cases: c.cases,
+            }[parts[3]];
+            if (
+              id !== c.id ||
+              !collection?.some((item) => item.id === parts[4])
+            )
+              fail(`Broken course collection link: ${url}`);
+            continue;
+          }
           if (parts.length > (parts[1] === "lesson" ? 4 : 3))
             fail(`Broken internal link: ${url}`);
           if (

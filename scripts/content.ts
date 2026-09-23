@@ -27,10 +27,47 @@ type RawLesson = {
   bodyFile: string;
   sections: { id: string; kind: string; markdown?: string }[];
 };
-type RawCourse = {
-  modules: { lessonFiles: string[]; lessons?: RawLesson[] }[];
+type RawModule = { lessonFiles: string[]; lessons?: RawLesson[] };
+type RawModulePackage = {
+  module: RawModule;
+  scenarios?: unknown[];
+  sources?: unknown[];
+  claims?: unknown[];
+  concepts?: unknown[];
 };
-export async function loadCourses(contentRoot = join(root, "content")) {
+type RawCourse = {
+  id: string;
+  modules: (RawModule | { file: string })[];
+  scenarios?: unknown[];
+  sources?: unknown[];
+  claims?: unknown[];
+  concepts?: unknown[];
+  labs?: { bodyFile?: string; body?: string }[];
+  guides?: { bodyFile?: string; body?: unknown }[];
+  cases?: { bodyFile?: string; body?: string }[];
+};
+export type LoadOptions = {
+  /** Module package files to load as if course.json listed them (course id → paths). */
+  extraModuleFiles?: Record<string, string[]>;
+};
+const guideMarkers = ["action", "example", "template", "limits"] as const;
+export function splitGuideBody(body: string) {
+  const blocks = body.split(/^<!-- section:([a-z][a-z0-9-]*) -->\s*$/m);
+  if (blocks[0].trim()) throw Error("Guide text before its first section");
+  const map: Record<string, string> = {};
+  for (let i = 1; i < blocks.length; i += 2) {
+    if (map[blocks[i]] !== undefined) throw Error("Duplicate guide section");
+    map[blocks[i]] = blocks[i + 1].trim();
+  }
+  for (const key of Object.keys(map))
+    if (!guideMarkers.includes(key as (typeof guideMarkers)[number]))
+      throw Error(`Unknown guide section: ${key}`);
+  return map;
+}
+export async function loadCourses(
+  contentRoot = join(root, "content"),
+  options: LoadOptions = {},
+) {
   const dirs = (
     await readdir(join(contentRoot, "courses"), { withFileTypes: true })
   )
@@ -42,7 +79,76 @@ export async function loadCourses(contentRoot = join(root, "content")) {
     const c = JSON.parse(
       await readFile(await confinedFile(courseDir, "course.json"), "utf8"),
     ) as RawCourse;
-    for (const m of c.modules) {
+    // A module package keeps one module's map entry, scenario, sources, claims
+    // and course-level concepts together; it is merged before validation so
+    // identities and references are checked exactly as inline modules are.
+    const modules: RawModule[] = [];
+    for (const entry of [
+      ...c.modules,
+      ...(options.extraModuleFiles?.[c.id] ?? []).map((file) => ({ file })),
+    ]) {
+      if (!("file" in entry)) {
+        modules.push(entry);
+        continue;
+      }
+      if (!safePath(entry.file) || !entry.file.endsWith(".json"))
+        throw Error("Unsafe module package path");
+      const pkg = JSON.parse(
+        await readFile(await confinedFile(courseDir, entry.file), "utf8"),
+      ) as RawModulePackage;
+      if (!pkg.module || typeof pkg.module !== "object")
+        throw Error(`Module package without a module: ${entry.file}`);
+      for (const key of Object.keys(pkg))
+        if (
+          !["module", "scenarios", "sources", "claims", "concepts"].includes(
+            key,
+          )
+        )
+          throw Error(`Unknown module package field: ${key}`);
+      modules.push(pkg.module);
+      c.scenarios = [...(c.scenarios ?? []), ...(pkg.scenarios ?? [])];
+      c.sources = [...(c.sources ?? []), ...(pkg.sources ?? [])];
+      c.claims = [...(c.claims ?? []), ...(pkg.claims ?? [])];
+      c.concepts = [...(c.concepts ?? []), ...(pkg.concepts ?? [])];
+    }
+    c.modules = modules;
+    for (const item of c.labs ?? []) {
+      if (
+        !item.bodyFile ||
+        !safePath(item.bodyFile) ||
+        !item.bodyFile.endsWith(".md")
+      )
+        throw Error("Unsafe lab body path");
+      item.body = (
+        await readFile(await confinedFile(courseDir, item.bodyFile), "utf8")
+      ).trim();
+      delete item.bodyFile;
+    }
+    for (const item of c.guides ?? []) {
+      if (
+        !item.bodyFile ||
+        !safePath(item.bodyFile) ||
+        !item.bodyFile.endsWith(".md")
+      )
+        throw Error("Unsafe guide body path");
+      item.body = splitGuideBody(
+        await readFile(await confinedFile(courseDir, item.bodyFile), "utf8"),
+      );
+      delete item.bodyFile;
+    }
+    for (const item of c.cases ?? []) {
+      if (
+        !item.bodyFile ||
+        !safePath(item.bodyFile) ||
+        !item.bodyFile.endsWith(".md")
+      )
+        throw Error("Unsafe case body path");
+      item.body = (
+        await readFile(await confinedFile(courseDir, item.bodyFile), "utf8")
+      ).trim();
+      delete item.bodyFile;
+    }
+    for (const m of modules) {
       const lessons = [];
       for (const f of m.lessonFiles) {
         if (!safePath(f) || !f.endsWith(".json"))
@@ -79,7 +185,7 @@ export async function loadCourses(contentRoot = join(root, "content")) {
         delete (l as Partial<RawLesson>).bodyFile;
         lessons.push(l);
       }
-      delete (m as Partial<typeof m>).lessonFiles;
+      delete (m as Partial<RawModule>).lessonFiles;
       m.lessons = lessons;
     }
     raw.push(c);
@@ -275,6 +381,10 @@ export function counts(courses: Course[]) {
       scenarios: 1,
     })),
     capstones: c.scenarios.filter((s) => s.isCapstone).length,
+    tracks: c.tracks?.length ?? 0,
+    labs: c.labs?.length ?? 0,
+    guides: c.guides?.length ?? 0,
+    cases: c.cases?.length ?? 0,
   }));
 }
 export async function buildContent(
@@ -539,7 +649,8 @@ export async function loadTeaching(
           "utf8",
         ),
       );
-      if (name === "media.json") media.push(...data);
+      if (name === "media.json" || /^media-[a-z0-9-]+\.json$/.test(name))
+        media.push(...data);
       else raw.push(data);
     }
   return validateTeaching(raw, courses, media);
