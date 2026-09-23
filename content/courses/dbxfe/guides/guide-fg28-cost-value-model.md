@@ -17,7 +17,7 @@ Deeper: the retained lesson [Make a transparent value calculation](#/lesson/dbxf
 
 <!-- section:example -->
 
-**Fictional worked example: Cinderline's illustrative annual model for the one-plant quality path.** Every number below is a hypothetical teaching input in hypothetical US dollars, per year unless stated, supplied by the fictional sponsor for this exercise only. None is a price, a quotation, a benchmark or an observed saving.
+**Fictional worked example: Cinderline's illustrative annual model for the one-plant quality path.** Every number is a hypothetical teaching input in US dollars, per year unless stated, from the fictional sponsor, for this exercise only; none is a price, a quotation, a benchmark or an observed saving.
 
 ### Inputs
 
@@ -27,9 +27,9 @@ Deeper: the retained lesson [Make a transparent value calculation](#/lesson/dbxf
 | Working weeks | 48 | weeks per year | n/a | Hypothetical | Sponsor |
 | Value per released hour | 60 | currency per hour | hypothetical USD | Hypothetical | Sponsor |
 | Realization factor | 0.5 / 0.75 / 1.0 | fraction | n/a | Hypothetical | Operations director |
-| Recurring platform and operations cost | 12,000 | currency per year | hypothetical USD, per year | Hypothetical | Data lead |
+| Recurring cost, as supplied | 12,000 | currency per year | hypothetical USD, per year | Hypothetical; coverage not stated | Data lead |
 | One-time implementation | 15,000 | currency, once | hypothetical USD, year one only | Hypothetical | Data lead |
-| Dual operation during transition | 0 / 1,500 / 3,000 | currency | hypothetical USD, year one only | Hypothetical | Data lead |
+| Dual operation during transition | 3,000 / 1,500 / 0 | currency | hypothetical USD, year one only | Hypothetical (low / base / high) | Data lead |
 
 ### Arithmetic
 
@@ -47,19 +47,19 @@ Base case by hand: 10 × 48 × 60 = 28,800. Realized at 0.75 = 21,600. Year-one 
 
 ### Break-even
 
-On the recurring year, realized value must reach 12,000: at a realization of 0.75 that is 12,000 ÷ (0.75 × 48 × 60) = 5.56 hours per week; at 1.0 it is 4.17. On year one with base dual operation, realized value must reach 28,500, which at 0.75 is 13.2 hours per week. The decision therefore turns on two inputs: the hours actually released and how much of that time becomes a real change. Both belong to the operations director and neither has been measured; the pilot's baseline week is where they get measured.
+On the recurring year, realized value must reach 12,000: at a realization of 0.75 that is 12,000 ÷ (0.75 × 48 × 60) = 5.56 hours per week; at 1.0 it is 4.17. On year one with base dual operation, realized value must reach 28,500, which at 0.75 is 13.2 hours per week. The decision turns on the hours actually released and how much of that time becomes a real change. Both belong to the operations director and neither is measured: the baseline week measures current effort; released hours and realization only after the change, over several weeks.
 
 ### Which input flips the sign
 
-Holding everything else at base, year one turns positive only above about 13 hours per week, or at 10 hours only if realization is 1.0 and dual operation is zero. The recurring year stays positive down to about 5.6 hours per week at base realization. A reader should conclude that the recurring year is robust to modest inputs and year one is not, which is an argument for measuring, not for choosing the high case.
+Holding everything else at base, year one turns positive only above about 13 hours per week, or, at 10 hours, only if realization reaches about 0.99 (about 0.94 with no dual operation). The recurring year stays positive down to about 5.6 hours per week at base realization. The recurring year is robust to modest inputs, year one is not: an argument for measuring, not for the high case. Operator effort could turn the recurring year negative on its own; see Excluded.
 
 ### Excluded
 
-Training time for analysts (not estimated); storage growth beyond the first year (unknown volume); any revenue effect of a better morning decision (not claimed, because no mechanism has been shown); internal support effort beyond the operator's hour per day (unmeasured); price changes over the period (unknown). Each exclusion is listed so a reader can add it, not so it can be forgotten.
+Training time for analysts (not estimated); storage growth beyond the first year (unknown volume); any revenue effect of a better morning decision (not claimed: no mechanism shown); operator effort, up to an hour a staffed day under the charter, about 240 hours or 14,400 a year at the model's hourly value, more than the base recurring-year net of 9,600 (not modelled: whether the recurring figure includes it is unstated, and the pilot has not measured it; data lead); price changes over the period (unknown). Each is listed so a reader can add it, not forget it.
 
 ### What this model is
 
-An illustration of drivers and their sensitivity over a hypothetical year, with every input labelled. It is not a savings promise, not a platform quotation, and released time is not cash unless the customer decides to make it so.
+An illustration of drivers and their sensitivity over a hypothetical year, every input labelled; not a savings promise or a platform quotation. Released time is not cash unless the customer decides so.
 
 <!-- section:template -->
 

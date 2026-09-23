@@ -12,42 +12,46 @@ An alternatives memo compares options on criteria the reader would have chosen w
 
 Evidence to collect: the criteria list with good and poor definitions, the filled matrix with a source per cell, the unknowns list with resolution owners, and the reversal conditions.
 
-Deeper: the retained lessons [Compare options honestly](#/lesson/dbxfe-m11-l01) and [Defend tradeoffs and alternatives](#/lesson/dbxfe-m08-l02), the module [Competition and business value](#/module/dbxfe-m11), and [Architecture reasoning and migration decisions](#/module/dbxfe-m08) for the decision not to migrate yet.
+Deeper: the retained lessons [Compare options honestly](#/lesson/dbxfe-m11-l01) and [Defend tradeoffs and alternatives](#/lesson/dbxfe-m08-l02), the module [Competition and business value](#/module/dbxfe-m11), and [Architecture and migration](#/module/dbxfe-m08) for the decision not to migrate yet.
 
 <!-- section:example -->
 
-**Fictional worked example: how Cinderline should produce the plant-one morning defect rate.** Decision: which path the pilot should test, given a three-person data team without continuous support, a weekly correction cycle, a daily decision at 08:00, and a source path not yet reviewed by security.
+**Fictional worked example: how Cinderline should produce the plant-one morning defect rate.** Written 26 February 2026, before the pilot. Decision: which path the pilot should test, for a three-person data team without continuous support, weekly corrections, a daily decision at 08:00 and a source path security has not reviewed.
 
 ### Options
 
-- **A. Improve the current path.** Keep the nightly stored procedure; fix the trailing-space duplicate rule, apply the plant-time boundary, add a revision check to the CSV import, and publish the same metric from the ERP.
-- **B. New scheduled path on the platform.** One plant, retained raw deliveries, explicit resolution, an accepted-inspection table and an owned metric, read by the existing report.
-- **C. Coexistence for a bounded period.** Run A's fixed report and B in parallel for twenty working days, with the old report as the served path until reconciliation passes.
+- **A. Improve the current path.** Keep the nightly procedure; remove the duplicates a package retry leaves, apply the plant-time boundary and add a revision check to the CSV import.
+- **B. New scheduled path on the platform.** One plant; retained raw deliveries, explicit resolution and an owned metric, read by the existing report.
+- **C. Coexistence for a bounded period.** A's fixed report and B in parallel, A served until reconciliation passes.
 
-### Criteria and entries
+### Criteria, good and poor
+
+Agreed with the sponsor first. Good: a measurement on the customer's data, a dated document or a dated local test, sourced. Poor: a design property or an estimate presented as a result. Correctness: shown on real corrections, not asserted; availability: a measured finish time, not a schedule; recovery: a timed reversal, not a described one; effort: logged hours, not an impression; access: reviewed identities, not assumed grants; reversibility: a rehearsed way back, not the word "reversible"; cost: a labelled basis, not a total; prerequisites: each with an owner.
+
+### Matrix
 
 | Criterion | A. Improve current | B. New scheduled path | C. Coexistence |
 |---|---|---|---|
-| Correctness mechanism | Fixes to three known defects; no retained raw history; correction ordering by file arrival | Retained raw, resolver with revision rule, quarantine; verified locally on synthetic input only | Both, compared daily; the comparison itself is the mechanism |
-| Availability to the 08:00 decision | Unknown: current 09:15 to 11:40 is workbook time, not procedure time; procedure finish time not measured | 47 to 71 minutes after source availability in the pilot's five days, synthetic and local | Same as A until cutover |
-| Recovery | Rerun the procedure; no replay evidence; no snapshot identity | Replay rehearsed once, 14 minutes | Fallback is inherent for the period |
-| Operating effort | DBA already operates it; the three fixes are small; unmeasured ongoing effort | One hour per day in week one, one operator, no backup | Highest: both paths plus the comparison |
-| Access model | Existing ERP grants; no new review | New identities, a source path review, region and connectivity pattern unagreed | Both |
-| Reversibility | Not applicable; it is the current path | Read path; reversible within the recovery window | Designed for reversal |
-| Cost basis | Unknown incremental; DBA time not costed | Hypothetical model only; no measured usage | A plus B plus comparison effort for twenty days |
-| Dependency on unverified prerequisites | None new | Source version, CDC permission, security review, operator backup | Same as B |
+| Correctness mechanism | Fixes to three known defects; no retained raw history; corrections ordered by file arrival (DBA, 25 Feb) | Retained raw, revision rule, quarantine; shown only locally on synthetic fixtures (demo log, 19 Feb) | Both, compared daily |
+| Availability to 08:00 | Unknown: 09:15 to 11:40 is workbook time, not procedure time; baseline week measures it (DBA) | Unknown: no platform run yet; measured from pilot day 1 (data lead) | As A until cutover |
+| Recovery | Rerun the procedure; no replay evidence or snapshot identity (DBA, 25 Feb) | Replay shown locally (demo log, 19 Feb); platform recovery unrehearsed | Old path is the fallback |
+| Operating effort | Unknown: fixes not yet sized (DBA) | Unknown: data lead estimates under an hour a day (25 Feb) | Unknown: A plus B plus a daily comparison |
+| Access model | Existing ERP grants; no new review (security lead, 24 Feb) | New identities and a source path review; region unagreed (security lead, 24 Feb) | Both |
+| Reversibility | Each fix changes the numbers served; revert by redeploying the prior procedure; the boundary fix restates history and needs the quality lead's approval | Read path; the old report keeps running, so reverting is repointing a link (design, unrehearsed) | Built for reversal; unrehearsed |
+| Cost basis | Unknown increment; DBA time not costed | Hypothetical model only (sponsor's figures) | A plus B plus comparison effort |
+| Unverified prerequisites | None new | Source version, CDC permission, security review, operator backup (charter draft, 24 Feb) | As B |
 
 ### Which differences matter here
 
-Two cells decide this memo. First, availability under A is unknown because nobody has measured when the procedure finishes; if it finishes by 07:00 and the workbook is the delay, A may satisfy the 08:00 decision at almost no cost, and the pilot should measure that in its baseline week. Second, B's correctness evidence is local and synthetic; it is stronger in mechanism and weaker in evidence than A's, and the memo says so rather than treating a design property as a result.
+Two cells decide this memo. Nobody has measured when A's procedure finishes; if by 07:00, with the workbook the delay, A may meet the 08:00 decision at almost no cost. B's correctness evidence is local and synthetic: stronger in mechanism, weaker in evidence than A's, and the memo says so rather than treating a design property as a result.
 
 ### Unknowns and how to resolve them
 
-Procedure finish time (DBA, one week of timestamps); whether the ERP's grants permit the CSV revision check (DBA); the platform's connectivity pattern for the customer's topology (integration specialist, reading current documentation); the actual operating effort of A after the fixes (DBA estimate, then measured).
+Procedure finish time (DBA, a week of timestamps); the size of A's fixes, and whether ERP grants permit the CSV check (DBA); B's availability and effort (data lead, in the pilot); connectivity for the customer's topology (integration specialist, current documentation).
 
 ### Recommendation, and what reverses it
 
-Test C in the form the charter proposes: fix A's three defects anyway, because they are defects in the current path regardless of the pilot; run B for one plant beside it; serve A until reconciliation passes. The recommendation reverses toward A alone if the procedure's finish time is shown to meet the 08:00 decision and the DBA can sustain the fixed path, and toward stopping B if the security review does not approve a path within the pilot window. No option is described as better in general; the memo compares them for this decision, this team and these unknowns.
+Test C as the charter proposes: fix A's three defects regardless of the pilot; run B for one plant beside it; serve A until reconciliation passes. This reverses toward A alone if the procedure finishes in time for 08:00 and the DBA can sustain it, and toward stopping B if security approves no path within the pilot window. No option is called better in general, only for this decision, team and set of unknowns.
 
 <!-- section:template -->
 

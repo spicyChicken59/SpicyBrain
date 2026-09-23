@@ -12,30 +12,30 @@ A cutover plan is a set of conditions and a set of people. Write the conditions 
 
 Evidence to collect: the checked entry conditions, the role list with names, the rehearsal record with timings and findings, the trigger list, and the communication sent.
 
-Deeper: the retained lesson [Migrate with reconciliation and rollback](#/lesson/dbxfe-m08-l03), [Warehouse and distributed-platform migrations](#/module/dbxfe-warehouse-migration) for the pilot, parallel-run, cutover and rollback sequence, [Production operations, observability and recovery](#/module/dbxfe-operations) for recovery validation, and [Architecture reasoning and migration decisions](#/module/dbxfe-m08).
+Deeper: the retained lesson [Migrate with reconciliation and rollback](#/lesson/dbxfe-m08-l03), [Warehouse and distributed-platform migrations](#/module/dbxfe-warehouse-migration) for the pilot, parallel-run, cutover and rollback sequence, [Production operations, observability and recovery](#/module/dbxfe-operations) for recovery validation, and [Architecture and migration](#/module/dbxfe-m08).
 
 <!-- section:example -->
 
-**Fictional worked example: switching Cinderline's plant-one morning report to the new path.** This is a read-path cutover. The ERP stays the system of record, the nightly stored procedure keeps running, and only the report users open at 08:00 changes.
+**Fictional worked example: switching Cinderline's plant-one morning report to the new path.** A read-path cutover: the ERP stays the system of record, the nightly stored procedure keeps running, and only the report users open at 08:00 changes. Days are pilot days: the second five-day run was days 11 to 15; cutover is day 16.
 
-### Entry conditions (status on the day before)
+### Entry conditions (status on day 15)
 
 | Condition | Verifier | Status |
 |---|---|---|
-| Five consecutive reconciled days with only accepted exceptions | Data lead | Met: days 6 to 10 after the day-5 fixes; register has one exception (inspector-code backfill) |
-| Access review of the new report and its pipeline identity | Security lead | Met, with a note that the analyst group still has read on the old table |
-| Alert and replay rehearsal on the new path | Operator | Met on day 8; replay produced the same snapshot id |
-| Named operator with a backup | Data lead | Met: operator named; backup named for one week only |
+| Five consecutive reconciled days with only accepted exceptions | Quality lead | Met: days 11 to 15; register has one exception (inspector-code backfill) |
+| Access review of the new report and its pipeline identity | Security lead | Met on day 14, with a note that the analyst group still has read on the old table |
+| Alert and replay rehearsal on the new path | Operator | Met on day 8; the platform replay produced the same snapshot id |
+| Named operator with a backup | Operations director | Partly met: operator Oskar named; the data lead backs him up for week one of the four-week recovery window only |
 | Business acceptance of the metric and the 06:00 plant-time boundary | Quality lead, operations director | Met in writing |
-| Users told the date and the fallback location | Operations analyst | Sent two working days before |
+| Users told the date and the fallback location | Operations analyst | Sent on day 14, two working days before |
 
 ### Ownership
 
-Technical go: the data lead. Business go: the operations director. Pause or revert at any time: the operator, who does not need permission to revert and does need to say so within fifteen minutes. User communication: the operations analyst. Access changes: the security lead.
+Technical go: the data lead, who for that reason verifies none of the entry conditions. Business go: the operations director. Pause or revert at any time: the operator, who needs no permission to revert and must say so within fifteen minutes. User communication: the operations analyst. Access changes: the security lead.
 
 ### Retained path
 
-The stored procedure keeps running nightly for twenty working days. The old report stays at its existing location, renamed "Morning defect report (fallback until day 30)". The plant sheet's link is the only thing that moves. Analyst workbooks that read the old table directly were inventoried; two do, and their owners chose to stay on the old table for the recovery window.
+The stored procedure keeps running nightly for twenty working days, to day 35. The old report stays at its existing location, renamed "Morning defect report (fallback until day 35)". The plant sheet's link is the only thing that moves. Analyst workbooks that read the old table directly were inventoried; two do, and their owners chose to stay on the old table for the recovery window.
 
 ### Triggers
 
@@ -43,19 +43,23 @@ Revert if: the new report is not available by 07:30 plant time; the day's inspec
 
 ### Steps
 
-Switch: repoint the plant sheet link; post the notice; record the snapshot id shown at 08:00. Revert: repoint the link back; post the notice naming which day's data users saw and from which path; record the snapshot id; open an escalation packet with the trigger and the observations. Data consequence: nothing is written through the report, so no user data is stranded; dispositions entered in the exception review application during the window are unaffected because they live in their own store.
+Switch: repoint the plant sheet link; post the notice; record the snapshot id shown at 08:00. Revert: repoint the link back; post the notice naming which day's data users saw and from which path; record the snapshot id; open an escalation packet with the trigger and the observations. Data consequence: nothing is written through the report, so no user data is stranded; dispositions in the exception review application live in their own store and are unaffected.
 
-### Recovery test (rehearsed on day −2)
+### Recovery test (rehearsed on day 14, two days before cutover)
 
-The operator switched the link at 09:10, stopped the new pipeline deliberately at 09:20 to simulate an unavailable report, recognised the trigger at 09:31 from the alert, reverted the link at 09:34 and confirmed the old report showed day −3's totals, matching the register. Total time from trigger to usable fallback: 14 minutes against a 30-minute target. Finding: the plant sheet cached the old link target in two browsers; users must reload, and the notice now says so. Second finding: the alert went to the operator only; the backup was added.
+The operator switched the link at 09:10, stopped the new pipeline deliberately at 09:20 to simulate an unavailable report, recognised the trigger at 09:29 from the alert, reverted the link at 09:32 and confirmed the old report showed day 13's totals, matching the register. Total time from trigger to usable fallback: 12 minutes against a 30-minute target. Finding: the plant sheet cached the old link target in two browsers; users must reload, and the notice now says so.
+
+### Cleanup deferral
+
+The procedure, the old table and the fallback report are not deleted before day 35. The DBA proposes it; the operations director and the quality lead accept it in writing, only after the two workbooks on the old table have moved and the third workbook's owner is found.
 
 ### Unknowns
 
-One analyst workbook of unknown ownership may read the new table by name; if it does, a revert leaves it on the new path. The operations analyst owns finding its owner before cutover day; if not found, cutover proceeds with that workbook listed as a known non-reverting consumer.
+A third analyst workbook of unknown ownership reads the old table. A revert leaves it untouched, but cleanup would break it silently, so it blocks cleanup; the operations analyst owns finding its owner by day 25.
 
 ### Decision
 
-Proceed, conditional on the workbook question being closed or listed, with the rehearsal record attached and the twenty-day retained path unchanged.
+Proceed on day 16 with the rehearsal record attached and the retained path unchanged. The backup gap after week one is a named risk, owned by the operations director and reviewed on day 20.
 
 <!-- section:template -->
 

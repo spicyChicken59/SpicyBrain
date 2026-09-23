@@ -12,56 +12,56 @@ A handoff moves a working path from the people who built it to the people who wi
 
 Evidence to collect: the owner table with acknowledgements, the dependency map, the readiness checklist with the date each item was observed, the adoption plan with retirement conditions, and the follow-up schedule.
 
-Deeper: the retained lessons [Write follow-ups people can act on](#/lesson/dbxfe-m12-l02), [Assemble the customer engagement](#/lesson/dbxfe-m12-l03) and [Move from discovery to decision](#/lesson/dbxfe-m01-l03), and [Production operations, observability and recovery](#/module/dbxfe-operations) for ownership, runbooks and recovery objectives.
+Deeper: the retained lessons [Write follow-ups people can act on](#/lesson/dbxfe-m12-l02), [Assemble the customer engagement](#/lesson/dbxfe-m12-l03) and [Move from discovery to decision](#/lesson/dbxfe-m01-l03); [Production operations, observability and recovery](#/module/dbxfe-operations) for ownership, runbooks and recovery objectives, and [Field execution and capstone](#/module/dbxfe-m12) for the handoff itself.
 
 <!-- section:example -->
 
-**Fictional worked example: handing the Cinderline plant-one quality path to its operating team after the second five-day run.** Names, dates and statuses are fictional.
+**Fictional worked example: handing the Cinderline plant-one quality path to its operating team after the second five-day run (days 11 to 15) and the cutover on day 16.** Names, dates and statuses are fictional.
 
 ### Components and owners
 
 | Component | Owner | Backup | Acknowledged |
 |---|---|---|---|
-| Nightly job `quality-nightly` | Named engineer (operator) | Data lead | Operator yes; data lead conditional on a second engineer by month end |
+| Nightly job `quality-nightly` | Oskar (operator) | Data lead, to day 20 only | Both yes; a second engineer is sought |
 | Accepted-inspection table and metric definition | Quality lead (meaning); data lead (schema) | None for meaning | Both yes |
 | Morning report | Operations analyst | Operations director | Analyst yes; director not asked yet |
 | Runbook and alerts | Operator | Data lead | Yes |
 | Pipeline identity and grants | Security lead | Data lead | Security lead yes, with a quarterly review condition |
 | Reconciliation and ledger records | Data lead | None | Yes |
-| Old stored procedure (fallback until day 30) | DBA | None | Yes |
+| Old stored procedure (fallback until day 35) | DBA | None | Yes |
 
 ### Dependencies
 
-Weekly CSV approvals from the quality lead, with a named cover during her absence (not yet named); CDC permission on the inspections table, granted for the pilot and expiring at quarter end unless renewed by the DBA; the workspace region and connectivity pattern, owned by the security lead's review, which closed on day 12 for this plant only; the planning budget, which expires with the pilot and needs a sponsor decision for continued operation; the platform's scheduled maintenance windows, which nobody on the team currently watches.
+Weekly CSV approvals from the quality lead, with a named cover during her absence (not yet named); CDC permission on the inspections table, granted for the pilot and expiring at quarter end unless renewed by the DBA; the security lead's approval of the region and the nightly export route, given before day 1 for plant one and the pilot only, so continued operation needs her renewal, and any other route waits for the live source path review, not started; the planning budget, which expires with the pilot; the platform's scheduled maintenance windows, which nobody on the team watches.
 
 ### Operational readiness
 
 | Item | Observed | Date |
 |---|---|---|
 | Runbook used by the operator in a rehearsal | Yes, injected failure, 14 minutes | Day 8 |
-| Runbook used by the backup | No | Scheduled day 16 |
+| Runbook used by the backup | No | Scheduled day 18 |
 | Alerts reach owner and backup | Owner yes; backup added day 9 after the escalation | Day 9 |
 | Replay performed by the owner | Yes | Day 8 and day 9 |
-| Access reviewed | Yes, plant one only | Day 12 |
+| Access reviewed | Yes, plant one only, before cutover | Day 14 |
 | Freshness message visible on the report | Yes: "data as of" with the snapshot time | Day 6 |
 | Cost bound monitored | No: usage is read manually by the data lead weekly | Open |
-| Second failure mode rehearsed | No | Scheduled day 16 |
+| Second failure mode rehearsed | No | Scheduled day 18 |
 
 ### Adoption
 
-Users of the output: the 08:00 meeting through the operations analyst's report, and two analyst workbooks that moved to the new table on day 11. The plant sheet's link moved at cutover; the old report stays reachable under its fallback name until day 30. Retirement of the old procedure's report is conditional on twenty working days without a revert and on the third workbook's owner being found; if the owner is not found by day 25, the procedure keeps running and the retirement decision moves to the next review. Training was one session for the operations analyst and a written note for the two workbook owners; the quality lead asked for a one-page explanation of the quarantine reasons, which is owed.
+Users of the output: the 08:00 meeting, through the operations analyst's report, whose plant-sheet link moved at cutover on day 16, two days after the access review. Two analyst workbooks stay on the old table through the recovery window, their owners' choice, and move by day 35; the old report stays reachable under its fallback name until then. Retiring the old procedure's report needs twenty working days without a revert, both workbooks moved and the third workbook's owner found; if that owner is not found by day 25, the procedure keeps running and the decision moves to the next review. Training was one session for the operations analyst and a note for the workbook owners; the quality lead's one-page explanation of the quarantine reasons is owed.
 
 ### Follow-ups
 
-Day 16: backup rehearsal and second failure mode; question answered: can someone other than the operator recover the path? Day 25: third workbook and retirement decision. Quarter end: CDC permission renewal and the security lead's quarterly access review. Sponsor decision on continued operation before the planning budget lapses, with the illustrative model's caveats attached.
+Day 18: backup rehearsal and second failure mode; can someone other than the operator recover the path? Day 20: the operator's backup after day 20, and backups for the components that have none. Day 25: third workbook, retirement decision, cost monitoring, approval cover and maintenance windows. Quarter end: CDC renewal and the quarterly access review. Before the pilot ends: the sponsor's decision on continued operation and the security lead's renewal of the route approval, with the illustrative model's caveats attached.
 
 ### Open risks carried forward
 
-One operator with a conditional backup; no automated cost monitoring; the quality lead's approval cover unnamed; maintenance windows unwatched.
+To day 20: the operator's backup after that day; no backup for the metric's meaning, the reconciliation and ledger records or the old procedure; the morning report's backup not yet asked. To day 25: no automated cost monitoring; the quality lead's approval cover unnamed; maintenance windows unwatched.
 
 ### Not included
 
-Plants two and three; sensor data; any ERP write; the maintenance assistant; any support commitment from outside the customer's team, which nobody has agreed.
+Plants two and three; sensor data; any ERP write; the maintenance assistant; any outside support commitment, which nobody has agreed.
 
 <!-- section:template -->
 

@@ -17,46 +17,47 @@ Deeper: the retained lessons [Assemble the customer engagement](#/lesson/dbxfe-m
 
 <!-- section:example -->
 
-**Fictional worked example: Cinderline plant-one quality pilot, readout to the sponsor.** All names, figures and dates are fictional.
+**Fictional worked example: Cinderline plant-one quality pilot, readout to the sponsor on day 10.** All names, figures and dates are fictional.
 
 ### Decision requested
 
-Approve a second five-day run on plant-one real data after the two open items below close, or retain the current path. Recommendation: approve the second run, conditional; do not approve expansion to other plants yet.
+Approve a second five-day run, days 11 to 15, inside the same approved sample, or retain the current path. Recommendation: approve it once the freshness clock is defined (operations director), a backup operator is named (data lead) and the security lead confirms in writing that her approval covers those days; do not approve expansion to other plants.
 
 ### What was tested
 
-One plant, approved fields only, five staffed reporting days (days 6 to 10) on the platform workspace the data lead provisioned, with the current report re-cut to the same plant-time boundary for comparison. Synthetic edge cases (duplicate batch, late correction, invalid quantity, injected failure) were delivered deliberately. Not tested: the other two plants, sensor data, any write to the ERP, and performance beyond the pilot's volume.
+Plant one, days 6 to 10, on the platform workspace, against the current report re-cut to the same plant-time boundary. Real data ran only as the approved sample: plant-one approved fields exported nightly to the workspace, a route the security lead approved in writing before day 1 after a specialist review of that route; no live source path has been reviewed. Synthetic edge cases (duplicate batch, late correction, invalid quantity, injected failure) were delivered on purpose. Not tested: plants two and three, sensor data, ERP writes, performance beyond pilot volume.
 
 ### Evidence
 
 | Criterion | Status | Observation | Evidence |
 |---|---|---|---|
-| Correctness | Pass with one named exception | Key-level and total reconciliation on all five days; inspector-code backfill accepted by the quality lead | Reconciliation records, days 6 to 10 |
-| Freshness | Not yet judged | 47, 52, 58, 71, 49 minutes; the 71-minute day followed a late CSV approval | Pipeline log; ledger row 6 |
+| Correctness | Pass with one named exception | Key-level and total reconciliation on all five days; inspector-code backfill accepted as an exception | Reconciliation records, days 6 to 10 |
+| Freshness | Not yet judged | Served by 07:45 on 4 of 5 days; 47, 52, 58 and 71 minutes after file arrival, day 10's 71 being 34 after a late approval | Pipeline log; ledger row 6 |
 | Replay | Pass | Duplicate delivery left the snapshot unchanged; correction produced one new snapshot | Snapshot ids in the run log |
 | Recovery | Pass, one failure mode | Injected failure recovered in 14 minutes against a 30-minute target | Rehearsal record, day 8 |
-| Operation | Not yet judged | 3.5 hours in week one by one operator learning the runbook; no backup | Operator log; ledger row 7 |
-| Source path review | Blocked | Specialist review not started; version and topology not supplied | Ledger row 5 |
+| Day-9 failure | Open | Resolver failed; day 8's rate shown, labelled stale; cause not established | Escalation packet, day 9; ledger row 11 |
+| Operation | Fail on one day | 0.5, 0.4, 0.9, 1.6, 0.4 hours on days 6 to 10; day 9, the failure, passed the one-hour ceiling | Operator log; ledger row 10 |
+| Source path review | Blocked | Live source path: specialist review not started; topology not supplied | Ledger row 5 |
 
 ### Business meaning
 
-For the 08:00 meeting, the pilot shows that one accepted-inspection path can produce a rate both the quality lead and the operations director accept, with corrections applied once and visible. It does not yet show that the rate arrives on time by a definition the operations director has set, because "source availability" has not been defined; on four of five days it arrived within the hour by either definition. It does not change the operating burden question: one operator without a backup is not an operating model.
+For the 08:00 meeting: one accepted-inspection path produced a rate the quality lead accepts, with corrections applied once and visible, and it failed safely on day 9, showing a day-old rate labelled stale rather than a wrong one. Freshness cannot be judged until the operations director defines when the clock starts; recorded latencies were 47 to 71 minutes. The operating burden is not settled: the failure cost 1.6 operator hours, and one operator without a backup is not an operating model.
 
 ### Cost on its basis
 
-Incurred: hypothetical platform usage of 410 currency units against the 1,500 planning figure, and 3.5 operator hours. Projected: the illustrative annual model, hypothetical inputs only, which is negative in year one at base and positive in the recurring year above about 5.6 released hours per week. No saving has been observed.
+Incurred, as measured in this fictional pilot, days 1 to 10: $410 of platform usage against the hypothetical $1,500 planning ceiling, and 7.3 operator hours (3.5 in week one while learning, 3.8 on days 6 to 10). Projected: the illustrative annual model, hypothetical inputs only, negative in year one at base and positive in the recurring year above about 5.6 released hours per week. No saving has been observed.
 
 ### Risks and open questions
 
-Freshness clock definition (operations director); operator backup (data lead); the source path review (security lead and specialist), which blocks any run on real data beyond the approved sample; a third analyst workbook of unknown ownership that reads the old table (operations analyst).
+Freshness clock definition (operations director); operator backup (data lead); the day-9 failure's cause (integration specialist); the live source path review (security lead and specialist), which blocks real data beyond the approved sample; a third analyst workbook of unknown ownership that reads the old table (operations analyst).
 
 ### Next step
 
-If the freshness definition and the operator backup are settled by the review date, run five more days on the same basis and re-read this table with a second column. Expansion to a second plant is not on the table until the source path review closes and the operation criterion is judged. The reader is asked to approve the second run's planning figure of a hypothetical 1,500 currency units; nothing else.
+If the three conditions are met by the review at 16:00 on day 10, run days 11 to 15 on the same basis and re-read this table with a second column; if not, the run starts the day after they are. A second plant waits for the live source path review and a met operation criterion. The reader is asked to approve the second run and its usage, expected within the ceiling's remaining $1,090; nothing else.
 
 ### Not claimed
 
-Production readiness, savings, performance at scale, and any result on plants two and three. The ledger with twenty-one rows is attached.
+Production readiness, savings, performance at scale, or any result on plants two and three. The twenty-one-row ledger is attached.
 
 <!-- section:template -->
 

@@ -11,7 +11,7 @@ Start from the decision the assistant is meant to support and the sources that a
 
 Evidence to collect: the source inventory, the case file with expected properties, one trace per case, a failure count by class and attribution, and the list of blocking results with their case ids.
 
-Go deeper on retrieval mechanics in [Document processing and retrieval](#/module/dbxfe-retrieval), on harnesses and traces in [GenAI evaluation and failure analysis](#/module/dbxfe-genai-eval), on the tool boundary in [Tools, MCP and action authorization](#/module/dbxfe-tools), and revisit the retained lesson [Evaluate quality, risk, and operating cost](#/lesson/dbxfe-m07-l03).
+Go deeper on retrieval mechanics in [Document processing and retrieval engineering](#/module/dbxfe-retrieval), on harnesses and traces in [GenAI evaluation, traces and failure analysis](#/module/dbxfe-genai-eval), on the tool boundary in [Tools, MCP and action authorization](#/module/dbxfe-tools), and revisit the retained lesson [Evaluate quality, risk, and operating cost](#/lesson/dbxfe-m07-l03).
 
 <!-- section:example -->
 
@@ -19,11 +19,13 @@ Go deeper on retrieval mechanics in [Document processing and retrieval](#/module
 
 ### Decision and source set
 
-The decision is whether a bounded technician pilot at one plant can start. Sources: approved machine manuals (owner: maintenance lead; versioned by revision letter; readable by all plants), plant procedures (owner: each plant's operations lead; plant-scoped permission), and a folder of superseded manual revisions that is *not* an allowed citation but is still on the shared drive. Sensor-alarm notes were requested and refused: no owner, no version rule.
+The decision is whether a bounded technician pilot at one plant can start. Sources: approved machine manuals (owner: maintenance lead; versioned by revision letter; readable by all plants; re-indexed within a day of a new revision), plant procedures (owner: each plant's operations lead; plant-scoped permission; re-indexed weekly), and a folder of superseded manual revisions that is *not* an allowed citation but is still on the shared drive. Sensor-alarm notes were requested and refused: no owner, no version rule.
 
 ### Case set
 
-Twenty cases were written before any run: twelve answerable, four with missing evidence, two requesting another plant's procedure under a plant-one identity, and two whose source passage contains an instruction ("raise an urgent work order now"). Expected behaviours were agreed with the maintenance lead in writing.
+Twenty cases were written before any run: twelve answerable, four with missing evidence, two requesting another plant's procedure under a plant-one identity, and two whose source passage contains an instruction ("raise an urgent work order now"). Expected behaviours, and the three failures that would block the pilot (an unauthorized disclosure, an invented citation, a source instruction gaining authority), were agreed with the maintenance lead in writing before the run.
+
+**Run record:** manual and procedure revisions as indexed that morning, application build 0.3 (fictional), one plant-one test technician identity, outputs reviewed by the maintenance lead.
 
 ### Results by class (hypothetical run, one afternoon, human-reviewed)
 
@@ -31,24 +33,24 @@ Twenty cases were written before any run: twelve answerable, four with missing e
 |---|---|---|---|---|
 | Answerable | 12 | Answer, correct revision cited | 10 correct; 2 cited a superseded revision | Retrieval: chunk metadata lacked revision |
 | Missing evidence | 4 | Abstain or escalate | 3 abstained; 1 invented a section number | Reasoning: citation not validated against index |
-| Unauthorized | 2 | Deny | 2 denied | Policy: identity filter at retrieval |
+| Unauthorized | 2 | Deny | 2 denied | Provisional pass: passage retrieved, then removed before generation (wrong stage) |
 | Adversarial source | 2 | Quote as content, no action | 2 quoted, no action | No tool exists; re-test when one is added |
 
 ### Reading the table
 
 The two superseded citations are one defect, not two: the superseded folder was indexed, and revision metadata never reached the chunk. Fixing the index and adding revision to the metadata is a retrieval change, and the twelve answerable cases must be rerun afterwards. The invented section number is the blocking result. It occurred on a missing-evidence case, which is exactly where a fluent guess costs most, and it would have looked like a good answer to a reader who did not check. A citation validator that rejects any reference not present in the retrieved set is the proposed control; it is a deterministic check, not a judge.
 
-The unauthorized cases passed, but the trace showed the plant-two passage was retrieved and then filtered before generation. That is enforcement at the wrong stage. The requirement is that the identity filter applies at retrieval so the passage never enters context; the data lead owns confirming which stage the platform's permission filter runs at. Until that is confirmed the pass is provisional.
+The unauthorized cases passed, but the trace showed the plant-two passage was retrieved and then filtered before generation. That is enforcement at the wrong stage: the requirement is that the identity filter applies at retrieval, so the passage never enters context. The open question is whether the platform's permission filter can be applied at retrieval for this index; the data lead owns it, and until it is answered the pass is provisional.
 
 The adversarial cases passed trivially because there is nothing to act on. The record says so, and the cases stay in the set so they are rerun the day any tool is proposed.
 
 ### What this run does not show
 
-Twenty authored questions are not the technicians' real question mix; latency and cost were not measured; the human review was one person, the maintenance lead, on one afternoon; no model judge was used, so there is no judge calibration to report.
+No outdated-versus-current or ambiguous-wording cases were written, so the superseded-revision defect surfaced by chance among the answerable cases; two of each are added before the rerun. Twenty authored questions are not the technicians' real question mix; latency and cost were not measured; the human review was one person, the maintenance lead, on one afternoon; no model judge was used, so there is no judge calibration to report.
 
 ### Conclusion
 
-Not ready to expand. Two changes (revision metadata, citation validator), one confirmation (filter stage), one full rerun with the same twenty cases plus any failures observed during the rerun. The pilot decision is deferred to that rerun, and the readout will carry this table beside the new one.
+Not ready to start the pilot. Two changes (revision metadata, citation validator), one confirmation (filter stage), one full rerun with the same twenty cases, the four missing-class cases and new cases for any failure observed since this run. The pilot decision is deferred to that rerun, and the readout will carry this table beside the new one.
 
 <!-- section:template -->
 

@@ -10,37 +10,38 @@ Keep one ledger for the whole engagement, from the first claim in a discovery ca
 6. **Name the unresolved gap** that stops the row from being closed, with an owner.
 7. **Never overwrite a row.** A new observation is a new row that supersedes the old one by reference.
 
-Evidence to collect: the ledger itself, with every row holding all six fields or an explicit "none", and the list of open gaps sorted by the decision they block.
+Evidence to collect: the ledger itself, with every row holding all seven fields or an explicit "none", and the list of open gaps sorted by the decision they block.
 
 Deeper: the retained lesson [Read out evidence and make a decision](#/lesson/dbxfe-m10-l03), the module [Proofs of value](#/module/dbxfe-m10) for the test matrix the ledger feeds, and [Field execution and capstone](#/module/dbxfe-m12) for the readouts and handoffs that quote it.
 
 <!-- section:example -->
 
-**Fictional worked example: the Cinderline quality pilot ledger, end of week two.** Nine rows are shown of the twenty-one in the full ledger. Dates and figures are fictional.
+**Fictional worked example: the Cinderline pilot ledger at the end of day 10.** Ten of twenty-one rows are shown. Day 1 was Monday 9 March 2026; days are staffed reporting days, times are plant-one local, and everything is fictional.
 
 | # | Claim | Source of claim | Test | Observation | Evidence source | Caveat | Unresolved gap |
 |---|---|---|---|---|---|---|---|
-| 1 | The workbook and plant sheet disagree on the morning rate | Operations director, discovery call | Compare both for ten days | Disagreed on 7 of 10 days; largest gap 0.9 percentage points | Comparison sheet, dated | Old report basis was server time; re-cut not yet applied | Which of the two the meeting acted on each day |
-| 2 | Corrections are approved weekly by the quality lead | Quality lead, demo session | Inspect approval records for a month | 4 approvals in 5 weeks | Approval email folder, listed by date | Reviewed by one person | Whether the skipped week means no corrections or an unrecorded approval |
-| 3 | The revision rule yields 20 / 1 after the A v2 correction | Demo script | Local deterministic run on fixtures | 20 inspected / 1 defective | Run log with fixture hashes | Synthetic input; local run | None; row closed |
-| 4 | Replay does not double count | Demo script | Deliver A v2 twice | Snapshot id unchanged | Same run log | Synthetic; local | Rerun on the platform pending |
-| 5 | Source connectivity to the ERP is feasible | Nobody; hypothesis | Specialist review of version, topology, path | Not run | None | Not testable until inputs are supplied | Version and topology from the DBA |
-| 6 | The report can be served within 60 minutes of source availability | Charter hypothesis | Pipeline timestamps over five days | 47, 52, 58, 71, 49 minutes | Pipeline log, days 6 to 10 | The 71-minute day followed a late CSV approval | Whether "source availability" starts at approval or at file arrival |
-| 7 | Reconciliation effort is two to four hours a week | Data lead, estimate | Operator time log in week one | 3.5 hours logged | Operator log | One week; the operator was learning the runbook | Second week's log |
-| 8 | The old path over-counts duplicate deliveries with trailing spaces | Reconciliation, day 5 | Trace five keys | Confirmed: 5 duplicates counted as distinct | Reconciliation record, day 5 | Found on one day | DBA to decide fix or documentation |
-| 9 | A null revision means first version | Nobody; assumption in the resolver | Ask the quality lead | Not yet asked | None | Surfaced by the day-5 quarantine | Quality lead's answer |
+| 1 | The workbook and plant sheet disagree on the morning rate | Mara, operations director, call of 2026-02-10 | Compare both for ten days | Disagreed on 7 of 10 days; largest gap 0.9 percentage points | `compare/rates-0211-0224.xlsx` | Old report on server time; not yet re-cut | Which one the meeting acted on each day |
+| 3 | The revision rule yields 20 / 1 after the A v2 correction | Demo script, 2026-02-19 | Local run on fixtures | 20 inspected / 1 defective | `runs/local/2026-02-19T07-40.log`, fixtures sha256 `3f2a…` | Synthetic; local | None; closed |
+| 4 | Replay does not double count | Demo script, 2026-02-19 | Deliver A v2 twice | Snapshot id unchanged | Same log | Synthetic; local | Platform rerun pending |
+| 5 | Source connectivity to the ERP is feasible | Nobody; hypothesis | Specialist review of version, topology, path | Not run | None | Not testable without inputs | Topology (DBA) |
+| 6 | Served by 07:45 and within 60 minutes of source availability | Charter criterion (freshness), 2026-02-24 | Pipeline timestamps, days 6 to 10 | Served 06:27, 06:32, 06:38, not on day 9, 06:51; 47, 52, 58 and 71 minutes after file arrival | `runs/pilot/d06-d10.log` | Day 10 waited for a 06:17 CSV approval | Does the clock start at arrival or approval? (operations director) |
+| 7 | Current reconciliation effort is two to four hours a week | Leo, data lead, charter estimate | Analyst's log, current process, baseline week | 5.5 hours | `baseline/analyst-log-0306.csv` | One week, one person | None; contradicted |
+| 8 | The old path counts trailing-space duplicates | Reconciliation, day 5 | Trace five keys | Confirmed: 5 counted as distinct | `recon/day05.md` | One day | Fix or document (DBA) |
+| 9 | A null revision is invalid | Nobody; the resolver assumes it and quarantines such rows | Ask the quality lead | Not yet asked | None | Surfaced by the day-5 quarantine | First version or unknown? (quality lead) |
+| 10 | No pilot day takes the operator over an hour | Charter criterion (operation) | Operator's daily log, days 6 to 10 | 0.5, 0.4, 0.9, 1.6, 0.4 hours | `ops/operator-log-d06-d10.csv` | Day 9: the failure in row 11. Week one logged only as a total (3.5 hours) | None; contradicted on day 9 |
+| 11 | The nightly run serves each day unaided | Nobody; design assumption | Nightly runs, days 6 to 10 | 4 of 5: on day 9 the resolver failed and day 8's rate was shown at 08:00, labelled stale | `esc/day09.md`; runs `r-8814` to `r-8817` | Cause not established | The cause (integration specialist) |
 
 ### Reading the ledger
 
-Row 3 is closed and says why. Row 4 is closed locally and open on the platform, so it appears once with the platform rerun as its gap. Row 5 is the honest shape of an untested claim: nobody made it, no test has run, and the row exists so the readout cannot omit it. Row 6 is a passing observation with a definitional gap; the 71-minute day is not a failure until the acceptor says where the clock starts, and the ledger records the observation without deciding that. Row 9 is the kind of row a ledger exists for: an assumption that lived in code until a quarantine made it visible.
+Row 4 is not edited: row 12 (day 8, not shown) records the platform replay and supersedes it. Row 5 is an untested claim nobody made, kept so the readout cannot omit it. Row 6 turns on a definition: day 10 was 71 minutes from arrival but 34 from approval, so where the clock starts decides freshness. Rows 7 and 10 closed as contradicted: a result, not a gap. Row 9 is an assumption that lived in code until a quarantine made it visible.
 
 ### Open gaps by the decision they block
 
-The charter's freshness criterion cannot be judged until row 6's clock is defined (operations director). The pilot cannot expand to real data until row 5 has its inputs (DBA) and a specialist review. Row 7 needs a second week before it supports the operation criterion. Row 9 blocks acceptance of the day-5 reconciliation (quality lead).
+Freshness waits for row 6's clock (operations director). Real data beyond the approved sample waits for row 5's inputs (DBA) and a specialist review. Acceptance of day 5 waits for row 9 (quality lead). Row 11 blocks nothing yet; a repeat would (integration specialist).
 
 ### What the ledger says at this point
 
-Two definitional questions and one untested prerequisite block the readout. No criterion has failed; two have not been fully measured; one prerequisite has not started.
+One criterion failed (operation, on the failure day), one cannot be judged (freshness), one prerequisite has not started and one assumption awaits an answer.
 
 <!-- section:template -->
 

@@ -13,7 +13,7 @@ An escalation packet lets someone who was not there act without asking you the f
 
 Evidence to collect: timestamps, the reproduction record with counts, sanitized log excerpts, the version list, and the list of attempts with outcomes.
 
-Deeper: the retained lessons [Write follow-ups people can act on](#/lesson/dbxfe-m12-l02) and [Orchestration, failure, and reconciliation](#/lesson/dbxfe-m04-l03), [Production operations, observability and recovery](#/module/dbxfe-operations) for separating facts from hypotheses on an incident timeline, and [Orchestration and recoverable execution](#/module/dbxfe-orchestration) for failure after raw retention and before an external effect.
+Deeper: the retained lessons [Write follow-ups people can act on](#/lesson/dbxfe-m12-l02) and [Orchestration, failure, and reconciliation](#/lesson/dbxfe-m04-l03), [Production operations, observability and recovery](#/module/dbxfe-operations) for separating facts from hypotheses on an incident timeline, and [Orchestration and recovery](#/module/dbxfe-orchestration) for failure after raw retention and before an external effect.
 
 <!-- section:example -->
 
@@ -21,15 +21,15 @@ Deeper: the retained lessons [Write follow-ups people can act on](#/lesson/dbxfe
 
 ### Symptoms
 
-At 05:42 the nightly run wrote the raw delivery for day 9 (batch `q-0912`, 406 rows) and then stopped at the resolution task with the message "task failed: resolver exited with status 3" and no further text. The accepted-inspection table still shows day 8's snapshot `snap-0911-a`. The morning report displayed day 8's totals with the stale label, as designed.
+At 05:42 the nightly run wrote the raw delivery for day 9 (batch `q-0319`, 409 rows) and then stopped at the resolution task with the message "task failed: resolver exited with status 3" and no further text. The accepted-inspection table still shows day 8's snapshot `snap-0318-a`. The morning report displayed day 8's totals with the stale label, as designed.
 
 ### Impact
 
-The 08:00 meeting used day 8's rate with the stale label visible; the operations director was told at 06:30. No wrong number was shown; the number was a day old and said so. No downstream effect was sent because the notification step keys on a new snapshot id and none was produced.
+The 08:00 meeting used day 8's rate with the stale label visible; the operations director was told at 06:30. No wrong number was shown; the number was a day old and said so. No downstream effect was sent: the nightly run failed before the notification step, and the reruns executed the resolution task alone; `snap-0319-a` (06:14) is retained and unpublished.
 
 ### Reproduction
 
-Rerunning the resolution task alone from the retained raw delivery reproduced the failure on 2 of 3 attempts (06:05 failed, 06:14 succeeded, 06:22 failed). The successful attempt produced snapshot `snap-0912-a` with 406 inspected and 18 defective, which matches the re-cut old report for day 9. Running the resolver locally over a copy of batch `q-0912` succeeded 5 of 5 times.
+Rerunning the resolution task alone from the retained raw delivery reproduced the failure on 2 of 3 attempts (06:05 failed, 06:14 succeeded, 06:22 failed). The successful attempt produced snapshot `snap-0319-a` with 409 inspected and 17 defective, which matches the re-cut old report for day 9. Running the resolver locally over a copy of batch `q-0319` succeeded 5 of 5 times, with the approval lookup stubbed to answer at once, so the local runs say nothing about the lookup.
 
 ### Environment and versions
 
@@ -40,25 +40,25 @@ Platform workspace `cl-pilot` in the agreed region; job `quality-nightly` versio
 Excerpt from the resolver task log, sanitized:
 
 ```
-05:42:11 resolver start batch=q-0912 rows=406
+05:42:11 resolver start batch=q-0319 rows=409
 05:42:13 approval lookup: 1 correction pending, approver=[removed]
 05:42:33 approval lookup timed out after 20s
 05:42:33 resolver exit status=3
 ```
 
-Full logs: job run identifiers `r-8815` (failed), `r-8817` (failed), `r-8816` (succeeded). Snapshot `snap-0912-a` from the successful rerun is retained and not yet published, pending this escalation.
+Full logs: job run identifiers `r-8814` (nightly, 05:42, failed), `r-8815` (06:05, failed), `r-8816` (06:14, succeeded), `r-8817` (06:22, failed). Snapshot `snap-0319-a` from the successful rerun is retained and not yet published, pending this escalation.
 
 ### What was tried
 
-Rerun three times (above). Local run five times (above). Checked that the raw delivery is complete: 406 rows, hash matches the CSV import log. Checked the approval store is reachable from the workspace: a manual query returned in 0.4 seconds at 06:30, after the failures.
+Rerun three times (above). Local run five times (above). Checked that the raw delivery is complete: 409 rows, hash matches the CSV import log. Checked the approval store is reachable from the workspace: a manual query returned in 0.4 seconds at 06:30, after the failures.
 
 ### Hypotheses (not conclusions)
 
-1. The approval lookup intermittently exceeds the 20-second timeout added on day 7; supported by the timeout line in both failed logs and by day 8's success being a run with no pending correction, so the lookup returned quickly. 2. A network path between the workspace and the approval store is slow at 05:40 specifically; not supported by anything yet, since the only manual check was at 06:30.
+1. The approval lookup intermittently exceeds the 20-second timeout added on day 7; supported by the timeout line in the logs of all three failed runs and by day 8's success being a run with no pending correction, so the lookup returned quickly. 2. A network path between the workspace and the approval store is slow at 05:40 specifically; not supported by anything yet, since the only manual check was at 06:30.
 
 ### Precise request
 
-To the integration specialist: is a 20-second budget for the approval store lookup reasonable from this workspace at 05:40, and is there a documented way to observe that lookup's latency over a week rather than at one manual check? To the data lead: approve publishing `snap-0912-a`, which matched the re-cut report, or say why it should wait. Next update from the operator by 12:00 today whether or not either answer arrives, and the day-10 run will keep the 20-second timeout unless the data lead says otherwise, so that the evidence stays comparable.
+To the integration specialist: is a 20-second budget for the approval store lookup reasonable from this workspace at 05:40? A follow-up question, how to observe that latency over a week, waits for this answer. To the data lead: approve publishing `snap-0319-a`, which matched the re-cut report, or say why it should wait. Next update from the operator by 12:00 today whether or not either answer arrives, and the day-10 run will keep the 20-second timeout unless the data lead says otherwise, so that the evidence stays comparable.
 
 <!-- section:template -->
 

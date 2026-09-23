@@ -16,7 +16,7 @@ Deeper: the retained lessons [Recover from failure and unknown questions](#/less
 
 <!-- section:example -->
 
-**Fictional worked example: the Cinderline correction demo, step three fails.** The script runs locally over fixture files. At 5:00 the correction file is delivered and the run stops with an error naming a file path and a permission.
+**Fictional worked example: the Cinderline correction demo, step three fails.** The script runs locally over fixture files. At 5:00 the correction file is delivered; at 5:10 the run stops with an error naming a file path and a permission.
 
 ### The failure list, written the day before
 
@@ -24,8 +24,10 @@ Deeper: the retained lessons [Recover from failure and unknown questions](#/less
 |---|---|---|---|---|
 | Baseline load | Fixture missing | Empty table | Static baseline table, labelled | "The load did not run; this table shows the inputs we intended." |
 | Correction | Run error | Error text | Static before/after table with the rule beside it | "The correction step did not complete. This is prepared output, not a run." |
-| Replay | Duplicate counted | 22 / 2 instead of 20 / 1 | None; this is a real defect, say so | "That is wrong, and it is the kind of defect the pilot must catch. I will not explain it away now." |
+| Replay | Duplicate counted | 32 / 2 instead of 20 / 1 | None; this is a real defect, say so | "That is wrong, and it is the kind of defect the pilot must catch. I will not explain it away now." |
 | Quarantine | Row silently dropped | Total unchanged, no quarantine row | Static quarantine row | "The row vanished instead of waiting; that is a defect." |
+
+Time box: three minutes. Offline diagnosis: the data lead. Retest: the presenter.
 
 ### What happened (hypothetical)
 
@@ -33,7 +35,7 @@ At 5:10 the correction run errored. The presenter read the honest sentence for t
 
 The operations director asked, "So did it work or not?" Answer: "No. The live step failed. The prepared table is what we expected to see."
 
-Troubleshooting was time-boxed to three minutes. The error mentioned a path under the presenter's home directory and a permission, which suggested an environment problem rather than a logic problem, but the presenter said "suggests" and did not name a cause. The data lead offered to look after the session; the presenter accepted and recorded him as the owner of diagnosis with the presenter as the owner of the retest.
+Troubleshooting stopped at the three-minute box. The error mentioned a path under the presenter's home directory and a permission, which suggested an environment problem rather than a logic problem, but the presenter said "suggests" and did not name a cause. As the plan named, the data lead took diagnosis offline after the session, and the presenter kept the retest.
 
 ### What was still agreed
 

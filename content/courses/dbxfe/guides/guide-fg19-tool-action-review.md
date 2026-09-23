@@ -12,7 +12,7 @@ Review one tool at a time. A tool is a promise that a call with certain argument
 
 Evidence to collect: the tool card, the test matrix with observed results, the audit rows produced by the tests, and the list of unknowns with owners.
 
-Deeper: [Tools, MCP and action authorization](#/module/dbxfe-tools) for the harness, [Identity, authorization and audit](#/module/dbxfe-identity) for principals and audit events, [Orchestration and recoverable execution](#/module/dbxfe-orchestration) for retries and external effects, and the retained lesson [Choose retrieval or a tool-using agent](#/lesson/dbxfe-m07-l02).
+Deeper: [Tools, MCP and action authorization](#/module/dbxfe-tools) for the harness, [Identity, authorization and audit](#/module/dbxfe-identity) for principals and audit events, [Orchestration and recovery](#/module/dbxfe-orchestration) for retries and external effects, and the retained lesson [Choose retrieval or a tool-using agent](#/lesson/dbxfe-m07-l02).
 
 <!-- section:example -->
 
@@ -36,11 +36,11 @@ Every draft lands in a supervisor queue. The queue is the approval; the tool cal
 
 ### Idempotency
 
-Key: a hash of user, machine id, manual section and calendar day. A replayed call with the same key returns the existing draft id and writes nothing new. A timed-out call reports "outcome unknown, safe to retry with the same key".
+Key: a client-generated intent id, minted when the technician confirms the note and kept for retries, hashed with user, machine id and manual section. A replayed call with the same key returns the existing draft id and writes nothing new; a second, different note on the same machine and section that day carries a new intent id and creates a second draft, because the key is per intent, not per day. A timed-out call reports "outcome unknown, safe to retry with the same key".
 
 ### Audit
 
-Each row records actor, key, arguments, result, timestamp and, later, the supervisor's decision. The `note` field may contain personal remarks, so it is stored but excluded from any export used for reporting.
+Each row records actor, key, arguments, result, timestamp and, later, the supervisor's decision. Rows live in an audit table in the plant schema, kept thirteen months, readable by the supervisor group and the security lead. The `note` field may contain personal remarks, so it is stored but excluded from any export used for reporting.
 
 ### Test matrix (local stub, hypothetical results)
 
@@ -50,11 +50,12 @@ Each row records actor, key, arguments, result, timestamp and, later, the superv
 | Denied | Plant-two technician, plant-one machine | Refused at authorization | Refused; audit row records the denial |
 | Malformed | `priority: urgent` supplied | Rejected by schema before handler | Rejected; no audit row (finding: log it) |
 | Replayed | Same key twice | One draft, same id returned | One draft |
+| Second note | Same machine and section, different note, same day | Second draft, new id | Two drafts |
 | Timed out | Stub delays 5 s beyond limit | "Unknown" to caller; retry with key creates nothing new | One draft after retry |
 
 ### Findings and decision
 
-One defect: schema rejections were not logged, so a burst of malformed calls would be invisible. Fixed in the handler and retested. One unknown: the real staging table's transaction behaviour on the platform is untested locally; the stub is not the platform. The tool is acceptable as a draft-only capability, conditional on a named queue owner and a platform-side rerun of the replay and timeout cases. ERP writes remain out of scope, and the review says so in its first line so that nobody reads "tool approved" as "work orders approved".
+One defect: schema rejections were not logged, so a burst of malformed calls would be invisible. Fixed in the validation layer, where the rejection happens, so a schema rejection now writes an audit row; retested. One unknown: the real staging table's transaction behaviour on the platform is untested locally; the stub is not the platform. The tool is acceptable as a draft-only capability, conditional on a named queue owner and a platform-side rerun of the denied, replayed and timed-out cases with the real delegated grants, since the stub cannot establish the platform's permission or transaction behaviour. ERP writes remain out of scope, and the review says so in its first line so that nobody reads "tool approved" as "work orders approved".
 
 <!-- section:template -->
 

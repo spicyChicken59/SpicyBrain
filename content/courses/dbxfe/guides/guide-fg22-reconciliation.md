@@ -36,23 +36,25 @@ Population: plant one inspections with an inspection date in the five days. Boun
 
 | Day | Old inspected / defective | New inspected / defective | Explained by |
 |---|---|---|---|
-| 3 | 412 / 19 | 414 / 19 | Two late corrections arrived after the old job ran and before the new snapshot; the as-of rule was violated on the old side. Rerun needed. |
+| 1 | 398 / 16 | 398 / 16 | Equal; no keyed differences. |
+| 2 | 405 / 21 | 405 / 21 | Equal; no keyed differences. |
+| 3 | 412 / 19 | 414 / 19 | Two late-arriving inspections (new keys) reached the new snapshot, taken after a later delivery, but not the old job: the as-of rule was violated. Rerun needed. |
 | 4 | 396 / 17 | 396 / 17 | Totals equal; seven rows have a null inspector code in old and a value in new, backfilled from the CSV. |
 | 5 | 406 / 18 | 406 / 18 | Totals equal; five keys differ. Not accepted. |
 
-Day 5 is the case the plan exists for. The totals match to the unit, and the rate matches to two decimals, yet five inspection keys present in the old output are absent from the new, and five others appear instead. Tracing them: the old path counted five duplicate deliveries of one batch as distinct inspections because it deduplicated on key alone and the duplicates carried a trailing space in the key; the new path trimmed and deduplicated correctly but also dropped five legitimate rows whose revision field was null, which the resolver treats as invalid. Two defects, one on each side, cancelling in the total.
+Day 5 is the case the plan exists for. Totals and rate match, yet five keys are only in old and five only in new. Tracing them: the five only in old are copies from a batch delivered twice, each copy's key carrying a trailing space and no revision; the old path deduplicated on the raw key and counted them, while the new path trimmed the key and quarantined the null-revision copies. The five only in new are legitimate rows the old path loses in its collation-sensitive join on inspector code. Two defects, both in the old path, whose two groups of five happened to carry the same units, so they cancelled in the total; the totals table alone would have accepted the day.
 
 ### Nulls
 
-Inspector code: old 7 nulls, new 0 (day 4, backfill accepted by the quality lead as an improvement, recorded as an exception with her name). Revision: old 5 nulls, new 0 because the rows were quarantined; whether a null revision means "first version" or "unknown" is now a question for the quality lead, not a code fix.
+Inspector code: old 7 nulls, new 0 (day 4, backfill accepted by the quality lead, Imani, on day 4 as an improvement, recorded as an exception with her name and the date). Revision: old 5 nulls (the re-delivered copies), new 0 because those rows were quarantined; whether a null revision means "first version" or "unknown" is now a question for the quality lead, not a code fix, and the answer must be written into the resolver either way.
 
-### Thresholds applied
+### Thresholds (fixed in the plan before the run)
 
 Keys exact; inspected and defective sums exact; the rate compared after rounding to two decimal places with zero tolerance because the inputs are integers. No tolerance was needed and none was invented.
 
 ### Decision
 
-Not accepted. Day 3 is a basis error and is rerun under the as-of rule. Day 5 has two open items: the old path's trailing-space duplicates (DBA, fix in the old path or document as a known overcount) and the null-revision meaning (quality lead). Day 4 passes with one named exception. The comparison is repeated over five clean days after both items close; the previously passing days are not carried forward as credit.
+Not accepted. Day 3 is a basis error and is rerun under the as-of rule. Day 5 has three open items: the old path's trailing-space duplicates and its collation-sensitive join (DBA, fix in the old path or document both as known differences) and the null-revision meaning (quality lead). Day 4 passes with one named exception. The comparison is repeated over five clean days after the open items close; the previously passing days are not carried forward as credit.
 
 <!-- section:template -->
 

@@ -27,6 +27,8 @@ Deeper: [Databricks Apps and application architecture](#/module/dbxfe-apps) for 
 
 ### Request traces
 
+*View the queue.* Browser → application back end (the reviewer's identity, forwarded by the platform) → query filtered to the reviewer's plant in the handler, until row-level enforcement is confirmed → response. No write. Same unknown and owner as the claim below; without the filter a reviewer could list other plants' quarantined records.
+
 *Claim an item.* Browser → application back end (user authenticated by the platform's application identity flow; the reviewer's identity is passed, not the app's) → authorization check that the reviewer belongs to the item's plant → Postgres write → response. The application's own identity holds the database grant; the reviewer's identity is recorded on the row and checked in the handler. Unknown: whether row-level enforcement in the database is available under the platform's managed offering, or whether the handler is the enforcement point. The data lead owns the answer, and the design assumes handler enforcement until then.
 
 *Record a disposition.* Same path, but the write touches two rows: the disposition record and the queue item's status. They must change together.
@@ -35,7 +37,7 @@ Deeper: [Databricks Apps and application architecture](#/module/dbxfe-apps) for 
 
 ### Contracts
 
-`ClaimRequest { inspection_key: "A-2031", revision: 2, reviewer: "imani.q" }` → `ClaimResponse { status: "claimed", claimed_at: "..." }` or `{ status: "conflict", claimed_by: "leo.d" }`. Errors are structured, never free text, and the conflict is a normal response, not an exception. Contract version is carried in the path.
+`ClaimRequest { inspection_key: "A-2031", revision: 2 }` → `ClaimResponse { status: "claimed", claimed_at: "2026-03-09T07:41:12Z" }` or `{ status: "conflict", claimed_by: "leo.d" }`. The reviewer is the identity the platform forwards, never a field in the body; a body that names one is rejected by the schema, and a test says so. Errors are structured, never free text, and the conflict is a normal response, not an exception. Contract version is carried in the path.
 
 ### State classification
 
@@ -52,6 +54,9 @@ Deeper: [Databricks Apps and application architecture](#/module/dbxfe-apps) for 
 - At most one active claim per (inspection key, revision). Test: two local connections claim the same item concurrently; exactly one succeeds, the other receives `conflict`.
 - A disposition can be recorded only by the current claimant. Test: a non-claimant's write is refused.
 - Dispositions are never updated; a correction appends a new disposition that supersedes the earlier one. Test: an update statement against the table is refused by grant.
+- A disposition and its queue-status change commit together or not at all. Test: the transaction is made to fail after the disposition insert; a second connection sees neither change.
+
+Isolation: read committed, with a unique partial index on active claims, which is what holds the first invariant under concurrent writers. Recovery: a failed transaction leaves the item claimed and the disposition retriable; nothing half-written is visible.
 
 The tests ran locally against a real PostgreSQL instance, and the record says so; nothing was deployed.
 
@@ -61,7 +66,7 @@ Dispositions reach the analytical table on an hourly schedule. The dashboard pri
 
 ### Open questions
 
-Whether dispositions must flow back to the ERP (out of scope for this design, stated so), the application identity model on the platform, and regional availability of the managed store. Each has an owner and blocks deployment, not design.
+Whether dispositions must flow back to the ERP (out of scope for this design, stated so; quality lead), the application identity model on the platform (data lead), and regional availability of the managed store (security lead). Each blocks deployment, not design.
 
 <!-- section:template -->
 

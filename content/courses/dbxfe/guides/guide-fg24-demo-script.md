@@ -24,15 +24,15 @@ Question: which defect rate should the 08:00 meeting trust when the analyst work
 
 ### Script with evidence moments
 
-| Time | Step | Evidence moment | Business depth | Technical depth |
-|---|---|---|---|---|
-| 0:00 | Intent | None | "We follow one correction into the rate. Synthetic data; this proves nothing about your source connection." | Same sentence, plus the note that the path is a local run, not the platform |
-| 2:00 | Baseline | Rows: A v1 10 inspected, 1 defective; C v1 8, 0. Total 18 / 1 | Show the two rows and the total; say 5.56% | Show the inspection key and revision columns; name the accepted-state rule |
-| 5:00 | Correction | A v2 12 / 1 arrives; total becomes 20 / 1 | "One row changed once. The rate is 5%." Ask what they would do differently at 08:00 with this number | Show that raw v1 is retained and the accepted state carries v2 only; show the ordering rule on revision |
-| 8:00 | Replay | Deliver A v2 again; total stays 20 / 1 | "A repeated file does not double count." | Show the snapshot id is unchanged; mention idempotency without the word |
-| 10:00 | Invalid record | B with a negative inspected quantity is quarantined; total unchanged | "Bad data waits for a person; it does not vanish or get counted." | Show the quarantine row and the reason code |
-| 12:00 | Explain-back | Audience answer recorded | "Which denominator does this rate use, and who decides when a correction is approved?" | "What happens if two revisions carry the same number?" |
-| 14:00 | Close | Next evidence named | Metric acceptance, approved sample, operating owner | Source version and topology, CDC permission, path review |
+| Time | Step | Evidence moment | Business depth | Technical depth | Label |
+|---|---|---|---|---|---|
+| 0:00 | Intent | None | "We follow one correction into the rate. Synthetic data; this proves nothing about your source connection." | Same sentence, plus the note that the path is a local run, not the platform | Spoken |
+| 2:00 | Baseline | Rows: A v1 10 inspected, 1 defective; C v1 8, 0. Total 18 / 1 | Show the two rows and the total; say 5.56% | Show the inspection key and revision columns; name the accepted-state rule | Synthetic, run live locally |
+| 5:00 | Correction | A v2 12 / 1 arrives; total becomes 20 / 1 | "One row changed once. The rate is 5%." Ask what they would do differently at 08:00 with this number | Show that raw v1 is retained and the accepted state carries v2 only; show the ordering rule on revision | Synthetic, run live locally |
+| 8:00 | Replay | Deliver A v2 again; total stays 20 / 1 | "A repeated file does not double count." | Show the snapshot id is unchanged; mention idempotency without the word | Synthetic, run live locally |
+| 10:00 | Invalid record | B with a negative inspected quantity is quarantined; total unchanged | "Bad data waits for a person; it does not vanish or get counted." | Show the quarantine row and the reason code | Synthetic, run live locally |
+| 12:00 | Explain-back | Audience answer recorded | "Which denominator does this rate use, and who decides when a correction is approved?" | "What happens if two revisions carry the same number?" | Live answer |
+| 14:00 | Close | Next evidence named | Metric acceptance, approved sample, operating owner | Source version and topology, CDC permission, path review | Spoken |
 
 ### Depth decisions
 
@@ -40,7 +40,7 @@ The business audience never sees the revision column; they see a row change and 
 
 ### Setup checklist
 
-Fixture files present and hashed; local run completed once this morning with the expected totals; screens arranged so rows and totals are visible together; the prepared static table open in a second window, labelled "prepared, not live"; the fallback plan printed; a timer.
+Fixture files present and hashed; local run completed once this morning with the expected totals; the script rehearsed once end to end with a timer, 14:20 against 15:00; screens arranged so rows and totals are visible together; the prepared static table open in a second window, labelled "prepared, not live"; the fallback plan printed; a timer.
 
 ### What the demo does not prove
 
@@ -48,7 +48,7 @@ Connectivity to the ERP, performance on real volumes, the platform's behaviour, 
 
 ### After the session (hypothetical)
 
-The quality lead answered the explain-back with "defective units over inspected units, corrections approved by me weekly" and added that historical reports are not restated. That sentence went into the charter draft as an agreed definition with her name. The operations director asked whether the rate could be shown per line; that was recorded as an unverified request, not a commitment.
+The quality lead answered the explain-back with "defective units over inspected units, corrections approved by me weekly" and added that historical reports are not restated. The denominator and the approval rule went into the charter draft as proposed definitions, which she confirmed in writing the next day. The restatement remark went in as an open question, because the demo had just moved a reported rate from 5.56% to 5%: how are corrections to already-reported days shown? The operations director asked whether the rate could be shown per line; that was recorded as an unverified request, not a commitment.
 
 <!-- section:template -->
 

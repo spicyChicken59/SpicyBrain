@@ -16,19 +16,19 @@ Deeper: [SQL Server and on-premises modernization](#/module/dbxfe-sqlserver) for
 
 <!-- section:example -->
 
-**Fictional worked example: Cinderline's ERP reporting layer.** The SQL Server ERP feeds a nightly reporting layer of fourteen stored procedures, three package-style import jobs and twenty-two reports. The question is which slice to pilot on the platform first. Sensor events are out of scope; they never enter this layer.
+**Fictional worked example: Cinderline's ERP reporting layer.** The SQL Server ERP feeds a nightly reporting layer of fourteen stored procedures, three package-style import jobs and twenty-two reports. The question is which slice to pilot on the platform first. The sensor historian itself is out of scope; sensor data reaches this layer only through the `sensor staging` table read by two of the procedures carded below, which stay in the inventory because one of them also reads `rpt_quality_daily` and the two share a global temp table.
 
 ### Inventory excerpt
 
-| Workload | Inputs | Outputs | Consumers | Owner | Compatibility flags | Criticality / difficulty / unknowns |
-|---|---|---|---|---|---|---|
-| `sp_daily_inspections` | ERP inspections; corrected CSV staging | `rpt_quality_daily` | Plant sheet, analyst workbook, morning report | DBA (named, available) | MERGE; local temp table; `GETDATE()` local time; collation-sensitive join on inspector code; 06:00 business-day cutoff hard-coded | High / medium / low |
-| `pkg_csv_import` | Weekly approved CSV files | CSV staging | `sp_daily_inspections` | Quality analyst | File-arrival trigger; row-count check only; no revision check | High / low / medium |
-| `sp_sensor_rollup` | Sensor staging | `rpt_line_health` | One dashboard, owner unclear | Unknown; last changed three years ago | Cursor loop; global temp table shared with `sp_line_summary` | Low / medium / high |
-| `sp_line_summary` | `rpt_quality_daily`, sensor staging | `rpt_line_summary` | Operations weekly review | Operations analyst | Reads the global temp table above | Medium / low / medium |
-| `rpt_morning_defect` | `rpt_quality_daily` | Morning report | Operations director | Operations analyst | Depends on the cutoff above; no independent logic | High / low / low |
+| Workload | Inputs | Outputs | Schedule | Consumers | Owner | Volume | Last change | Compatibility flags | Criticality / difficulty / unknowns |
+|---|---|---|---|---|---|---|---|---|---|
+| `sp_daily_inspections` | ERP inspections; corrected CSV staging | `rpt_quality_daily` | Nightly 22:40, after the ERP extract | Plant sheet, analyst workbook, morning report | Dev (DBA), available | ~400 rows per plant per day | 2025-11 | MERGE; local temp table; `GETDATE()` local time; collation-sensitive join on inspector code; 06:00 business-day cutoff hard-coded | High / medium / medium |
+| `pkg_csv_import` | Weekly approved CSV files | CSV staging | On file arrival, Fridays and ad hoc | `sp_daily_inspections` | Quality analyst | One file, tens of rows | 2024-08 | File-arrival trigger; row-count check only; no revision check | High / low / medium |
+| `sp_sensor_rollup` | Sensor staging | `rpt_line_health` | Hourly | One dashboard, owner unclear | Unknown | ~50,000 rows per day | 2023-02 | Cursor loop; global temp table shared with `sp_line_summary` | Low / medium / high |
+| `sp_line_summary` | `rpt_quality_daily`, sensor staging | `rpt_line_summary` | Nightly 23:30 | Operations weekly review | Operations analyst | Three rows per line per day | 2025-06 | Reads the global temp table above | Medium / low / medium |
+| `rpt_morning_defect` | `rpt_quality_daily` | Morning report | Refresh 01:10 | Operations director | Operations analyst | One page | 2025-11 | Depends on the cutoff above; no independent logic | High / low / low |
 
-Nine further procedures and seventeen reports are carded in the full table; four reports have no identified consumer and are candidates for retirement rather than migration.
+Eleven further procedures, two further import jobs and twenty-one further reports are carded in the full table; four of those reports have no identified consumer and are candidates for retirement rather than migration.
 
 ### Dependency findings
 
@@ -36,11 +36,11 @@ Two procedures share a global temporary table, so neither can move alone without
 
 ### Pilot selection
 
-Criteria: bounded to one plant; exercises MERGE-on-corrections, which is the hard feature the rest of the layer shares; has an existing report to reconcile against; owner available; read path, so the old report keeps running. `sp_daily_inspections` for plant one meets all five. `sp_sensor_rollup` was rejected despite looking easy: no owner, unknown consumer, and a shared temp table. `pkg_csv_import` is not a pilot on its own but is a prerequisite because the pilot's inputs come through it; its missing revision check is logged as a dependency risk.
+Criteria: bounded to one plant; exercises MERGE-on-corrections, which is the hard feature the rest of the layer shares; has an existing report to reconcile against; owner available; read path, so the old report keeps running. `sp_daily_inspections` for plant one meets all five; its unknowns are rated medium, not low, because three of the four listed below bear on it, and it starts only when the first two close. `sp_sensor_rollup` was rejected despite looking easy: no owner, unknown consumer, and a shared temp table. `pkg_csv_import` is not a pilot on its own but is a prerequisite because the pilot's inputs come through it; its missing revision check is logged as a dependency risk.
 
 ### Unknowns and owners
 
-SQL Server version and edition (DBA); whether change-data capture may be enabled on the inspections table (DBA and security lead); the consumer of `rpt_line_health` (operations director); the intended time zone for the business day (quality lead). None is guessed. The pilot proposal is conditional on the first two, and the reconciliation plan will carry the fourth as an explicit alignment rule.
+SQL Server version and edition (DBA); whether change-data capture may be enabled on the inspections table (DBA and security lead); the consumer of `rpt_line_health` (operations director); the intended time zone for the business day (quality lead). None is guessed. The pilot is conditional on the first two and starts once they close; the reconciliation plan carries the fourth as an explicit alignment rule.
 
 ### Conclusion
 

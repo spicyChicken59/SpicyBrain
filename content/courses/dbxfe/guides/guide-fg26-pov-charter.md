@@ -21,7 +21,7 @@ Deeper: the retained lessons [Build a baseline and a hypothesis](#/lesson/dbxfe-
 
 ### Baseline (partly measured)
 
-Over the last ten reporting days at plant one, the analyst workbook was ready between 09:15 and 11:40, measured from the workbook's save timestamps; the 08:00 meeting used the plant sheet on every one of those days. Three corrections arrived in the period; two were applied to the workbook, one was missed. Reconciliation effort was not measured; the data lead estimates two to four hours per week and the charter records that as an estimate to be measured in week one, not as a baseline.
+Over the last ten reporting days at plant one, the analyst workbook was ready between 09:15 and 11:40 clock time, measured from its save timestamps; the 08:00 meeting used the plant sheet on every one of those days. Minutes from source availability could not be computed, because nobody records when its inputs arrive; the baseline week records the current path on both measures. Three corrections arrived in the period; two were applied to the workbook, one was missed. Reconciliation effort was not measured; the data lead estimates two to four hours per week, and the charter records it as an estimate, to be measured on the current process in the baseline week.
 
 ### Hypothesis
 
@@ -36,21 +36,23 @@ Population: plant-one inspections with approved fields only, as classified by th
 | Role | Person | Confirms |
 |---|---|---|
 | Executes the path | Data lead | Not yet |
-| Accepts metric meaning and corrections | Quality lead | Confirmed in the demo session |
+| Accepts metric meaning and corrections | Quality lead | Confirmed in writing after the demo |
 | Accepts operational usefulness | Operations director | Not yet |
 | Approves data and network access | Security lead | Requires specialist review first |
 | Approves spending | Sponsor | Planning figure only; no authorization |
-| Operates during the test | Named engineer | Nominated; backup not identified |
+| Operates during the test | Oskar (engineer) | Nominated; backup not identified |
 
 ### Criteria (proposed)
 
 | Criterion | Threshold | Measured how | Acceptor |
 |---|---|---|---|
 | Correctness | Key-level and total reconciliation against the re-cut old report, exceptions named | Reconciliation record per day | Quality lead |
-| Freshness | At least 4 of 5 days served within 60 minutes of source availability; the fifth explained | Timestamps recorded by the pipeline | Operations director |
-| Replay | Same snapshot after duplicate delivery; corrected snapshot after correction | Snapshot ids | Data lead |
-| Recovery | Injected failure recovered by the operator within 30 minutes using the runbook | Timed rehearsal record | Data lead |
+| Freshness | Served by 07:45 plant time, and within 60 minutes of source availability, on at least 4 of 5 days; the fifth explained | Publication and source-availability timestamps, from the pipeline | Operations director |
+| Replay | Same snapshot after duplicate delivery; corrected snapshot after correction | Snapshot ids | Quality lead |
+| Recovery | Injected failure recovered by the operator within 30 minutes using the runbook | Timed rehearsal record | Operations director |
 | Operation | Operator reports effort per day; no day exceeds one hour | Operator log | Operations director |
+
+Clock time tests the hypothesis; the 60 minutes isolate the path's own delay. Neither the data lead nor the operator, who execute the path, accepts a criterion.
 
 ### Stop conditions
 
@@ -58,15 +60,15 @@ Unapproved fields appear in any input; spending approaches the planning figure o
 
 ### Exit decisions
 
-Expand to a second plant only if all five criteria are met and an operator with a backup is confirmed. Revise if correctness or replay fail. Collect missing evidence if freshness fails on a source-availability cause. Retain the current path if operation effort exceeds what the team confirms it can sustain. Stop if access is not approved within the window.
+Expand to a second plant only if all five criteria are met and an operator with a backup is confirmed. Revise if correctness or replay fail. Collect missing evidence if freshness fails on a source-availability cause. Retain the current path if operation effort exceeds what the team confirms it can sustain. Stop if access is not approved in the window.
 
 ### Prerequisites and their status
 
-Specialist review of the source path: not started. Region and connectivity pattern: not agreed. CDC permission: awaiting the DBA. Baseline effort measurement: week one. Budget: a planning ceiling, explicitly not authorization.
+Specialist review of the source path: not started. Region and connectivity pattern: not agreed. CDC permission: awaiting the DBA. Baseline effort measurement: the baseline week. Budget: a planning ceiling, not authorization.
 
 ### Change log
 
-Draft 1 sent for review; the maintenance assistant request received during the demo was declined for this charter and logged as a separate decision.
+2026-02-24: draft 1 sent for review; the maintenance assistant request raised during the demo was declined for this charter and logged separately.
 
 <!-- section:template -->
 
