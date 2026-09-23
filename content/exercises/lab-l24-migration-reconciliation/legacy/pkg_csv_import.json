@@ -1,0 +1,30 @@
+{
+ "package": "pkg_csv_import",
+ "description": "Original SpicyBrain SSIS-style package outline for Lab L24: a simplified teaching representation of control flow, not the .dtsx format. Shown as text only; never executed.",
+ "schedule": {
+  "engine": "SQL Server Agent",
+  "agent_job": "nightly_quality",
+  "frequency": "daily",
+  "time": "06:30",
+  "time_zone": "server local clock (not recorded in the job)"
+ },
+ "connections": [
+  {"name": "erp", "kind": "OLE DB", "points_to": "ERP database (fictional)"},
+  {"name": "quality_drop", "kind": "flat file folder", "points_to": "incoming quality corrections folder (fictional)"}
+ ],
+ "tasks": [
+  {"name": "Loop over delivered CSV files", "type": "Foreach Loop Container", "contains": ["Load inspection corrections"]},
+  {"name": "Load inspection corrections", "type": "Data Flow Task", "inside": "Loop over delivered CSV files",
+   "flow": ["Flat File Source: quality_drop", "OLE DB Destination: erp.inspection_staging"]},
+  {"name": "Apply corrections", "type": "Execute SQL Task", "sql": "EXEC etl.sp_apply_corrections"},
+  {"name": "Build daily report", "type": "Execute SQL Task", "sql": "EXEC dbo.sp_daily_inspections @plant_code = N'P1'"},
+  {"name": "Notify on failure", "type": "Send Mail Task"}
+ ],
+ "precedence_constraints": [
+  {"from": "Loop over delivered CSV files", "to": "Apply corrections", "value": "Success"},
+  {"from": "Apply corrections", "to": "Build daily report", "value": "Success"},
+  {"from": "Loop over delivered CSV files", "to": "Notify on failure", "value": "Failure", "logical_or": true},
+  {"from": "Apply corrections", "to": "Notify on failure", "value": "Failure", "logical_or": true},
+  {"from": "Build daily report", "to": "Notify on failure", "value": "Failure", "logical_or": true}
+ ]
+}

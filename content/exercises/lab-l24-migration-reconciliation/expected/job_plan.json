@@ -1,0 +1,42 @@
+{
+ "job": "nightly_quality",
+ "schedule": {
+  "frequency": "daily",
+  "time": "06:30",
+  "time_zone": "America/New_York"
+ },
+ "tasks": [
+  {
+   "task_key": "loop_over_delivered_csv_files",
+   "source": "Foreach Loop Container + Data Flow Task",
+   "depends_on": [],
+   "run_if": null
+  },
+  {
+   "task_key": "apply_corrections",
+   "source": "Execute SQL Task",
+   "depends_on": [
+    "loop_over_delivered_csv_files"
+   ],
+   "run_if": "all_succeeded"
+  },
+  {
+   "task_key": "build_daily_report",
+   "source": "Execute SQL Task",
+   "depends_on": [
+    "apply_corrections"
+   ],
+   "run_if": "all_succeeded"
+  },
+  {
+   "task_key": "notify_on_failure",
+   "source": "Send Mail Task",
+   "depends_on": [
+    "apply_corrections",
+    "build_daily_report",
+    "loop_over_delivered_csv_files"
+   ],
+   "run_if": "at_least_one_failed"
+  }
+ ]
+}
