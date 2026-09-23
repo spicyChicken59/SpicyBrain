@@ -46,10 +46,14 @@ distinguishes **authored** (files exist), **integrated** (registered in
 | 2026-09-23 | `scripts/package-labs.py` deterministic lab packaging | yes | — | smoke | — | |
 | 2026-09-23 | Pilot module A4 `dbxfe-spark-execution` + lab L04 | in progress (agent) | no | no | no | |
 | 2026-09-23 | Module C2 `dbxfe-analytical-sql` + lab L12 | in progress (agent) | no | no | no | |
-| 2026-09-23 | Module D3 `dbxfe-aws` | in progress (agent) | no | no | no | |
-| 2026-09-23 | Engine: two-tier catalog lazy loading | in progress (agent) | no | no | no | design in agent brief; SCALE.md expected |
-| 2026-09-23 | Labs L02, L03 (retained A3); L06, L10 (retained B3) | in progress (agents) | no | no | no | |
-| 2026-09-23 | Field guides FG01–FG16, FG17–FG32 | in progress (agents) | no | no | no | |
+| 2026-09-23 | Module D3 `dbxfe-aws` | yes | yes (registered) | academy-check PASS | spot-checked | 13 beats, 12 core, 4 ext, 4 Samajh |
+| 2026-09-23 | Engine: two-tier catalog lazy loading | yes | yes | unit 145, e2e 47, extension PASS (agent copy); clone re-validation in progress | — | initial JS 916,247 B raw / 226,797 B gzip; `docs/academy/SCALE.md` |
+| 2026-09-23 | Labs L02, L03 (retained A3); L06, L10 (retained B3) | yes | packaged, indexed; not yet in course.json | run-labs.py re-execution PASS (9/9/24/19) | — | |
+| 2026-09-23 | Field guides FG01–FG32 | yes (64 files) | not yet (links target unregistered modules) | guideSchema + contract ids PASS | pending | |
 | 2026-09-23 | Eight case analyses + crosswalk | yes (17 files) | no | shape + refs | pending editorial | search-level evidence only; publishedAt unknown for all eight |
-| 2026-09-23 | Capstones: Cinderline deepening, service knowledge, coexistence | in progress (agents) | no | no | no | fragments under `content/courses/dbxfe/capstones/` |
-| 2026-09-23 | Retained-module deepening (cards ≥10, Samajh ≥2, windows beat, adoption) | in progress (agent) | no | no | no | |
+| 2026-09-23 | Capstones: Cinderline deepening, service knowledge, coexistence | yes | not yet | scenarioSchema PASS; Cinderline identities preserved | pending | fragments under `content/courses/dbxfe/capstones/` |
+| 2026-09-23 | Retained-module deepening | yes | yes | academy-check PASS ×16; 179 core cards, 37 Samajh, 136 beats | pending | one extension card revision → 2 |
+| 2026-09-23 | Wave 2 modules: B2+L05, B4+L08, B5+L07, A2+L01, C1+L11, C6+L13, E2+L18, E3+L17 | in progress (agents) | no | no | no | |
+| 2026-09-23 | Wave 3 modules: D4, D5, D6, C4, C5, E4, F5, F6 | in progress (agents) | no | no | no | |
+| 2026-09-23 | Engine: tracks course map, lab shelf, guides, cases, crosswalk, capstone notices | in progress (agent) | no | no | no | |
+| 2026-09-23 | Registration policy | — | — | — | — | teaching JSON is auto-discovered, so a module is committed only together with its `course.json` registration; guides/cases/labs/capstones register once every linked module exists |

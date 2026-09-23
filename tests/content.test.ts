@@ -36,11 +36,27 @@ test("launch inventory and stable IDs are preserved while additional lessons are
   // The academy grows the module list; the retained sixteen must remain.
   assert.ok(c.modules.length >= 16);
   for (const id of [
-    "dbxfe-m01","dbxfe-m02","dbxfe-m03","dbxfe-delta","dbxfe-transformations","dbxfe-m04",
-    "dbxfe-orchestration","dbxfe-m05","dbxfe-m06","dbxfe-m07","dbxfe-genai","dbxfe-m08",
-    "dbxfe-m09","dbxfe-m10","dbxfe-m11","dbxfe-m12",
+    "dbxfe-m01",
+    "dbxfe-m02",
+    "dbxfe-m03",
+    "dbxfe-delta",
+    "dbxfe-transformations",
+    "dbxfe-m04",
+    "dbxfe-orchestration",
+    "dbxfe-m05",
+    "dbxfe-m06",
+    "dbxfe-m07",
+    "dbxfe-genai",
+    "dbxfe-m08",
+    "dbxfe-m09",
+    "dbxfe-m10",
+    "dbxfe-m11",
+    "dbxfe-m12",
   ])
-    assert.ok(c.modules.some((m) => m.id === id), `retained module ${id}`);
+    assert.ok(
+      c.modules.some((m) => m.id === id),
+      `retained module ${id}`,
+    );
   const current = validatePreservation(
     JSON.parse(
       await readFile("content/preservation/dbxfe-study-hub.json", "utf8"),
