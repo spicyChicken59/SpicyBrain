@@ -1,0 +1,306 @@
+{
+ "module": {
+  "id": "dbxfe-spark-execution",
+  "title": "Distributed execution and reading Spark evidence",
+  "summary": "Predict shuffle boundaries, stages and tasks from a plan, then check them against measured tasks, shuffle records, skew and adaptive changes from a recorded local run.",
+  "objectives": [
+   "Predict Exchange nodes, stages and task counts from a physical plan and verify them against runtime evidence.",
+   "Explain with numbers why a hot key defeats more workers and more partitions, and what a broadcast, a salt or adaptive execution changes.",
+   "Run one bounded experiment that changes one variable and state honestly what a local toy run cannot prove."
+  ],
+  "prerequisiteIds": [
+   "dbxfe-transformations"
+  ],
+  "lessonFiles": [
+   "lessons/dbxfe-spark-execution-l01.json"
+  ],
+  "scenarioId": "dbxfe-spark-execution-scenario"
+ },
+ "scenarios": [
+  {
+   "id": "dbxfe-spark-execution-scenario",
+   "title": "The nightly regional roll-up and the request for a bigger cluster",
+   "context": "Fictional Cinderline Components runs a nightly job that joins every plant's inspection events to a small plant dimension and rolls them up by region. Since North's new automated line started, the job has taken twice as long. The operations lead has asked for the cluster to be doubled before the month-end close. The only evidence so far is the job's wall-clock duration and a screenshot of the plan showing a SortMergeJoin with an Exchange under each side.",
+   "task": "Write a one-page diagnosis and experiment plan for the platform lead: what the plan already tells you, what runtime evidence you would read next, which single change you would test first, and what measurement would make you recommend the bigger cluster after all.",
+   "requirements": [
+    "Separate what the plan proves from what only runtime evidence can show, and name the runtime evidence you need.",
+    "State the skew hypothesis with a concrete number-based test and say what result would refute it.",
+    "Propose one bounded experiment that changes exactly one variable, with its expected evidence and its limits.",
+    "Say honestly under which measurement doubling the cluster would be the right call."
+   ],
+   "model": "### What the plan proves\nThe join is a sort-merge join with an Exchange on each side and one more for the regional aggregate, so every fact row is shuffled by plant. The plan does not say how many rows each task read, how long any task ran or whether a task spilled; a plan cannot see skew.\n\n### Runtime evidence before any change\nFrom the Spark UI stage page of the join stage: task count, the maximum task duration against the median, shuffle read records and bytes per task, and spill. Skew is confirmed if one task reads several times the median and the others finish early; it is refuted if shuffle read is large and even across tasks, which means the job is genuinely bigger.\n\n### The first experiment\nThe plant dimension is four rows, so the first change is a broadcast hint on it, which removes the fact-side shuffle entirely. Run the same night's data once with and once without the hint and compare the Exchange count, the stage list, shuffle read per task and the longest task; nothing else changes. Expected: the fact-side Exchange disappears, the shuffle carries only regional partials, and the long join task is gone. If a long task remains in the regional aggregate, the next hypothesis is a different skewed key, tested the same way. A broadcast planned up front is preferred to waiting for adaptive execution to convert the join: Spark documents the runtime conversion as less efficient than planning the broadcast in the first place, and in the lab's adaptive run both inputs were still shuffled before the conversion.\n\n### When the bigger cluster is right\nIf the stage page shows many evenly sized tasks that are each slow, more executors shorten the stage. If it shows one task holding North, doubling the cluster doubles idle slots and the month-end close still waits for that task. Adaptive skew handling will not help unless the skewed partition exceeds both its size threshold and five times the median, which the team must check on the real run rather than assume.",
+   "reasoning": "The answer uses the plan for what it can prove, names the per-task runtime metrics that separate skew from volume, tests the cheapest single change first, and states the measurement that would justify the original request instead of dismissing it.",
+   "rubric": [
+    {
+     "id": "dbxfe-spark-execution-scenario-rubric-1",
+     "criterion": "Plan versus runtime",
+     "weak": "Treats the SortMergeJoin screenshot as proof of the cause.",
+     "partial": "Names runtime metrics but does not say which would confirm or refute skew.",
+     "strong": "States what the plan proves, names per-task shuffle read and duration as the deciding evidence and the result that would refute skew."
+    },
+    {
+     "id": "dbxfe-spark-execution-scenario-rubric-2",
+     "criterion": "Bounded experiment",
+     "weak": "Proposes several changes at once or doubling the cluster first.",
+     "partial": "Proposes one change without expected evidence or limits.",
+     "strong": "Changes one variable, states the expected change in exchanges, stages and task reads, and what a single-night result cannot show."
+    },
+    {
+     "id": "dbxfe-spark-execution-scenario-rubric-3",
+     "criterion": "Honesty about the request",
+     "weak": "Rejects or accepts the bigger cluster without a measurement.",
+     "partial": "Mentions skew as a reason but gives no condition under which scaling helps.",
+     "strong": "Gives the concrete task-distribution measurement under which more executors would shorten the stage."
+    },
+    {
+     "id": "dbxfe-spark-execution-scenario-rubric-4",
+     "criterion": "Mechanism accuracy",
+     "weak": "Confuses partitions, tasks and executors or says a broadcast copies the large side.",
+     "partial": "Mostly accurate but vague about why a hot key cannot be split by partition count.",
+     "strong": "Explains hash partitioning, the stage waiting for its longest task, why the broadcast removes the fact-side exchange, and when adaptive skew handling applies."
+    }
+   ],
+   "disclosures": [
+    {
+     "question": "How big is the plant dimension and how many rows does North contribute now?",
+     "response": "Fictional data lead response: the plant dimension is four rows. Since the automated line started, North sends about three quarters of the nightly events; it used to be a third."
+    },
+    {
+     "question": "Is adaptive query execution enabled on the job's runtime?",
+     "response": "Fictional platform lead response: it is enabled, but nobody has checked whether the skewed partition is above the split threshold, and the last run's stage page has not been looked at."
+    }
+   ],
+   "lessonIds": [
+    "dbxfe-spark-execution-l01"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-runtime-metrics",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "isCapstone": false
+  }
+ ],
+ "sources": [
+  {
+   "id": "dbxfe-spark-execution-course-source-cluster",
+   "title": "Cluster Mode Overview (Spark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/cluster-overview.html",
+   "publisher": "Apache Software Foundation",
+   "type": "official documentation",
+   "context": "Apache Spark 4.0.4 documentation; driver program, executors and tasks on any cluster manager.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Describes the generic open-source model; a Databricks Runtime bundles its own Spark version and compute model, and local[2] hosts driver and executor in one JVM. Search returned the same-titled 4.0.0 to 4.0.2 copies; the 4.0.4 path follows the course's pinned Spark URLs. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-source-rdd-guide",
+   "title": "RDD Programming Guide (Spark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/rdd-programming-guide.html",
+   "publisher": "Apache Software Foundation",
+   "type": "official documentation",
+   "context": "Apache Spark 4.0.4 documentation; lazy transformations, actions, shuffle operations, persistence and the collect() caution.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Written for the RDD API; DataFrame plans add an optimizer and adaptive execution on the same execution model. Search returned the same-titled 4.0.0 and 4.0.2 copies. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-source-sql-tuning",
+   "title": "Performance Tuning (Spark SQL, 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/sql-performance-tuning.html",
+   "publisher": "Apache Software Foundation",
+   "type": "official documentation",
+   "context": "Apache Spark 4.0.4 documentation; caching, join strategy hints, shuffle partitions and adaptive query execution (coalescing, join conversion, skew join).",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Defaults and thresholds are version-specific; the lab read its own values back rather than assuming them. Search returned the same-titled 4.0.0 and 4.0.2 copies. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-source-explain",
+   "title": "pyspark.sql.DataFrame.explain (PySpark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.explain.html",
+   "publisher": "Apache Software Foundation",
+   "type": "official documentation",
+   "context": "PySpark 4.0.4 API reference; explain modes simple, extended, codegen, cost and formatted.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "A printed plan is a proposal; with adaptive execution the physical plan can change after an action. This pinned URL is already cited by the course; search returned the latest copy. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-source-web-ui",
+   "title": "Web UI (Spark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/web-ui.html",
+   "publisher": "Apache Software Foundation",
+   "type": "official documentation",
+   "context": "Apache Spark 4.0.4 documentation; the Jobs and Stages tabs, shuffle read and write, task metrics and spill.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "The lab ran with the UI disabled and read the same stage, task and shuffle-record counts from Spark's status store. Search returned the same-titled 4.0.0, 4.0.2 and 4.0.3 copies. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-source-configuration",
+   "title": "Configuration (Spark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/configuration.html",
+   "publisher": "Apache Software Foundation",
+   "type": "official documentation",
+   "context": "Apache Spark 4.0.4 documentation; application properties including spark.driver.maxResultSize.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Defaults are per version and a platform may override them; the search snippet did not show this property's row. Search returned the same-titled 4.0.0 and 4.0.2 copies. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-source-cache",
+   "title": "pyspark.sql.DataFrame.cache (PySpark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.cache.html",
+   "publisher": "Apache Software Foundation",
+   "type": "official documentation",
+   "context": "PySpark 4.0.4 API reference; cache() and its default storage level.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "The Databricks disk cache for Parquet reads is a different mechanism. Search returned the latest copy of this page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-source-databricks-aqe",
+   "title": "Adaptive query execution | Databricks on AWS",
+   "url": "https://docs.databricks.com/aws/en/optimizations/aqe",
+   "publisher": "Databricks",
+   "type": "official documentation",
+   "context": "Databricks on AWS documentation; runtime re-optimization: coalescing partitions, switching join strategies, handling skew, propagating empty relations.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Databricks-specific behaviour and defaults; the local lab ran open-source Spark, not Databricks Runtime. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-spark-execution-course-claim-execution",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-course-source-cluster",
+    "dbxfe-spark-execution-course-source-rdd-guide",
+    "dbxfe-spark-execution-course-source-explain"
+   ],
+   "description": "A driver program coordinates executors that run tasks; transformations build a lazy plan and actions execute it; a shuffle redistributes rows across partitions and is costly; explain() prints the plan in several modes; collect() returns all rows to the driver.",
+   "context": "Apache Spark 4.0.4 documentation confirmed at search level on 2026-09-23; the generic execution model, not a Databricks compute claim."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-claim-tuning",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-course-source-sql-tuning",
+    "dbxfe-spark-execution-course-source-databricks-aqe"
+   ],
+   "description": "Spark SQL can cache tables and DataFrames; join strategy hints such as BROADCAST steer the planner; adaptive query execution uses runtime statistics to coalesce post-shuffle partitions, convert a sort-merge join to a broadcast join when any side is below the threshold at runtime, and split a join partition that exceeds both a factor of the median partition size and a byte threshold.",
+   "context": "Apache Spark 4.0.4 and Databricks on AWS pages confirmed at search level on 2026-09-23; thresholds and defaults are version-specific."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-claim-runtime-metrics",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-course-source-web-ui"
+   ],
+   "description": "The Stages tab of the Spark web UI shows each stage's shuffle read and write in bytes and records and summarizes task metrics, including duration and shuffle spill.",
+   "context": "Apache Spark 4.0.4 web UI page confirmed at search level on 2026-09-23; the lab read the same counts from the status store with the UI disabled."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-claim-memory",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-course-source-rdd-guide",
+    "dbxfe-spark-execution-course-source-configuration",
+    "dbxfe-spark-execution-course-source-cache"
+   ],
+   "description": "collect() fetches the entire dataset to the driver and can make it run out of memory; spark.driver.maxResultSize (default 1g) aborts an action whose serialized results exceed it; DataFrame.cache() persists with the MEMORY_AND_DISK_DESER storage level.",
+   "context": "Apache Spark 4.0.4 pages confirmed at search level on 2026-09-23; the maxResultSize row was not visible in the search snippet."
+  },
+  {
+   "id": "dbxfe-spark-execution-course-claim-local-run",
+   "kind": "guidance",
+   "sourceIds": [],
+   "description": "Original SpicyBrain execution evidence: lab L04 ran on local Apache Spark 4.0.4 in local[2] mode on one machine with four shuffle partitions, recording plans, partition membership, executed stages, task counts and shuffle records; no duration is a benchmark and nothing ran on Databricks.",
+   "context": "Recorded in docs/academy/labs/lab-l04-plans-shuffle.json; evidence about this configuration only."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-spark-execution-l01-execution-concept",
+   "term": "Spark execution model",
+   "aliases": [
+    "driver",
+    "executor",
+    "task",
+    "stage",
+    "action"
+   ],
+   "definition": "The driver builds a lazy plan from transformations and, at an action, splits it into stages of one task per partition that executors run.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-model"
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-boundary-concept",
+   "term": "shuffle boundary",
+   "aliases": [
+    "Exchange",
+    "wide dependency",
+    "narrow dependency"
+   ],
+   "definition": "The point in a plan where rows must move between partitions to meet by key; it appears as an Exchange and ends a stage.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-model"
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-evidence-concept",
+   "term": "planned versus measured evidence",
+   "aliases": [
+    "explain",
+    "status tracker",
+    "web UI stage metrics",
+    "shuffle records"
+   ],
+   "definition": "A plan states the operators Spark proposes; runtime evidence states which stages, tasks, shuffle records and partition sizes actually ran.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-boundaries"
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-skew-concept",
+   "term": "data skew",
+   "aliases": [
+    "hot key",
+    "straggler task",
+    "salting"
+   ],
+   "definition": "A key distribution in which one key's rows dominate one partition, so one task carries most of a stage's work whatever the worker count.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-skew"
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-adaptive-concept",
+   "term": "adaptive query execution",
+   "aliases": [
+    "AQE",
+    "AdaptiveSparkPlan",
+    "isFinalPlan",
+    "skew join"
+   ],
+   "definition": "Runtime re-planning that uses measured shuffle statistics to coalesce partitions, switch join strategies and split skewed join partitions.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-adaptive"
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-collect-concept",
+   "term": "collection to the driver",
+   "aliases": [
+    "collect",
+    "toPandas",
+    "out of memory",
+    "cache"
+   ],
+   "definition": "Moving every row of a result into the single driver process, bounded only by that process's memory, as opposed to keeping rows on executors.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-memory"
+  }
+ ]
+}
