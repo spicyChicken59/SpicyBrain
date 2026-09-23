@@ -1,0 +1,3239 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-forecasting",
+ "title": "Forecasting, anomalies and practical model selection",
+ "summary": "Evaluate three kinds of prediction the way their decisions need: a weekly forecast against naive and seasonal naive baselines on rolling origins, an anomaly threshold through the inspection load it creates, and a ranked queue at its real capacity.",
+ "outcomes": [
+  "Name a forecast's origin and horizon, compute naive and seasonal naive baselines, and build rolling-origin folds that never train on later days.",
+  "Detect temporal leakage and compare a lag regression with its baselines fold by fold using MAE, MASE and a MAPE that refuses zeros.",
+  "State an empirical prediction interval with its measured coverage and the events it cannot cover.",
+  "Turn an anomaly threshold into inspection load, false positives and misses, and re-choose it when the cost of a miss changes.",
+  "Judge a ranked inspection queue with precision and recall at its real capacity instead of accuracy."
+ ],
+ "startingAssumptions": [
+  "The machine-learning foundations module has covered targets, prediction time, baselines, held-out data and precision and recall.",
+  "Short Python with numpy arrays and a pandas DataFrame is readable; every result is also given as a table."
+ ],
+ "lessonIds": [
+  "dbxfe-forecasting-l01"
+ ],
+ "optionalBridgeLessonIds": [],
+ "editorialRationale": "Forecasting and anomaly work fails less from weak models than from evaluations that do not match the decision, so the module fixes the decision first (a Friday origin and a seven-day horizon), builds the baselines any model must beat, rolls the origin forward and removes leakage before comparing a readable model fold by fold. Metrics, intervals and thresholds are then treated as consequences for planners and inspectors, and a small ranking comparison shows that not all ML is classification. Every number comes from lab L19's executed synthetic data; managed tools appear only after the mechanism.",
+ "sources": [
+  {
+   "id": "dbxfe-forecasting-source-cv",
+   "title": "Cross-validation: evaluating estimator performance",
+   "url": "https://scikit-learn.org/stable/modules/cross_validation.html",
+   "publisher": "scikit-learn developers",
+   "reviewedAt": "2026-09-20",
+   "publishedAt": null,
+   "context": "scikit-learn 1.9.1 user guide; general and cloud-independent; lab-l19 pins scikit-learn 1.9.1.",
+   "caveat": "A split strategy is only valid if it matches the decision's timing; no split guarantees deployed accuracy.",
+   "reviewedEvidence": "Reused record: the URL, title and publisher are those the machine-learning foundations module reviewed on 2026-09-20; not re-confirmed by search in this build session, whose web-search budget was exhausted (200 of 200 searches) on 2026-09-23, and the page body was not fetched here (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: time series observations are correlated with observations near them in time, so classical cross-validation that assumes independent samples, such as KFold and ShuffleSplit, would put unreasonably correlated observations in training and test sets; TimeSeriesSplit instead returns the first k folds as the training set and the (k+1)th as the test set, each successive training set a superset of the one before."
+  },
+  {
+   "id": "dbxfe-forecasting-source-tss",
+   "title": "TimeSeriesSplit",
+   "url": "https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html",
+   "publisher": "scikit-learn developers",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "scikit-learn API reference; lab-l19 executes version 1.9.1.",
+   "caveat": "Parameter names and defaults are version-specific; the behaviour quoted here was executed with scikit-learn 1.9.1.",
+   "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the URL is as supplied in the build's source list and the title as previously read; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The behaviour this module relies on was executed instead: lab-l19 runs scikit-learn 1.9.1's TimeSeriesSplit with n_splits=4 and test_size=7, then with gap=1 and with max_train_size=28, and compares every fold boundary with independently derived index arithmetic. Passage relied on, as previously read: successive training sets are supersets of those before them; test_size limits the size of each test set and defaults to the number of samples divided by n_splits plus one; gap excludes samples from the end of each training set before the test set; max_train_size caps the training set."
+  },
+  {
+   "id": "dbxfe-forecasting-source-fpp3",
+   "title": "Forecasting: Principles and Practice (3rd ed)",
+   "url": "https://otexts.com/fpp3/",
+   "publisher": "OTexts (Rob J Hyndman and George Athanasopoulos)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open online forecasting textbook; methods are software-independent although its examples use R.",
+   "caveat": "Cited at the book's landing page; chapter details are summarized as previously read and should be checked in the current edition.",
+   "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the URL is as supplied in the build's source list and the title as previously read; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: the naive method sets every forecast to the last observation and the seasonal naive method sets each forecast to the last observed value from the same season; time series cross-validation evaluates forecasts on a rolling forecasting origin, training only on observations before each test set; percentage errors are infinite or undefined when an observation is zero and extreme when it is close to zero, the symmetric MAPE is not recommended, and scaled errors such as MASE divide by the in-sample MAE of a naive or seasonal naive method; a prediction interval gives a range expected to contain the value with a stated probability and usually widens as the horizon grows; exponential smoothing forecasts are weighted averages of past observations whose weights decay exponentially with age."
+  },
+  {
+   "id": "dbxfe-forecasting-source-automl",
+   "title": "What is AutoML?",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/automl/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; AutoML for classification, regression and forecasting problems.",
+   "caveat": "Supported runtimes, compute, algorithms and any deprecation notice change; check the current page. Nothing in this module ran AutoML.",
+   "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the URL is as supplied in the build's source list and the title as previously read; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: Databricks AutoML prepares a dataset, trains and tunes a set of candidate models for classification, regression and forecasting problems, and generates a notebook with the source code of each trial so that results can be reviewed, reproduced and modified. Details only the page could confirm (supported runtimes and compute, algorithm lists, deprecation notices) are not asserted in this module."
+  },
+  {
+   "id": "dbxfe-forecasting-source-metrics",
+   "title": "Metrics and scoring: quantifying prediction quality",
+   "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
+   "publisher": "scikit-learn developers",
+   "reviewedAt": "2026-09-20",
+   "publishedAt": null,
+   "context": "scikit-learn 1.9.1 user guide; regression and classification metrics.",
+   "caveat": "A metric's formula does not say which consequence matters; lab-l19 executes the MAPE behaviour quoted here.",
+   "reviewedEvidence": "Reused record: URL, title and publisher as reviewed on 2026-09-20 for the machine-learning foundations module; not re-confirmed by search in this build session (web-search budget exhausted, 200 of 200 searches) and page body not fetched here (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: precision is TP/(TP+FP) and depends on the decision threshold; the regression-metrics section defines the mean absolute percentage error with a small strictly positive epsilon in the denominator to avoid undefined results when a true value is zero. lab-l19 executes mean_absolute_percentage_error on a zero actual and checks the result."
+  },
+  {
+   "id": "dbxfe-forecasting-source-threshold",
+   "title": "Tuning the decision threshold for class prediction",
+   "url": "https://scikit-learn.org/stable/modules/classification_threshold.html",
+   "publisher": "scikit-learn developers",
+   "reviewedAt": "2026-09-20",
+   "publishedAt": null,
+   "context": "scikit-learn 1.9.1 user guide; the separation of scores from action thresholds.",
+   "caveat": "Written for classifiers; this module applies the same separation to an anomaly score by analogy.",
+   "reviewedEvidence": "Reused record: URL, title and publisher as reviewed on 2026-09-20 for the machine-learning foundations module; not re-confirmed by search in this build session (web-search budget exhausted, 200 of 200 searches) and page body not fetched here (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: a model's scores and the decision threshold that turns them into actions are separate; the default 0.5 threshold is not a business optimum, and a threshold can be tuned to a metric that reflects the costs of errors, on data not used to fit the model."
+  },
+  {
+   "id": "dbxfe-forecasting-source-pitfalls",
+   "title": "Common pitfalls and recommended practices",
+   "url": "https://scikit-learn.org/stable/common_pitfalls.html",
+   "publisher": "scikit-learn contributors",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "scikit-learn 1.9.1 documentation; general and cloud-independent.",
+   "caveat": "General guidance for scikit-learn estimators; time-specific leakage checks are this module's own.",
+   "reviewedEvidence": "Title, URL and publisher as confirmed by search on 2026-09-23 for the features module's source record (also reused by the MLflow module); this build session's search budget was exhausted before this module was written, so it was not searched again, and the page body was not fetched (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: data leakage occurs when information that would not be available at prediction time is used when building the model, which produces overly optimistic performance estimates; preprocessing must be learnt from the training subset only."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-forecasting-claim-tscv",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-cv",
+    "dbxfe-forecasting-source-tss",
+    "dbxfe-forecasting-source-fpp3"
+   ],
+   "description": "Time-series cross-validation evaluates forecasts on a rolling forecasting origin: each test set follows its training data in time, and scikit-learn's TimeSeriesSplit yields successive training sets that are supersets of earlier ones, whereas KFold and ShuffleSplit assume independent samples.",
+   "context": "General forecasting evaluation; scikit-learn 1.9.1 executed in lab-l19."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-tss-params",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-tss"
+   ],
+   "description": "TimeSeriesSplit's test_size sets each test set's length (by default the number of samples divided by n_splits plus one), gap drops samples from the end of each training set before its test set, and max_train_size caps the training window.",
+   "context": "scikit-learn 1.9.1; the fold boundaries were executed and checked in lab-l19."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-baselines",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ],
+   "description": "The naive method forecasts every step as the last observation; the seasonal naive method forecasts each step as the last observed value from the same season.",
+   "context": "Standard forecasting baselines; software-independent."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-percentage",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3",
+    "dbxfe-forecasting-source-metrics"
+   ],
+   "description": "Percentage errors such as MAPE are infinite or undefined when an actual is zero and extreme when it is close to zero; scikit-learn's mean_absolute_percentage_error divides by the larger of the actual's magnitude and a small epsilon, so a zero actual yields a very large finite value.",
+   "context": "Forecast accuracy measures; the scikit-learn behaviour was executed in lab-l19."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-mase",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ],
+   "description": "Scaled errors such as MASE divide forecast errors by the in-sample mean absolute error of a naive or seasonal naive method, giving a unit-free measure that stays defined when actuals are zero.",
+   "context": "Forecast accuracy measures; the lab scales by the seasonal naive method on working days."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-intervals",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ],
+   "description": "A prediction interval gives a range within which the future value is expected to lie with a stated probability, under the assumptions of the method that produced it.",
+   "context": "Forecast uncertainty; the lab's band is an empirical residual-quantile range."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-width",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ],
+   "description": "Prediction intervals usually widen as the forecast horizon grows, because more uncertainty accumulates the further ahead the forecast reaches.",
+   "context": "Forecast uncertainty; the lab's single residual band does not model this."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-smape",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ],
+   "description": "The symmetric MAPE still divides by a number close to zero when the actual is close to zero, can be negative in its original form, and is not recommended as a replacement for MAPE.",
+   "context": "Forecast accuracy measures; recommendation attributed to Hyndman and Koehler (2006) in the textbook."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-smoothing",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ],
+   "description": "Exponential smoothing forecasts are weighted averages of past observations whose weights decay exponentially as observations get older; seasonal variants such as Holt-Winters add a seasonal component.",
+   "context": "Forecasting methods; not executed in lab-l19."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-leakage",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-pitfalls",
+    "dbxfe-forecasting-source-cv"
+   ],
+   "description": "Data leakage uses information that would not be available at prediction time when building or evaluating a model, which produces overly optimistic performance estimates.",
+   "context": "General evaluation practice; the time-specific checks in this module are original guidance."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-threshold",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-threshold",
+    "dbxfe-forecasting-source-metrics"
+   ],
+   "description": "A score and the threshold that turns it into an action are separate choices; precision is TP/(TP+FP) and changes with the threshold, which can be set by the costs of the errors it trades.",
+   "context": "Classification thresholds, applied to an anomaly score and a ranked queue by analogy."
+  },
+  {
+   "id": "dbxfe-forecasting-claim-automl",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-forecasting-source-automl"
+   ],
+   "description": "Databricks documents AutoML as preparing data, training and tuning candidate models, and generating a source notebook for each trial, for classification, regression and forecasting problems.",
+   "context": "Databricks on AWS; supported runtimes and compute must be verified; nothing here ran AutoML."
+  },
+  {
+   "id": "dbxfe-forecasting-guidance",
+   "kind": "guidance",
+   "sourceIds": [],
+   "description": "Original SpicyBrain evaluation designs, decision rules, cost comparisons, checklists and interpretations for forecasting, anomaly thresholds and ranked queues; not a Databricks or scikit-learn recommendation.",
+   "context": "Independent curriculum; adapt costs, calendars and capacities to the actual operation."
+  },
+  {
+   "id": "dbxfe-forecasting-fiction",
+   "kind": "fictional",
+   "sourceIds": [],
+   "description": "Cinderline Components, bracket line L4, its lots, events, inspector-hour costs and every number quoted from lab-l19 are synthetic, produced by the lab's seeded generator and executed locally with pandas, numpy and scikit-learn.",
+   "context": "No real line, customer or Databricks workspace was measured; nothing here is a safety or financial guarantee."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-forecasting-origin-concept",
+   "term": "forecast origin",
+   "aliases": [
+    "as-of time",
+    "forecast cutoff"
+   ],
+   "definition": "The last point in time whose data a forecast may use; every step of the forecast is counted from it.",
+   "example": "Cinderline's Friday 2026-07-24 origin uses units through that Friday and nothing later.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-horizon-concept",
+   "term": "forecast horizon",
+   "aliases": [
+    "lead time",
+    "steps ahead"
+   ],
+   "definition": "The number of steps between the forecast origin and the furthest target the forecast must cover.",
+   "example": "A Friday roster forecast for Saturday to Friday has a seven-day horizon; next Friday is step 7.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-naive-concept",
+   "term": "naive forecast",
+   "aliases": [
+    "naive method",
+    "last-value forecast"
+   ],
+   "definition": "A baseline that sets every future value to the last observed value.",
+   "example": "Friday's 409 units repeated for every day of the following week.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-seasonal-concept",
+   "term": "seasonal naive forecast",
+   "aliases": [
+    "seasonal naive method",
+    "snaive"
+   ],
+   "definition": "A baseline that repeats the last observed value from the same point in the seasonal cycle.",
+   "example": "Next Saturday forecast as last Saturday's 176 units.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-seasonality-concept",
+   "term": "seasonality",
+   "aliases": [
+    "seasonal pattern",
+    "weekly pattern"
+   ],
+   "definition": "A pattern that repeats at a fixed period, such as a weekly production calendar.",
+   "example": "L4 runs two shifts Monday to Friday, one on Saturday and none on Sunday.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-rolling-concept",
+   "term": "rolling-origin backtest",
+   "aliases": [
+    "time series cross-validation",
+    "backtest",
+    "walk-forward validation",
+    "TimeSeriesSplit"
+   ],
+   "definition": "Evaluation at several successive forecast origins, each fitted only on data before its own test period.",
+   "example": "Four Friday origins, each followed by a seven-day test week, scored on 24 working days.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-cv",
+    "dbxfe-forecasting-source-tss",
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-leakage-concept",
+   "term": "temporal leakage",
+   "aliases": [
+    "look-ahead bias",
+    "future leakage"
+   ],
+   "definition": "Using, in training or evaluation, a value that would not exist at the forecast origin.",
+   "example": "A regression on the same day's run hours scores 12.06 units of error by reading data nobody has on Friday.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-pitfalls"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-lagmodel-concept",
+   "term": "lag regression",
+   "aliases": [
+    "lagged linear regression",
+    "seasonal lag model"
+   ],
+   "definition": "A linear model that predicts a value from earlier values of the same series at fixed lags.",
+   "example": "7.32 + 0.477 x last week's same day + 0.498 x the same day two weeks back.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-mape-concept",
+   "term": "MAPE",
+   "aliases": [
+    "mean absolute percentage error"
+   ],
+   "definition": "The mean of absolute errors divided by the actual values, usually times 100; undefined when an actual is zero.",
+   "example": "37 units wrong on a 425-unit day is 8.7%; on a closed 0-unit day it is undefined.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3",
+    "dbxfe-forecasting-source-metrics"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-mase-concept",
+   "term": "MASE",
+   "aliases": [
+    "mean absolute scaled error",
+    "scaled error"
+   ],
+   "definition": "Mean absolute error divided by the in-sample mean absolute error of a naive or seasonal naive method.",
+   "example": "Mean MASE over four folds: 1.49 for the lag regression, 1.67 for seasonal naive.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-interval-concept",
+   "term": "prediction interval",
+   "aliases": [
+    "uncertainty band",
+    "forecast range"
+   ],
+   "definition": "A range stated with a probability, within which the future value is expected to fall under the method's assumptions.",
+   "example": "An 80% band of 392.5 to 432.2 units for Wednesday 2026-08-19, which the breakdown missed.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-coverage-concept",
+   "term": "empirical coverage",
+   "aliases": [
+    "interval coverage"
+   ],
+   "definition": "The share of held-out actuals that fell inside the intervals stated for them.",
+   "example": "20 of 24 scored working days inside an 80% band: 83%.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-anomaly-concept",
+   "term": "anomaly score",
+   "aliases": [
+    "outlier score",
+    "standardized excess"
+   ],
+   "definition": "A number measuring how far an observation is from what was expected, before any threshold turns it into a flag.",
+   "example": "29 defects against 8.55 expected gives a score of about 7.0.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-threshold"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-threshold-concept",
+   "term": "anomaly threshold",
+   "aliases": [
+    "alert threshold",
+    "cut-off"
+   ],
+   "definition": "The score at or above which an observation is flagged for action.",
+   "example": "A threshold of 2.5 flags five of 47 scored days for review.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-threshold"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-load-concept",
+   "term": "false positive and inspection load",
+   "aliases": [
+    "false alarm",
+    "alert fatigue",
+    "review load"
+   ],
+   "definition": "The work a threshold creates: every flag costs a review, and a false positive is a flag that finds nothing.",
+   "example": "Threshold 1.5 creates 12 reviews, 7 of them false positives, 36 inspector-hours.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-threshold",
+    "dbxfe-forecasting-source-metrics"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-cost-concept",
+   "term": "decision cost",
+   "aliases": [
+    "cost-based threshold",
+    "expected cost"
+   ],
+   "definition": "The total cost of the actions a threshold triggers plus the misses it allows, used to choose the threshold.",
+   "example": "3 hours per review plus 12 hours per missed bad lot makes 2.5 the cheapest threshold.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-threshold"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-ranking-concept",
+   "term": "precision at k",
+   "aliases": [
+    "precision@k",
+    "top-k precision",
+    "ranking metric"
+   ],
+   "definition": "The fraction of the k highest-ranked items that are relevant.",
+   "example": "Model B's top four lots are all nonconforming: precision at 4 is 1.00.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-metrics"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-recommendation-concept",
+   "term": "recommendation task",
+   "aliases": [
+    "recommender",
+    "ranking task",
+    "ranked queue"
+   ],
+   "definition": "A task whose output is an ordered list for each request, judged by what the user acts on at the top of the list.",
+   "example": "A queue of 20 lots of which inspectors open the first four each shift.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-automl-concept",
+   "term": "Databricks AutoML",
+   "aliases": [
+    "AutoML forecasting",
+    "managed forecasting"
+   ],
+   "definition": "A Databricks tool that prepares data, trains and tunes candidate models and records each trial as a notebook.",
+   "example": "A forecasting trial whose notebook shows its split, inputs and metric for review.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-automl"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-extension-gap-concept",
+   "term": "split gap",
+   "aliases": [
+    "TimeSeriesSplit gap",
+    "embargo"
+   ],
+   "definition": "Samples removed between each training set and its test set so a backtest mimics data that arrive late.",
+   "example": "gap=1 ends fold 1's training on Thursday 2026-07-23 instead of the Friday origin.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-tss"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-extension-smape-concept",
+   "term": "symmetric MAPE",
+   "aliases": [
+    "sMAPE"
+   ],
+   "definition": "A percentage error that divides the absolute error by the average magnitude of actual and forecast.",
+   "example": "A zero actual with a 7-unit forecast scores 200% whatever the forecast size.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-extension-smoothing-concept",
+   "term": "exponential smoothing",
+   "aliases": [
+    "simple exponential smoothing",
+    "Holt-Winters"
+   ],
+   "definition": "Forecasting with weighted averages of past observations whose weights shrink exponentially with age.",
+   "example": "Each Wednesday's forecast as a weighted average of past Wednesdays, the latest weighted most.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-extension-width-concept",
+   "term": "interval width by horizon",
+   "aliases": [
+    "horizon-dependent uncertainty"
+   ],
+   "definition": "The tendency of prediction intervals to widen as the step being forecast lies further from the origin.",
+   "example": "A step-14 range wider than a step-1 range from the same Friday origin.",
+   "sourceIds": [
+    "dbxfe-forecasting-source-fpp3"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-forecasting-horizon-visual",
+   "kind": "timeline",
+   "title": "One origin, seven steps, and what each step can read",
+   "alt": "A timeline from Thursday 23 July to Friday 31 July 2026 with the Friday origin marked, then the same days showing which inputs each step can read at the origin.",
+   "caption": "The origin fixes what is known; lag 7 is observed for all seven steps, lag 1 only for step 1. Synthetic teaching example from lab L19.",
+   "textEquivalent": "Friday origin, seven steps: The roster is planned on Friday 24 July with units observed through that day; the forecast covers Saturday to Friday. Nodes: Thu 07-23: known. Observed: 411 units. (context); Fri 07-24 origin: origin. The last day the forecast may use: 409 units. (selected); Sat 07-25: step 1. Step 1: one shift planned. (pending); Sun 07-26: step 2. Step 2: closed by the published calendar. (context); Mon 07-27: step 3. Step 3: two shifts planned. (pending); Fri 07-31: step 7. Step 7: the end of the horizon. (pending). Relationships: Thu 07-23 → Fri 07-24 origin: observed up to; Fri 07-24 origin → Sat 07-25: forecast from; Fri 07-24 origin → Fri 07-31: horizon of 7.\n\nWhat each step can read at the origin: Lag 7 points at a day on or before the origin for every step up to 7; lag 1 does so only for step 1. Nodes: Sat 07-18: lag 7 of step 1. Read by step 1 through lag 7: observed. (selected); Fri 07-24 origin: origin. Read by step 7 through lag 7 and by step 1 through lag 1: observed. (selected); Sat 07-25 step 1: unknown at origin. Step 2's lag 1 would read this day: not yet observed at the origin. (warning); Sun 07-26 step 2: step 2. Its lag-1 input does not exist on Friday. (pending); Fri 07-31 step 7: same-day input. Its own run hours are recorded only after it ends. (excluded). Relationships: Sat 07-18 → Sat 07-25 step 1: lag 7; Fri 07-24 origin → Fri 07-31 step 7: lag 7; Sat 07-25 step 1 → Sun 07-26 step 2: lag 1, not available.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "origin",
+     "title": "Friday origin, seven steps",
+     "explanation": "The roster is planned on Friday 24 July with units observed through that day; the forecast covers Saturday to Friday.",
+     "nodes": [
+      {
+       "id": "thu",
+       "label": "Thu 07-23",
+       "detail": "Observed: 411 units.",
+       "status": "context",
+       "value": "known"
+      },
+      {
+       "id": "fri",
+       "label": "Fri 07-24 origin",
+       "detail": "The last day the forecast may use: 409 units.",
+       "status": "selected",
+       "value": "origin"
+      },
+      {
+       "id": "sat",
+       "label": "Sat 07-25",
+       "detail": "Step 1: one shift planned.",
+       "status": "pending",
+       "value": "step 1"
+      },
+      {
+       "id": "sun",
+       "label": "Sun 07-26",
+       "detail": "Step 2: closed by the published calendar.",
+       "status": "context",
+       "value": "step 2"
+      },
+      {
+       "id": "mon",
+       "label": "Mon 07-27",
+       "detail": "Step 3: two shifts planned.",
+       "status": "pending",
+       "value": "step 3"
+      },
+      {
+       "id": "fri2",
+       "label": "Fri 07-31",
+       "detail": "Step 7: the end of the horizon.",
+       "status": "pending",
+       "value": "step 7"
+      }
+     ],
+     "connections": [
+      {
+       "from": "thu",
+       "to": "fri",
+       "label": "observed up to"
+      },
+      {
+       "from": "fri",
+       "to": "sat",
+       "label": "forecast from"
+      },
+      {
+       "from": "fri",
+       "to": "fri2",
+       "label": "horizon of 7"
+      }
+     ]
+    },
+    {
+     "id": "reach",
+     "title": "What each step can read at the origin",
+     "explanation": "Lag 7 points at a day on or before the origin for every step up to 7; lag 1 does so only for step 1.",
+     "nodes": [
+      {
+       "id": "sat18",
+       "label": "Sat 07-18",
+       "detail": "Read by step 1 through lag 7: observed.",
+       "status": "selected",
+       "value": "lag 7 of step 1"
+      },
+      {
+       "id": "fri24",
+       "label": "Fri 07-24 origin",
+       "detail": "Read by step 7 through lag 7 and by step 1 through lag 1: observed.",
+       "status": "selected",
+       "value": "origin"
+      },
+      {
+       "id": "sat25",
+       "label": "Sat 07-25 step 1",
+       "detail": "Step 2's lag 1 would read this day: not yet observed at the origin.",
+       "status": "warning",
+       "value": "unknown at origin"
+      },
+      {
+       "id": "sun26",
+       "label": "Sun 07-26 step 2",
+       "detail": "Its lag-1 input does not exist on Friday.",
+       "status": "pending",
+       "value": "step 2"
+      },
+      {
+       "id": "fri31",
+       "label": "Fri 07-31 step 7",
+       "detail": "Its own run hours are recorded only after it ends.",
+       "status": "excluded",
+       "value": "same-day input"
+      }
+     ],
+     "connections": [
+      {
+       "from": "sat18",
+       "to": "sat25",
+       "label": "lag 7"
+      },
+      {
+       "from": "fri24",
+       "to": "fri31",
+       "label": "lag 7"
+      },
+      {
+       "from": "sat25",
+       "to": "sun26",
+       "label": "lag 1, not available"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-naive-visual",
+   "kind": "table",
+   "title": "The naive forecast from four Friday origins",
+   "alt": "Two tables: the naive forecast of 409 units against each day of the week after Friday 24 July, then the Saturday error and weekly MAE for all four origins.",
+   "caption": "Repeating Friday's value is worst on the one-shift Saturday at every origin. Synthetic teaching example from lab L19.",
+   "textEquivalent": "Naive from Friday 07-24: Every step repeats Friday's 409 units; Saturday's one shift made 169, so the error is 240. The closed Sunday is not scored. Table columns: Day, Actual, Naive, Abs error. Rows: Sat 07-25, 169, 409, 240; Sun 07-26, 0 (closed), 409, not scored; Mon 07-27, 382, 409, 27; Tue 07-28, 425, 409, 16; Wed 07-29, 419, 409, 10; Thu 07-30, 393, 409, 16; Fri 07-31, 407, 409, 2.\n\nFour origins, one pattern: Whichever Friday is the origin, the naive forecast carries two shifts into Saturday; the six-day MAE stays above 40 units. Table columns: Origin, Naive value, Saturday error, MAE, 6 working days. Rows: Fri 07-24, 409, 240, 51.83; Fri 07-31, 407, 249, 47.00; Fri 08-07, 412, 215, 41.83; Fri 08-14, 409, 227, 89.17.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "week",
+     "title": "Naive from Friday 07-24",
+     "explanation": "Every step repeats Friday's 409 units; Saturday's one shift made 169, so the error is 240. The closed Sunday is not scored.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Day",
+       "Actual",
+       "Naive",
+       "Abs error"
+      ],
+      "rows": [
+       [
+        "Sat 07-25",
+        "169",
+        "409",
+        "240"
+       ],
+       [
+        "Sun 07-26",
+        "0 (closed)",
+        "409",
+        "not scored"
+       ],
+       [
+        "Mon 07-27",
+        "382",
+        "409",
+        "27"
+       ],
+       [
+        "Tue 07-28",
+        "425",
+        "409",
+        "16"
+       ],
+       [
+        "Wed 07-29",
+        "419",
+        "409",
+        "10"
+       ],
+       [
+        "Thu 07-30",
+        "393",
+        "409",
+        "16"
+       ],
+       [
+        "Fri 07-31",
+        "407",
+        "409",
+        "2"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "origins",
+     "title": "Four origins, one pattern",
+     "explanation": "Whichever Friday is the origin, the naive forecast carries two shifts into Saturday; the six-day MAE stays above 40 units.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Origin",
+       "Naive value",
+       "Saturday error",
+       "MAE, 6 working days"
+      ],
+      "rows": [
+       [
+        "Fri 07-24",
+        "409",
+        "240",
+        "51.83"
+       ],
+       [
+        "Fri 07-31",
+        "407",
+        "249",
+        "47.00"
+       ],
+       [
+        "Fri 08-07",
+        "412",
+        "215",
+        "41.83"
+       ],
+       [
+        "Fri 08-14",
+        "409",
+        "227",
+        "89.17"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-seasonal-visual",
+   "kind": "table",
+   "title": "Seasonal naive: last week's same day, whatever happened on it",
+   "alt": "Three tables: naive against seasonal naive for the week after 24 July, the 14-day seasonal naive forecast repeating one week twice, and the breakdown Wednesday copied into the next week's forecast.",
+   "caption": "Seasonal naive tracks the weekly calendar and copies anomalies forward. Synthetic teaching example from lab L19.",
+   "textEquivalent": "Fold 1: naive against seasonal naive: Copying the same weekday last week follows the calendar: 176 for Saturday instead of 409. Table columns: Day, Actual, Naive, Seasonal naive. Rows: Sat 07-25, 169, 409, 176; Mon 07-27, 382, 409, 379; Tue 07-28, 425, 409, 388; Wed 07-29, 419, 409, 418; Thu 07-30, 393, 409, 411; Fri 07-31, 407, 409, 409; MAE, -, 51.83, 11.33.\n\nHorizon 14 repeats the last week: From the Friday 08-14 origin, steps 8 to 14 have no newer same-weekday value, so they repeat steps 1 to 7. Table columns: Steps, Days, Forecast. Rows: 1 to 7, Sat 08-15 to Fri 08-21, 197, 0, 403, 422, 418, 404, 409; 8 to 14, Sat 08-22 to Fri 08-28, 197, 0, 403, 422, 418, 404, 409.\n\nThe breakdown copied forward: From the Friday 08-21 origin, next Wednesday is forecast as last Wednesday's 156 units, the breakdown. Table columns: Target day, Copied from, Seasonal naive, Same weekday, three weeks before. Rows: Wed 08-26, Wed 08-19 (breakdown), 156, 419, 410, 418; Thu 08-27, Thu 08-20, 425, 393, 413, 404.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "compare",
+     "title": "Fold 1: naive against seasonal naive",
+     "explanation": "Copying the same weekday last week follows the calendar: 176 for Saturday instead of 409.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Day",
+       "Actual",
+       "Naive",
+       "Seasonal naive"
+      ],
+      "rows": [
+       [
+        "Sat 07-25",
+        "169",
+        "409",
+        "176"
+       ],
+       [
+        "Mon 07-27",
+        "382",
+        "409",
+        "379"
+       ],
+       [
+        "Tue 07-28",
+        "425",
+        "409",
+        "388"
+       ],
+       [
+        "Wed 07-29",
+        "419",
+        "409",
+        "418"
+       ],
+       [
+        "Thu 07-30",
+        "393",
+        "409",
+        "411"
+       ],
+       [
+        "Fri 07-31",
+        "407",
+        "409",
+        "409"
+       ],
+       [
+        "MAE",
+        "-",
+        "51.83",
+        "11.33"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "fourteen",
+     "title": "Horizon 14 repeats the last week",
+     "explanation": "From the Friday 08-14 origin, steps 8 to 14 have no newer same-weekday value, so they repeat steps 1 to 7.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Steps",
+       "Days",
+       "Forecast"
+      ],
+      "rows": [
+       [
+        "1 to 7",
+        "Sat 08-15 to Fri 08-21",
+        "197, 0, 403, 422, 418, 404, 409"
+       ],
+       [
+        "8 to 14",
+        "Sat 08-22 to Fri 08-28",
+        "197, 0, 403, 422, 418, 404, 409"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "copied",
+     "title": "The breakdown copied forward",
+     "explanation": "From the Friday 08-21 origin, next Wednesday is forecast as last Wednesday's 156 units, the breakdown.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Target day",
+       "Copied from",
+       "Seasonal naive",
+       "Same weekday, three weeks before"
+      ],
+      "rows": [
+       [
+        "Wed 08-26",
+        "Wed 08-19 (breakdown)",
+        "156",
+        "419, 410, 418"
+       ],
+       [
+        "Thu 08-27",
+        "Thu 08-20",
+        "425",
+        "393, 413, 404"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-rolling-visual",
+   "kind": "timeline",
+   "title": "Rolling-origin validation over 82 days",
+   "alt": "Six timeline states: four folds whose training windows grow by a week and whose test weeks follow them, then the same fold 1 with gap=1 and with a sliding 28-day window.",
+   "caption": "TimeSeriesSplit(n_splits=4, test_size=7) on L4's 82 days; no training day is ever later than a test day. Synthetic teaching example from lab L19.",
+   "textEquivalent": "Fold 1: Training ends at the first Friday origin; the next seven days are the test week and everything later is unused. Nodes: Train Jun 01-Jul 24: 54 days. Every earlier day, fitted once for this fold. (selected); Origin Fri 07-24: origin. Last training day; forecasts start here. (selected); Test Jul 25-31: 7 days. Seven days scored on their six working days. (pending); Later days: unused. Aug 01-21: invisible to fold 1. (excluded). Relationships: Train Jun 01-Jul 24 → Origin Fri 07-24: ends at; Origin Fri 07-24 → Test Jul 25-31: forecast 7 steps.\n\nFold 2: The origin moves forward one week; fold 1's test week has become training data. Nodes: Train Jun 01-Jul 31: 61 days. Includes fold 1's test week. (selected); Origin Fri 07-31: origin. Second Friday origin. (selected); Test Aug 01-07: 7 days. The next seven days. (pending); Later days: unused. Aug 08-21: invisible to fold 2. (excluded). Relationships: Train Jun 01-Jul 31 → Origin Fri 07-31: ends at; Origin Fri 07-31 → Test Aug 01-07: forecast 7 steps.\n\nFold 3: Another week of training; the model is refitted from scratch on 68 days. Nodes: Train Jun 01-Aug 07: 68 days. Refitted on 68 days. (selected); Origin Fri 08-07: origin. Third Friday origin. (selected); Test Aug 08-14: 7 days. The next seven days. (pending); Later days: unused. Aug 15-21: invisible to fold 3. (excluded). Relationships: Train Jun 01-Aug 07 → Origin Fri 08-07: ends at; Origin Fri 08-07 → Test Aug 08-14: forecast 7 steps.\n\nFold 4: The last fold tests the final week of data, which contains the breakdown. Nodes: Train Jun 01-Aug 14: 75 days. Refitted on 75 days. (selected); Origin Fri 08-14: origin. Fourth Friday origin. (selected); Test Aug 15-21: 7 days. Includes the breakdown on Wednesday 08-19. (warning). Relationships: Train Jun 01-Aug 14 → Origin Fri 08-14: ends at; Origin Fri 08-14 → Test Aug 15-21: forecast 7 steps.\n\ngap=1: Friday left out: With gap=1 fold 1 trains to Thursday, as if Friday's count were not final at planning time, and tests the same week. Nodes: Train Jun 01-Jul 23: 53 days. Ends one day earlier. (selected); Fri 07-24 dropped: gap=1. Between training and test; used by neither. (excluded); Test Jul 25-31: 7 days. Unchanged test week. (pending). Relationships: Train Jun 01-Jul 23 → Fri 07-24 dropped: then skip; Fri 07-24 dropped → Test Jul 25-31: then test.\n\nmax_train_size=28: a sliding window: Capping training at 28 days keeps only the four most recent weeks before each test week. Nodes: Jun 01-Jun 26: dropped. No longer used by fold 1. (excluded); Train Jun 27-Jul 24: 28 days. The latest four weeks only. (selected); Test Jul 25-31: 7 days. Unchanged test week. (pending). Relationships: Jun 01-Jun 26 → Train Jun 27-Jul 24: window slides; Train Jun 27-Jul 24 → Test Jul 25-31: then test.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-claim-tss-params",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "fold1",
+     "title": "Fold 1",
+     "explanation": "Training ends at the first Friday origin; the next seven days are the test week and everything later is unused.",
+     "nodes": [
+      {
+       "id": "train",
+       "label": "Train Jun 01-Jul 24",
+       "detail": "Every earlier day, fitted once for this fold.",
+       "status": "selected",
+       "value": "54 days"
+      },
+      {
+       "id": "origin",
+       "label": "Origin Fri 07-24",
+       "detail": "Last training day; forecasts start here.",
+       "status": "selected",
+       "value": "origin"
+      },
+      {
+       "id": "test",
+       "label": "Test Jul 25-31",
+       "detail": "Seven days scored on their six working days.",
+       "status": "pending",
+       "value": "7 days"
+      },
+      {
+       "id": "later",
+       "label": "Later days",
+       "detail": "Aug 01-21: invisible to fold 1.",
+       "status": "excluded",
+       "value": "unused"
+      }
+     ],
+     "connections": [
+      {
+       "from": "train",
+       "to": "origin",
+       "label": "ends at"
+      },
+      {
+       "from": "origin",
+       "to": "test",
+       "label": "forecast 7 steps"
+      }
+     ]
+    },
+    {
+     "id": "fold2",
+     "title": "Fold 2",
+     "explanation": "The origin moves forward one week; fold 1's test week has become training data.",
+     "nodes": [
+      {
+       "id": "train",
+       "label": "Train Jun 01-Jul 31",
+       "detail": "Includes fold 1's test week.",
+       "status": "selected",
+       "value": "61 days"
+      },
+      {
+       "id": "origin",
+       "label": "Origin Fri 07-31",
+       "detail": "Second Friday origin.",
+       "status": "selected",
+       "value": "origin"
+      },
+      {
+       "id": "test",
+       "label": "Test Aug 01-07",
+       "detail": "The next seven days.",
+       "status": "pending",
+       "value": "7 days"
+      },
+      {
+       "id": "later",
+       "label": "Later days",
+       "detail": "Aug 08-21: invisible to fold 2.",
+       "status": "excluded",
+       "value": "unused"
+      }
+     ],
+     "connections": [
+      {
+       "from": "train",
+       "to": "origin",
+       "label": "ends at"
+      },
+      {
+       "from": "origin",
+       "to": "test",
+       "label": "forecast 7 steps"
+      }
+     ]
+    },
+    {
+     "id": "fold3",
+     "title": "Fold 3",
+     "explanation": "Another week of training; the model is refitted from scratch on 68 days.",
+     "nodes": [
+      {
+       "id": "train",
+       "label": "Train Jun 01-Aug 07",
+       "detail": "Refitted on 68 days.",
+       "status": "selected",
+       "value": "68 days"
+      },
+      {
+       "id": "origin",
+       "label": "Origin Fri 08-07",
+       "detail": "Third Friday origin.",
+       "status": "selected",
+       "value": "origin"
+      },
+      {
+       "id": "test",
+       "label": "Test Aug 08-14",
+       "detail": "The next seven days.",
+       "status": "pending",
+       "value": "7 days"
+      },
+      {
+       "id": "later",
+       "label": "Later days",
+       "detail": "Aug 15-21: invisible to fold 3.",
+       "status": "excluded",
+       "value": "unused"
+      }
+     ],
+     "connections": [
+      {
+       "from": "train",
+       "to": "origin",
+       "label": "ends at"
+      },
+      {
+       "from": "origin",
+       "to": "test",
+       "label": "forecast 7 steps"
+      }
+     ]
+    },
+    {
+     "id": "fold4",
+     "title": "Fold 4",
+     "explanation": "The last fold tests the final week of data, which contains the breakdown.",
+     "nodes": [
+      {
+       "id": "train",
+       "label": "Train Jun 01-Aug 14",
+       "detail": "Refitted on 75 days.",
+       "status": "selected",
+       "value": "75 days"
+      },
+      {
+       "id": "origin",
+       "label": "Origin Fri 08-14",
+       "detail": "Fourth Friday origin.",
+       "status": "selected",
+       "value": "origin"
+      },
+      {
+       "id": "test",
+       "label": "Test Aug 15-21",
+       "detail": "Includes the breakdown on Wednesday 08-19.",
+       "status": "warning",
+       "value": "7 days"
+      }
+     ],
+     "connections": [
+      {
+       "from": "train",
+       "to": "origin",
+       "label": "ends at"
+      },
+      {
+       "from": "origin",
+       "to": "test",
+       "label": "forecast 7 steps"
+      }
+     ]
+    },
+    {
+     "id": "gap",
+     "title": "gap=1: Friday left out",
+     "explanation": "With gap=1 fold 1 trains to Thursday, as if Friday's count were not final at planning time, and tests the same week.",
+     "nodes": [
+      {
+       "id": "train",
+       "label": "Train Jun 01-Jul 23",
+       "detail": "Ends one day earlier.",
+       "status": "selected",
+       "value": "53 days"
+      },
+      {
+       "id": "dropped",
+       "label": "Fri 07-24 dropped",
+       "detail": "Between training and test; used by neither.",
+       "status": "excluded",
+       "value": "gap=1"
+      },
+      {
+       "id": "test",
+       "label": "Test Jul 25-31",
+       "detail": "Unchanged test week.",
+       "status": "pending",
+       "value": "7 days"
+      }
+     ],
+     "connections": [
+      {
+       "from": "train",
+       "to": "dropped",
+       "label": "then skip"
+      },
+      {
+       "from": "dropped",
+       "to": "test",
+       "label": "then test"
+      }
+     ]
+    },
+    {
+     "id": "sliding",
+     "title": "max_train_size=28: a sliding window",
+     "explanation": "Capping training at 28 days keeps only the four most recent weeks before each test week.",
+     "nodes": [
+      {
+       "id": "old",
+       "label": "Jun 01-Jun 26",
+       "detail": "No longer used by fold 1.",
+       "status": "excluded",
+       "value": "dropped"
+      },
+      {
+       "id": "train",
+       "label": "Train Jun 27-Jul 24",
+       "detail": "The latest four weeks only.",
+       "status": "selected",
+       "value": "28 days"
+      },
+      {
+       "id": "test",
+       "label": "Test Jul 25-31",
+       "detail": "Unchanged test week.",
+       "status": "pending",
+       "value": "7 days"
+      }
+     ],
+     "connections": [
+      {
+       "from": "old",
+       "to": "train",
+       "label": "window slides"
+      },
+      {
+       "from": "train",
+       "to": "test",
+       "label": "then test"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-leakage-visual",
+   "kind": "comparison",
+   "title": "Honest inputs against inputs the origin cannot see",
+   "alt": "Three comparison states: honest lag inputs with their backtest error, a same-day run-hours model with a better but impossible error, and shuffled folds against time-ordered folds.",
+   "caption": "A leaked input improves the backtest and cannot exist at the origin. Synthetic teaching example from lab L19.",
+   "textEquivalent": "Honest inputs: Lag 7 and lag 14 read days on or before the Friday origin, and the calendar is published weeks ahead. Nodes: Lag 7 and lag 14: known at origin. Read days on or before the Friday origin. (selected); Planned hours: known ahead. Published weeks ahead; a legitimate future input. (selected); Backtest MAE: 21.17. Mean of four folds for the lag regression. (selected).\n\nSame-day run hours: Units regressed on the target day's own run hours: a far better backtest built on values nobody has on Friday. Nodes: Run hours of the target day: after the day. Written when the day ends; unknown at the origin for every step. (warning); Backtest MAE: 12.06. Looks much better than anything achievable at the origin. (warning); Breakdown Wed 08-19: 5.5 hours. 'Predicted' from its own 5.5 run hours. (warning).\n\nShuffled folds: Random folds put later days into training for every fold; time-ordered folds never do. Nodes: KFold(shuffle=True): 4 of 4 folds leak. All four folds train on days later than some of their test days. (warning); TimeSeriesSplit: 0 of 4 folds leak. Every training day precedes every test day. (selected).",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-leakage",
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "honest",
+     "title": "Honest inputs",
+     "explanation": "Lag 7 and lag 14 read days on or before the Friday origin, and the calendar is published weeks ahead.",
+     "nodes": [
+      {
+       "id": "lags",
+       "label": "Lag 7 and lag 14",
+       "detail": "Read days on or before the Friday origin.",
+       "status": "selected",
+       "value": "known at origin"
+      },
+      {
+       "id": "calendar",
+       "label": "Planned hours",
+       "detail": "Published weeks ahead; a legitimate future input.",
+       "status": "selected",
+       "value": "known ahead"
+      },
+      {
+       "id": "mae",
+       "label": "Backtest MAE",
+       "detail": "Mean of four folds for the lag regression.",
+       "status": "selected",
+       "value": "21.17"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "sameday",
+     "title": "Same-day run hours",
+     "explanation": "Units regressed on the target day's own run hours: a far better backtest built on values nobody has on Friday.",
+     "nodes": [
+      {
+       "id": "hours",
+       "label": "Run hours of the target day",
+       "detail": "Written when the day ends; unknown at the origin for every step.",
+       "status": "warning",
+       "value": "after the day"
+      },
+      {
+       "id": "mae",
+       "label": "Backtest MAE",
+       "detail": "Looks much better than anything achievable at the origin.",
+       "status": "warning",
+       "value": "12.06"
+      },
+      {
+       "id": "breakdown",
+       "label": "Breakdown Wed 08-19",
+       "detail": "'Predicted' from its own 5.5 run hours.",
+       "status": "warning",
+       "value": "5.5 hours"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "shuffled",
+     "title": "Shuffled folds",
+     "explanation": "Random folds put later days into training for every fold; time-ordered folds never do.",
+     "nodes": [
+      {
+       "id": "kfold",
+       "label": "KFold(shuffle=True)",
+       "detail": "All four folds train on days later than some of their test days.",
+       "status": "warning",
+       "value": "4 of 4 folds leak"
+      },
+      {
+       "id": "tss",
+       "label": "TimeSeriesSplit",
+       "detail": "Every training day precedes every test day.",
+       "status": "selected",
+       "value": "0 of 4 folds leak"
+      }
+     ],
+     "connections": []
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-model-visual",
+   "kind": "table",
+   "title": "Baselines against the lag regression, fold by fold",
+   "alt": "Three tables: mean absolute error for naive, seasonal naive and the lag regression in each of four folds, the regression's coefficients per fold, and the means without the breakdown week.",
+   "caption": "The model wins the mean and three folds, not every fold. Values from lab L19's executed backtest on synthetic data.",
+   "textEquivalent": "MAE by fold: Same folds, same working days, three methods; the better of the last two columns is named in each row. Table columns: Fold (test week), Naive, Seasonal naive, Lag regression, Better of last two. Rows: 1 (Jul 25-31), 51.83, 11.33, 12.55, seasonal naive; 2 (Aug 01-07), 47.00, 11.50, 9.71, lag regression; 3 (Aug 08-14), 41.83, 14.50, 11.72, lag regression; 4 (Aug 15-21), 89.17, 57.33, 50.69, lag regression; Mean, 57.46, 23.67, 21.17, lag regression.\n\nWhat the model learned: Each fold refits the same two-lag formula; the weights stay near one half each, a smoothed seasonal naive. Table columns: Fold, Rows, Intercept, x last week, x two weeks ago. Rows: 1, 35, 7.32, 0.477, 0.498; 2, 41, 5.93, 0.464, 0.515; 3, 47, 1.73, 0.475, 0.516; 4, 53, 8.69, 0.453, 0.522.\n\nFolds 1 to 3 only: Without the breakdown week the gap between the two stronger methods is about one unit a day. Table columns: Method, Mean MAE, folds 1-3. Rows: Naive, 46.89; Seasonal naive, 12.44; Lag regression, 11.33.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "mae",
+     "title": "MAE by fold",
+     "explanation": "Same folds, same working days, three methods; the better of the last two columns is named in each row.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Fold (test week)",
+       "Naive",
+       "Seasonal naive",
+       "Lag regression",
+       "Better of last two"
+      ],
+      "rows": [
+       [
+        "1 (Jul 25-31)",
+        "51.83",
+        "11.33",
+        "12.55",
+        "seasonal naive"
+       ],
+       [
+        "2 (Aug 01-07)",
+        "47.00",
+        "11.50",
+        "9.71",
+        "lag regression"
+       ],
+       [
+        "3 (Aug 08-14)",
+        "41.83",
+        "14.50",
+        "11.72",
+        "lag regression"
+       ],
+       [
+        "4 (Aug 15-21)",
+        "89.17",
+        "57.33",
+        "50.69",
+        "lag regression"
+       ],
+       [
+        "Mean",
+        "57.46",
+        "23.67",
+        "21.17",
+        "lag regression"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "coef",
+     "title": "What the model learned",
+     "explanation": "Each fold refits the same two-lag formula; the weights stay near one half each, a smoothed seasonal naive.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Fold",
+       "Rows",
+       "Intercept",
+       "x last week",
+       "x two weeks ago"
+      ],
+      "rows": [
+       [
+        "1",
+        "35",
+        "7.32",
+        "0.477",
+        "0.498"
+       ],
+       [
+        "2",
+        "41",
+        "5.93",
+        "0.464",
+        "0.515"
+       ],
+       [
+        "3",
+        "47",
+        "1.73",
+        "0.475",
+        "0.516"
+       ],
+       [
+        "4",
+        "53",
+        "8.69",
+        "0.453",
+        "0.522"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "nobreak",
+     "title": "Folds 1 to 3 only",
+     "explanation": "Without the breakdown week the gap between the two stronger methods is about one unit a day.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Method",
+       "Mean MAE, folds 1-3"
+      ],
+      "rows": [
+       [
+        "Naive",
+        "46.89"
+       ],
+       [
+        "Seasonal naive",
+        "12.44"
+       ],
+       [
+        "Lag regression",
+        "11.33"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-metrics-visual",
+   "kind": "equation",
+   "title": "What a zero actual does to MAE, MAPE and MASE",
+   "alt": "Three states: the formulas of MAE, MAPE and MASE, the ratio each day contributes to MAPE when Sunday's actual is zero, and the three metrics on working days for all methods.",
+   "caption": "MAPE divides by the actual; a closed day's zero makes it infinite or enormous. Values from lab L19's execution on synthetic data.",
+   "textEquivalent": "Three formulas: MAE keeps units, MAPE divides each error by its actual, MASE divides MAE by a baseline's in-sample error. Equation: MAE = mean(|y - f|);  MAPE = 100 x mean(|y - f| / |y|);  MASE = MAE / mean(|y(t) - y(t-7)|) over the fold's training working days\n\nA closed Sunday: The naive forecast gives the closed Sunday 409 units; its ratio has no finite value. Table columns: Day, Actual, Naive, |error| / |actual|. Rows: Sat 07-25, 169, 409, 1.42; Sun 07-26 (closed), 0, 409, numpy: infinite; scikit-learn: 1.8 x 10^18; Mon 07-27, 382, 409, 0.07.\n\nScored on working days: Scored on the 24 working days, all three metrics are defined and rank the methods the same way. Table columns: Method, Mean MAE (units), Mean MAPE, Mean MASE. Rows: Naive, 57.46, 31.0%, 4.03; Seasonal naive, 23.67, 11.0%, 1.67; Lag regression, 21.17, 10.2%, 1.49.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-percentage",
+    "dbxfe-forecasting-claim-mase",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "formulas",
+     "title": "Three formulas",
+     "explanation": "MAE keeps units, MAPE divides each error by its actual, MASE divides MAE by a baseline's in-sample error.",
+     "nodes": [],
+     "connections": [],
+     "equation": "MAE = mean(|y - f|);  MAPE = 100 x mean(|y - f| / |y|);  MASE = MAE / mean(|y(t) - y(t-7)|) over the fold's training working days"
+    },
+    {
+     "id": "zero",
+     "title": "A closed Sunday",
+     "explanation": "The naive forecast gives the closed Sunday 409 units; its ratio has no finite value.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Day",
+       "Actual",
+       "Naive",
+       "|error| / |actual|"
+      ],
+      "rows": [
+       [
+        "Sat 07-25",
+        "169",
+        "409",
+        "1.42"
+       ],
+       [
+        "Sun 07-26 (closed)",
+        "0",
+        "409",
+        "numpy: infinite; scikit-learn: 1.8 x 10^18"
+       ],
+       [
+        "Mon 07-27",
+        "382",
+        "409",
+        "0.07"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "working",
+     "title": "Scored on working days",
+     "explanation": "Scored on the 24 working days, all three metrics are defined and rank the methods the same way.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Method",
+       "Mean MAE (units)",
+       "Mean MAPE",
+       "Mean MASE"
+      ],
+      "rows": [
+       [
+        "Naive",
+        "57.46",
+        "31.0%",
+        "4.03"
+       ],
+       [
+        "Seasonal naive",
+        "23.67",
+        "11.0%",
+        "1.67"
+       ],
+       [
+        "Lag regression",
+        "21.17",
+        "10.2%",
+        "1.49"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-uncertainty-visual",
+   "kind": "table",
+   "title": "An 80% band described day by day",
+   "alt": "Two tables: fold 4's forecast, lower and upper bound, actual and whether it fell inside for each working day, then the number of days inside the band in each fold.",
+   "caption": "An empirical band from the 10th and 90th percentiles of training residuals; it cannot contain the breakdown. Values from lab L19's execution on synthetic data.",
+   "textEquivalent": "Fold 4 band: The band is the forecast plus about -20 to +20 units; five days fall inside and the breakdown falls far below. Table columns: Day, Forecast, Lower, Upper, Actual, Inside. Rows: Sat 08-15, 180.5, 160.7, 200.5, 182, yes; Mon 08-17, 394.5, 374.7, 414.5, 387, yes; Tue 08-18, 413.1, 393.2, 433.0, 402, yes; Wed 08-19, 412.3, 392.5, 432.2, 156, no; Thu 08-20, 407.5, 387.7, 427.5, 425, yes; Fri 08-21, 409.3, 389.4, 429.2, 399, yes.\n\nCoverage by fold: Across four folds 20 of 24 scored days fall inside: close to 80% on this sample, guaranteed for none. Table columns: Fold, Inside, Scored days, Outside. Rows: 1, 4, 6, Tue 07-28 (425 above 420.4); Thu 07-30 (393 below 396.9); 2, 6, 6, none; 3, 5, 6, Sat 08-08 (197 above 184.0); 4, 5, 6, Wed 08-19 (156 below 392.5); All, 20, 24, 83% inside against 80% nominal.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-intervals",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "fold4",
+     "title": "Fold 4 band",
+     "explanation": "The band is the forecast plus about -20 to +20 units; five days fall inside and the breakdown falls far below.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Day",
+       "Forecast",
+       "Lower",
+       "Upper",
+       "Actual",
+       "Inside"
+      ],
+      "rows": [
+       [
+        "Sat 08-15",
+        "180.5",
+        "160.7",
+        "200.5",
+        "182",
+        "yes"
+       ],
+       [
+        "Mon 08-17",
+        "394.5",
+        "374.7",
+        "414.5",
+        "387",
+        "yes"
+       ],
+       [
+        "Tue 08-18",
+        "413.1",
+        "393.2",
+        "433.0",
+        "402",
+        "yes"
+       ],
+       [
+        "Wed 08-19",
+        "412.3",
+        "392.5",
+        "432.2",
+        "156",
+        "no"
+       ],
+       [
+        "Thu 08-20",
+        "407.5",
+        "387.7",
+        "427.5",
+        "425",
+        "yes"
+       ],
+       [
+        "Fri 08-21",
+        "409.3",
+        "389.4",
+        "429.2",
+        "399",
+        "yes"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "coverage",
+     "title": "Coverage by fold",
+     "explanation": "Across four folds 20 of 24 scored days fall inside: close to 80% on this sample, guaranteed for none.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Fold",
+       "Inside",
+       "Scored days",
+       "Outside"
+      ],
+      "rows": [
+       [
+        "1",
+        "4",
+        "6",
+        "Tue 07-28 (425 above 420.4); Thu 07-30 (393 below 396.9)"
+       ],
+       [
+        "2",
+        "6",
+        "6",
+        "none"
+       ],
+       [
+        "3",
+        "5",
+        "6",
+        "Sat 08-08 (197 above 184.0)"
+       ],
+       [
+        "4",
+        "5",
+        "6",
+        "Wed 08-19 (156 below 392.5)"
+       ],
+       [
+        "All",
+        "20",
+        "24",
+        "83% inside against 80% nominal"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-anomaly-visual",
+   "kind": "table",
+   "title": "From a calibration rate to a daily anomaly score",
+   "alt": "Three states: the formula for the defect score with the calibration rate, four scored days with their expected defects and scores, and the two kinds of day the score cannot judge.",
+   "caption": "The score compares each day with the defects expected for the units it made. Values from lab L19's execution on synthetic data.",
+   "textEquivalent": "Calibrate first, then score: The rate comes from the 28 days before scoring starts, so no scored day influences its own expectation. Equation: rate = defects / units over Jun 01-28 = 0.02025;  expected = rate x units;  z = (defects - expected) / sqrt(expected)\n\nFour scored days: Two bad-lot days score high, one normal day scores 3.28, and a small bad lot scores below 2. Table columns: Day, Units, Defects, Expected, z, Event. Rows: Tue 08-11, 422, 29, 8.55, 7.00, bad_lot; Wed 07-22, 418, 18, 8.47, 3.28, none; Mon 07-27, 382, 16, 7.74, 2.97, bad_lot; Tue 07-07, 409, 14, 8.28, 1.99, bad_lot.\n\nDays the score cannot judge: A closed day has no expectation and is not scored; the breakdown's defect rate is ordinary. Table columns: Day, Units, Defects, Expected, z, Event. Rows: Sun 08-16, 0, 0, none, not scored, none; Wed 08-19, 156, 3, 3.16, -0.09, breakdown.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-claim-leakage",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "formula",
+     "title": "Calibrate first, then score",
+     "explanation": "The rate comes from the 28 days before scoring starts, so no scored day influences its own expectation.",
+     "nodes": [],
+     "connections": [],
+     "equation": "rate = defects / units over Jun 01-28 = 0.02025;  expected = rate x units;  z = (defects - expected) / sqrt(expected)"
+    },
+    {
+     "id": "scored",
+     "title": "Four scored days",
+     "explanation": "Two bad-lot days score high, one normal day scores 3.28, and a small bad lot scores below 2.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Day",
+       "Units",
+       "Defects",
+       "Expected",
+       "z",
+       "Event"
+      ],
+      "rows": [
+       [
+        "Tue 08-11",
+        "422",
+        "29",
+        "8.55",
+        "7.00",
+        "bad_lot"
+       ],
+       [
+        "Wed 07-22",
+        "418",
+        "18",
+        "8.47",
+        "3.28",
+        "none"
+       ],
+       [
+        "Mon 07-27",
+        "382",
+        "16",
+        "7.74",
+        "2.97",
+        "bad_lot"
+       ],
+       [
+        "Tue 07-07",
+        "409",
+        "14",
+        "8.28",
+        "1.99",
+        "bad_lot"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "limits",
+     "title": "Days the score cannot judge",
+     "explanation": "A closed day has no expectation and is not scored; the breakdown's defect rate is ordinary.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Day",
+       "Units",
+       "Defects",
+       "Expected",
+       "z",
+       "Event"
+      ],
+      "rows": [
+       [
+        "Sun 08-16",
+        "0",
+        "0",
+        "none",
+        "not scored",
+        "none"
+       ],
+       [
+        "Wed 08-19",
+        "156",
+        "3",
+        "3.16",
+        "-0.09",
+        "breakdown"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-threshold-visual",
+   "kind": "table",
+   "title": "Threshold against inspection load",
+   "alt": "Two tables: for five thresholds, the days flagged, bad lots caught, false positives, bad lots missed and review hours; then what moving from 2.5 to 2.0 changes.",
+   "caption": "Each flag costs an inspector 3 hours whether or not it finds a bad lot. Values from lab L19's execution on 47 synthetic scored days with 5 bad lots.",
+   "textEquivalent": "Threshold table: Lower thresholds catch more bad lots and create more reviews, most of them false positives. Table columns: Threshold, Flagged, Bad lots caught, False positives, Missed, Review hours. Rows: 1.5, 12, 5, 7, 0, 36; 2.0, 7, 4, 3, 1, 21; 2.5, 5, 4, 1, 1, 15; 3.0, 4, 3, 1, 2, 12; 3.5, 2, 2, 0, 3, 6.\n\nMoving from 2.5 to 2.0: Two more reviews, both on days with no event; the missed bad lot on Tuesday 07-07 still scores below 2.0. Table columns: Quantity, At 2.5, At 2.0. Rows: Reviews, 5, 7; Bad lots caught, 4, 4; False positives, 1, 3; Missed, 1, 1; New flags, -, Mon 08-03, Thu 08-13 (no event).",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "table",
+     "title": "Threshold table",
+     "explanation": "Lower thresholds catch more bad lots and create more reviews, most of them false positives.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Threshold",
+       "Flagged",
+       "Bad lots caught",
+       "False positives",
+       "Missed",
+       "Review hours"
+      ],
+      "rows": [
+       [
+        "1.5",
+        "12",
+        "5",
+        "7",
+        "0",
+        "36"
+       ],
+       [
+        "2.0",
+        "7",
+        "4",
+        "3",
+        "1",
+        "21"
+       ],
+       [
+        "2.5",
+        "5",
+        "4",
+        "1",
+        "1",
+        "15"
+       ],
+       [
+        "3.0",
+        "4",
+        "3",
+        "1",
+        "2",
+        "12"
+       ],
+       [
+        "3.5",
+        "2",
+        "2",
+        "0",
+        "3",
+        "6"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "move",
+     "title": "Moving from 2.5 to 2.0",
+     "explanation": "Two more reviews, both on days with no event; the missed bad lot on Tuesday 07-07 still scores below 2.0.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Quantity",
+       "At 2.5",
+       "At 2.0"
+      ],
+      "rows": [
+       [
+        "Reviews",
+        "5",
+        "7"
+       ],
+       [
+        "Bad lots caught",
+        "4",
+        "4"
+       ],
+       [
+        "False positives",
+        "1",
+        "3"
+       ],
+       [
+        "Missed",
+        "1",
+        "1"
+       ],
+       [
+        "New flags",
+        "-",
+        "Mon 08-03, Thu 08-13 (no event)"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-cost-visual",
+   "kind": "table",
+   "title": "The same table under two miss costs",
+   "alt": "Two tables of total inspector-hours by threshold: review hours plus missed bad lots at 12 hours each, then at 40 hours each.",
+   "caption": "Only the cost of a miss changed; the cheapest threshold moved from 2.5 to 1.5. Synthetic teaching costs; values from lab L19.",
+   "textEquivalent": "A miss costs 12 hours: Quality engineering's containment estimate: 2.5 is cheapest at 27 hours. Table columns: Threshold, Review hours, Missed, Miss hours, Total. Rows: 1.5, 36, 0, 0, 36; 2.0, 21, 1, 12, 33; 2.5, 15, 1, 12, 27 (cheapest); 3.0, 12, 2, 24, 36; 3.5, 6, 3, 36, 42.\n\nA miss costs 40 hours: During a customer audit a miss is estimated at 40 hours: 1.5 becomes cheapest at 36 hours. Table columns: Threshold, Review hours, Missed, Miss hours, Total. Rows: 1.5, 36, 0, 0, 36 (cheapest); 2.0, 21, 1, 40, 61; 2.5, 15, 1, 40, 55; 3.0, 12, 2, 80, 92; 3.5, 6, 3, 120, 126.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "base",
+     "title": "A miss costs 12 hours",
+     "explanation": "Quality engineering's containment estimate: 2.5 is cheapest at 27 hours.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Threshold",
+       "Review hours",
+       "Missed",
+       "Miss hours",
+       "Total"
+      ],
+      "rows": [
+       [
+        "1.5",
+        "36",
+        "0",
+        "0",
+        "36"
+       ],
+       [
+        "2.0",
+        "21",
+        "1",
+        "12",
+        "33"
+       ],
+       [
+        "2.5",
+        "15",
+        "1",
+        "12",
+        "27 (cheapest)"
+       ],
+       [
+        "3.0",
+        "12",
+        "2",
+        "24",
+        "36"
+       ],
+       [
+        "3.5",
+        "6",
+        "3",
+        "36",
+        "42"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "altered",
+     "title": "A miss costs 40 hours",
+     "explanation": "During a customer audit a miss is estimated at 40 hours: 1.5 becomes cheapest at 36 hours.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Threshold",
+       "Review hours",
+       "Missed",
+       "Miss hours",
+       "Total"
+      ],
+      "rows": [
+       [
+        "1.5",
+        "36",
+        "0",
+        "0",
+        "36 (cheapest)"
+       ],
+       [
+        "2.0",
+        "21",
+        "1",
+        "40",
+        "61"
+       ],
+       [
+        "2.5",
+        "15",
+        "1",
+        "40",
+        "55"
+       ],
+       [
+        "3.0",
+        "12",
+        "2",
+        "80",
+        "92"
+       ],
+       [
+        "3.5",
+        "6",
+        "3",
+        "120",
+        "126"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-ranking-visual",
+   "kind": "table",
+   "title": "Accuracy against precision at k for an inspection queue",
+   "alt": "Three tables comparing model A, model B and an all-conforming rule: accuracy at a 0.5 cut, then precision and recall with four inspections, then with eight.",
+   "caption": "Accuracy prefers A; four inspectors should use B; eight should use A. Hand-authored synthetic lots from lab L19.",
+   "textEquivalent": "Accuracy view: Counting all 20 lots at a 0.5 cut, A looks better than B and no better than calling every lot conforming. Table columns: Rule, Accuracy at 0.5, Bad lots scored above 0.5. Rows: Model A, 0.75, 2 of 5 (and 2 false alarms); Model B, 0.60, 5 of 5 (and 8 false alarms); All conforming, 0.75, 0 of 5.\n\nFour inspections: Only the first four lots are opened; B's first four are all nonconforming. Table columns: Model, Top four, Precision at 4, Recall at 4. Rows: Model A, L05, L12, L03, L07, 0.50, 0.40; Model B, L11, L03, L14, L18, 1.00, 0.80.\n\nEight inspections: With eight openings A's first eight contain all five bad lots and B's contain four. Table columns: Model, Precision at 8, Recall at 8. Rows: Model A, 0.625, 1.00; Model B, 0.500, 0.80.",
+   "provenance": "Original SpicyBrain authored visual; values from lab-l19's local execution with pandas 3.0.6, numpy 2.5.3 and scikit-learn 1.9.1 on seeded synthetic data; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "accuracy",
+     "title": "Accuracy view",
+     "explanation": "Counting all 20 lots at a 0.5 cut, A looks better than B and no better than calling every lot conforming.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Rule",
+       "Accuracy at 0.5",
+       "Bad lots scored above 0.5"
+      ],
+      "rows": [
+       [
+        "Model A",
+        "0.75",
+        "2 of 5 (and 2 false alarms)"
+       ],
+       [
+        "Model B",
+        "0.60",
+        "5 of 5 (and 8 false alarms)"
+       ],
+       [
+        "All conforming",
+        "0.75",
+        "0 of 5"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "four",
+     "title": "Four inspections",
+     "explanation": "Only the first four lots are opened; B's first four are all nonconforming.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Model",
+       "Top four",
+       "Precision at 4",
+       "Recall at 4"
+      ],
+      "rows": [
+       [
+        "Model A",
+        "L05, L12, L03, L07",
+        "0.50",
+        "0.40"
+       ],
+       [
+        "Model B",
+        "L11, L03, L14, L18",
+        "1.00",
+        "0.80"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "eight",
+     "title": "Eight inspections",
+     "explanation": "With eight openings A's first eight contain all five bad lots and B's contain four.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Model",
+       "Precision at 8",
+       "Recall at 8"
+      ],
+      "rows": [
+       [
+        "Model A",
+        "0.625",
+        "1.00"
+       ],
+       [
+        "Model B",
+        "0.500",
+        "0.80"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-platform-visual",
+   "kind": "comparison",
+   "title": "What a managed forecasting tool takes over, and what stays with the team",
+   "alt": "Two comparison states: the work an automated model search can do, and the evaluation decisions that remain with Cinderline's team.",
+   "caption": "Automation searches models; the decision's timing, inputs, baselines, coverage and costs stay with the team. Schematic; no product screen.",
+   "textEquivalent": "Can be automated: An automated search prepares data, fits and tunes candidate models and records each trial for review. Nodes: Data preparation: Choices recorded in each trial's notebook for review. (selected); Candidate models: Several model types fitted and tuned. (selected); Trial notebooks: Each trial's code can be read and rerun. (selected); Primary metric: Selectable, but only the team knows the zeros and costs. (context).\n\nStays with the team: The decision's timing, the inputs known at the origin, the baselines, the band's coverage and the costs are not in the data. Nodes: Origin and horizon: Friday origin, seven steps; lags must exist. (warning); Baselines on the same folds: Naive and seasonal naive computed and reported. (warning); Inputs known at the origin: Run hours excluded; the calendar allowed. (warning); Interval coverage: Checked on held-out weeks, events named. (warning); Threshold and costs: Owned by quality; re-derived when costs change. (warning).",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-forecasting-claim-automl",
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "states": [
+    {
+     "id": "tool",
+     "title": "Can be automated",
+     "explanation": "An automated search prepares data, fits and tunes candidate models and records each trial for review.",
+     "nodes": [
+      {
+       "id": "prep",
+       "label": "Data preparation",
+       "detail": "Choices recorded in each trial's notebook for review.",
+       "status": "selected"
+      },
+      {
+       "id": "search",
+       "label": "Candidate models",
+       "detail": "Several model types fitted and tuned.",
+       "status": "selected"
+      },
+      {
+       "id": "trials",
+       "label": "Trial notebooks",
+       "detail": "Each trial's code can be read and rerun.",
+       "status": "selected"
+      },
+      {
+       "id": "metric",
+       "label": "Primary metric",
+       "detail": "Selectable, but only the team knows the zeros and costs.",
+       "status": "context"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "team",
+     "title": "Stays with the team",
+     "explanation": "The decision's timing, the inputs known at the origin, the baselines, the band's coverage and the costs are not in the data.",
+     "nodes": [
+      {
+       "id": "origin",
+       "label": "Origin and horizon",
+       "detail": "Friday origin, seven steps; lags must exist.",
+       "status": "warning"
+      },
+      {
+       "id": "baseline",
+       "label": "Baselines on the same folds",
+       "detail": "Naive and seasonal naive computed and reported.",
+       "status": "warning"
+      },
+      {
+       "id": "inputs",
+       "label": "Inputs known at the origin",
+       "detail": "Run hours excluded; the calendar allowed.",
+       "status": "warning"
+      },
+      {
+       "id": "band",
+       "label": "Interval coverage",
+       "detail": "Checked on held-out weeks, events named.",
+       "status": "warning"
+      },
+      {
+       "id": "costs",
+       "label": "Threshold and costs",
+       "detail": "Owned by quality; re-derived when costs change.",
+       "status": "warning"
+      }
+     ],
+     "connections": []
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-forecasting-horizon-question",
+   "revision": "1",
+   "prompt": "Cinderline's planner forecasts at the Friday origin for Saturday to Friday. A proposed input is 'units on the day before the target day'. For which steps of the seven-day horizon is that input observed at the origin?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-horizon-question-a",
+     "text": "Only step 1, because its previous day is the origin Friday itself.",
+     "rationale": "Step 1's previous day is the last observed day; from step 2 on the previous day lies after Friday and has not happened."
+    },
+    {
+     "id": "dbxfe-forecasting-horizon-question-b",
+     "text": "All seven steps, because the input is always exactly one day old.",
+     "rationale": "One day old relative to the target, not to the origin: for step 2 onward that day is in the future."
+    },
+    {
+     "id": "dbxfe-forecasting-horizon-question-c",
+     "text": "None of them, because Friday's value is too recent to be trusted.",
+     "rationale": "Friday is the origin and is observed; the difficulty is only with days after it."
+    },
+    {
+     "id": "dbxfe-forecasting-horizon-question-d",
+     "text": "Steps 1 to 5, because the weekend days are closed.",
+     "rationale": "The calendar does not create observations; any step whose previous day falls after Friday lacks the input."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-horizon-question-a",
+   "conceptIds": [
+    "dbxfe-forecasting-origin-concept",
+    "dbxfe-forecasting-horizon-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-naive-question",
+   "revision": "1",
+   "prompt": "At the Friday 2026-07-31 origin the line had made 407 units. Saturday 2026-08-01 then made 158 and Monday 2026-08-03 made 389. What are the naive forecast's absolute errors for those two days?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-naive-question-a",
+     "text": "11 and 7.",
+     "rationale": "Those are the seasonal naive errors, which compare with the previous Saturday (169) and Monday (382)."
+    },
+    {
+     "id": "dbxfe-forecasting-naive-question-b",
+     "text": "249 and 0, because the forecast restarts on Monday.",
+     "rationale": "The naive method never restarts inside a horizon; every step repeats the origin value."
+    },
+    {
+     "id": "dbxfe-forecasting-naive-question-c",
+     "text": "249 and 18.",
+     "rationale": "Every step repeats Friday's 407: |158 - 407| = 249 and |389 - 407| = 18."
+    },
+    {
+     "id": "dbxfe-forecasting-naive-question-d",
+     "text": "0 and 0, because the naive method copies the actuals.",
+     "rationale": "It copies only the last observed value, which cannot know Saturday's or Monday's actual."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-naive-question-c",
+   "conceptIds": [
+    "dbxfe-forecasting-naive-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-rolling-question",
+   "revision": "1",
+   "prompt": "L4's file has 82 daily rows, indexed 0 to 81. TimeSeriesSplit(n_splits=4, test_size=7).split(rows) yields four folds in order. Which indices form the first fold's test set?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-rolling-question-a",
+     "text": "0 to 6.",
+     "rationale": "TimeSeriesSplit never tests on the earliest rows; they are always training data."
+    },
+    {
+     "id": "dbxfe-forecasting-rolling-question-b",
+     "text": "54 to 60, with training rows 0 to 53.",
+     "rationale": "The test blocks are the last 4 x 7 = 28 rows, 54 to 81, yielded from earliest to latest; the first starts at 54."
+    },
+    {
+     "id": "dbxfe-forecasting-rolling-question-c",
+     "text": "75 to 81.",
+     "rationale": "That is the last fold's test set; folds are yielded from earliest to latest."
+    },
+    {
+     "id": "dbxfe-forecasting-rolling-question-d",
+     "text": "18 to 33.",
+     "rationale": "That is what the default test_size of 82 // 5 = 16 rows would give; test_size=7 fixes each block at seven."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-rolling-question-b",
+   "conceptIds": [
+    "dbxfe-forecasting-rolling-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-claim-tss-params",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-leakage-question",
+   "revision": "1",
+   "prompt": "A colleague's model forecasts next week's units from each target day's run hours and scores a mean MAE of 12.06 in the four-fold backtest, against 21.17 for the lag regression. What is the correct diagnosis?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-leakage-question-a",
+     "text": "The model is better: run hours drive units, so it should replace the lag regression.",
+     "rationale": "Being a strong driver does not make a value available; at the origin next week's run hours are unknown."
+    },
+    {
+     "id": "dbxfe-forecasting-leakage-question-b",
+     "text": "Four folds are too few; with more folds the two methods would tie.",
+     "rationale": "More folds repeat the same leak in each fold; the defect is the input's timing, not the sample size."
+    },
+    {
+     "id": "dbxfe-forecasting-leakage-question-c",
+     "text": "MAE is the wrong metric; MAPE would show the lag regression winning.",
+     "rationale": "Changing the metric does not remove future information; any metric computed on leaked forecasts stays optimistic."
+    },
+    {
+     "id": "dbxfe-forecasting-leakage-question-d",
+     "text": "The backtest uses a value recorded after each target day ends, which does not exist at the Friday origin, so the score is not achievable.",
+     "rationale": "Run hours are written when the day finishes; at the roster meeting none of next week's exist, so the backtest measured an impossible forecast."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-leakage-question-d",
+   "conceptIds": [
+    "dbxfe-forecasting-leakage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-leakage",
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-model-question",
+   "revision": "1",
+   "prompt": "Which conclusion does the four-fold table support?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-model-question-a",
+     "text": "The lag regression beats seasonal naive on the mean (21.17 against 23.67) and in three of four folds; the gain is about 2.5 units a day and one fold goes the other way.",
+     "rationale": "That is exactly what the table shows, with the size and the exception stated."
+    },
+    {
+     "id": "dbxfe-forecasting-model-question-b",
+     "text": "The lag regression is a different kind of model and will keep a 2.5-unit advantage on any line.",
+     "rationale": "Four folds on one synthetic line cannot establish a general advantage, and the coefficients show it is a smoothed seasonal naive."
+    },
+    {
+     "id": "dbxfe-forecasting-model-question-c",
+     "text": "Seasonal naive should be preferred because it won fold 1.",
+     "rationale": "One fold of four does not outweigh the mean and the other three; it is a reason to report per-fold results."
+    },
+    {
+     "id": "dbxfe-forecasting-model-question-d",
+     "text": "Naive is competitive in fold 4, where every method's error is large.",
+     "rationale": "Naive's 89.17 is still the worst in fold 4; every method suffered from the breakdown, naive most."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-model-question-a",
+   "conceptIds": [
+    "dbxfe-forecasting-lagmodel-concept",
+    "dbxfe-forecasting-rolling-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-metrics-question",
+   "revision": "1",
+   "prompt": "What does sklearn.metrics.mean_absolute_percentage_error(y_true=[0, 400], y_pred=[409, 400]) return?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-metrics-question-a",
+     "text": "inf, because 409 divided by 0 is infinite.",
+     "rationale": "A plain numpy division would give inf, but scikit-learn guards the denominator with epsilon."
+    },
+    {
+     "id": "dbxfe-forecasting-metrics-question-b",
+     "text": "It raises ValueError about a zero in y_true.",
+     "rationale": "scikit-learn does not refuse zeros here; the lab's own mape function raises, which is a deliberate design choice."
+    },
+    {
+     "id": "dbxfe-forecasting-metrics-question-c",
+     "text": "About 9.2 x 10^17: the zero actual is replaced by machine epsilon, so the first term is enormous and finite.",
+     "rationale": "scikit-learn divides by max(|actual|, epsilon); 409 / 2.2 x 10^-16 is about 1.8 x 10^18, and averaging with 0 halves it."
+    },
+    {
+     "id": "dbxfe-forecasting-metrics-question-d",
+     "text": "0.5, treating the zero-actual day as a 100% error.",
+     "rationale": "No rule turns a zero actual into 100%; the guard divides by epsilon, and the function returns a fraction, not a percentage."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-metrics-question-c",
+   "conceptIds": [
+    "dbxfe-forecasting-mape-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-percentage",
+    "dbxfe-forecasting-claim-mase",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-uncertainty-question",
+   "revision": "1",
+   "prompt": "The 80% band covered 20 of the 24 scored days (83%). Which statement is justified?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-uncertainty-question-a",
+     "text": "The band is proven correct, so 80% of next week's days will fall inside it.",
+     "rationale": "Past coverage does not bind the future; a new calendar, an event or drift changes it."
+    },
+    {
+     "id": "dbxfe-forecasting-uncertainty-question-b",
+     "text": "The band is too wide because 83% exceeds 80%; narrow it until coverage is exactly 80%.",
+     "rationale": "Tuning the band on the test days leaks them into its construction, and 20 of 24 is within sampling noise of 80%."
+    },
+    {
+     "id": "dbxfe-forecasting-uncertainty-question-c",
+     "text": "The band failed, because four days fell outside it.",
+     "rationale": "An 80% band is expected to miss about one day in five; four of 24 is not a failure by itself."
+    },
+    {
+     "id": "dbxfe-forecasting-uncertainty-question-d",
+     "text": "On these 24 days the band behaved roughly as stated, but it was built from ordinary days and says nothing about events like the breakdown; next week's coverage is not guaranteed.",
+     "rationale": "Coverage is evidence about the days it was measured on, and the band's residuals never included a breakdown."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-uncertainty-question-d",
+   "conceptIds": [
+    "dbxfe-forecasting-interval-concept",
+    "dbxfe-forecasting-coverage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-intervals",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-anomaly-question",
+   "revision": "1",
+   "prompt": "Quality asks why Wednesday 2026-08-19, the breakdown day, was not flagged by the defect score. What is the reason?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-anomaly-question-a",
+     "text": "Breakdown days are excluded from scoring, like closed Sundays.",
+     "rationale": "Only days with zero units are not scored; the breakdown made 156 units and was scored."
+    },
+    {
+     "id": "dbxfe-forecasting-anomaly-question-b",
+     "text": "The score compares defects with those expected for the units made; 3 defects on 156 units is an ordinary rate, so z is about -0.09. The breakdown is a production anomaly, which the forecast band caught.",
+     "rationale": "The expectation scales with units, so a short day with a normal defect rate scores near zero."
+    },
+    {
+     "id": "dbxfe-forecasting-anomaly-question-c",
+     "text": "The threshold is too high; lowering it to 1.5 would flag the breakdown.",
+     "rationale": "A negative score sits below every threshold in the table; lowering it flags many normal days first."
+    },
+    {
+     "id": "dbxfe-forecasting-anomaly-question-d",
+     "text": "The calibration window contains the breakdown, which hides it.",
+     "rationale": "Calibration covers June 1 to 28; the breakdown happened on August 19."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-anomaly-question-b",
+   "conceptIds": [
+    "dbxfe-forecasting-anomaly-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-claim-leakage",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-threshold-question",
+   "revision": "1",
+   "prompt": "Quality proposes lowering the threshold from 2.5 to 2.0 'to be safer'. Using the table, what does that change do on these 47 scored days?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-threshold-question-a",
+     "text": "It adds two reviews, six inspector-hours, both false positives, and catches no additional bad lot.",
+     "rationale": "Flags rise from 5 to 7 while catches stay at 4; the new flags fall on 08-03 and 08-13, which had no event."
+    },
+    {
+     "id": "dbxfe-forecasting-threshold-question-b",
+     "text": "It catches the missed bad lot on Tuesday 07-07.",
+     "rationale": "07-07 scores 1.99, just below 2.0; only a threshold of 1.5 flags it."
+    },
+    {
+     "id": "dbxfe-forecasting-threshold-question-c",
+     "text": "It removes the false positive on Wednesday 07-22.",
+     "rationale": "Lowering a threshold can only add flags; 07-22 at 3.28 stays flagged."
+    },
+    {
+     "id": "dbxfe-forecasting-threshold-question-d",
+     "text": "It halves the false positives, because more bad lots are flagged.",
+     "rationale": "False positives rise from 1 to 3 and catches stay at 4."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-threshold-question-a",
+   "conceptIds": [
+    "dbxfe-forecasting-threshold-concept",
+    "dbxfe-forecasting-load-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-cost-question",
+   "revision": "1",
+   "prompt": "Suppose a missed bad-lot day costs 20 inspector-hours, with 3 hours per review. Using the table's flags and misses, which threshold minimizes total hours?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-cost-question-a",
+     "text": "2.5, at 35 hours.",
+     "rationale": "15 review hours plus one 20-hour miss is 35, the lowest total at this miss cost."
+    },
+    {
+     "id": "dbxfe-forecasting-cost-question-b",
+     "text": "1.5, at 36 hours.",
+     "rationale": "36 is one hour more than 2.5's 35; 1.5 only wins when a miss costs more than 21 hours."
+    },
+    {
+     "id": "dbxfe-forecasting-cost-question-c",
+     "text": "2.0, at 41 hours.",
+     "rationale": "21 review hours plus one 20-hour miss is 41."
+    },
+    {
+     "id": "dbxfe-forecasting-cost-question-d",
+     "text": "3.0, at 52 hours.",
+     "rationale": "12 review hours plus two misses at 20 hours is 52."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-cost-question-a",
+   "conceptIds": [
+    "dbxfe-forecasting-cost-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-ranking-question",
+   "revision": "1",
+   "prompt": "The incoming-goods team can inspect four of the twenty lots per shift. Which model should order the queue, and on what evidence?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-ranking-question-a",
+     "text": "Model A, because its accuracy is 0.75 against 0.60.",
+     "rationale": "Accuracy counts all 20 lots at a 0.5 cut, and calling every lot conforming also scores 0.75."
+    },
+    {
+     "id": "dbxfe-forecasting-ranking-question-b",
+     "text": "Either, because both models eventually rank all five bad lots.",
+     "rationale": "With four inspections per shift, what the first four contain is the whole outcome of the shift."
+    },
+    {
+     "id": "dbxfe-forecasting-ranking-question-c",
+     "text": "Model B, because its precision at 4 is 1.00 against 0.50, even though its accuracy at 0.5 is lower.",
+     "rationale": "Only the first four lots are opened, so the share of bad lots among them is the outcome that matters."
+    },
+    {
+     "id": "dbxfe-forecasting-ranking-question-d",
+     "text": "Model A, because its recall at 8 is 1.00.",
+     "rationale": "Recall at 8 answers a different capacity; with four inspections B finds four bad lots and A two."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-ranking-question-c",
+   "conceptIds": [
+    "dbxfe-forecasting-ranking-concept",
+    "dbxfe-forecasting-recommendation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-forecasting-seasonal-self",
+   "revision": "1",
+   "prompt": "From the Friday 2026-08-21 origin, the seasonal naive forecast for Wednesday 2026-08-26 is 156 units, because the previous Wednesday was a breakdown. Explain what the baseline is doing, why that forecast is probably wrong, and two honest ways to handle it.",
+   "modelAnswer": "Seasonal naive copies the last observed value from the same weekday, so it copies the breakdown's 156 units as if they were Wednesday's pattern. Unless the breakdown recurs, Wednesday will be near its usual 410 to 419 units. Handle it by recording the breakdown as an event and replacing that input with the previous normal Wednesday or a recent Wednesday average, and by publishing the adjusted and unadjusted forecasts side by side with the reason, so the planner sees the assumption.",
+   "reasoning": "The baseline has no memory beyond one season, so an anomaly in its input becomes the forecast. Adjusting inputs is acceptable only when the event is documented and the adjustment is disclosed; leaving the forecast unadjusted but flagged is also defensible.",
+   "conceptIds": [
+    "dbxfe-forecasting-seasonal-concept",
+    "dbxfe-forecasting-seasonality-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-platform-self",
+   "revision": "1",
+   "prompt": "A colleague proposes running a managed forecasting tool on L4's history and shipping its best trial as next week's roster forecast. Write the checks you require before accepting it, in order.",
+   "modelAnswer": "First, confirm the setup matches the decision: a Friday origin, a seven-day horizon and folds whose test weeks follow their training days. Second, remove inputs not known at the origin, such as run hours, and keep the published calendar. Third, compare the chosen trial with naive and seasonal naive on the same folds and read every fold, not only the mean. Fourth, score with MAE or MASE on working days rather than MAPE over closed Sundays. Fifth, check any interval's coverage on held-out weeks and state what it cannot cover. Finally, confirm the tool is available for the workspace's runtime and record the trial notebook with the decision.",
+   "reasoning": "The tool automates the model search, so every check targets what it cannot know: the decision's timing, which inputs exist at the origin, the baselines and the metric's behaviour on zeros. Ordering the checks by how cheaply they expose a problem is an acceptable alternative.",
+   "conceptIds": [
+    "dbxfe-forecasting-automl-concept",
+    "dbxfe-forecasting-rolling-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-automl",
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-forecasting-horizon",
+   "version": "1.0.0",
+   "title": "Every forecast is made at an origin for a horizon",
+   "outcome": "Name a forecast's origin, horizon and steps, and say which inputs are observed at the origin for each step.",
+   "explanation": "A forecast is never just 'next week'. Cinderline's planner sets inspector rosters on Friday, so the [[dbxfe-forecasting-origin-concept|forecast origin]] is Friday: the last day whose units may be used. Saturday is step 1 and next Friday is step 7, a seven-day [[dbxfe-forecasting-horizon-concept|horizon]]. Every input must exist at the origin for every step it feeds. Notice in the second state that units seven days earlier are observed for all seven steps, while yesterday's units exist only for step 1.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-horizon",
+   "conceptIds": [
+    "dbxfe-forecasting-origin-concept",
+    "dbxfe-forecasting-horizon-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-horizon-visual",
+   "questionIds": [
+    "dbxfe-forecasting-horizon-question"
+   ],
+   "hint": "Count from the origin, not from the target: which days after Friday are already observed?",
+   "handbook": {
+    "markdown": "A forecast is defined by three things before any model is chosen: the **origin** (the last time whose data may be used), the **horizon** (how many steps ahead the decision needs) and the **target** at each step. Cinderline's roster meeting is on Friday afternoon and covers Saturday to Friday, so every evaluation in this module uses a Friday origin and steps 1 to 7.\n\nWrite down, for each candidate input, when it becomes known:\n\n| Input | Known when | Usable at a Friday origin for steps 1-7? |\n|---|---|---|\n| Units 7 days before the target | end of that day | yes: step 7 reads the origin itself |\n| Units 14 days before the target | end of that day | yes |\n| Units 1 day before the target | end of that day | only for step 1 |\n| Planned hours (published calendar) | weeks ahead | yes |\n| Run hours of the target day | when the target day ends | no |\n\n```python\norigin = 53                 # Fri 2026-07-24 in the daily series\nfor h in range(1, 8):\n    target = origin + h\n    print(h, target - 7 <= origin, target - 1 <= origin)   # lag 7 always, lag 1 only h == 1\n```\n\nTwo design choices follow. A **direct** forecast uses only inputs available at the origin for each step (the lag-7 and lag-14 model here). A **recursive** forecast feeds its own step-1 prediction back in as step 2's input, which compounds errors and must be evaluated the same way it is used. Either way, evaluate at the horizon the decision uses: a model that is accurate one day ahead can be poor at step 7. What to inspect: the input table above, and whether the backtest's origins fall on the same weekday as the real decision.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-horizon"
+    ]
+   },
+   "recap": "Name the origin and horizon first; an input is usable only if it exists at the origin for every step it feeds.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-naive",
+   "version": "1.0.0",
+   "title": "The naive forecast carries Friday into the weekend",
+   "outcome": "Compute a naive forecast by hand and explain why it fails on a weekly production calendar.",
+   "explanation": "The [[dbxfe-forecasting-naive-concept|naive forecast]] repeats the last observed value for every step. From Friday 2026-07-24 that is 409 units for all seven days. Notice the Saturday row: one shift made 169 units, so the forecast is 240 units wrong, while on weekdays it is off by 2 to 27. Its mean absolute error over the six working days is 51.83. The naive method is still worth computing: it is the floor any method claiming skill must clear.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-horizon",
+   "conceptIds": [
+    "dbxfe-forecasting-naive-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-naive-visual",
+   "questionIds": [
+    "dbxfe-forecasting-naive-question"
+   ],
+   "hint": "Every step of a naive forecast is the same number. Which number?",
+   "handbook": {
+    "markdown": "The naive method is the simplest possible forecast: ŷ(origin + h) = y(origin) for every step h. It needs no fitting, so it cannot overfit, and it is the right model for a series whose best guess really is its latest value (a level that drifts without a pattern). It is the wrong model whenever a known pattern repeats inside the horizon, and L4's calendar is exactly that: two shifts on weekdays, one on Saturday, none on Sunday.\n\n```python\nimport numpy as np\nunits = frame['units'].to_numpy(float)\norigin = 53                       # Fri 2026-07-24\nnaive = np.full(7, units[origin])  # 409.0 for Saturday .. Friday\n```\n\nAcross the four Friday origins in lab L19 the naive method's Saturday error is between 215 and 249 units, and its six-day mean absolute error is 51.83, 47.00, 41.83 and 89.17 (the last week includes a breakdown). Those numbers are the bar, not the result: any method that cannot beat them has learned nothing a planner does not already know.\n\nTwo practical notes. First, the closed Sunday is a calendar fact, so it is excluded from scoring rather than counted as a 409-unit error; the published calendar is a legitimate input known weeks ahead. Second, compute errors per weekday as well as in total: a naive forecast that is fine Monday to Friday and terrible on Saturday points straight at the seasonal pattern the next beat uses. What to inspect: the error by weekday and by origin.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-horizon"
+    ]
+   },
+   "recap": "Naive repeats the last value; on a weekly calendar it is the floor, not a contender.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-seasonal",
+   "version": "1.0.0",
+   "title": "Seasonal naive copies last week's same day, anomalies included",
+   "outcome": "Compute seasonal naive forecasts for any horizon and predict when they copy an anomaly forward.",
+   "explanation": "The [[dbxfe-forecasting-seasonal-concept|seasonal naive forecast]] repeats the last observed value from the same point in the season. L4's [[dbxfe-forecasting-seasonality-concept|seasonality]] is weekly, so next Saturday is forecast as last Saturday: 176 units against 169 actual, and the closed Sunday as 0. Over fold 1's working days its mean absolute error is 11.33 against naive's 51.83. Notice the third state: from the 2026-08-21 origin it forecasts Wednesday 2026-08-26 as 156, last Wednesday's breakdown, because it cannot tell an event from a pattern.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-horizon",
+   "conceptIds": [
+    "dbxfe-forecasting-seasonal-concept",
+    "dbxfe-forecasting-seasonality-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-seasonal-visual",
+   "samajh": {
+    "text": "Socho mohalle mein har Budhwar ko haat lagti hai. Sabziwale bhaiya kal Mangalwar ki bikri nahi dekhte; woh dekhte hain pichhle Budhwar kitna bika tha, aur utna hi maal le aate hain. Zyadatar hisaab baith jaata hai. Par agar pichhle Budhwar baarish ki wajah se haat aadhi khaali rahi thi, toh is Budhwar bhi woh aadha maal hi laayenge, jab tak koi unhe yaad na dilaye ki woh baarish wala din tha.",
+    "mapping": "Last Wednesday's sales are the seasonal naive forecast for this Wednesday, and the rainy Wednesday is an anomaly copied forward unless someone marks it.",
+    "boundary": "A vendor adjusts with judgement and weather news; seasonal naive is a fixed rule that changes only when its inputs are changed."
+   },
+   "questionIds": [
+    "dbxfe-forecasting-seasonal-self"
+   ],
+   "handbook": {
+    "markdown": "With a season of length m (7 for a weekly calendar), the seasonal naive forecast is ŷ(T + h) = y(T + h − m(k + 1)) with k = ⌊(h − 1)/m⌋. For steps 1 to 7 that is simply the same weekday last week; for steps 8 to 14 it is the same weekday of the last observed week again, because nothing newer exists.\n\n```python\nsteps = np.arange(1, horizon + 1)\nseasonal_naive = units[origin + steps - 7 * ((steps - 1) // 7 + 1)]\n```\n\nOn L4 it is a strong baseline: mean absolute errors of 11.33, 11.50, 14.50 and 57.33 over the four folds (mean 23.67) against naive's 57.46. It is strong because the calendar explains most of the variation, and it gets closed days right for free: last Sunday was 0, so next Sunday is 0.\n\nIts failure modes are specific. It copies anomalies forward: the 156-unit breakdown on 2026-08-19 becomes next Wednesday's forecast. It follows calendar changes one season late: if Saturdays close from September, the first closed Saturday is forecast at about 180 units. It carries one week's noise straight into the forecast, which is exactly what an averaging model can reduce. Holidays that move between weekdays break the one-week memory.\n\nUse the season that matches the decision. Hourly data might need a daily season (m = 24) and a weekly one; this module's daily series needs only m = 7. What to inspect: the input row each forecast copies, and any event recorded on it.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-horizon"
+    ]
+   },
+   "recap": "Seasonal naive copies the same point of the last season; it follows the calendar and every anomaly on it.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-rolling",
+   "version": "1.0.0",
+   "title": "A backtest rolls the origin forward and never trains on later days",
+   "outcome": "Build rolling-origin folds with TimeSeriesSplit and read which rows each fold trains and tests on.",
+   "explanation": "A single train/test split gives one number from one week. A [[dbxfe-forecasting-rolling-concept|rolling-origin backtest]] repeats the forecast at several origins, each fitted only on earlier days. scikit-learn's TimeSeriesSplit(n_splits=4, test_size=7) on L4's 82 days makes four folds: fold 1 trains on 54 days to Friday 2026-07-24 and tests the next week, and each later fold adds a week. Notice that test weeks never overlap and no training day is later than a test day; the last two states move the training edges.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-backtest",
+   "conceptIds": [
+    "dbxfe-forecasting-rolling-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-claim-tss-params",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-rolling-visual",
+   "samajh": {
+    "text": "Board exam se pehle Riya har Ravivaar ek mock test deti hai. Niyam seedha hai: us Ravivaar tak jitne chapter padhe, bas wahi kaam aayenge, aur answer key test ke baad hi khulti hai. Chaar Ravivaar, chaar test, chaar alag score, aur har hafte syllabus thoda bada. Agar woh pehle hi aakhri test ki answer key dekh le, toh score shaandaar aayega, par board exam mein us score ka koi matlab nahi hoga.",
+    "mapping": "Each Sunday's mock test is a fold: chapters studied so far are the training window, the paper is the test week, and peeking at a later answer key is fitting on data after the origin.",
+    "boundary": "Mock papers are separate exercises; consecutive production weeks are correlated, which is exactly why their order must be preserved in the split."
+   },
+   "questionIds": [
+    "dbxfe-forecasting-rolling-question"
+   ],
+   "hint": "The test blocks are taken from the end of the series. How many rows do four blocks of seven cover?",
+   "handbook": {
+    "markdown": "Rolling-origin evaluation (time series cross-validation) repeats the real forecasting situation several times: fit on everything up to an origin, forecast the horizon, score, move the origin forward, refit. scikit-learn's `TimeSeriesSplit` produces the index sets; `test_size` should equal the horizon the decision uses.\n\n```python\nfrom sklearn.model_selection import TimeSeriesSplit\nfor train, test in TimeSeriesSplit(n_splits=4, test_size=7).split(range(82)):\n    print(train[0], train[-1], test[0], test[-1])\n# 0 53 54 60 | 0 60 61 67 | 0 67 68 74 | 0 74 75 81\n```\n\nBecause the data end on a Friday and the test blocks are seven days, every origin is a Friday, matching the roster meeting. That alignment matters: origins on a different weekday would test a different decision.\n\nTwo parameters change the training edge. `gap` drops days between training and test: gap=1 ends fold 1 on Thursday 2026-07-23, which is what planners know if Friday's count is not final by the meeting. `max_train_size` caps the window: 28 keeps only 2026-06-27 to 2026-07-24, a sliding window that forgets old behaviour, useful when the line's level drifts and wasteful when it does not.\n\nEverything learned from data must be refitted inside each fold on that fold's training rows: model coefficients, scalers, residual quantiles and anomaly rates alike. Report each fold's result, not only the mean, because one unusual week (fold 4's breakdown) can dominate an average of four. More origins give a steadier estimate at the cost of shorter early training windows. What to inspect: the printed boundaries of every fold, and the check that the largest training index is smaller than the smallest test index.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-backtest"
+    ]
+   },
+   "recap": "Fit on the past, test the next horizon, move the origin, refit; report every fold.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-leakage",
+   "version": "1.0.0",
+   "title": "A value the origin cannot see makes a backtest lie",
+   "outcome": "Spot three forms of time-series leakage and show one of them changing a backtest's verdict.",
+   "explanation": "[[dbxfe-forecasting-leakage-concept|Temporal leakage]] means training or scoring with a value that does not exist at the origin. On L4 the tempting one is run hours: units follow the hours the line actually ran, so a regression on the same day's run hours scores a mean error of 12.06 units against the honest 21.17, and even 'predicts' the breakdown. Notice the second state: run hours are written when the day ends, so none of next week's exist on Friday. Shuffled folds and lags shorter than the horizon leak the same way.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-backtest",
+   "conceptIds": [
+    "dbxfe-forecasting-leakage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-leakage",
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-leakage-visual",
+   "questionIds": [
+    "dbxfe-forecasting-leakage-question"
+   ],
+   "hint": "Ask when each input is written, not how well it correlates with units.",
+   "handbook": {
+    "markdown": "Leakage in time series is any path by which information from after the origin reaches training or prediction. It makes the backtest look better than the deployed forecast can be. Four common paths:\n\n1. **Same-day covariates.** Run hours, scrap counted at shift end, a day's energy use: all are recorded when the target day ends. In lab L19 a regression on the target day's run hours scores 12.06 against 21.17, and changing one test day's run hours moves that day's 'forecast' by more than 100 units. Planned hours, by contrast, are published weeks ahead and are fair inputs.\n2. **Lags shorter than the horizon.** A lag-1 feature for step 2 reads the day after the origin; in the lab, adding 100 units to that day moves step 2's forecast by exactly 100.\n3. **Random splits.** KFold with shuffling trains every fold on some days later than its test days.\n4. **Fitting on everything.** A scaler, a defect rate or a residual quantile computed on the whole series carries the test period into training.\n\nA cheap test catches most of them: alter every value after the origin and require the forecast to stay identical.\n\n```python\naltered = units.copy()\naltered[origin + 1:] = altered[origin + 1:] * 3 + 50\nassert np.array_equal(forecast(units, origin), forecast(altered, origin))\n```\n\nWhat to inspect: a table of every input with the time it becomes known, the fold boundaries, and any preprocessing fitted outside the fold loop. A result that improves sharply after adding one input deserves this check before any celebration.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-backtest"
+    ]
+   },
+   "recap": "If the forecast changes when the future changes, the backtest has leaked.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-model",
+   "version": "1.0.0",
+   "title": "A model earns its place by beating seasonal naive on the same folds",
+   "outcome": "Read a baseline-versus-model table fold by fold and state what the evidence supports.",
+   "explanation": "The [[dbxfe-forecasting-lagmodel-concept|lag regression]] predicts units from the same weekday one and two weeks back. In fold 1 it is 7.32 + 0.477 x last week + 0.498 x the week before: a readable, smoothed seasonal naive. On the same four folds its mean absolute error is 21.17 against 23.67 for seasonal naive and 57.46 for naive. Notice that it loses fold 1 and that the breakdown week dominates every mean: the honest conclusion is a narrow, fold-by-fold improvement.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-metrics",
+   "conceptIds": [
+    "dbxfe-forecasting-lagmodel-concept",
+    "dbxfe-forecasting-rolling-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-claim-baselines",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-model-visual",
+   "questionIds": [
+    "dbxfe-forecasting-model-question"
+   ],
+   "handbook": {
+    "markdown": "The model in lab L19 is ordinary least squares on two seasonal lags, fitted on working days from day 14 to the origin and refitted in every fold:\n\n```python\nfrom sklearn.linear_model import LinearRegression\nrows = np.array([t for t in range(14, origin + 1) if working[t]])\nX = np.column_stack([units[rows - 7], units[rows - 14]])\nmodel = LinearRegression().fit(X, units[rows])\n# fold 1: intercept 7.32, coefficients 0.477 and 0.498\n```\n\nIt is **direct**: every step up to 7 reads only observed lags, so it needs no recursion. Asking it for step 8 would need a lag-7 value after the origin, so the lab's function refuses a 14-day horizon with a clear error instead of quietly using the future.\n\nReading the coefficients is part of the evaluation. Weights near one half each and a small intercept say the model averages the last two same weekdays. That is why it can beat seasonal naive at all: averaging two noisy weeks reduces noise. It also says what it cannot do: it has no idea of a breakdown, a new shift or a holiday.\n\nThe decision rule should be written before the numbers arrive: adopt the model if it beats seasonal naive on the mean over the same folds, report every fold, and keep the baseline published beside it. Here the model wins (21.17 against 23.67; 11.33 against 12.44 without the breakdown week) and loses fold 1. With four folds and one line, that is modest evidence, not a general result. An exponential smoothing model or a model with the calendar as an input would be judged on exactly the same folds.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-metrics"
+    ]
+   },
+   "recap": "A model counts only if it beats seasonal naive on the same folds, and the table shows where it does not.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-metrics",
+   "version": "1.0.0",
+   "title": "MAPE divides by the actual, so a closed Sunday breaks it",
+   "outcome": "Predict what MAE, MAPE and MASE report when an actual is zero, and choose a metric that stays defined.",
+   "explanation": "MAE reports errors in units, which planners understand. [[dbxfe-forecasting-mape-concept|MAPE]] divides each error by its actual, so a closed Sunday with 0 units is a division by zero. Notice the second state: numpy returns infinity, while scikit-learn's mean_absolute_percentage_error divides by machine epsilon and returns about 2.6 x 10^17 for a week of naive forecasts. Neither is an error rate. [[dbxfe-forecasting-mase-concept|MASE]] divides MAE by the seasonal naive method's in-sample error instead: 1.49 for the lag regression, 1.67 for seasonal naive.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-metrics",
+   "conceptIds": [
+    "dbxfe-forecasting-mape-concept",
+    "dbxfe-forecasting-mase-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-percentage",
+    "dbxfe-forecasting-claim-mase",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-metrics-visual",
+   "questionIds": [
+    "dbxfe-forecasting-metrics-question"
+   ],
+   "hint": "Look at the denominator of each metric when the actual is 0.",
+   "handbook": {
+    "markdown": "Three summaries of the same errors answer different questions:\n\n- **MAE**, mean(|y − f|), is in units. Planners can act on '21 units a day'. It cannot compare lines of different size.\n- **MAPE**, 100 × mean(|y − f| / |y|), is scale-free but divides by the actual. A closed day makes it undefined; a small actual makes it huge. In lab L19's fold 4 the breakdown day (156 units, forecast about 412) alone contributes about 27 of the lag regression's 29.4% MAPE, so the metric mostly reports one event.\n- **MASE** divides MAE by the in-sample MAE of the seasonal naive method on the fold's training days (about 14 units here). Below 1 means better than that baseline was in-sample; it stays defined with zeros.\n\nImplementations differ on the zero case, which is why the metric must be chosen deliberately:\n\n```python\nfrom sklearn.metrics import mean_absolute_percentage_error\nmean_absolute_percentage_error([0, 400], [409, 400])   # about 9.2e17, not inf, not an error\nnp.mean(np.abs(np.array([0, 400]) - [409, 400]) / np.array([0, 400]))   # inf, with a warning\n```\n\nThe lab's own `mape` raises a ValueError naming the zero. For L4 the defensible choice is MAE on scheduled working days for the roster, with MASE when comparing lines, and MAPE only when every actual is safely above zero. The symmetric MAPE is not a cure (see the extension card). What to inspect: the days with the smallest actuals, and whether any scored day is a scheduled closure.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-metrics"
+    ]
+   },
+   "recap": "Use MAE for planners and MASE to compare; MAPE is undefined on a zero and misleading near one.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-uncertainty",
+   "version": "1.0.0",
+   "title": "A prediction interval is a range from past errors, not a promise",
+   "outcome": "Build an empirical interval from residuals, measure its coverage and name what it cannot cover.",
+   "explanation": "A point forecast of 412 units hides how wrong such forecasts usually are. A [[dbxfe-forecasting-interval-concept|prediction interval]] states a range: here the forecast plus the 10th and 90th percentiles of the model's training residuals, roughly -20 to +20 units, an 80% band. Notice the fold 4 rows: five days fall inside, and Wednesday's breakdown, 156 units against a band of 392.5 to 432.2, falls far outside. Across four folds 20 of 24 days are inside: [[dbxfe-forecasting-coverage-concept|coverage]] of 83%, consistent with 80% on this sample and guaranteed for none.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-uncertainty",
+   "conceptIds": [
+    "dbxfe-forecasting-interval-concept",
+    "dbxfe-forecasting-coverage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-intervals",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-uncertainty-visual",
+   "samajh": {
+    "text": "Office se station jaane ke liye auto wale bhaiya se poocho, toh kehte hain: 'Didi, 20 se 30 minute.' Yeh range unke roz ke chakkaron se bani hai: kabhi jaldi pahunche, kabhi der se, sab unhe yaad hai. Zyadatar din yeh sach nikalti hai. Par jis din flyover pe truck palat jaaye, us din 70 minute lagte hain, aur unki range ne aisa din kabhi dekha hi nahi tha. Range se andaza milta hai, guarantee nahi.",
+    "mapping": "The driver's 20 to 30 minutes is an interval built from past trips, like the residual band, and the overturned truck is the breakdown day that falls outside it.",
+    "boundary": "A driver's range is a feeling; a prediction interval is computed from recorded errors, and its coverage can be counted on held-out days."
+   },
+   "questionIds": [
+    "dbxfe-forecasting-uncertainty-question"
+   ],
+   "handbook": {
+    "markdown": "The lab's interval is empirical: take the residuals of the fitted model on its training rows, find their 10th and 90th percentiles, and add them to each point forecast.\n\n```python\nlow, high = np.quantile(model.residuals, [0.1, 0.9])   # fold 4: about -19.8 and +19.9\nlower, upper = forecast + low, forecast + high\ninside = (actual >= lower) & (actual <= upper)\n```\n\nThen the band is checked like any forecast: on held-out days. Coverage per fold was 4, 6, 5 and 5 of 6 days, 20 of 24 in all. The misses are two ordinary weekdays just outside in fold 1, a busy Saturday in fold 3 and the breakdown.\n\nThree limits belong in any sentence that publishes the band. In-sample residuals come from days the model was fitted to, so they tend to understate new errors; residuals from earlier backtest folds are a more honest source when enough folds exist. The band has one width for every step, although uncertainty usually grows with the horizon (the extension card explains why). And no band built from ordinary weeks contains an event those weeks never showed: the breakdown is 236 units below the lower bound.\n\nSay it as a range with its evidence: 'next Wednesday about 412 units, 80% band 392 to 432 based on past errors, which covered 20 of 24 test days; breakdowns are not covered'. Never present the band as a guarantee for staffing, safety or money. What to inspect: coverage per fold, the days outside and why, and whether the band's residuals come from training or from held-out forecasts.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-uncertainty"
+    ]
+   },
+   "recap": "An interval is a range learned from past errors; report its measured coverage and what it cannot contain.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-anomaly",
+   "version": "1.0.0",
+   "title": "An anomaly score compares each day with its own expectation",
+   "outcome": "Compute a defect anomaly score from a calibration rate and explain which days it cannot judge.",
+   "explanation": "An [[dbxfe-forecasting-anomaly-concept|anomaly score]] measures distance from an expectation before any flag is raised. Quality calibrates a defect rate on the first 28 days only, 0.02025 defects per unit, and scores each later day as (defects - expected) / sqrt(expected). Notice Tuesday 2026-08-11: 29 defects against 8.55 expected scores about 7.0. The last state shows two limits: a closed Sunday has no expectation and is not scored rather than called normal, and the breakdown day scores -0.09 because its defect rate was ordinary.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-anomaly",
+   "conceptIds": [
+    "dbxfe-forecasting-anomaly-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-claim-leakage",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-anomaly-visual",
+   "questionIds": [
+    "dbxfe-forecasting-anomaly-question"
+   ],
+   "hint": "Expected defects scale with units. What was the breakdown day's defect rate?",
+   "handbook": {
+    "markdown": "An anomaly detector is two decisions: a **score** (how unusual is this day?) and a **threshold** (at what score do we act?). Keep them apart, as a classifier's probability and its decision threshold are kept apart.\n\nThe score here is a standardized excess: expected defects are the calibration rate times the day's units, and the score divides the excess by the square root of the expectation, a Poisson-style scale.\n\n```python\nrate = frame.iloc[:28]['defects'].sum() / frame.iloc[:28]['units'].sum()   # 0.02025\nscored = frame.iloc[28:].copy()\nexpected = rate * scored['units']\nscored['z'] = ((scored['defects'] - expected) / np.sqrt(expected)).where(scored['units'] > 0)\n```\n\nThree rules make the score trustworthy. **Calibrate before you score**: computing the rate over all 82 days raises it to 0.0228, because the bad lots are inside it, and at threshold 2.5 one more bad lot is missed. **Not scored is not normal**: a closed Sunday has no expectation; marking it 0 would silently call it fine. **Each score sees one kind of anomaly**: the breakdown made 156 units with 3 defects, an ordinary rate, so this score cannot see it; the forecast band (a production view) did.\n\nThe Poisson scale assumes the day-to-day variation equals the mean. Real defect counts usually vary more, and the lab's generator adds such variation, so normal days like Wednesday 07-22 (18 defects, z 3.28) score high more often than a textbook table would suggest. What to inspect: the highest-scoring days with their context, the calibration window's own anomalies, and how many days are not scored and why.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-anomaly"
+    ]
+   },
+   "recap": "A score measures surprise against a calibrated expectation; flags come later.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-threshold",
+   "version": "1.0.0",
+   "title": "Lowering the threshold buys catches with inspectors' hours",
+   "outcome": "Read a threshold table as inspection load, false positives and misses, and predict the effect of moving the threshold.",
+   "explanation": "A [[dbxfe-forecasting-threshold-concept|threshold]] turns scores into reviews, and every review costs an inspector three hours whether or not it finds anything. Notice the table: at 3.5 two days are flagged and both are bad lots, but three bad lots are missed; at 1.5 all five are caught, with seven [[dbxfe-forecasting-load-concept|false positives]] among twelve reviews. Moving from 2.5 to 2.0 adds two reviews, both false positives, and catches nothing new. The threshold is a workload decision, not a statistical constant.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-anomaly",
+   "conceptIds": [
+    "dbxfe-forecasting-threshold-concept",
+    "dbxfe-forecasting-load-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-threshold-visual",
+   "samajh": {
+    "text": "Society ke chowkidar do tarah se galat ho sakte hain. Ek jo har courier, har doodhwale pe intercom baja de, raat ko bhi; kuch hafton mein log intercom uthana hi band kar dete hain. Doosra jo kisi ko nahi rokta; sab shaant rehta hai jab tak koi galat aadmi andar na aa jaaye. Ghanti kab bajani hai, yeh society ko tay karna padta hai: har ghanti kisi ka time leti hai, aur har chooka hua aadmi nuksaan karta hai.",
+    "mapping": "Each intercom call is a flagged day that costs a review, a call about a courier is a false positive, and the stranger who walks in unannounced is a missed bad lot.",
+    "boundary": "A guard judges each visitor with context; an anomaly threshold is one fixed cut-off on a score and knows nothing the score does not."
+   },
+   "questionIds": [
+    "dbxfe-forecasting-threshold-question"
+   ],
+   "handbook": {
+    "markdown": "For each candidate threshold, count four things on labelled history: flags (the inspection load), true positives, false positives and misses. With 5 bad lots among 47 scored days, even a good score produces many false positives at low thresholds, because normal days vastly outnumber bad ones.\n\n```python\nfor threshold in [1.5, 2.0, 2.5, 3.0, 3.5]:\n    flagged = scored['z'] >= threshold\n    bad = scored['event'] == 'bad_lot'\n    print(threshold, flagged.sum(), (flagged & bad).sum(), (flagged & ~bad).sum(), (~flagged & bad).sum())\n```\n\nThe table is monotone: raising the threshold never adds a review and never catches more. What changes between rows is which days cross the line. Between 2.5 and 2.0 the new flags are Monday 08-03 (z 2.18) and Thursday 08-13 (z 2.03), both without an event; the missed bad lot on Tuesday 07-07 scores 1.99, so it needs 1.5.\n\nReport the load in the unit the team spends: at 3 hours per review, 1.5 costs 36 hours over these weeks and 3.5 costs 6. False positives also have a cost the table does not show: inspectors who are sent to nothing too often start to ignore the flags (alert fatigue), which quietly raises the miss rate.\n\nWith five labelled bad lots, the true positive rate at any threshold is extremely uncertain: one more or one fewer bad lot would move it by 20 points. The table shows the mechanism; confirming a threshold needs weeks not used to choose it. What to inspect: the flagged dates at each threshold, the scores just below the chosen line, and who reviews how many flags per week.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-anomaly"
+    ]
+   },
+   "recap": "Every flag costs a review; read the threshold table as the inspectors' workload.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-cost",
+   "version": "1.0.0",
+   "title": "The cheapest threshold moves when a miss costs more",
+   "outcome": "Choose a threshold by total cost and recompute the choice when the cost of a miss changes.",
+   "explanation": "A [[dbxfe-forecasting-cost-concept|decision cost]] turns the threshold table into one number per threshold: 3 review hours per flag plus a cost for every missed bad-lot day. With a miss at 12 hours, 2.5 is cheapest at 27 hours. Notice the second state: during a customer audit a miss is estimated at 40 hours, and 1.5 becomes cheapest at 36 hours although seven of its twelve reviews find nothing. The scores did not change; only the business cost did, so the preferred threshold must be re-derived, not inherited.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-anomaly",
+   "conceptIds": [
+    "dbxfe-forecasting-cost-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-cost-visual",
+   "questionIds": [
+    "dbxfe-forecasting-cost-question"
+   ],
+   "hint": "Add 3 hours per flag to 20 hours per missed bad lot for each row.",
+   "handbook": {
+    "markdown": "A decision-oriented metric scores a threshold by what it costs the business, not by how often it is right:\n\ntotal hours = review hours per flag × flags + miss hours × missed bad lots\n\n```python\ntotals = table['review_hours'] + table['missed'] * miss_hours\nchoice = table.loc[totals == totals.min(), 'threshold'].max()   # ties go to fewer reviews\n```\n\nWith 3 hours per review, thresholds 1.5 to 3.5 cost 36, 33, 27, 36 and 42 hours when a miss costs 12 hours, and 36, 61, 55, 92 and 126 hours when it costs 40. The break-even between 2.5 and 1.5 is where 15 + m = 36, a miss cost of 21 hours: below it 2.5 wins, above it 1.5 wins. That single number is worth putting in front of the people who own the miss cost, because it turns an argument about thresholds into an argument about costs, which they can actually settle.\n\nThree cautions. The costs are estimates owned by someone (quality engineering, the customer-quality lead) and should be named as such; nothing here is a measured or financial figure. The table was built on the same labelled weeks used to pick the threshold, so confirm the choice on later weeks before relying on its totals. And a cost model is only as complete as its terms: alert fatigue, the value of an early warning and the severity of different bad lots are not in this one. What to inspect: the break-even miss cost, how close the top two totals are, and who signed off each cost.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-anomaly"
+    ]
+   },
+   "recap": "Choose the threshold by total cost, publish the break-even, and re-derive it when the costs change.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-ranking",
+   "version": "1.0.0",
+   "title": "A ranked queue is judged at its top, not by accuracy",
+   "outcome": "Compare two rankings with precision and recall at k and explain why accuracy picks the wrong one.",
+   "explanation": "Not every model is a classifier. The incoming-goods team inspects four of twenty lots per shift, so the useful output is a ranked queue, the same shape as a [[dbxfe-forecasting-recommendation-concept|recommendation]] list. Model A has accuracy 0.75 at a 0.5 cut, B only 0.60, and calling every lot conforming also scores 0.75. Notice the second state: B's top four are all nonconforming, precision 1.00, A's only half. With eight inspections the answer flips, A 0.625 against B 0.500, so [[dbxfe-forecasting-ranking-concept|precision at k]] must use the real capacity.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-ranking",
+   "conceptIds": [
+    "dbxfe-forecasting-ranking-concept",
+    "dbxfe-forecasting-recommendation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-threshold",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-ranking-visual",
+   "samajh": {
+    "text": "Society ke plumber bhaiya din mein sirf chaar flat dekh sakte hain, aur complaint bees flat se aayi hai. Agar woh har flat ke liye 'leak hai ya nahi' ka andaza lagaayein aur zyadatar 'nahi' bolein, toh unka andaza zyadatar sahi niklega, kyunki leak sirf paanch flat mein hai. Par din tab kaam ka hai jab jo chaar darwaaze woh khatkhataate hain, unmein se zyada se zyada mein sach mein paani tapak raha ho.",
+    "mapping": "The twenty complaints are the lots, the plumber's four visits are the capacity k, and the share of visited flats with real leaks is precision at k.",
+    "boundary": "A plumber can ask questions and reorder visits during the day; a ranking model fixes the order from its scores before any lot is opened."
+   },
+   "questionIds": [
+    "dbxfe-forecasting-ranking-question"
+   ],
+   "handbook": {
+    "markdown": "Ranking and recommendation tasks output an ordered list per request: lots to inspect first, spare parts to suggest for a work order, products to show a shopper. The user acts on the top of the list, so the evaluation must look where the user looks.\n\n```python\ntop = lots.sort_values('score_b', ascending=False).head(4)\nprecision_at_4 = top['nonconforming'].mean()                                 # 1.0\nrecall_at_4 = top['nonconforming'].sum() / lots['nonconforming'].sum()     # 0.8\n```\n\nAccuracy at a fixed cut answers a different question (how many of all 20 lots are labelled correctly) and is dominated by the 15 conforming lots: a rule that inspects nothing scores 0.75. Precision at k asks how many of the k opened lots were worth opening; recall at k asks how many of all bad lots were found within capacity. Both depend on k, which is a fact about the team, not the model: with four inspections B is better (1.00 against 0.50), with eight A is (0.625 against 0.500, and recall 1.00).\n\nFor a recommender serving many requests, compute the metric per request and average it: precision at 3 for each technician's suggested parts, or at 5 for each shopper's page in a retail transfer. Metrics that also weight position inside the top k, such as normalized discounted cumulative gain, refine the same idea. Ties in scores must be broken by a stated rule, or two runs can open different lots.\n\nLimits: the lab's 20 lots are hand-authored to show one contrast, and five bad lots make every rate coarse. What to inspect: the capacity per shift, the top-k list itself, and whether the capacity is about to change.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-ranking"
+    ]
+   },
+   "recap": "Evaluate a ranked list at the capacity that consumes it; accuracy over all items answers another question.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-platform",
+   "version": "1.0.0",
+   "title": "Managed forecasting automates fitting, not the evaluation design",
+   "outcome": "List what a managed forecasting tool can do for Cinderline and the checks that stay with the team.",
+   "explanation": "Databricks documents [[dbxfe-forecasting-automl-concept|AutoML]], which prepares data, trains and tunes candidate models and writes a notebook for each trial, including for forecasting problems. That automation searches models; it does not know that the roster is set on Friday, that run hours arrive after the day, that Sundays are closed or what a missed bad lot costs. Notice the comparison: the first state lists what a tool can take over, the second what stays with the team. Check the current documentation for supported runtimes before planning on it.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-platform",
+   "conceptIds": [
+    "dbxfe-forecasting-automl-concept",
+    "dbxfe-forecasting-rolling-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-automl",
+    "dbxfe-forecasting-claim-tscv",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "visualId": "dbxfe-forecasting-platform-visual",
+   "questionIds": [
+    "dbxfe-forecasting-platform-self"
+   ],
+   "handbook": {
+    "markdown": "Managed tools make the model search cheap. Databricks documents AutoML as preparing the data, training and tuning a set of candidate models for classification, regression and forecasting problems, and generating a notebook with the code of each trial so it can be reviewed, rerun and modified. Supported runtimes, compute, algorithms and any deprecation notices change, so read the current page for the workspace in question; nothing in this module ran AutoML.\n\nWhat automation cannot supply is the evaluation design, because it is not in the data:\n\n| Decision | Why the tool cannot know it | Where this module set it |\n|---|---|---|\n| Origin and horizon | the roster meeting's day and span | Friday origin, 7 steps |\n| Inputs known at the origin | when each column is written | run hours excluded |\n| Baselines | what counts as skill | naive and seasonal naive on the same folds |\n| Scoring days and metric | closures and zeros | MAE and MASE on working days |\n| Interval and coverage | how the band will be used | 80% band, 20 of 24 covered |\n| Thresholds and costs | who pays for a miss | 2.5 at 12 hours, 1.5 at 40 |\n\nTreat a trial notebook like any colleague's code: read its split, its inputs and its metric, rerun it on the same rolling origins as the baselines, and record the result with the decision. The experiment-tracking module covers how runs and their evidence are recorded. A generated model that cannot beat seasonal naive on the same folds is not an improvement, however sophisticated its algorithm.",
+    "sourceSectionIds": [
+     "dbxfe-forecasting-l01-platform"
+    ]
+   },
+   "recap": "Let tools search models; keep the origin, inputs, baselines, metric and costs as the team's decisions.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-forecasting-l01-card1",
+   "beatId": "dbxfe-forecasting-horizon"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card2",
+   "beatId": "dbxfe-forecasting-naive"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card3",
+   "beatId": "dbxfe-forecasting-seasonal"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card4",
+   "beatId": "dbxfe-forecasting-rolling"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card5",
+   "beatId": "dbxfe-forecasting-leakage"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card6",
+   "beatId": "dbxfe-forecasting-model"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card7",
+   "beatId": "dbxfe-forecasting-metrics"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card8",
+   "beatId": "dbxfe-forecasting-uncertainty"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card9",
+   "beatId": "dbxfe-forecasting-anomaly"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card10",
+   "beatId": "dbxfe-forecasting-threshold"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card11",
+   "beatId": "dbxfe-forecasting-cost"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card12",
+   "beatId": "dbxfe-forecasting-ranking"
+  },
+  {
+   "cardId": "dbxfe-forecasting-l01-card13",
+   "beatId": "dbxfe-forecasting-platform"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-forecasting-extension-gap",
+   "revision": "1",
+   "prompt": "Friday's night-shift count is posted after the 16:00 roster meeting. Which TimeSeriesSplit setting keeps the backtest honest, and what else changes?",
+   "answer": "Set gap=1 so each fold's training ends on Thursday, the last final count; the week to plan becomes steps 2 to 8 from that origin.",
+   "explanation": "[[dbxfe-forecasting-extension-gap-concept|gap]] removes the given number of samples from the end of each training set before its test set. With gap=1 fold 1 trains on 53 days to Thursday 2026-07-23 and still tests Saturday to Friday, which matches what the meeting actually knows. The horizon quietly grows to eight steps: a lag-7 model can no longer reach next Friday from a Thursday origin, so that step needs lag 14 or a seasonal naive value from two weeks back. Write the gap into the backtest's description so readers compare like with like.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-backtest",
+   "conceptIds": [
+    "dbxfe-forecasting-extension-gap-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-tss-params",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "beatId": "dbxfe-forecasting-rolling",
+   "whyItMatters": "Late-arriving data is common on a shop floor; a backtest that ignores it credits a model with information the planners never have."
+  },
+  {
+   "id": "dbxfe-forecasting-extension-smape",
+   "revision": "1",
+   "prompt": "Is symmetric MAPE a safe replacement for MAPE when some actuals are zero?",
+   "answer": "No: it still divides by values near zero, gives the same 200% to any forecast on a zero-actual day, and the forecasting textbook recommends against it.",
+   "explanation": "[[dbxfe-forecasting-extension-smape-concept|Symmetric MAPE]] divides each absolute error by the average magnitude of actual and forecast. On a closed Sunday with a 7-unit forecast that ratio is exactly 2, a 200% error, and it would be 200% for a 409-unit forecast too, so the metric cannot tell a small slip from a large one. When both actual and forecast are small the ratio swings wildly. Forecasting: Principles and Practice notes that the original form can even be negative and, following Hyndman and Koehler, recommends not using it. For L4, MAE on working days and MASE remain the defensible choices.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-metrics",
+   "conceptIds": [
+    "dbxfe-forecasting-extension-smape-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-smape",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "beatId": "dbxfe-forecasting-metrics",
+   "whyItMatters": "Swapping one percentage metric for another is a common reflex after MAPE fails; knowing why sMAPE fails too saves a wasted review cycle."
+  },
+  {
+   "id": "dbxfe-forecasting-extension-smoothing",
+   "revision": "1",
+   "prompt": "What would exponential smoothing add to L4's forecast, and what must it be combined with?",
+   "answer": "A weighted average of past values with exponentially decaying weights, which smooths noise; on L4 it must be run per weekday or in a seasonal form.",
+   "explanation": "[[dbxfe-forecasting-extension-smoothing-concept|Exponential smoothing]] forecasts with a weighted average of past observations whose weights shrink geometrically with age: a smoothing parameter near 1 follows the latest value, near 0 averages a long history. Run on L4's raw daily series it would blend one-shift Saturdays into two-shift weekdays, so it needs a seasonal form such as Holt-Winters or a separate level per weekday. Like the lag regression, it carries part of a breakdown into later forecasts, and it must be compared with seasonal naive on the same rolling origins before it earns a place.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-metrics",
+   "conceptIds": [
+    "dbxfe-forecasting-extension-smoothing-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-smoothing",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "beatId": "dbxfe-forecasting-model",
+   "whyItMatters": "It is the most common transparent alternative to a lag regression, and knowing its seasonal requirement prevents a model that ignores the calendar."
+  },
+  {
+   "id": "dbxfe-forecasting-extension-width",
+   "revision": "1",
+   "prompt": "Why should a 14-day forecast's interval usually be wider than a 1-day forecast's from the same origin?",
+   "answer": "More can change between the origin and a distant target, so errors, and intervals built from them, usually grow with the horizon.",
+   "explanation": "The forecasting textbook notes that prediction intervals usually widen as the horizon grows, because uncertainty accumulates the further ahead a forecast reaches. The lab's band ignores this: it uses one set of in-sample residuals for every step, so steps 1 and 7 get the same [[dbxfe-forecasting-extension-width-concept|width]]. A horizon-aware band would take, for each step h, the errors of past step-h forecasts from the rolling backtest. With only four folds each step has four errors, which is why the lab keeps one pooled band and says so.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-uncertainty",
+   "conceptIds": [
+    "dbxfe-forecasting-extension-width-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-claim-width",
+    "dbxfe-forecasting-guidance",
+    "dbxfe-forecasting-fiction"
+   ],
+   "beatId": "dbxfe-forecasting-uncertainty",
+   "whyItMatters": "A band that is as narrow for next Friday as for tomorrow overstates what the planner can rely on at the far end of the roster."
+  }
+ ],
+ "recap": {
+  "title": "Name the decision, then evaluate that decision",
+  "markdown": "**A prediction is only as good as the evaluation that matches its decision.** Fix the origin and horizon first, build naive and seasonal naive baselines, roll the origin forward with TimeSeriesSplit and refit in every fold, and remove every input the origin cannot see. Compare the model fold by fold (21.17 against 23.67 units here, one fold lost), score working days with MAE and MASE rather than a MAPE that breaks on zeros, and publish the 80% band with its measured coverage and the breakdown it could not contain. For anomalies, read the threshold table as inspection load and choose by cost; for a ranked queue, measure precision at the real capacity. **Transfer challenge:** Saturdays close from September and a missed bad lot is re-estimated at 25 hours; say what changes in the scoring days, the seasonal naive forecast and the chosen threshold, and what stays the same.",
+  "visualId": "dbxfe-forecasting-model-visual"
+ },
+ "appliedTask": {
+  "title": "Replan for a five-day week and a new miss cost",
+  "prompt": "From September line L4 closes on Saturdays as well as Sundays, quality re-estimates a missed bad-lot day at 25 inspector-hours, and the incoming-goods team gets capacity for eight lot inspections per shift. Using the module's results, explain what changes in the backtest and scoring days, what the seasonal naive forecast does in the first closed week, which anomaly threshold is now cheapest, which model should order the lot queue, and what you would mark as unknown.",
+  "modelAnswer": "Scoring: Saturdays join Sundays as scheduled closures, so they are forecast as 0 from the published calendar and excluded from MAE and MASE; MAPE stays unusable on closed days. The first closed week breaks seasonal naive, which copies last Saturday's roughly 180 units into a closed day; the calendar rule must override it, and the lag regression simply stops fitting and forecasting Saturdays, which are no longer working days. The backtest needs new rolling origins after the change before any model comparison is trusted. Threshold: with 3 review hours and 25 miss hours the totals for 1.5 to 3.5 are 36, 46, 40, 62 and 81, so 1.5 becomes cheapest; the break-even with 2.5 is 21 hours. Queue: with eight inspections model A is better (precision at 8 of 0.625 against 0.500, recall 1.00). Unknown: whether the five-day week changes weekday volumes, and whether the new miss cost is measured or estimated.",
+  "reasoning": "The answer separates what the calendar decides from what a model estimates, recomputes the threshold from the cost table rather than inheriting it, and ties the ranking metric to the new capacity, while naming what the old data cannot show.",
+  "beatIds": [
+   "dbxfe-forecasting-seasonal",
+   "dbxfe-forecasting-rolling",
+   "dbxfe-forecasting-metrics",
+   "dbxfe-forecasting-cost",
+   "dbxfe-forecasting-ranking"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-forecasting-scenario"
+ ]
+}
