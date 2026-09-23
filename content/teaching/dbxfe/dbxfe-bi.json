@@ -1,0 +1,3345 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-bi",
+ "title": "Business intelligence and semantic delivery",
+ "summary": "A dashboard people act on: designed backward from a decision, labelled so every number can be defended, bound to one metric contract, opened by two separate doors, honest about freshness, and proved by an acceptance script before anyone trusts it.",
+ "outcomes": [
+  "Write a page's decision chain and rewrite a misleading tile label into a defensible one bound to a named metric contract.",
+  "Predict what field filters and parameters change, and write an access matrix that separates dashboard permissions, the publish-time data-permission choice and table privileges.",
+  "State freshness in words, place a refresh after the job that publishes the data, and explain what a metric view and the business-user surface add.",
+  "Compare the native AI/BI page with Power BI, Tableau and ODBC or JDBC clients, and write a storyboard and an acceptance script with independent expected values and signers."
+ ],
+ "startingAssumptions": [
+  "SQL aggregation, grouping and joins are familiar; the SQL performance module's metric lesson has introduced a trustworthy metric.",
+  "The metric contract guide's unit_defect_rate definition, with its numerator, denominator, empty case and restatement rule, is the contract this module consumes rather than writes.",
+  "Unity Catalog privileges such as SELECT on a table were introduced in the governance module."
+ ],
+ "lessonIds": [
+  "dbxfe-bi-l01"
+ ],
+ "optionalBridgeLessonIds": [],
+ "editorialRationale": "Dashboard teaching fails when it starts from the tool, so the module starts from the meeting: a decision chain, then the label that makes a number defensible, then the contract every tile inherits and the controls that change it. Access is taught as two doors with the publish-time credential choice between them, freshness as a sentence and an ordering problem, and semantics as one governed definition. The business-user surface and external BI tools are placed against the same page so the learner sees what travels and what stays behind, and the storyboard and acceptance script turn the plan into evidence. Genie itself is left to its own module.",
+ "sources": [
+  {
+   "id": "dbxfe-bi-source-aibi",
+   "title": "Databricks AI/BI",
+   "url": "https://docs.databricks.com/aws/en/ai-bi/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; overview of AI/BI dashboards, Genie Agents and Genie One.",
+   "caveat": "Names in this product family changed in 2025 and 2026; the AI/BI and Genie One release notes are the place to check current names and availability before writing a runbook.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: AI/BI includes dashboards for visualization and reporting, while Genie One includes Genie Agents for conversational analytics and the Genie One UI for business users; dashboards are AI-powered, low-code dashboards with visualizations and cross-filtering; Genie Agents are domain-specific environments where data teams configure trusted data, metrics and business rules that power Genie One answers.."
+  },
+  {
+   "id": "dbxfe-bi-source-dashboards",
+   "title": "Dashboards",
+   "url": "https://docs.databricks.com/aws/en/dashboards/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; AI/BI dashboards landing page (the API still calls them Lakeview dashboards).",
+   "caveat": "A product overview; feature availability and limits change and are checked on the current page, not assumed from this summary.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: AI/BI dashboards offer AI-assisted authoring, a visualization library and a streamlined configuration experience; when published, a dashboard can be shared with anyone registered to the Databricks account, even if they do not have access to the workspace.."
+  },
+  {
+   "id": "dbxfe-bi-source-concepts",
+   "title": "Dashboard concepts",
+   "url": "https://docs.databricks.com/aws/en/dashboards/concepts",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; datasets, visualizations and pages of an AI/BI dashboard.",
+   "caveat": "Describes the authoring model; it does not define any business metric, which remains the metric contract's job.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: datasets define the data sources that power dashboard visualizations; each dataset is based on a table, view, metric view or custom SQL query; every visualization reads from one or more datasets; the Data tab holds datasets and calculations and the page tabs hold visualizations and filters.."
+  },
+  {
+   "id": "dbxfe-bi-source-share",
+   "title": "Share a dashboard",
+   "url": "https://docs.databricks.com/aws/en/dashboards/share/share",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; publishing, data permissions and the sharing dialog for AI/BI dashboards.",
+   "caveat": "Publishing options and defaults are product behaviour that can change; the access matrix is re-checked against the current page at review time.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: when you publish a dashboard you choose Share data permission (the default) or Individual data permission; with shared data permissions viewers run queries using the publisher's data permissions and can view the dashboard without direct access to the underlying data and compute; with individual data permissions viewers run queries with their own credentials, see results their permissions allow and must have access to the underlying data; after publishing, the sharing dialog opens.."
+  },
+  {
+   "id": "dbxfe-bi-source-acl",
+   "title": "Access control lists",
+   "url": "https://docs.databricks.com/aws/en/security/auth/access-control",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; workspace object access control, including AI/BI dashboard ACLs.",
+   "caveat": "Permission names differ between the UI and the API (Can View is CAN_READ in the API); legacy dashboards are a separate object with their own ACL.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: for AI/BI dashboards, CAN VIEW and CAN RUN let a user view results and interact with widgets; CAN EDIT also lets them edit the dashboard and publish; only CAN MANAGE lets them modify permissions and delete the dashboard; the permissions API lists CAN_READ, CAN_RUN, CAN_EDIT and CAN_MANAGE; users who do not have access to the workspace are limited to CAN RUN even if a higher level appears in the sharing dialog.."
+  },
+  {
+   "id": "dbxfe-bi-source-filters",
+   "title": "Use dashboard filters",
+   "url": "https://docs.databricks.com/aws/en/dashboards/manage/filters/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; filter widgets on AI/BI dashboards.",
+   "caveat": "Browser-side filtering is described for relatively small datasets; the size at which a query re-runs is product behaviour, not a contract.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: a filter widget is configured with its type, an optional title and description, and the dataset fields it filters; for relatively small datasets field filters often perform more efficiently than parameters because they are applied in the browser without re-running the query; published dashboards store field filter and parameter selections in the URL, so a bookmarked or shared link opens with those values applied.."
+  },
+  {
+   "id": "dbxfe-bi-source-filtertypes",
+   "title": "Dashboard filter types",
+   "url": "https://docs.databricks.com/aws/en/dashboards/manage/filter-types",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the filter widget types available to AI/BI dashboards.",
+   "caveat": "The list of types grows between releases; read the current page rather than this summary before designing.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: field filters support single value, multiple values, date picker, date range picker, text entry and range slider; parameter filters support single value, multiple values, date picker and date range.."
+  },
+  {
+   "id": "dbxfe-bi-source-parameters",
+   "title": "Work with dashboard parameters",
+   "url": "https://docs.databricks.com/aws/en/dashboards/manage/filters/parameters",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; parameters in AI/BI dashboard datasets and query-based parameters.",
+   "caveat": "Parameter syntax and multi-value handling are documented on the page; nothing here was executed against a warehouse.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: dashboard parameters substitute different values into dataset queries at runtime, so data can be filtered before it is aggregated in the SQL query; authors add parameters to datasets and connect them to widgets; query-based parameters combine a field filter and a parameter filter in one widget so viewers choose from a list drawn from a dataset; queries that allow multiple selections use ARRAY_CONTAINS.."
+  },
+  {
+   "id": "dbxfe-bi-source-schedule",
+   "title": "Manage scheduled dashboard updates and subscriptions",
+   "url": "https://docs.databricks.com/aws/en/dashboards/share/schedule-subscribe",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; refresh schedules and subscriptions for published AI/BI dashboards.",
+   "caveat": "Subscriber limits and destination types are product limits that can change; the schedule costs warehouse time on every run.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: a schedule sets a periodic cadence at which all SQL that defines the datasets runs and, for dashboards published with shared data permissions, refreshes the shared cache; subscriptions send dashboard snapshots to email, Slack or Microsoft Teams; a subscription list can hold up to 100 subscribers and a notification destination counts as one; a subscriber can choose to refresh data without receiving email.."
+  },
+  {
+   "id": "dbxfe-bi-source-task",
+   "title": "Dashboard task for jobs",
+   "url": "https://docs.databricks.com/aws/en/jobs/tasks/dashboard",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; a Lakeflow Jobs task type that refreshes an AI/BI dashboard.",
+   "caveat": "Task availability and warehouse requirements are stated on the page; no job was created or run in this build.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: a dashboard task refreshes a dashboard and sends a snapshot to subscribers; its subscriber list is separate from subscribers configured through the dashboards UI or API; the task must use a serverless or pro SQL warehouse, and if none is selected it uses the dashboard's default warehouse.."
+  },
+  {
+   "id": "dbxfe-bi-source-caching",
+   "title": "Dataset optimization and caching",
+   "url": "https://docs.databricks.com/aws/en/dashboards/caching",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; how AI/BI dashboards cache query results.",
+   "caveat": "The cache is described as best effort; a design must not depend on a cached result being present.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: dashboards cache query results to improve load times on a best-effort basis with a 24-hour result cache; a dashboard published with shared data permissions uses a shared cache where all viewers see the same results, while a draft or a dashboard published with individual data permissions uses a per-user cache; scheduled updates populate the cache and speed up the first load.."
+  },
+  {
+   "id": "dbxfe-bi-source-api",
+   "title": "Use dashboard APIs to create and manage dashboards",
+   "url": "https://docs.databricks.com/aws/en/dashboards/tutorials/dashboard-crud-api",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; tutorial for the dashboard (Lakeview) REST API, including publishing as a service principal.",
+   "caveat": "A tutorial, not a deployment standard; token handling and secret storage follow the organization's own identity rules.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: to publish with service principal credentials, authenticate as the service principal to obtain an OAuth access token and call the publish endpoint with embed_credentials set to true; the service principal needs at least CAN MANAGE on the dashboard, SELECT on all data sources the dashboard uses and CAN USE on the warehouse; viewers then use the principal's permissions for data and compute and need permission only on the dashboard object; audit logs show the service principal as the query executor.."
+  },
+  {
+   "id": "dbxfe-bi-source-embedding",
+   "title": "What is embedding for external users?",
+   "url": "https://docs.databricks.com/aws/en/dashboards/share/embedding/external-embed",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; embedding AI/BI dashboards in applications for viewers without Databricks accounts.",
+   "caveat": "Availability, token lifetime and recommended publishing mode are stated on the page and must be re-read before any design; nothing was embedded in this build.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: embedding for external users integrates dashboards into external applications without provisioning Databricks accounts for viewers such as partners and customers; it uses a service principal granted read access to the dashboard and its underlying data, and the application's server obtains a token scoped to the individual viewer; the tokens are valid for one hour.."
+  },
+  {
+   "id": "dbxfe-bi-source-metricviews",
+   "title": "Unity Catalog metric views",
+   "url": "https://docs.databricks.com/aws/en/uc-semantics/metric-views/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Unity Catalog semantics. Release status, UI flows and runtime requirements vary; check the page.",
+   "caveat": "Search snippets on 2026-09-23 described metric views as the core implementation of Unity Catalog semantics and reported a runtime requirement and a general-availability announcement; none of this was executed here, so status is checked on the page.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: metric views separate measure definitions from the fields (dimensions) used to group, filter and aggregate them, so a metric is defined once and queried at runtime; a standard view locks in aggregations at creation time, while with a metric view users can group by any available field and the engine generates the correct computation; metric views are created with SQL DDL or Catalog Explorer and defined in YAML.."
+  },
+  {
+   "id": "dbxfe-bi-source-genieone",
+   "title": "Use Genie One",
+   "url": "https://docs.databricks.com/aws/en/genie-one/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the simplified interface for business users, previously named Databricks One.",
+   "caveat": "A renamed product: older pages, videos and community answers say Databricks One; features on the consumer surface change between releases.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: Genie One, previously known as Databricks One, is the simplified Databricks UI for business users: a single entry point to view and interact with AI/BI dashboards, ask data questions in natural language through Genie Agents and use Databricks Apps, without navigating compute, queries, models or notebooks; consumer access, the least-privileged option, is enough for Genie One chat.."
+  },
+  {
+   "id": "dbxfe-bi-source-consumers",
+   "title": "What is consumer access?",
+   "url": "https://docs.databricks.com/aws/en/ai-bi/consumers/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the consumer access workspace entitlement.",
+   "caveat": "Entitlement names and defaults are administered per workspace; which groups hold it is checked by an administrator, not assumed.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: consumer access is a workspace entitlement that gives users access to workspace-level Genie One and directs them there instead of the standard Databricks workspace, where they can discover and interact with dashboards, Genie Agents and Databricks Apps shared with them.."
+  },
+  {
+   "id": "dbxfe-bi-source-powerbi",
+   "title": "Power BI with Databricks",
+   "url": "https://docs.databricks.com/gcp/en/partners/bi/power-bi",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on Google Cloud edition of the Power BI landing page; the AWS edition at the same path surfaced in search without a title.",
+   "caveat": "The landing page names three paths; which apply to Cinderline depends on its cloud, its Power BI licence and tenant settings, which this build cannot check.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: connect Microsoft Power BI to Databricks to publish data to the Power BI service, to connect Power BI Desktop, and to orchestrate semantic model refreshes with a Power BI task.."
+  },
+  {
+   "id": "dbxfe-bi-source-pbidesktop",
+   "title": "Connect Power BI Desktop to Databricks",
+   "url": "https://docs.databricks.com/aws/en/partners/bi/power-bi/desktop",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; connecting Power BI Desktop to clusters and SQL warehouses.",
+   "caveat": "Connector versions, authentication methods and supported modes change; the page recommends the latest Power BI Desktop for Unity Catalog data.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: Power BI Desktop connects to Databricks clusters and SQL warehouses through Partner Connect, manually with the server hostname and HTTP path, or through the Power BI Delta Sharing connector; the Databricks connector supports the Arrow Database Connectivity (ADBC) driver; both Import and DirectQuery are supported and SQL warehouses are recommended for DirectQuery; the latest Power BI Desktop is recommended for Unity Catalog data.."
+  },
+  {
+   "id": "dbxfe-bi-source-tableau",
+   "title": "Connect Tableau and Databricks",
+   "url": "https://docs.databricks.com/aws/en/partners/bi/tableau",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Tableau Desktop and Tableau Cloud connections.",
+   "caveat": "Tableau-side licensing, permissions and extract schedules are Tableau's to document; only the Databricks side is summarized.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: Partner Connect connects a compute resource or SQL warehouse to Tableau Desktop in a few clicks; Tableau Desktop or Tableau Cloud can connect to Databricks; with Tableau Cloud, Tableau data sources can be created from Unity Catalog tables or schemas directly from the Databricks UI, which requires the data to be in Unity Catalog with Unity Catalog enabled compute.."
+  },
+  {
+   "id": "dbxfe-bi-source-drivers",
+   "title": "Databricks ODBC and JDBC Drivers",
+   "url": "https://docs.databricks.com/aws/en/integrations/jdbc-odbc-bi",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; ODBC (Open Database Connectivity) and JDBC (Java Database Connectivity) drivers for tools and clients.",
+   "caveat": "Driver versions, supported platforms and authentication options are on the driver pages; no driver was installed here.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: Databricks provides an ODBC driver and a JDBC driver to connect tools or clients to Databricks; some tools require installing the ODBC driver while others embed it, for example Tableau Desktop needs the ODBC driver installed while recent Power BI Desktop releases include it preinstalled.."
+  },
+  {
+   "id": "dbxfe-bi-source-measure",
+   "title": "measure aggregate function",
+   "url": "https://docs.databricks.com/aws/en/sql/language-manual/functions/measure",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks SQL language reference; metric views.",
+   "caveat": "Syntax only; the function exists for metric view queries and was not executed in this build.",
+   "reviewedEvidence": "Reused from this repository's data-modeling module's record for the same URL, title and publisher (dbxfe-modeling-source-measure; its author confirmed the search-result title and snippet on 2026-09-23); not re-searched for this record, and the page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as recorded there: measure(measure_column) evaluates a measure of a metric view, with an optional FILTER clause restricting the rows used; queries list columns rather than SELECT * because measures need MEASURE() to evaluate."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-bi-claim-dashboards",
+   "description": "AI/BI dashboards are low-code dashboards built from datasets; each dataset is based on a table, view, metric view or custom SQL query, every visualization reads from one or more datasets, and a published dashboard can be shared with users registered to the Databricks account.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-dashboards",
+    "dbxfe-bi-source-concepts"
+   ],
+   "context": "AI/BI dashboards on Databricks; features and limits vary by release."
+  },
+  {
+   "id": "dbxfe-bi-claim-filters",
+   "description": "Field filters narrow results by dataset fields and come as single value, multiple values, date picker, date range picker, text entry and range slider; for relatively small datasets they are often applied in the browser without re-running the query.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-filters",
+    "dbxfe-bi-source-filtertypes"
+   ],
+   "context": "AI/BI dashboard filter widgets."
+  },
+  {
+   "id": "dbxfe-bi-claim-parameters",
+   "description": "Dashboard parameters substitute values into dataset queries at runtime so data is filtered before aggregation; parameter filters come as single value, multiple values, date picker and date range, and query-based parameters draw their allowed values from a dataset.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-parameters",
+    "dbxfe-bi-source-filtertypes"
+   ],
+   "context": "AI/BI dashboard parameters; syntax on the current page."
+  },
+  {
+   "id": "dbxfe-bi-claim-permissions",
+   "description": "An AI/BI dashboard has its own permission levels, Can View (CAN_READ), Can Run, Can Edit and Can Manage, which govern the dashboard object; whether its queries return data is decided separately by data permissions on the underlying objects.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-acl",
+    "dbxfe-bi-source-share"
+   ],
+   "context": "Workspace object ACLs; Unity Catalog privileges are a separate system."
+  },
+  {
+   "id": "dbxfe-bi-claim-share",
+   "description": "At publish time the publisher chooses shared data permissions (the default), where viewers' queries run with the publisher's data permissions and share one cache, or individual data permissions, where each viewer's own credentials and access to the data decide the results and the cache is per user.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-share",
+    "dbxfe-bi-source-caching"
+   ],
+   "context": "Publishing AI/BI dashboards; defaults may change."
+  },
+  {
+   "id": "dbxfe-bi-claim-api",
+   "description": "The dashboard API publishes with embed_credentials; publishing as a service principal needs at least CAN MANAGE on the dashboard, SELECT on its data sources and CAN USE on the warehouse, after which viewers use the principal's permissions and audit logs show the principal as the executor.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-api"
+   ],
+   "context": "Dashboard (Lakeview) REST API tutorial."
+  },
+  {
+   "id": "dbxfe-bi-claim-schedule",
+   "description": "A dashboard schedule runs all dataset SQL on a periodic cadence and, for a dashboard published with shared data permissions, refreshes the shared cache; subscriptions send snapshots by email, Slack or Microsoft Teams.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-schedule"
+   ],
+   "context": "Published AI/BI dashboards; each run uses warehouse compute."
+  },
+  {
+   "id": "dbxfe-bi-claim-task",
+   "description": "A dashboard task in a job refreshes a dashboard and sends a snapshot to its own subscriber list, using a serverless or pro SQL warehouse.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-task"
+   ],
+   "context": "Lakeflow Jobs task types; availability varies."
+  },
+  {
+   "id": "dbxfe-bi-claim-metricviews",
+   "description": "A Unity Catalog metric view separates measure definitions from dimensions, is defined in YAML and registered with SQL DDL or Catalog Explorer, lets a query group by any available dimension while the engine generates the computation, and is queried with the MEASURE function.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-metricviews",
+    "dbxfe-bi-source-measure"
+   ],
+   "context": "Unity Catalog semantics; status and runtime requirements on the current page."
+  },
+  {
+   "id": "dbxfe-bi-claim-aibi",
+   "description": "Databricks AI/BI comprises dashboards for visualization and reporting and, under Genie One, Genie Agents for conversational analytics configured by data teams with trusted data, metrics and business rules.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-aibi"
+   ],
+   "context": "Product family naming as of September 2026."
+  },
+  {
+   "id": "dbxfe-bi-claim-genie-one",
+   "description": "Genie One, previously Databricks One, is the simplified interface where business users view AI/BI dashboards, ask questions in natural language and use Databricks Apps; the consumer access entitlement directs users there and is the least-privileged option.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-genieone",
+    "dbxfe-bi-source-consumers"
+   ],
+   "context": "Workspace-level Genie One; entitlements administered per workspace."
+  },
+  {
+   "id": "dbxfe-bi-claim-powerbi",
+   "description": "Power BI connects to Databricks from Power BI Desktop through Partner Connect, a manual hostname and HTTP path connection or the Delta Sharing connector; the connector supports ADBC, Import and DirectQuery, with SQL warehouses recommended for DirectQuery; data can also be published to the Power BI service and semantic model refreshes orchestrated with a Power BI task.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-powerbi",
+    "dbxfe-bi-source-pbidesktop"
+   ],
+   "context": "Power BI integration; licence and tenant settings are Power BI's."
+  },
+  {
+   "id": "dbxfe-bi-claim-tableau",
+   "description": "Tableau Desktop connects through Partner Connect or manually, and with Tableau Cloud data sources can be created from Unity Catalog tables or schemas directly from the Databricks UI.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-tableau"
+   ],
+   "context": "Tableau integration; Tableau-side permissions are Tableau's."
+  },
+  {
+   "id": "dbxfe-bi-claim-drivers",
+   "description": "Databricks provides ODBC and JDBC drivers for tools and clients; some tools need the ODBC driver installed, such as Tableau Desktop, while recent Power BI Desktop releases include it.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-drivers"
+   ],
+   "context": "Driver-based connectivity to Databricks compute."
+  },
+  {
+   "id": "dbxfe-bi-claim-caching",
+   "description": "AI/BI dashboards keep a best-effort 24-hour result cache: shared across viewers for a dashboard published with shared data permissions, per user for drafts and individual data permissions, and populated by scheduled updates.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-caching"
+   ],
+   "context": "Dashboard caching behaviour; best effort, not a guarantee."
+  },
+  {
+   "id": "dbxfe-bi-claim-account-share",
+   "description": "A published AI/BI dashboard can be shared with users registered to the Databricks account who lack workspace access; such users are limited to Can Run whatever level the sharing dialog shows.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-dashboards",
+    "dbxfe-bi-source-acl"
+   ],
+   "context": "Account-level sharing of published dashboards."
+  },
+  {
+   "id": "dbxfe-bi-claim-embedding",
+   "description": "Embedding for external users places a dashboard in an external application for viewers without Databricks accounts, using a service principal with read access to the dashboard and its data and one-hour tokens scoped to each viewer.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-embedding"
+   ],
+   "context": "External embedding; availability checked on the current page."
+  },
+  {
+   "id": "dbxfe-bi-claim-filter-url",
+   "description": "A published dashboard stores its field filter and parameter selections in the URL, so a bookmarked or shared link reopens the dashboard with those values applied.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-bi-source-filters"
+   ],
+   "context": "Published AI/BI dashboards."
+  },
+  {
+   "id": "dbxfe-bi-guidance",
+   "description": "Original SpicyBrain reasoning for dashboard delivery: the decision chain, labelling rules, access-matrix layout, freshness wording, storyboard frames and acceptance scripts; not a Databricks runbook.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "Independent curriculum; adapt to the actual audience, workspace, tools and review process."
+  },
+  {
+   "id": "dbxfe-bi-fiction",
+   "description": "Cinderline Components, its North and South plants, lines, inspections, tables, groups, service principals, times, rates, restatements and meeting are synthetic teaching records.",
+   "kind": "fictional",
+   "sourceIds": [],
+   "context": "No dashboard, warehouse, grant, schedule or external BI connection was created, read or tested in this build."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-bi-decision-concept",
+   "term": "decision chain",
+   "aliases": [
+    "audience, decision, action, metric",
+    "dashboard purpose"
+   ],
+   "definition": "The four links a dashboard exists to serve: who reads it, what they decide, what they then do, and the metric that changes that decision.",
+   "example": "Line supervisors at 8 a.m. choose which line to investigate first from unit_defect_rate per line.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-bi-label-concept",
+   "term": "defensible label",
+   "aliases": [
+    "tile label",
+    "chart labelling",
+    "freshness stamp"
+   ],
+   "definition": "A tile label that carries axis treatment, units, period, denominator and publish time, so a reader can say exactly what the number means.",
+   "example": "4.8% of 250 inspected units on line 3, previous business day, published 06:32.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-bi-binding-concept",
+   "term": "contract binding",
+   "aliases": [
+    "metric contract binding",
+    "tile-to-contract binding"
+   ],
+   "definition": "Tying a tile to a named, versioned metric contract so its dataset computes exactly the contract's grain, numerator, denominator, precision and empty rule.",
+   "example": "The plant tile reads unit_defect_rate v1 as 47 over 1,040, never a mean of line rates.",
+   "sourceIds": [
+    "dbxfe-bi-source-concepts"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-filter-concept",
+   "term": "field filter",
+   "aliases": [
+    "dashboard filter",
+    "filter widget"
+   ],
+   "definition": "A dashboard control that narrows a dataset's returned rows by one of its fields, without changing what the query computed.",
+   "example": "Setting line to 3 hides the other line rows; the plant dataset, which has no line field, is untouched.",
+   "sourceIds": [
+    "dbxfe-bi-source-filters",
+    "dbxfe-bi-source-filtertypes"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-parameter-concept",
+   "term": "dashboard parameter",
+   "aliases": [
+    "parameter filter",
+    "query parameter",
+    "named parameter marker",
+    "query-based parameter"
+   ],
+   "definition": "A named value substituted into a dataset's SQL at runtime, before aggregation, so it changes the population a query computes over.",
+   "example": "Changing :business_day from 4 to 3 recomputes every line tile and the plant tile.",
+   "sourceIds": [
+    "dbxfe-bi-source-parameters"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-permission-concept",
+   "term": "dashboard permission",
+   "aliases": [
+    "Can View",
+    "Can Run",
+    "Can Edit",
+    "Can Manage",
+    "dashboard ACL"
+   ],
+   "definition": "An access level on the dashboard object itself, separate from any privilege on the tables its queries read.",
+   "example": "Supervisors hold Can View on the page while SELECT on the table is a Unity Catalog grant.",
+   "sourceIds": [
+    "dbxfe-bi-source-acl",
+    "dbxfe-bi-source-share"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-credentials-concept",
+   "term": "shared data permissions",
+   "aliases": [
+    "embedded credentials",
+    "share data permission",
+    "embed_credentials"
+   ],
+   "definition": "A publishing mode in which every viewer's queries run with the publisher's data permissions, so viewers need only access to the dashboard.",
+   "example": "Published as a service principal granted only the accepted table, a page lets supervisors read tiles without grants of their own.",
+   "sourceIds": [
+    "dbxfe-bi-source-share",
+    "dbxfe-bi-source-api"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-viewer-credentials-concept",
+   "term": "individual data permissions",
+   "aliases": [
+    "viewer credentials",
+    "individual data permission"
+   ],
+   "definition": "A publishing mode in which each viewer's own credentials run the queries, so results depend on that viewer's access to the underlying data.",
+   "example": "Cinderline's morning page shows each supervisor only what their group's SELECT allows.",
+   "sourceIds": [
+    "dbxfe-bi-source-share"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-freshness-concept",
+   "term": "freshness statement",
+   "aliases": [
+    "freshness line",
+    "data freshness",
+    "not-updated state"
+   ],
+   "definition": "Words on the page naming the period covered, the publish time, whether shown days were restated, and what the page says when it was not updated.",
+   "example": "Covers Tuesday. Published 06:32. Restated days are marked.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-bi-refresh-concept",
+   "term": "refresh schedule",
+   "aliases": [
+    "scheduled dashboard update",
+    "dashboard subscription",
+    "dashboard task",
+    "dashboard refresh"
+   ],
+   "definition": "A cadence or job task that re-runs a published dashboard's dataset queries and refreshes its cache, optionally sending snapshots to subscribers.",
+   "example": "A 06:30 daily schedule, or a dashboard task placed after the nightly publishing task.",
+   "sourceIds": [
+    "dbxfe-bi-source-schedule",
+    "dbxfe-bi-source-task"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-metricview-concept",
+   "term": "metric view",
+   "aliases": [
+    "Unity Catalog metric view",
+    "semantic layer",
+    "Unity Catalog semantics",
+    "semantic metric definition"
+   ],
+   "definition": "A Unity Catalog object, defined in YAML, that holds measure definitions separately from dimensions so the aggregation is computed at query time for any grouping.",
+   "example": "unit_defect_rate defined once returns 4.8% for line 3 and 4.5% for the plant.",
+   "sourceIds": [
+    "dbxfe-bi-source-metricviews"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-measure-concept",
+   "term": "measure",
+   "aliases": [
+    "MEASURE function",
+    "metric view measure"
+   ],
+   "definition": "A named aggregate expression in a metric view with no fixed level of aggregation, evaluated in a query with the MEASURE function.",
+   "example": "MEASURE(unit_defect_rate) grouped by line_id returns one rate per line.",
+   "sourceIds": [
+    "dbxfe-bi-source-metricviews",
+    "dbxfe-bi-source-measure"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-aibi-concept",
+   "term": "AI/BI",
+   "aliases": [
+    "Databricks AI/BI",
+    "AI/BI dashboards",
+    "Lakeview dashboards"
+   ],
+   "definition": "Databricks' business intelligence family: low-code dashboards plus Genie Agents and the Genie One interface for business users.",
+   "example": "Cinderline's morning page is an AI/BI dashboard read through Genie One.",
+   "sourceIds": [
+    "dbxfe-bi-source-aibi",
+    "dbxfe-bi-source-dashboards"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-genie-one-concept",
+   "term": "Genie One",
+   "aliases": [
+    "Databricks One",
+    "consumer access",
+    "consumer surface"
+   ],
+   "definition": "The simplified Databricks interface, previously Databricks One, where business users view dashboards, ask data questions and use apps.",
+   "example": "A supervisor with consumer access opens the morning page in Genie One on a phone.",
+   "sourceIds": [
+    "dbxfe-bi-source-genieone",
+    "dbxfe-bi-source-consumers"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-storyboard-concept",
+   "term": "storyboard",
+   "aliases": [
+    "dashboard storyboard",
+    "meeting storyboard"
+   ],
+   "definition": "The meeting drawn as ordered frames, each naming time, actor, surface, what is read, what is decided and where the actor goes next.",
+   "example": "Frame 3, 07:47: supervisors compare four tiles and choose line 2 first.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-bi-external-concept",
+   "term": "external BI integration",
+   "aliases": [
+    "Power BI connector",
+    "Tableau connector",
+    "Partner Connect",
+    "Import mode",
+    "DirectQuery"
+   ],
+   "definition": "Connecting a separate BI tool to a Databricks SQL warehouse, where the tool sends queries under its own connection identity and keeps its own sharing and refresh.",
+   "example": "A Tableau data source for the supplier reading a view that returns only line 2.",
+   "sourceIds": [
+    "dbxfe-bi-source-powerbi",
+    "dbxfe-bi-source-pbidesktop",
+    "dbxfe-bi-source-tableau"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-driver-concept",
+   "term": "ODBC and JDBC drivers",
+   "aliases": [
+    "ODBC driver",
+    "JDBC driver",
+    "Open Database Connectivity",
+    "Java Database Connectivity",
+    "ADBC"
+   ],
+   "definition": "Client libraries, ODBC (Open Database Connectivity) and JDBC (Java Database Connectivity), through which tools send SQL to Databricks compute.",
+   "example": "Tableau Desktop needs the ODBC driver installed before it can connect.",
+   "sourceIds": [
+    "dbxfe-bi-source-drivers",
+    "dbxfe-bi-source-pbidesktop"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-acceptance-concept",
+   "term": "acceptance script",
+   "aliases": [
+    "validation script",
+    "dashboard acceptance test"
+   ],
+   "definition": "A written list of checks with expected values from outside the page, the states and identities to try, and who signs each row.",
+   "example": "Line 3, day 4 must show 4.8%, taken from the reconciliation sheet, signed by the plant analyst.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-bi-extension-caching-concept",
+   "term": "dashboard result cache",
+   "aliases": [
+    "shared cache",
+    "per-user cache",
+    "query result cache"
+   ],
+   "definition": "The best-effort store of dashboard query results, shared across viewers or kept per user depending on how the dashboard was published.",
+   "example": "All supervisors read one cached result of the 06:30 refresh.",
+   "sourceIds": [
+    "dbxfe-bi-source-caching"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-extension-account-share-concept",
+   "term": "account-level dashboard sharing",
+   "aliases": [
+    "sharing with account users",
+    "sharing outside the workspace"
+   ],
+   "definition": "Sharing a published dashboard with people registered to the Databricks account who do not have access to the workspace.",
+   "example": "A supplier quality contact registered to the account but not the workspace opens the page.",
+   "sourceIds": [
+    "dbxfe-bi-source-dashboards",
+    "dbxfe-bi-source-acl"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-extension-embedding-concept",
+   "term": "embedding for external users",
+   "aliases": [
+    "external embedding",
+    "embedded dashboard"
+   ],
+   "definition": "Placing a published dashboard inside an external application for viewers without Databricks accounts, authorized by a service principal and per-viewer tokens.",
+   "example": "A supplier portal shows the line 2 page to the supplier's staff.",
+   "sourceIds": [
+    "dbxfe-bi-source-embedding"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-extension-filter-url-concept",
+   "term": "filter state in the URL",
+   "aliases": [
+    "shareable filtered link",
+    "bookmarked filter state"
+   ],
+   "definition": "The published dashboard's practice of recording its field filter and parameter selections in the page address.",
+   "example": "A link opening the page with line = 3 and business day 4 already selected.",
+   "sourceIds": [
+    "dbxfe-bi-source-filters"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-bi-decision-visual",
+   "kind": "nodes",
+   "title": "From a table-first draft to a decision-first page",
+   "alt": "A decision chain from audience to decision, action and metric. The first state draws tiles first and hopes for a decision; the second draws the chain first and excludes a tile with no action.",
+   "caption": "The same meeting drawn twice: tiles hoping for a decision, then a decision chain that admits only the tile it needs. Synthetic teaching example.",
+   "textEquivalent": "Table-first draft: Three tiles were drawn from the tables at hand. The decision is still pending because nothing on the page says which line to investigate first. Nodes: Supervisors, 8 a.m.: Will look at whatever is on the page. (context); Sensor average tile: Drawn because the sensor table exists. (selected); Inspection count tile: Drawn because it is easy. (selected); Defect rate tile: Drawn last, unlabelled. (selected); Decision: which line first?: Still argued from printed reports. (pending). Relationships: Supervisors, 8 a.m. → Sensor average tile: sees; Supervisors, 8 a.m. → Inspection count tile: sees; Supervisors, 8 a.m. → Defect rate tile: sees; Sensor average tile → Decision: which line first?: hoped; Inspection count tile → Decision: which line first?: hoped; Defect rate tile → Decision: which line first?: hoped.\n\nDecision-first page: The chain is drawn first. The action names the metric, the metric names its contract, and the sensor tile is excluded because no action needs it. Nodes: Supervisors, 8 a.m.: Choose which line to investigate first. (selected); Decision: which line first?: Made in the meeting, from the page. (selected); Action: send a technician: Open the excluded inspection for that line. (selected); Metric: unit_defect_rate v1: one tile per line. Per line, previous business day, one decimal. (selected); Counts beside each tile: Accepted, excluded, quarantined: the exclusions. (selected); Sensor average tile: No action needs it; no contract covers it. (excluded). Relationships: Supervisors, 8 a.m. → Decision: which line first?: makes; Decision: which line first? → Action: send a technician: leads to; Action: send a technician → Metric: unit_defect_rate v1: needs; Metric: unit_defect_rate v1 → Counts beside each tile: disclosed with; Sensor average tile → Decision: which line first?: no link.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "draft",
+     "title": "Table-first draft",
+     "explanation": "Three tiles were drawn from the tables at hand. The decision is still pending because nothing on the page says which line to investigate first.",
+     "nodes": [
+      {
+       "id": "audience",
+       "label": "Supervisors, 8 a.m.",
+       "detail": "Will look at whatever is on the page.",
+       "status": "context"
+      },
+      {
+       "id": "sensor",
+       "label": "Sensor average tile",
+       "detail": "Drawn because the sensor table exists.",
+       "status": "selected"
+      },
+      {
+       "id": "count",
+       "label": "Inspection count tile",
+       "detail": "Drawn because it is easy.",
+       "status": "selected"
+      },
+      {
+       "id": "rate",
+       "label": "Defect rate tile",
+       "detail": "Drawn last, unlabelled.",
+       "status": "selected"
+      },
+      {
+       "id": "decision",
+       "label": "Decision: which line first?",
+       "detail": "Still argued from printed reports.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "audience",
+       "to": "sensor",
+       "label": "sees"
+      },
+      {
+       "from": "audience",
+       "to": "count",
+       "label": "sees"
+      },
+      {
+       "from": "audience",
+       "to": "rate",
+       "label": "sees"
+      },
+      {
+       "from": "sensor",
+       "to": "decision",
+       "label": "hoped"
+      },
+      {
+       "from": "count",
+       "to": "decision",
+       "label": "hoped"
+      },
+      {
+       "from": "rate",
+       "to": "decision",
+       "label": "hoped"
+      }
+     ]
+    },
+    {
+     "id": "chain",
+     "title": "Decision-first page",
+     "explanation": "The chain is drawn first. The action names the metric, the metric names its contract, and the sensor tile is excluded because no action needs it.",
+     "nodes": [
+      {
+       "id": "audience",
+       "label": "Supervisors, 8 a.m.",
+       "detail": "Choose which line to investigate first.",
+       "status": "selected"
+      },
+      {
+       "id": "decision",
+       "label": "Decision: which line first?",
+       "detail": "Made in the meeting, from the page.",
+       "status": "selected"
+      },
+      {
+       "id": "action",
+       "label": "Action: send a technician",
+       "detail": "Open the excluded inspection for that line.",
+       "status": "selected"
+      },
+      {
+       "id": "rate",
+       "label": "Metric: unit_defect_rate v1",
+       "detail": "Per line, previous business day, one decimal.",
+       "status": "selected",
+       "value": "one tile per line"
+      },
+      {
+       "id": "count",
+       "label": "Counts beside each tile",
+       "detail": "Accepted, excluded, quarantined: the exclusions.",
+       "status": "selected"
+      },
+      {
+       "id": "sensor",
+       "label": "Sensor average tile",
+       "detail": "No action needs it; no contract covers it.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "audience",
+       "to": "decision",
+       "label": "makes"
+      },
+      {
+       "from": "decision",
+       "to": "action",
+       "label": "leads to"
+      },
+      {
+       "from": "action",
+       "to": "rate",
+       "label": "needs"
+      },
+      {
+       "from": "rate",
+       "to": "count",
+       "label": "disclosed with"
+      },
+      {
+       "from": "sensor",
+       "to": "decision",
+       "label": "no link"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-labels-visual",
+   "kind": "table",
+   "title": "Schematic dashboard: misleading, then defensible",
+   "alt": "A schematic dashboard drawn as a table of four tiles. The first state shows misleading labels; the second shows the same values with defensible labels bound to the unit_defect_rate contract.",
+   "caption": "Schematic dashboard, not product UI. The same four tiles with the same values; only the labels change. Synthetic teaching example.",
+   "textEquivalent": "Misleading draft (schematic): Four tiles as first drawn. Each label leaves a reader unable to say what the value means. Table columns: Tile | Shown | What a reader cannot tell. Rows: Line 3 | Defects 4.8 | A count or a rate? Of what? Which day? || Trend, 7 bars | Axis 4.0 to 5.0 | A 0.2 point move looks like a doubling. || Plant | 4.6 | Averaged from line rates; which denominator? || Header | (no date, no time) | Whether yesterday is in the numbers..\n\nDefensible page (schematic): The same values, each bound to the contract and labelled with unit, period, denominator and freshness. Table columns: Tile | Shown | Label carried. Rows: Line 3 | 4.8% · 12 of 250 | unit_defect_rate v1; previous business day; per cent of inspected units; 1 excluded || Trend, 7 bars | Axis 0 to 8% | Same metric, seven business days; restated day marked || Plant | 4.5% · 47 of 1,040 | All lines, same calculation; never an average of lines || Header | Covers Tue; published 06:32 | Restated days are marked; not-updated wording defined.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "misleading",
+     "title": "Misleading draft (schematic)",
+     "explanation": "Four tiles as first drawn. Each label leaves a reader unable to say what the value means.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Tile",
+       "Shown",
+       "What a reader cannot tell"
+      ],
+      "rows": [
+       [
+        "Line 3",
+        "Defects 4.8",
+        "A count or a rate? Of what? Which day?"
+       ],
+       [
+        "Trend, 7 bars",
+        "Axis 4.0 to 5.0",
+        "A 0.2 point move looks like a doubling."
+       ],
+       [
+        "Plant",
+        "4.6",
+        "Averaged from line rates; which denominator?"
+       ],
+       [
+        "Header",
+        "(no date, no time)",
+        "Whether yesterday is in the numbers."
+       ]
+      ]
+     }
+    },
+    {
+     "id": "defensible",
+     "title": "Defensible page (schematic)",
+     "explanation": "The same values, each bound to the contract and labelled with unit, period, denominator and freshness.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Tile",
+       "Shown",
+       "Label carried"
+      ],
+      "rows": [
+       [
+        "Line 3",
+        "4.8% · 12 of 250",
+        "unit_defect_rate v1; previous business day; per cent of inspected units; 1 excluded"
+       ],
+       [
+        "Trend, 7 bars",
+        "Axis 0 to 8%",
+        "Same metric, seven business days; restated day marked"
+       ],
+       [
+        "Plant",
+        "4.5% · 47 of 1,040",
+        "All lines, same calculation; never an average of lines"
+       ],
+       [
+        "Header",
+        "Covers Tue; published 06:32",
+        "Restated days are marked; not-updated wording defined"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-binding-visual",
+   "kind": "equation",
+   "title": "One contract, three calculations",
+   "alt": "Three equations for the unit defect rate: line 3 on day 4, the plant over all lines, and the wrong average of line rates.",
+   "caption": "Line 3 is 12 over 250; the plant is 47 over 1,040; the mean of four line rates is a different number the contract forbids. Synthetic teaching example.",
+   "textEquivalent": "Line 3, day 4: The contract's numerator over its denominator for one line and one business day, both summed over accepted inspections. Equation: unit_defect_rate(line 3, day 4) = 12 defective / 250 inspected = 4.8%\n\nPlant, all lines: The same calculation over all four lines: the sums are added before dividing. Equation: unit_defect_rate(plant, day 4) = (10 + 15 + 12 + 10) / (300 + 250 + 250 + 240) = 47 / 1,040 = 4.5%\n\nWrong: mean of line rates: Averaging the four line rates weights a 240-unit line like a 300-unit line and prints a figure the contract does not define. Equation: (3.3% + 6.0% + 4.8% + 4.2%) / 4 = 4.6%  ≠  4.5% (not the contract)",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "line",
+     "title": "Line 3, day 4",
+     "explanation": "The contract's numerator over its denominator for one line and one business day, both summed over accepted inspections.",
+     "nodes": [],
+     "connections": [],
+     "equation": "unit_defect_rate(line 3, day 4) = 12 defective / 250 inspected = 4.8%"
+    },
+    {
+     "id": "plant",
+     "title": "Plant, all lines",
+     "explanation": "The same calculation over all four lines: the sums are added before dividing.",
+     "nodes": [],
+     "connections": [],
+     "equation": "unit_defect_rate(plant, day 4) = (10 + 15 + 12 + 10) / (300 + 250 + 250 + 240) = 47 / 1,040 = 4.5%"
+    },
+    {
+     "id": "wrong",
+     "title": "Wrong: mean of line rates",
+     "explanation": "Averaging the four line rates weights a 240-unit line like a 300-unit line and prints a figure the contract does not define.",
+     "nodes": [],
+     "connections": [],
+     "equation": "(3.3% + 6.0% + 4.8% + 4.2%) / 4 = 4.6%  ≠  4.5% (not the contract)"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-filters-visual",
+   "kind": "table",
+   "title": "What a filter reaches and what a parameter changes",
+   "alt": "Tiny per-line and plant datasets across three states: no selection, a field filter on line 3, and a business-day parameter changed to day 3.",
+   "caption": "Four line rows and one plant row: the line filter hides rows from the dataset that has a line field, the day parameter recomputes both datasets. Synthetic teaching example.",
+   "textEquivalent": "No selection (day 4): Both datasets return their rows for the default business day. All five values are shown. Table columns: Dataset | line | day | rate | Shown?. Rows: per-line | 1 | 4 | 3.3% | yes || per-line | 2 | 4 | 6.0% | yes || per-line | 3 | 4 | 4.8% | yes || per-line | 4 | 4 | 4.2% | yes || plant | (no field) | 4 | 4.5% | yes.\n\nField filter: line = 3: The per-line dataset keeps only the row whose line field equals 3. The plant dataset has no line field, so its value is untouched. Table columns: Dataset | line | day | rate | Shown?. Rows: per-line | 1 | 4 | 3.3% | hidden || per-line | 2 | 4 | 6.0% | hidden || per-line | 3 | 4 | 4.8% | yes || per-line | 4 | 4 | 4.2% | hidden || plant | (no field) | 4 | 4.5% | yes, unchanged.\n\nParameter: business_day = 3: The day is substituted into both queries before aggregation. Every value is recomputed for day 3, plant included. Table columns: Dataset | line | day | rate | Shown?. Rows: per-line | 1 | 3 | 2.9% | recomputed || per-line | 2 | 3 | 5.4% | recomputed || per-line | 3 | 3 | 5.3% | recomputed || per-line | 4 | 3 | 3.5% | recomputed || plant | (no field) | 3 | 4.2% | recomputed.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-filters",
+    "dbxfe-bi-claim-parameters",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "open",
+     "title": "No selection (day 4)",
+     "explanation": "Both datasets return their rows for the default business day. All five values are shown.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Dataset",
+       "line",
+       "day",
+       "rate",
+       "Shown?"
+      ],
+      "rows": [
+       [
+        "per-line",
+        "1",
+        "4",
+        "3.3%",
+        "yes"
+       ],
+       [
+        "per-line",
+        "2",
+        "4",
+        "6.0%",
+        "yes"
+       ],
+       [
+        "per-line",
+        "3",
+        "4",
+        "4.8%",
+        "yes"
+       ],
+       [
+        "per-line",
+        "4",
+        "4",
+        "4.2%",
+        "yes"
+       ],
+       [
+        "plant",
+        "(no field)",
+        "4",
+        "4.5%",
+        "yes"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "filter",
+     "title": "Field filter: line = 3",
+     "explanation": "The per-line dataset keeps only the row whose line field equals 3. The plant dataset has no line field, so its value is untouched.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Dataset",
+       "line",
+       "day",
+       "rate",
+       "Shown?"
+      ],
+      "rows": [
+       [
+        "per-line",
+        "1",
+        "4",
+        "3.3%",
+        "hidden"
+       ],
+       [
+        "per-line",
+        "2",
+        "4",
+        "6.0%",
+        "hidden"
+       ],
+       [
+        "per-line",
+        "3",
+        "4",
+        "4.8%",
+        "yes"
+       ],
+       [
+        "per-line",
+        "4",
+        "4",
+        "4.2%",
+        "hidden"
+       ],
+       [
+        "plant",
+        "(no field)",
+        "4",
+        "4.5%",
+        "yes, unchanged"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "param",
+     "title": "Parameter: business_day = 3",
+     "explanation": "The day is substituted into both queries before aggregation. Every value is recomputed for day 3, plant included.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Dataset",
+       "line",
+       "day",
+       "rate",
+       "Shown?"
+      ],
+      "rows": [
+       [
+        "per-line",
+        "1",
+        "3",
+        "2.9%",
+        "recomputed"
+       ],
+       [
+        "per-line",
+        "2",
+        "3",
+        "5.4%",
+        "recomputed"
+       ],
+       [
+        "per-line",
+        "3",
+        "3",
+        "5.3%",
+        "recomputed"
+       ],
+       [
+        "per-line",
+        "4",
+        "3",
+        "3.5%",
+        "recomputed"
+       ],
+       [
+        "plant",
+        "(no field)",
+        "3",
+        "4.2%",
+        "recomputed"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-permissions-visual",
+   "kind": "table",
+   "title": "Access matrix: the page door and the data door",
+   "alt": "An access matrix with one row per principal and columns for page permission, underlying-data privileges and what the principal must not be able to do; the second state revokes the analysts' SELECT.",
+   "caption": "Each principal has two doors. Revoking a table privilege leaves the page permission unchanged and vice versa. Synthetic teaching example.",
+   "textEquivalent": "Designed matrix: Five principals, two doors each. The page permission and the table privileges are granted and reviewed separately, and the page is published with individual data permissions. Table columns: Principal | Page | Underlying data | Must not. Rows: north-reporting-analysts | Can View | SELECT accepted.daily_line_rate | Reach raw or quarantine rows through any filter || quality-stewards | Can View, quarantine link | SELECT accepted + quarantine tables | Edit the page || data team (page owner) | Can Edit | Its own grants, never sp-north-nightly's | Publish a tile with no contract || sp-north-nightly | none | Writes the accepted tables | Author, publish or view the page || everyone else | none | none | Open the page at all.\n\nSELECT revoked on analysts: The analysts keep Can View; their SELECT is gone, so their tiles return nothing and the access review catches it. Under shared data permissions they would still render, which is the next beat's point. Table columns: Principal | Page | Underlying data | Effect on tiles. Rows: north-reporting-analysts | Can View (unchanged) | no SELECT (revoked) | Tiles show no data: their own grants run the queries || quality-stewards | Can View, quarantine link | SELECT accepted + quarantine tables | Unchanged || data team (page owner) | Can Edit | Its own grants, never sp-north-nightly's | Unchanged || sp-north-nightly | none | Writes the accepted tables | Unchanged || everyone else | none | none | Unchanged: no page.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-permissions",
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "designed",
+     "title": "Designed matrix",
+     "explanation": "Five principals, two doors each. The page permission and the table privileges are granted and reviewed separately, and the page is published with individual data permissions.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Principal",
+       "Page",
+       "Underlying data",
+       "Must not"
+      ],
+      "rows": [
+       [
+        "north-reporting-analysts",
+        "Can View",
+        "SELECT accepted.daily_line_rate",
+        "Reach raw or quarantine rows through any filter"
+       ],
+       [
+        "quality-stewards",
+        "Can View, quarantine link",
+        "SELECT accepted + quarantine tables",
+        "Edit the page"
+       ],
+       [
+        "data team (page owner)",
+        "Can Edit",
+        "Its own grants, never sp-north-nightly's",
+        "Publish a tile with no contract"
+       ],
+       [
+        "sp-north-nightly",
+        "none",
+        "Writes the accepted tables",
+        "Author, publish or view the page"
+       ],
+       [
+        "everyone else",
+        "none",
+        "none",
+        "Open the page at all"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "revoked",
+     "title": "SELECT revoked on analysts",
+     "explanation": "The analysts keep Can View; their SELECT is gone, so their tiles return nothing and the access review catches it. Under shared data permissions they would still render, which is the next beat's point.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Principal",
+       "Page",
+       "Underlying data",
+       "Effect on tiles"
+      ],
+      "rows": [
+       [
+        "north-reporting-analysts",
+        "Can View (unchanged)",
+        "no SELECT (revoked)",
+        "Tiles show no data: their own grants run the queries"
+       ],
+       [
+        "quality-stewards",
+        "Can View, quarantine link",
+        "SELECT accepted + quarantine tables",
+        "Unchanged"
+       ],
+       [
+        "data team (page owner)",
+        "Can Edit",
+        "Its own grants, never sp-north-nightly's",
+        "Unchanged"
+       ],
+       [
+        "sp-north-nightly",
+        "none",
+        "Writes the accepted tables",
+        "Unchanged"
+       ],
+       [
+        "everyone else",
+        "none",
+        "none",
+        "Unchanged: no page"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-credentials-visual",
+   "kind": "nodes",
+   "title": "Whose grants are checked when a tile runs",
+   "alt": "A request path from a viewer through the published page and the SQL warehouse to a Unity Catalog privilege check and two tables. In the alternative the check uses a publishing service principal; in Cinderline's choice it uses the viewer.",
+   "caption": "The path is the same; the identity at the privilege check changes with the publish choice, and with it which tables the viewer can reach. Synthetic teaching example.",
+   "textEquivalent": "Alternative: shared data permissions: The design Cinderline did not choose: the viewer holds Can View only and every query runs as a publishing service principal, whose single grant bounds what any viewer can reach. Nodes: Supervisor: Can View on the page; no table grants of their own. (context); Published page: Published with share data permissions. (selected); SQL warehouse: Runs the dataset queries. (selected); Privilege check: as the publisher. Unity Catalog checks the publishing principal's grants. (selected); accepted.daily_line_rate: SELECT granted to the principal; rows returned. (selected); quarantine.inspections: No grant to the principal; unreachable by any viewer. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as publisher; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied.\n\nCinderline's choice: individual data permissions: Each viewer's own grants are checked. A supervisor whose group holds SELECT on the accepted table sees it; the quarantine table stays closed unless the viewer is a steward. Nodes: Supervisor: Can View on the page; SELECT only on the accepted table. (selected); Published page: Published with individual data permissions. (selected); SQL warehouse: Runs the dataset queries; the viewer needs access to it. (selected); Privilege check: as the viewer. Unity Catalog checks the viewer's own grants. (warning); accepted.daily_line_rate: Viewer holds SELECT; rows returned. (selected); quarantine.inspections: Viewer lacks SELECT; the tile shows no data for them. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as viewer; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied for this viewer.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-claim-api",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "embedded",
+     "title": "Alternative: shared data permissions",
+     "explanation": "The design Cinderline did not choose: the viewer holds Can View only and every query runs as a publishing service principal, whose single grant bounds what any viewer can reach.",
+     "nodes": [
+      {
+       "id": "viewer",
+       "label": "Supervisor",
+       "detail": "Can View on the page; no table grants of their own.",
+       "status": "context"
+      },
+      {
+       "id": "page",
+       "label": "Published page",
+       "detail": "Published with share data permissions.",
+       "status": "selected"
+      },
+      {
+       "id": "wh-node",
+       "label": "SQL warehouse",
+       "detail": "Runs the dataset queries.",
+       "status": "selected"
+      },
+      {
+       "id": "check",
+       "label": "Privilege check",
+       "detail": "Unity Catalog checks the publishing principal's grants.",
+       "status": "selected",
+       "value": "as the publisher"
+      },
+      {
+       "id": "accepted",
+       "label": "accepted.daily_line_rate",
+       "detail": "SELECT granted to the principal; rows returned.",
+       "status": "selected"
+      },
+      {
+       "id": "quar",
+       "label": "quarantine.inspections",
+       "detail": "No grant to the principal; unreachable by any viewer.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "viewer",
+       "to": "page",
+       "label": "opens"
+      },
+      {
+       "from": "page",
+       "to": "wh-node",
+       "label": "runs datasets"
+      },
+      {
+       "from": "wh-node",
+       "to": "check",
+       "label": "as publisher"
+      },
+      {
+       "from": "check",
+       "to": "accepted",
+       "label": "allowed"
+      },
+      {
+       "from": "check",
+       "to": "quar",
+       "label": "denied"
+      }
+     ]
+    },
+    {
+     "id": "individual",
+     "title": "Cinderline's choice: individual data permissions",
+     "explanation": "Each viewer's own grants are checked. A supervisor whose group holds SELECT on the accepted table sees it; the quarantine table stays closed unless the viewer is a steward.",
+     "nodes": [
+      {
+       "id": "viewer",
+       "label": "Supervisor",
+       "detail": "Can View on the page; SELECT only on the accepted table.",
+       "status": "selected"
+      },
+      {
+       "id": "page",
+       "label": "Published page",
+       "detail": "Published with individual data permissions.",
+       "status": "selected"
+      },
+      {
+       "id": "wh-node",
+       "label": "SQL warehouse",
+       "detail": "Runs the dataset queries; the viewer needs access to it.",
+       "status": "selected"
+      },
+      {
+       "id": "check",
+       "label": "Privilege check",
+       "detail": "Unity Catalog checks the viewer's own grants.",
+       "status": "warning",
+       "value": "as the viewer"
+      },
+      {
+       "id": "accepted",
+       "label": "accepted.daily_line_rate",
+       "detail": "Viewer holds SELECT; rows returned.",
+       "status": "selected"
+      },
+      {
+       "id": "quar",
+       "label": "quarantine.inspections",
+       "detail": "Viewer lacks SELECT; the tile shows no data for them.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "viewer",
+       "to": "page",
+       "label": "opens"
+      },
+      {
+       "from": "page",
+       "to": "wh-node",
+       "label": "runs datasets"
+      },
+      {
+       "from": "wh-node",
+       "to": "check",
+       "label": "as viewer"
+      },
+      {
+       "from": "check",
+       "to": "accepted",
+       "label": "allowed"
+      },
+      {
+       "from": "check",
+       "to": "quar",
+       "label": "denied for this viewer"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-freshness-visual",
+   "kind": "timeline",
+   "title": "From the plant's day to the meeting",
+   "alt": "A timeline from the end of the business day through the nightly job, the scheduled refresh and the freshness line to the 7:45 meeting; the second state shows the job finishing after the refresh.",
+   "caption": "On a normal morning the refresh follows the job and the freshness line names Tuesday; on a late morning the line must say not updated. Synthetic teaching example.",
+   "textEquivalent": "Normal morning: The job publishes Tuesday's rows at 02:10, the refresh at 06:30 reads them, and the freshness line names the day it covers and when it was published. Nodes: Tuesday ends 23:59: Inspection times assign records to the business day. (context); Nightly job 02:10: Publishes Tuesday's accepted rows and a publish_run row. (selected); Scheduled refresh 06:30: Re-runs the page's datasets against the published table. (selected); Freshness line: Covers Tue · published 06:32 · restated days marked. Reads the latest publish_run row. (selected); Meeting 07:45: Supervisors read the line, then the tiles. (selected). Relationships: Tuesday ends 23:59 → Nightly job 02:10: then; Nightly job 02:10 → Scheduled refresh 06:30: then; Scheduled refresh 06:30 → Freshness line: then; Freshness line → Meeting 07:45: then.\n\nLate job: The job is still running at the meeting, so the page can show only Monday. The freshness line says so and the operator note follows. Nodes: Tuesday ends 23:59: Unchanged. (context); Scheduled refresh 06:30: Runs on time, over Monday's rows. (warning); Nightly job 08:20: Still running at 07:45; Tuesday's rows arrive after the meeting. (warning); Freshness line: Not updated: showing Mon · see operator note. Latest publish_run row is Monday's. (warning); Meeting 07:45: Supervisors read Monday knowingly, with the note. (context). Relationships: Tuesday ends 23:59 → Scheduled refresh 06:30: then; Scheduled refresh 06:30 → Nightly job 08:20: then; Nightly job 08:20 → Freshness line: not yet read; Freshness line → Meeting 07:45: then.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-schedule",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "normal",
+     "title": "Normal morning",
+     "explanation": "The job publishes Tuesday's rows at 02:10, the refresh at 06:30 reads them, and the freshness line names the day it covers and when it was published.",
+     "nodes": [
+      {
+       "id": "day",
+       "label": "Tuesday ends 23:59",
+       "detail": "Inspection times assign records to the business day.",
+       "status": "context"
+      },
+      {
+       "id": "job",
+       "label": "Nightly job 02:10",
+       "detail": "Publishes Tuesday's accepted rows and a publish_run row.",
+       "status": "selected"
+      },
+      {
+       "id": "refresh",
+       "label": "Scheduled refresh 06:30",
+       "detail": "Re-runs the page's datasets against the published table.",
+       "status": "selected"
+      },
+      {
+       "id": "line",
+       "label": "Freshness line",
+       "detail": "Reads the latest publish_run row.",
+       "status": "selected",
+       "value": "Covers Tue · published 06:32 · restated days marked"
+      },
+      {
+       "id": "meeting",
+       "label": "Meeting 07:45",
+       "detail": "Supervisors read the line, then the tiles.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "day",
+       "to": "job",
+       "label": "then"
+      },
+      {
+       "from": "job",
+       "to": "refresh",
+       "label": "then"
+      },
+      {
+       "from": "refresh",
+       "to": "line",
+       "label": "then"
+      },
+      {
+       "from": "line",
+       "to": "meeting",
+       "label": "then"
+      }
+     ]
+    },
+    {
+     "id": "late",
+     "title": "Late job",
+     "explanation": "The job is still running at the meeting, so the page can show only Monday. The freshness line says so and the operator note follows.",
+     "nodes": [
+      {
+       "id": "day",
+       "label": "Tuesday ends 23:59",
+       "detail": "Unchanged.",
+       "status": "context"
+      },
+      {
+       "id": "refresh",
+       "label": "Scheduled refresh 06:30",
+       "detail": "Runs on time, over Monday's rows.",
+       "status": "warning"
+      },
+      {
+       "id": "job",
+       "label": "Nightly job 08:20",
+       "detail": "Still running at 07:45; Tuesday's rows arrive after the meeting.",
+       "status": "warning"
+      },
+      {
+       "id": "line",
+       "label": "Freshness line",
+       "detail": "Latest publish_run row is Monday's.",
+       "status": "warning",
+       "value": "Not updated: showing Mon · see operator note"
+      },
+      {
+       "id": "meeting",
+       "label": "Meeting 07:45",
+       "detail": "Supervisors read Monday knowingly, with the note.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "day",
+       "to": "refresh",
+       "label": "then"
+      },
+      {
+       "from": "refresh",
+       "to": "job",
+       "label": "then"
+      },
+      {
+       "from": "job",
+       "to": "line",
+       "label": "not yet read"
+      },
+      {
+       "from": "line",
+       "to": "meeting",
+       "label": "then"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-refresh-visual",
+   "kind": "nodes",
+   "title": "The refresh reads what the job has published",
+   "alt": "A chain from the nightly job to the published table, the schedule, the snapshot posted to the supervisors' channel and the supervisors' own queries; in the second state the job finishes after the schedule and the meeting.",
+   "caption": "Same chain, two orders: job then schedule snapshots Tuesday; schedule then job snapshots Monday with no warning. Synthetic teaching example.",
+   "textEquivalent": "Job before refresh: The job finishes at 02:10, the table holds Tuesday, the 06:30 schedule snapshots Tuesday, and supervisors' own queries return Tuesday at 07:45. Nodes: Nightly job: 02:10. Completes at 02:10. (selected); Published table: max day: Tue. Holds Tuesday's rows. (selected); Schedule: 06:30 daily. Runs the datasets at 06:30. (selected); Snapshot to channel: Tue. Tuesday's tiles posted at 06:35. (selected); Supervisors at 07:45: Their own queries return Tuesday. (selected). Relationships: Nightly job → Published table: publishes; Published table → Schedule: read by; Schedule → Snapshot to channel: sends; Published table → Supervisors at 07:45: queried by.\n\nJob after refresh: The job finishes at 08:20. At 06:30 the table still held Monday, so the snapshot carries Monday, and at 07:45 the supervisors' queries still return Monday; only the freshness line says so. Nodes: Nightly job: 08:20. Completes at 08:20, after the schedule and the meeting. (warning); Published table: max day: Mon. Held Monday's rows at 06:30 and at 07:45. (context); Schedule: 06:30 daily. Ran on time, unaware of the job. (selected); Snapshot to channel: Mon. Monday's tiles posted at 06:35 with no note. (warning); Supervisors at 07:45: Read Monday; the freshness line must say not updated. (warning). Relationships: Schedule → Published table: read at 06:30; Schedule → Snapshot to channel: sends; Nightly job → Published table: publishes at 08:20; Published table → Supervisors at 07:45: queried by.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-schedule",
+    "dbxfe-bi-claim-task",
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "ordered",
+     "title": "Job before refresh",
+     "explanation": "The job finishes at 02:10, the table holds Tuesday, the 06:30 schedule snapshots Tuesday, and supervisors' own queries return Tuesday at 07:45.",
+     "nodes": [
+      {
+       "id": "job",
+       "label": "Nightly job",
+       "detail": "Completes at 02:10.",
+       "status": "selected",
+       "value": "02:10"
+      },
+      {
+       "id": "table",
+       "label": "Published table",
+       "detail": "Holds Tuesday's rows.",
+       "status": "selected",
+       "value": "max day: Tue"
+      },
+      {
+       "id": "sched",
+       "label": "Schedule",
+       "detail": "Runs the datasets at 06:30.",
+       "status": "selected",
+       "value": "06:30 daily"
+      },
+      {
+       "id": "snap",
+       "label": "Snapshot to channel",
+       "detail": "Tuesday's tiles posted at 06:35.",
+       "status": "selected",
+       "value": "Tue"
+      },
+      {
+       "id": "viewers",
+       "label": "Supervisors at 07:45",
+       "detail": "Their own queries return Tuesday.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "job",
+       "to": "table",
+       "label": "publishes"
+      },
+      {
+       "from": "table",
+       "to": "sched",
+       "label": "read by"
+      },
+      {
+       "from": "sched",
+       "to": "snap",
+       "label": "sends"
+      },
+      {
+       "from": "table",
+       "to": "viewers",
+       "label": "queried by"
+      }
+     ]
+    },
+    {
+     "id": "inverted",
+     "title": "Job after refresh",
+     "explanation": "The job finishes at 08:20. At 06:30 the table still held Monday, so the snapshot carries Monday, and at 07:45 the supervisors' queries still return Monday; only the freshness line says so.",
+     "nodes": [
+      {
+       "id": "job",
+       "label": "Nightly job",
+       "detail": "Completes at 08:20, after the schedule and the meeting.",
+       "status": "warning",
+       "value": "08:20"
+      },
+      {
+       "id": "table",
+       "label": "Published table",
+       "detail": "Held Monday's rows at 06:30 and at 07:45.",
+       "status": "context",
+       "value": "max day: Mon"
+      },
+      {
+       "id": "sched",
+       "label": "Schedule",
+       "detail": "Ran on time, unaware of the job.",
+       "status": "selected",
+       "value": "06:30 daily"
+      },
+      {
+       "id": "snap",
+       "label": "Snapshot to channel",
+       "detail": "Monday's tiles posted at 06:35 with no note.",
+       "status": "warning",
+       "value": "Mon"
+      },
+      {
+       "id": "viewers",
+       "label": "Supervisors at 07:45",
+       "detail": "Read Monday; the freshness line must say not updated.",
+       "status": "warning"
+      }
+     ],
+     "connections": [
+      {
+       "from": "sched",
+       "to": "table",
+       "label": "read at 06:30"
+      },
+      {
+       "from": "sched",
+       "to": "snap",
+       "label": "sends"
+      },
+      {
+       "from": "job",
+       "to": "table",
+       "label": "publishes at 08:20"
+      },
+      {
+       "from": "table",
+       "to": "viewers",
+       "label": "queried by"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-metricview-visual",
+   "kind": "table",
+   "title": "One definition, two grains",
+   "alt": "A schematic metric view definition as a table of parts, then the same definition queried grouped by line and with no grouping, with the forbidden mean of rates shown for contrast.",
+   "caption": "The definition is written once; the line result and the plant result are both computed from it, and the mean of line rates is not a query the view can answer. Synthetic teaching example.",
+   "textEquivalent": "Definition (schematic): The parts of the metric view: one source, two dimensions, three measures. Nothing here is aggregated yet. Table columns: Part | Name | Expression. Rows: source | cinderline.accepted.inspections | accepted rows only || dimension | line_id | line_id || dimension | business_day | business_day || measure | defective_units | SUM(defective_units) || measure | inspected_units | SUM(inspected_units) || measure | unit_defect_rate | try_divide(SUM(defective_units), SUM(inspected_units)).\n\nQueried at two grains: The same measure asked by line and for the whole plant on day 4. The engine sums first and divides after, at each grain. Table columns: Query | Grouping | Result. Rows: MEASURE(unit_defect_rate) | line_id = 3 | 12 / 250 = 4.8% || MEASURE(unit_defect_rate) | none (plant) | 47 / 1,040 = 4.5% || AVG of a rate column | not a metric view query | 4.6% (forbidden by the contract).",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-metricviews",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "definition",
+     "title": "Definition (schematic)",
+     "explanation": "The parts of the metric view: one source, two dimensions, three measures. Nothing here is aggregated yet.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Part",
+       "Name",
+       "Expression"
+      ],
+      "rows": [
+       [
+        "source",
+        "cinderline.accepted.inspections",
+        "accepted rows only"
+       ],
+       [
+        "dimension",
+        "line_id",
+        "line_id"
+       ],
+       [
+        "dimension",
+        "business_day",
+        "business_day"
+       ],
+       [
+        "measure",
+        "defective_units",
+        "SUM(defective_units)"
+       ],
+       [
+        "measure",
+        "inspected_units",
+        "SUM(inspected_units)"
+       ],
+       [
+        "measure",
+        "unit_defect_rate",
+        "try_divide(SUM(defective_units), SUM(inspected_units))"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "queried",
+     "title": "Queried at two grains",
+     "explanation": "The same measure asked by line and for the whole plant on day 4. The engine sums first and divides after, at each grain.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Query",
+       "Grouping",
+       "Result"
+      ],
+      "rows": [
+       [
+        "MEASURE(unit_defect_rate)",
+        "line_id = 3",
+        "12 / 250 = 4.8%"
+       ],
+       [
+        "MEASURE(unit_defect_rate)",
+        "none (plant)",
+        "47 / 1,040 = 4.5%"
+       ],
+       [
+        "AVG of a rate column",
+        "not a metric view query",
+        "4.6% (forbidden by the contract)"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-consumer-visual",
+   "kind": "comparison",
+   "title": "The supervisor's path and the author's path",
+   "alt": "Two paths to the same published page: a supervisor through the consumer surface with Can View and their group's grants, and a data team author through the workspace draft.",
+   "caption": "One published page, two surfaces. The supervisor reads it with their own grants; the author builds and publishes it. Synthetic teaching example.",
+   "textEquivalent": "Supervisor's path: A supervisor with consumer access opens the consumer surface, finds the page and reads it under Can View; the queries run with the supervisor's own grants. Nodes: Supervisor: Consumer access; Can View; SELECT via the analysts group. (selected); Genie One (consumer surface): View dashboards, ask questions, run apps. (selected); Published page: Individual data permissions; same object for everyone. (selected); Privilege check: As the supervisor: the group's SELECT on the accepted table. (selected); Data team author: Not on this path. (context); Workspace draft: Not on this path. (context); Genie question: The Genie module's subject. (pending). Relationships: Supervisor → Genie One (consumer surface): opens; Genie One (consumer surface) → Published page: shows; Published page → Privilege check: runs as viewer; Genie One (consumer surface) → Genie question: may ask.\n\nAuthor's path: The author works in the workspace on the draft, binds datasets to the contract and publishes with individual data permissions. Nodes: Data team author: Can Edit; works with the team's own grants. (selected); Workspace draft: Datasets, widgets, filters, publish dialog and schedule. (selected); Published page: Published with individual data permissions. (selected); Privilege check: Runs as each viewer when the page is read. (context); Supervisor: Not on this path. (context); Genie One (consumer surface): Where the published page is read. (context); Genie question: The Genie module's subject. (pending). Relationships: Data team author → Workspace draft: edits; Workspace draft → Published page: publishes; Published page → Genie One (consumer surface): read in; Published page → Privilege check: runs as viewer.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-aibi",
+    "dbxfe-bi-claim-genie-one",
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "supervisor",
+     "title": "Supervisor's path",
+     "explanation": "A supervisor with consumer access opens the consumer surface, finds the page and reads it under Can View; the queries run with the supervisor's own grants.",
+     "nodes": [
+      {
+       "id": "sup",
+       "label": "Supervisor",
+       "detail": "Consumer access; Can View; SELECT via the analysts group.",
+       "status": "selected"
+      },
+      {
+       "id": "one",
+       "label": "Genie One (consumer surface)",
+       "detail": "View dashboards, ask questions, run apps.",
+       "status": "selected"
+      },
+      {
+       "id": "page",
+       "label": "Published page",
+       "detail": "Individual data permissions; same object for everyone.",
+       "status": "selected"
+      },
+      {
+       "id": "check",
+       "label": "Privilege check",
+       "detail": "As the supervisor: the group's SELECT on the accepted table.",
+       "status": "selected"
+      },
+      {
+       "id": "author",
+       "label": "Data team author",
+       "detail": "Not on this path.",
+       "status": "context"
+      },
+      {
+       "id": "ws-node",
+       "label": "Workspace draft",
+       "detail": "Not on this path.",
+       "status": "context"
+      },
+      {
+       "id": "genie",
+       "label": "Genie question",
+       "detail": "The Genie module's subject.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "sup",
+       "to": "one",
+       "label": "opens"
+      },
+      {
+       "from": "one",
+       "to": "page",
+       "label": "shows"
+      },
+      {
+       "from": "page",
+       "to": "check",
+       "label": "runs as viewer"
+      },
+      {
+       "from": "one",
+       "to": "genie",
+       "label": "may ask"
+      }
+     ]
+    },
+    {
+     "id": "author",
+     "title": "Author's path",
+     "explanation": "The author works in the workspace on the draft, binds datasets to the contract and publishes with individual data permissions.",
+     "nodes": [
+      {
+       "id": "author",
+       "label": "Data team author",
+       "detail": "Can Edit; works with the team's own grants.",
+       "status": "selected"
+      },
+      {
+       "id": "ws-node",
+       "label": "Workspace draft",
+       "detail": "Datasets, widgets, filters, publish dialog and schedule.",
+       "status": "selected"
+      },
+      {
+       "id": "page",
+       "label": "Published page",
+       "detail": "Published with individual data permissions.",
+       "status": "selected"
+      },
+      {
+       "id": "check",
+       "label": "Privilege check",
+       "detail": "Runs as each viewer when the page is read.",
+       "status": "context"
+      },
+      {
+       "id": "sup",
+       "label": "Supervisor",
+       "detail": "Not on this path.",
+       "status": "context"
+      },
+      {
+       "id": "one",
+       "label": "Genie One (consumer surface)",
+       "detail": "Where the published page is read.",
+       "status": "context"
+      },
+      {
+       "id": "genie",
+       "label": "Genie question",
+       "detail": "The Genie module's subject.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "author",
+       "to": "ws-node",
+       "label": "edits"
+      },
+      {
+       "from": "ws-node",
+       "to": "page",
+       "label": "publishes"
+      },
+      {
+       "from": "page",
+       "to": "one",
+       "label": "read in"
+      },
+      {
+       "from": "page",
+       "to": "check",
+       "label": "runs as viewer"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-storyboard-visual",
+   "kind": "timeline",
+   "title": "The morning meeting in five frames",
+   "alt": "Five storyboard frames in time order from the analyst's 7:30 check to the quality lead opening an excluded inspection, with line 2 chosen first; the second state shows the not-updated morning.",
+   "caption": "Each frame names who reads which sentence and what they decide; the not-updated morning changes the sentence and the decision. Synthetic teaching example.",
+   "textEquivalent": "Normal morning: Five frames. The freshness line is read before any tile; line 2 is chosen from the four tiles; the quality lead opens the excluded inspection. Nodes: 07:30 Analyst confirms: Freshness line and the four tiles against the sheet. (selected); 07:45 Supervisors open page: Read: Covers Tue, published 06:32. (selected); 07:47 Compare four tiles: Line 2: 6.0%, 15 of 250, the highest. Chosen first. (selected); 07:50 Restatement mark: Line 2, day 2 shows 5.1%, previous 5.3%; no argument. (selected); 08:05 Quality lead: Opens the excluded inspection from the quarantine page. (selected). Relationships: 07:30 Analyst confirms → 07:45 Supervisors open page: then; 07:45 Supervisors open page → 07:47 Compare four tiles: then; 07:47 Compare four tiles → 07:50 Restatement mark: then; 07:50 Restatement mark → 08:05 Quality lead: then.\n\nNot-updated morning: The same frames when the job was late. The sentence in frame 2 changes, and frame 3 becomes a decision about Monday, not Tuesday. Nodes: 07:30 Analyst confirms: Finds no Tuesday row in publish_run; writes the operator note. (warning); 07:45 Supervisors open page: Read: Not updated: showing Mon. See operator note. (warning); 07:47 Decide on Monday: Use Monday knowingly, or wait for the operator's next note. (warning); 07:50 Restatement mark: Unchanged; Monday's marks still valid. (context); 08:05 Quality lead: Opens Monday's excluded inspection; Tuesday's later. (context). Relationships: 07:30 Analyst confirms → 07:45 Supervisors open page: then; 07:45 Supervisors open page → 07:47 Decide on Monday: then; 07:47 Decide on Monday → 07:50 Restatement mark: then; 07:50 Restatement mark → 08:05 Quality lead: then.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "happy",
+     "title": "Normal morning",
+     "explanation": "Five frames. The freshness line is read before any tile; line 2 is chosen from the four tiles; the quality lead opens the excluded inspection.",
+     "nodes": [
+      {
+       "id": "f1-node",
+       "label": "07:30 Analyst confirms",
+       "detail": "Freshness line and the four tiles against the sheet.",
+       "status": "selected"
+      },
+      {
+       "id": "f2-node",
+       "label": "07:45 Supervisors open page",
+       "detail": "Read: Covers Tue, published 06:32.",
+       "status": "selected"
+      },
+      {
+       "id": "f3-node",
+       "label": "07:47 Compare four tiles",
+       "detail": "Line 2: 6.0%, 15 of 250, the highest. Chosen first.",
+       "status": "selected"
+      },
+      {
+       "id": "f4-node",
+       "label": "07:50 Restatement mark",
+       "detail": "Line 2, day 2 shows 5.1%, previous 5.3%; no argument.",
+       "status": "selected"
+      },
+      {
+       "id": "f5-node",
+       "label": "08:05 Quality lead",
+       "detail": "Opens the excluded inspection from the quarantine page.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "f1-node",
+       "to": "f2-node",
+       "label": "then"
+      },
+      {
+       "from": "f2-node",
+       "to": "f3-node",
+       "label": "then"
+      },
+      {
+       "from": "f3-node",
+       "to": "f4-node",
+       "label": "then"
+      },
+      {
+       "from": "f4-node",
+       "to": "f5-node",
+       "label": "then"
+      }
+     ]
+    },
+    {
+     "id": "stale",
+     "title": "Not-updated morning",
+     "explanation": "The same frames when the job was late. The sentence in frame 2 changes, and frame 3 becomes a decision about Monday, not Tuesday.",
+     "nodes": [
+      {
+       "id": "f1-node",
+       "label": "07:30 Analyst confirms",
+       "detail": "Finds no Tuesday row in publish_run; writes the operator note.",
+       "status": "warning"
+      },
+      {
+       "id": "f2-node",
+       "label": "07:45 Supervisors open page",
+       "detail": "Read: Not updated: showing Mon. See operator note.",
+       "status": "warning"
+      },
+      {
+       "id": "f3-node",
+       "label": "07:47 Decide on Monday",
+       "detail": "Use Monday knowingly, or wait for the operator's next note.",
+       "status": "warning"
+      },
+      {
+       "id": "f4-node",
+       "label": "07:50 Restatement mark",
+       "detail": "Unchanged; Monday's marks still valid.",
+       "status": "context"
+      },
+      {
+       "id": "f5-node",
+       "label": "08:05 Quality lead",
+       "detail": "Opens Monday's excluded inspection; Tuesday's later.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "f1-node",
+       "to": "f2-node",
+       "label": "then"
+      },
+      {
+       "from": "f2-node",
+       "to": "f3-node",
+       "label": "then"
+      },
+      {
+       "from": "f3-node",
+       "to": "f4-node",
+       "label": "then"
+      },
+      {
+       "from": "f4-node",
+       "to": "f5-node",
+       "label": "then"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-external-visual",
+   "kind": "table",
+   "title": "Integration comparison: what each reads and what does not travel",
+   "alt": "A comparison table of the native AI/BI dashboard, Power BI, Tableau and ODBC/JDBC clients, first by what each connects to and runs as, then by which page properties do not travel.",
+   "caption": "Four ways to read the same table. The second state lists what an external tool must rebuild for itself. Synthetic teaching example.",
+   "textEquivalent": "What each does: Every external tool connects to a SQL warehouse under a credential of its own and refreshes on its own model. Table columns: Integration | Connects to | Runs as | Refresh model. Rows: AI/BI dashboard | Published table via datasets | Each viewer (individual) or the publisher (shared) | Schedule or dashboard task || Power BI | SQL warehouse via the Databricks connector | Its connection: a user or a service principal | DirectQuery live, or Import copy on refresh || Tableau | SQL warehouse via connector or Partner Connect | The data source's credential | Live, or extract copy || ODBC / JDBC client | SQL warehouse via the driver | Identity in the connection string | Whatever the client does.\n\nWhat does not travel: None of the page's own properties reach an external tool; each must be rebuilt and accepted there. Table columns: Integration | Page Can View list | Filters and defaults | Freshness line | Metric contract. Rows: AI/BI dashboard | applies | applies | applies | bound tile or metric view || Power BI | no; Power BI sharing | rebuilt as slicers | rebuilt; model refresh time | metric view by SQL, or re-expressed || Tableau | no; Tableau permissions | rebuilt as filters | rebuilt; extract time | metric view by SQL, or re-expressed || ODBC / JDBC client | no; catalog grants only | none | none | metric view by SQL.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-powerbi",
+    "dbxfe-bi-claim-tableau",
+    "dbxfe-bi-claim-drivers",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "does",
+     "title": "What each does",
+     "explanation": "Every external tool connects to a SQL warehouse under a credential of its own and refreshes on its own model.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Integration",
+       "Connects to",
+       "Runs as",
+       "Refresh model"
+      ],
+      "rows": [
+       [
+        "AI/BI dashboard",
+        "Published table via datasets",
+        "Each viewer (individual) or the publisher (shared)",
+        "Schedule or dashboard task"
+       ],
+       [
+        "Power BI",
+        "SQL warehouse via the Databricks connector",
+        "Its connection: a user or a service principal",
+        "DirectQuery live, or Import copy on refresh"
+       ],
+       [
+        "Tableau",
+        "SQL warehouse via connector or Partner Connect",
+        "The data source's credential",
+        "Live, or extract copy"
+       ],
+       [
+        "ODBC / JDBC client",
+        "SQL warehouse via the driver",
+        "Identity in the connection string",
+        "Whatever the client does"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "not",
+     "title": "What does not travel",
+     "explanation": "None of the page's own properties reach an external tool; each must be rebuilt and accepted there.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Integration",
+       "Page Can View list",
+       "Filters and defaults",
+       "Freshness line",
+       "Metric contract"
+      ],
+      "rows": [
+       [
+        "AI/BI dashboard",
+        "applies",
+        "applies",
+        "applies",
+        "bound tile or metric view"
+       ],
+       [
+        "Power BI",
+        "no; Power BI sharing",
+        "rebuilt as slicers",
+        "rebuilt; model refresh time",
+        "metric view by SQL, or re-expressed"
+       ],
+       [
+        "Tableau",
+        "no; Tableau permissions",
+        "rebuilt as filters",
+        "rebuilt; extract time",
+        "metric view by SQL, or re-expressed"
+       ],
+       [
+        "ODBC / JDBC client",
+        "no; catalog grants only",
+        "none",
+        "none",
+        "metric view by SQL"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-bi-acceptance-visual",
+   "kind": "table",
+   "title": "Acceptance script before and after the run",
+   "alt": "Seven acceptance rows with expected values from the reconciliation sheet; the second state adds observed values from a run, one of which fails.",
+   "caption": "Seven rows, three signers, one failure found by a value the page did not write. Synthetic teaching example.",
+   "textEquivalent": "Before the run: Expected values are fixed from the sheet and the plan; nothing has been observed yet. Table columns: Check | Expected | Observed | Signer. Rows: Line 3, day 4 tile | 4.8% | — | Plant analyst || Counts, line 2, day 2 | 20 / 1 / 1 | — | Quality lead || Line 2 day-2 mark after day-4 fix | marked; previous 5.3% | — | Quality lead || Line 4, day 5 (no inspections) | no inspections | — | Plant analyst || Filter line = 3, plant tile | 4.5% unchanged | — | Plant analyst || Test analyst identity | tiles shown; quarantine link refused | — | Security lead || Outsider identity | page does not load | — | Security lead.\n\nAfter the run: Observed values recorded with the identity used. One row fails: the empty case printed a number the contract forbids. Table columns: Check | Expected | Observed | Status. Rows: Line 3, day 4 tile | 4.8% | 4.8% | pass || Counts, line 2, day 2 | 20 / 1 / 1 | 20 / 1 / 1 | pass || Line 2 day-2 mark after day-4 fix | marked; previous 5.3% | marked; previous 5.3% | pass || Line 4, day 5 (no inspections) | no inspections | 0.0% | FAIL: fix the dataset's empty case || Filter line = 3, plant tile | 4.5% unchanged | 4.5% | pass || Test analyst identity | tiles shown; quarantine link refused | as expected | pass || Outsider identity | page does not load | did not load | pass.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-claim-permissions",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "states": [
+    {
+     "id": "before",
+     "title": "Before the run",
+     "explanation": "Expected values are fixed from the sheet and the plan; nothing has been observed yet.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Check",
+       "Expected",
+       "Observed",
+       "Signer"
+      ],
+      "rows": [
+       [
+        "Line 3, day 4 tile",
+        "4.8%",
+        "—",
+        "Plant analyst"
+       ],
+       [
+        "Counts, line 2, day 2",
+        "20 / 1 / 1",
+        "—",
+        "Quality lead"
+       ],
+       [
+        "Line 2 day-2 mark after day-4 fix",
+        "marked; previous 5.3%",
+        "—",
+        "Quality lead"
+       ],
+       [
+        "Line 4, day 5 (no inspections)",
+        "no inspections",
+        "—",
+        "Plant analyst"
+       ],
+       [
+        "Filter line = 3, plant tile",
+        "4.5% unchanged",
+        "—",
+        "Plant analyst"
+       ],
+       [
+        "Test analyst identity",
+        "tiles shown; quarantine link refused",
+        "—",
+        "Security lead"
+       ],
+       [
+        "Outsider identity",
+        "page does not load",
+        "—",
+        "Security lead"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "after",
+     "title": "After the run",
+     "explanation": "Observed values recorded with the identity used. One row fails: the empty case printed a number the contract forbids.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Check",
+       "Expected",
+       "Observed",
+       "Status"
+      ],
+      "rows": [
+       [
+        "Line 3, day 4 tile",
+        "4.8%",
+        "4.8%",
+        "pass"
+       ],
+       [
+        "Counts, line 2, day 2",
+        "20 / 1 / 1",
+        "20 / 1 / 1",
+        "pass"
+       ],
+       [
+        "Line 2 day-2 mark after day-4 fix",
+        "marked; previous 5.3%",
+        "marked; previous 5.3%",
+        "pass"
+       ],
+       [
+        "Line 4, day 5 (no inspections)",
+        "no inspections",
+        "0.0%",
+        "FAIL: fix the dataset's empty case"
+       ],
+       [
+        "Filter line = 3, plant tile",
+        "4.5% unchanged",
+        "4.5%",
+        "pass"
+       ],
+       [
+        "Test analyst identity",
+        "tiles shown; quarantine link refused",
+        "as expected",
+        "pass"
+       ],
+       [
+        "Outsider identity",
+        "page does not load",
+        "did not load",
+        "pass"
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-bi-labels-question",
+   "revision": "1",
+   "prompt": "A morning-page tile reads \"Defect rate 4.8\" over a seven-bar chart whose axis runs from 4.0 to 5.0, with no date on the page. Which single change makes the tile defensible?",
+   "options": [
+    {
+     "id": "dbxfe-bi-labels-question-a",
+     "text": "Label it with the metric contract name and version, the period covered, the unit and denominator, and the publish time, and start the axis at zero or state the truncation.",
+     "rationale": "Each part answers an argument: what was divided by what, over which day, in which unit, and whether yesterday is in it. The value itself was never the problem."
+    },
+    {
+     "id": "dbxfe-bi-labels-question-b",
+     "text": "Show 4.80 instead of 4.8 so the precision is visible.",
+     "rationale": "Precision beyond the contract's one decimal adds nothing a reader can defend and still says nothing about period, unit or denominator."
+    },
+    {
+     "id": "dbxfe-bi-labels-question-c",
+     "text": "Colour the tile red whenever it rises from the previous day.",
+     "rationale": "A colour rule on a truncated axis and an unlabelled value amplifies the misleading reading rather than correcting it."
+    },
+    {
+     "id": "dbxfe-bi-labels-question-d",
+     "text": "Replace the daily value with a seven-day rolling average to smooth the noise.",
+     "rationale": "A rolling figure labelled as a daily rate is the most common silent labelling error; it changes the number and still leaves the label incomplete."
+    }
+   ],
+   "correctOptionId": "dbxfe-bi-labels-question-a",
+   "conceptIds": [
+    "dbxfe-bi-label-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-binding-question",
+   "revision": "1",
+   "prompt": "The per-line dataset returns one row per line with unit_defect_rate. A plant tile is configured to show the AVERAGE of that column. On day 4 the rows are 3.3, 6.0, 4.8 and 4.2 per cent with inspected units 300, 250, 250 and 240 and defective units 10, 15, 12 and 10. What does the plant tile show, and is it the contract's figure?",
+   "options": [
+    {
+     "id": "dbxfe-bi-binding-question-a",
+     "text": "4.6%, and it is not the contract's figure; the contract's plant rate is 47 over 1,040, which is 4.5%.",
+     "rationale": "The mean of the four rates is 4.575%, printed 4.6%. The contract defines the plant rate as the same calculation over all lines, sums first, which gives 4.519%, printed 4.5%."
+    },
+    {
+     "id": "dbxfe-bi-binding-question-b",
+     "text": "4.5%, the contract's figure, because averaging rates equals dividing the sums.",
+     "rationale": "Averaging rates equals dividing the sums only when every line inspected the same number of units, which they did not."
+    },
+    {
+     "id": "dbxfe-bi-binding-question-c",
+     "text": "4.6%, and it is the contract's figure because the plant rate is defined as the mean of line rates.",
+     "rationale": "The metric contract explicitly forbids a plant average of line rates; the plant value is the all-lines calculation."
+    },
+    {
+     "id": "dbxfe-bi-binding-question-d",
+     "text": "18.3%, the sum of the four rates.",
+     "rationale": "A sum of rates is not a rate of anything; no widget aggregation produces a defensible plant figure from a rate column."
+    }
+   ],
+   "correctOptionId": "dbxfe-bi-binding-question-a",
+   "conceptIds": [
+    "dbxfe-bi-binding-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-filters-question",
+   "revision": "1",
+   "prompt": "The morning page has two datasets: per-line (line_id, business_day, rate) and plant (business_day, rate). A supervisor sets the line filter to 3. What happens to the plant tile?",
+   "options": [
+    {
+     "id": "dbxfe-bi-filters-question-a",
+     "text": "It is unchanged, because a field filter reaches only datasets that return the field it is bound to, and the plant dataset has no line_id.",
+     "rationale": "A field filter narrows results by a field the dataset returns; the plant dataset returns no line field, so the filter has nothing to act on and the plan's promise holds."
+    },
+    {
+     "id": "dbxfe-bi-filters-question-b",
+     "text": "It shows line 3's rate, because a filter applies to every tile on the page.",
+     "rationale": "A filter applies to the widgets and datasets it is connected to and only through fields those datasets return; it cannot make a plant dataset return a line."
+    },
+    {
+     "id": "dbxfe-bi-filters-question-c",
+     "text": "It errors, because the filter names a field the plant dataset lacks.",
+     "rationale": "An unconnected or unmatched dataset is simply not filtered; the documentation describes connection to widgets, not a failure mode."
+    },
+    {
+     "id": "dbxfe-bi-filters-question-d",
+     "text": "It is recomputed as the plant rate with line 3 excluded.",
+     "rationale": "Recomputation before aggregation is what a parameter substituted into the SQL does, not what a field filter on returned rows does."
+    }
+   ],
+   "correctOptionId": "dbxfe-bi-filters-question-a",
+   "conceptIds": [
+    "dbxfe-bi-filter-concept",
+    "dbxfe-bi-parameter-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-filters",
+    "dbxfe-bi-claim-parameters",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-permissions-question",
+   "revision": "1",
+   "prompt": "A supervisor has Can View on the published morning page, which was published with individual data permissions. Every tile shows no data for them. Which fix respects Cinderline's access matrix?",
+   "options": [
+    {
+     "id": "dbxfe-bi-permissions-question-a",
+     "text": "Grant the north-reporting-analysts group SELECT on accepted.daily_line_rate, the table the matrix already assigns them.",
+     "rationale": "Under individual data permissions the viewer's own grants are checked at the table door; the matrix names exactly this grant for exactly this group."
+    },
+    {
+     "id": "dbxfe-bi-permissions-question-b",
+     "text": "Raise the supervisor's dashboard permission to Can Manage.",
+     "rationale": "Can Manage opens more of the page door and none of the table door; the tiles would still return nothing under the viewer's grants."
+    },
+    {
+     "id": "dbxfe-bi-permissions-question-c",
+     "text": "Republish the page with the analyst's own credentials embedded so every viewer sees data.",
+     "rationale": "That widens every viewer's reach to everything the analyst's datasets can return, including rows the matrix says supervisors must not see."
+    },
+    {
+     "id": "dbxfe-bi-permissions-question-d",
+     "text": "Make the supervisor a workspace admin.",
+     "rationale": "Admin rights are neither door in the matrix and grant far more than SELECT on one table; this is the opposite of least privilege."
+    }
+   ],
+   "correctOptionId": "dbxfe-bi-permissions-question-a",
+   "conceptIds": [
+    "dbxfe-bi-permission-concept",
+    "dbxfe-bi-viewer-credentials-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-permissions",
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-refresh-question",
+   "revision": "1",
+   "prompt": "The nightly job normally finishes at 02:10; the page's schedule runs at 06:30 and posts a snapshot to the supervisors' channel at 06:35. On Wednesday the job finishes at 08:20. What does the 06:35 snapshot show?",
+   "options": [
+    {
+     "id": "dbxfe-bi-refresh-question-a",
+     "text": "The older day's rows, because the schedule read the table as it stood at 06:30; only a freshness line inside the snapshot tells readers the page was not updated.",
+     "rationale": "The schedule ran on time over the table as it was; it neither waited nor failed. Lateness becomes visible only through data the page reads about the run."
+    },
+    {
+     "id": "dbxfe-bi-refresh-question-b",
+     "text": "Nothing yet: the schedule waits for the job and sends at 08:20.",
+     "rationale": "A schedule is a cadence and knows nothing about the job's completion; waiting on the job is what a dashboard task placed after the publishing task does."
+    },
+    {
+     "id": "dbxfe-bi-refresh-question-c",
+     "text": "An error message, because the tables were being written.",
+     "rationale": "The queries succeed over whatever committed rows exist; a table holding the older day returns it without complaint."
+    },
+    {
+     "id": "dbxfe-bi-refresh-question-d",
+     "text": "The new day's rows, because a snapshot always reads the latest published data.",
+     "rationale": "It did read the latest committed rows at 06:30, and those were the older day's; no refresh can produce rows the job has not yet published."
+    }
+   ],
+   "correctOptionId": "dbxfe-bi-refresh-question-a",
+   "conceptIds": [
+    "dbxfe-bi-refresh-concept",
+    "dbxfe-bi-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-schedule",
+    "dbxfe-bi-claim-task",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-metricview-question",
+   "revision": "1",
+   "prompt": "A metric view defines unit_defect_rate as SUM(defective_units) / SUM(inspected_units) over accepted inspections, with dimensions line_id and business_day. A query selects the measure grouped by business_day only. For day 4, where the lines have defective units 10, 15, 12, 10 and inspected units 300, 250, 250, 240, what is returned?",
+   "options": [
+    {
+     "id": "dbxfe-bi-metricview-question-a",
+     "text": "One row for day 4 with 47 / 1,040, which is 4.5%.",
+     "rationale": "With no line dimension the engine sums both quantities across all lines for the day and divides once: the contract's plant calculation."
+    },
+    {
+     "id": "dbxfe-bi-metricview-question-b",
+     "text": "One row for day 4 with 4.6%, the mean of the four line rates.",
+     "rationale": "A metric view recomputes the ratio over sums at each grain; it never averages precomputed rates."
+    },
+    {
+     "id": "dbxfe-bi-metricview-question-c",
+     "text": "An error, because every dimension must appear in the grouping.",
+     "rationale": "Dimensions are optional in a query; grouping by any subset, including none, is the point of separating measures from dimensions."
+    },
+    {
+     "id": "dbxfe-bi-metricview-question-d",
+     "text": "Four rows, one per line, because the line dimension is part of the definition.",
+     "rationale": "Rows follow the query's grouping, not the definition's dimension list; grouping by day alone yields one row per day."
+    }
+   ],
+   "correctOptionId": "dbxfe-bi-metricview-question-a",
+   "conceptIds": [
+    "dbxfe-bi-metricview-concept",
+    "dbxfe-bi-measure-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-metricviews",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-external-question",
+   "revision": "1",
+   "prompt": "Cinderline's analyst builds a Power BI report on accepted.daily_line_rate in Import mode using her own login and shares it to the supervisors' Power BI workspace. Which statement is accurate?",
+   "options": [
+    {
+     "id": "dbxfe-bi-external-question-a",
+     "text": "Supervisors read the imported copy under Power BI's sharing; the AI/BI page's Can View list and Unity Catalog grants are not consulted when they open the report.",
+     "rationale": "Import copies the rows into Power BI at refresh time under the analyst's credential; from then on Power BI's workspace sharing governs who sees the copy."
+    },
+    {
+     "id": "dbxfe-bi-external-question-b",
+     "text": "Unity Catalog checks each supervisor's SELECT when they open the report.",
+     "rationale": "The catalog was consulted once, for the analyst's identity at refresh; an imported copy is read from Power BI's engine, not from the warehouse."
+    },
+    {
+     "id": "dbxfe-bi-external-question-c",
+     "text": "The report inherits the AI/BI page's connected filters and freshness line.",
+     "rationale": "Nothing of the page travels to Power BI; slicers, a freshness caption and a schedule must be rebuilt in the report and accepted there."
+    },
+    {
+     "id": "dbxfe-bi-external-question-d",
+     "text": "Import mode is not possible; only DirectQuery works with Databricks.",
+     "rationale": "The documentation describes both Import and DirectQuery, recommending SQL warehouses for DirectQuery; Import is supported and copies data."
+    }
+   ],
+   "correctOptionId": "dbxfe-bi-external-question-a",
+   "conceptIds": [
+    "dbxfe-bi-external-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-powerbi",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-bi-decision-self",
+   "revision": "1",
+   "prompt": "A plant manager asks for a page \"with everything about quality\". Write the four-line decision chain you would put in front of them before drawing any tile, and name one tile you would refuse and why.",
+   "modelAnswer": "Audience: line supervisors at the 8 a.m. meeting. Decision: which line to investigate first. Action: send a technician and open that line's excluded inspection. Metric: unit_defect_rate per line for the previous business day, with its exclusion counts. I would refuse the sensor-average tile: no action in the meeting depends on it and no metric contract defines it, so it would be decoration that invites argument.",
+   "reasoning": "The chain forces the page to serve one decision; a tile with no action and no contract fails both tests. Naming a second audience with the same numbers at the same grain, such as the plant analyst confirming at 7:30, is an acceptable addition.",
+   "conceptIds": [
+    "dbxfe-bi-decision-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-credentials-self",
+   "revision": "1",
+   "prompt": "Cinderline's analyst, who holds SELECT on the raw and quarantine schemas, publishes the morning page with shared data permissions. Explain what a supervisor with Can View can now reach, and what you would change before the security review.",
+   "modelAnswer": "Every dataset now runs with the analyst's grants, so a supervisor with only Can View can reach any row those datasets return, through a filter, a table view or an export, including quarantine rows if any dataset touches that schema; the catalog never checks the supervisor. Before review I would republish with individual data permissions, as the access matrix assumes, so each supervisor's own SELECT on accepted.daily_line_rate decides what they see and the quarantine link works only for stewards, and record the mode and the publishing identity in the matrix.",
+   "reasoning": "Shared data permissions bound exposure by the publisher's grants and the datasets, so the fix is to change whose grants run the queries, not to add a filter. Keeping shared data permissions but publishing through the API as a service principal whose only grant is the accepted table is an acceptable alternative if the review records it.",
+   "conceptIds": [
+    "dbxfe-bi-credentials-concept",
+    "dbxfe-bi-viewer-credentials-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-claim-api",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-freshness-self",
+   "revision": "1",
+   "prompt": "Write the freshness sentence for the morning page in the normal case and in the late-job case, say where it sits, and say what data it reads.",
+   "modelAnswer": "Normal: \"Covers Tuesday, the previous business day. Published 06:32. Restated days are marked.\" Late job: \"Not updated: showing Monday. See the operator note,\" with the note beneath. It sits at the top of the page where the eye lands, never in a tooltip. It is a tile whose dataset reads the latest successful row of the publish-run table and compares that row's business day with the expected day; the restatement mark reads the restated flag and previous value on the published table.",
+   "reasoning": "Both clocks, the period and the publish time, are named in words, and the not-updated state is designed rather than left to a stale timestamp. A sentence that names the job's completion time instead of a publish time is acceptable if that is what the run table records.",
+   "conceptIds": [
+    "dbxfe-bi-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-schedule",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-consumer-self",
+   "revision": "1",
+   "prompt": "Cinderline's supervisors will open the morning page on a phone through the consumer surface at the 8 a.m. meeting. List what must be true of the page, the entitlements and the data grants for a supervisor to see yesterday's tiles, and what you cannot verify without a workspace.",
+   "modelAnswer": "The page must be published with individual data permissions and refreshed after the nightly job. The supervisors' group needs the consumer access entitlement, Can View on the published page and SELECT on accepted.daily_line_rate, because each supervisor's own grants run the queries; the access review also confirms whatever warehouse access the current documentation requires of viewers. Without a workspace I cannot verify the group's actual entitlement, the phone rendering of the first screen, or the exact behaviour of the consumer surface on the current release, so those are listed as unverified in the plan.",
+   "reasoning": "The answer separates the page door, the entitlement and the data door, and names what only a live workspace can confirm. Publishing instead through a least-privilege service principal with shared data permissions, so supervisors need no table grant, is an acceptable alternative design if the matrix records it.",
+   "conceptIds": [
+    "dbxfe-bi-aibi-concept",
+    "dbxfe-bi-genie-one-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-aibi",
+    "dbxfe-bi-claim-genie-one",
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-storyboard-self",
+   "revision": "1",
+   "prompt": "Describe, in words, the storyboard frame in which a supervisor notices that day 2 has been restated, and state what the frame must show for them to accept the number rather than argue about it.",
+   "modelAnswer": "Frame 4, 07:50, supervisors, the same page on a phone: they read the seven-day line for line 2, the line they chose first, and see a mark on day 2. The frame must show the current value 5.1%, the previous value 5.3%, the date of restatement and the reason category, all from the published table's restated flag, in the same place every time, so the supervisor reads a corrected number with its history instead of remembering a different figure from the printed report and disputing it.",
+   "reasoning": "The frame names the reader, the surface, the sentence read and the decision; the restatement mark with its previous value is what turns a dispute into a reading. Showing the mark in the table view only, with a hover on the chart, is acceptable if the storyboard says so.",
+   "conceptIds": [
+    "dbxfe-bi-storyboard-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-bi-acceptance-self",
+   "revision": "1",
+   "prompt": "The morning page passes every acceptance row except one: line 4 on day 5 shows 0.0% where the script expects \"no inspections\". Explain why this is a contract failure rather than a cosmetic one, and what you change in the dataset rather than in the tile.",
+   "modelAnswer": "The contract says a line with no accepted inspections has no rate, and 0.0% asserts a perfect day that never happened; a supervisor comparing lines would rank line 4 best on a day it did not run. The failure is in the dataset: somewhere a zero denominator was coalesced to zero or a division was guarded with a default. The fix is to return NULL when the summed inspected units are zero and let the tile render NULL as \"no inspections\"; the tile's formatting stays as it is, and the row is re-run after the change.",
+   "reasoning": "Locating the fix in the dataset keeps the tile a pure renderer of the contract and makes the correction visible to every consumer of that dataset. Adding the empty case to the metric view's definition is an acceptable alternative when the tile reads a metric view.",
+   "conceptIds": [
+    "dbxfe-bi-acceptance-concept",
+    "dbxfe-bi-binding-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-bi-decision",
+   "version": "1.0.0",
+   "title": "A dashboard is designed backward from the action",
+   "outcome": "Name the audience, the decision, the action and the metric a page exists for before choosing any tile.",
+   "explanation": "Start from the meeting, not from the tables. Cinderline's line supervisors meet at 8 a.m. and must choose which line to investigate first; that choice is the action, and the number that supports it is yesterday's unit defect rate per line. A [[dbxfe-bi-decision-concept|decision chain]] runs audience, decision, action, metric, and a tile that sits on no link of that chain is decoration. Notice in the second state that the sensor-average tile has no action behind it and no contract under it, so it is excluded before anyone draws it.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-decision",
+   "conceptIds": [
+    "dbxfe-bi-decision-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-decision-visual",
+   "questionIds": [
+    "dbxfe-bi-decision-self"
+   ],
+   "handbook": {
+    "markdown": "The first question a delivery plan asks is not which tables exist but who will act, on what, and when. Write it as four lines: the audience (line supervisors at the 8 a.m. meeting), the decision (which line to investigate first), the action (send a technician and open the excluded inspection), and the metric that changes the decision (`unit_defect_rate` per line, previous business day). Then add a fifth line the plan guide insists on: what the audience does today instead, because that is what the page must beat. At Cinderline it is two printed reports that disagree.\n\nOne page can serve two audiences only if their actions need the same numbers at the same grain. The plant analyst confirms the numbers at 7:30 and explains exclusions when asked; that is the same numbers, so the same page. The quality lead needs a count of excluded and quarantined inspections and a link to open them; that is a count and a link, not a second page.\n\nWhat fails: a page with twenty tiles that answers every question and drives no decision. Sensor averages, shift counts and a plant-wide gauge each look useful and each has no action attached and no metric contract underneath, so each is removed or labelled unverified. What to inspect on an existing page: for every tile, name the action it changes; if you cannot, it is a report, and a report nobody trusts is a dispute. How to demonstrate honestly: walk the storyboard with the operations director before anything is built, and record which tile they read first.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-decision"
+    ]
+   },
+   "recap": "Audience, decision, action, metric: a tile on no link of that chain is removed before it is drawn.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Socho ghar mein subah ka nashta banana hai. Pehle yeh sochte ho ki kaun khayega, kitne baje nikalna hai, aur kya banega, tab jaake fridge kholte ho. Jo pehle fridge khol kar sab kuch bahar nikaal deta hai, uska table bhar jaata hai par koi kuch khaata nahi. Dashboard bhi aisa hi hai: pehle meeting, phir decision, phir woh ek number jo decision badal de; tables uske baad.",
+    "mapping": "The people leaving for work are the audience, the time they leave is the meeting, the one dish is the metric, and the fridge is the set of tables you already have.",
+    "boundary": "A meal is eaten once; a page serves a repeating decision, so its metric also needs a contract and a freshness rule that breakfast never does."
+   }
+  },
+  {
+   "id": "dbxfe-bi-labels",
+   "version": "1.0.0",
+   "title": "A label is part of the number",
+   "outcome": "Rewrite a misleading tile label into one a reader can defend, naming the five parts it must carry.",
+   "explanation": "A tile reading 4.8 is not a fact until its label says what was divided by what, over which period, in which unit, and when it was published. The schematic's first state is Cinderline's draft: a tile titled Defects 4.8, a bar chart whose axis starts at 4.0, a plant figure averaged from lines, and no date anywhere. The second state shows the same values under a [[dbxfe-bi-label-concept|defensible label]]: unit_defect_rate v1, previous business day, per cent of inspected units, published 06:32, restated days marked. Notice that no value changed; what changed is what a reader can defend.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-decision",
+   "conceptIds": [
+    "dbxfe-bi-label-concept",
+    "dbxfe-bi-decision-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-labels-visual",
+   "questionIds": [
+    "dbxfe-bi-labels-question"
+   ],
+   "handbook": {
+    "markdown": "Five label parts make a rate tile defensible, and each one answers an argument that happens in the meeting.\n\n**Axis.** A bar chart whose axis runs 4.0 to 5.0 turns a move from 4.6 to 4.8 into a bar twice as tall. Start a rate axis at zero, or print the truncation in the axis label. **Units.** \"Defects 4.8\" could be a count, a rate or a percentage; write \"per cent of inspected units, one decimal\". **Period.** \"Previous business day, plant local time\" is a period; \"latest\" is not, and a seven-day rolling figure labelled as daily is the most common silent error. **Denominator.** The rate is defective units over inspected units of accepted inspections, so print the exclusion counts beside it: accepted, excluded, quarantined. **Freshness stamp.** The business day covered, the publish time, whether any shown day was restated, and the not-updated wording, where the eye lands rather than in a tooltip.\n\nA useful test is to read every label aloud as a sentence: \"4.8 per cent of the units line 3 inspected on the previous business day were defective; 250 inspected, 12 defective; one inspection excluded; published 06:32.\" If the sentence cannot be spoken, the label is missing a part. What fails without this: two percentages of different bases side by side, a plant tile that averages line rates, and a red colour rule that fires on a truncated axis. Nothing here needs a workspace; the schematic is a drawing, and a real page is checked against it by the acceptance script.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-decision"
+    ]
+   },
+   "recap": "Axis, unit, period, denominator and freshness stamp: read the label aloud as a sentence, and if it cannot be spoken it is not a label.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "hint": "Ask what a supervisor could wrongly conclude from each tile as drawn."
+  },
+  {
+   "id": "dbxfe-bi-binding",
+   "version": "1.0.0",
+   "title": "Every tile inherits one metric contract",
+   "outcome": "Bind a tile to a contract by name and version and predict what the page must show for the plant figure and for an empty line.",
+   "explanation": "A tile is bound to a metric contract by name and version and inherits the contract's grain, numerator, denominator, precision and empty rule; it never re-derives them. The equation shows unit_defect_rate for line 3 on day 4: 12 defective units over 250 inspected is 4.8%. The plant figure is the same calculation over all lines, 47 over 1,040, which is 4.5%, never the average of line rates, which the third state shows would print 4.6%. A line with no accepted inspections shows no inspections, not 0.0%, because the contract says so, and [[dbxfe-bi-binding-concept|contract binding]] carries that rule to the page.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-binding",
+   "conceptIds": [
+    "dbxfe-bi-binding-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-binding-visual",
+   "questionIds": [
+    "dbxfe-bi-binding-question"
+   ],
+   "handbook": {
+    "markdown": "Binding means the tile's dataset computes exactly what the contract defines and the tile adds nothing. For `unit_defect_rate` version 1 the dataset returns one row per line per business day with the summed numerator, the summed denominator and the rate, computed over accepted inspections only (shown here for one business day):\n\n```sql\nSELECT l.line_id,\n       COUNT(i.inspection_id) AS accepted_inspections,\n       SUM(i.defective_units) AS defective_units,\n       SUM(i.inspected_units) AS inspected_units,\n       try_divide(SUM(i.defective_units), SUM(i.inspected_units)) AS unit_defect_rate\nFROM ref.north_lines AS l\nLEFT JOIN accepted.inspections AS i\n  ON i.line_id = l.line_id AND i.business_day = :business_day\nGROUP BY l.line_id\n```\n\nThe plant tile is a second dataset with the same sums over all lines: 10 + 15 + 12 + 10 = 47 defective over 300 + 250 + 250 + 240 = 1,040 inspected, which is 4.519%, printed 4.5%. Averaging the four line rates (3.3, 6.0, 4.8, 4.2) gives 4.575%, printed 4.6%, and a reader who checks the sheet will find the page wrong by a tenth and stop trusting the rest. The query starts from the line list, because grouping inspections alone would drop a line that had none and the tile would silently vanish; with the left join that line returns NULL sums, and `try_divide` returns NULL rather than raising a division-by-zero error. That NULL is what the tile renders in words, and the inspection count tells the contract's two empty cases apart: no accepted inspections reads \"no inspections\", accepted inspections whose units total zero read \"no inspected units\". A COALESCE to zero at any layer breaks the contract.\n\nWhat fails: a tile widget configured to aggregate a rate column, a rolling average added in the chart settings, or rounding applied twice. What to inspect: the tile's dataset SQL against the contract text, the widget's aggregation setting, and the reconciliation sheet's value for one line and one day. The restatement rule needs a column too, a restated flag with the previous value, so that the restatement mark in the freshness line has something to read. The contract itself is the metric contract guide's subject; here it is consumed, not written.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-binding"
+    ]
+   },
+   "recap": "The tile inherits grain, numerator, denominator, precision and the empty rule; the plant figure is sums over sums, never a mean of rates.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-bi-filters",
+   "version": "1.0.0",
+   "title": "A filter narrows a result; a parameter rewrites the query",
+   "outcome": "Predict which tiles move when a viewer changes a field filter and when they change a parameter.",
+   "explanation": "AI/BI dashboards give a viewer two kinds of control. A [[dbxfe-bi-filter-concept|field filter]] narrows a dataset's results by a field that dataset returns; a [[dbxfe-bi-parameter-concept|dashboard parameter]] is substituted into the dataset's SQL at runtime, before aggregation, so it changes what the query computes. In the table, the line filter keeps only line 3's row from the per-line dataset, while the plant dataset returns no line field and is untouched. The third state substitutes a business-day parameter into both queries and every value moves together. Notice that a filter reaches only fields a dataset returns.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-binding",
+   "conceptIds": [
+    "dbxfe-bi-filter-concept",
+    "dbxfe-bi-parameter-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-filters",
+    "dbxfe-bi-claim-parameters",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-filters-visual",
+   "questionIds": [
+    "dbxfe-bi-filters-question"
+   ],
+   "handbook": {
+    "markdown": "The documentation describes filter widgets added to the canvas and connected to dataset fields, with single value, multiple values, date, date range, text entry and range slider types for field filters, and single, multiple, date and date range for parameter filters. A field filter operates on a field the dataset already returns; that is why Cinderline's plant tile, whose dataset has no `line_id` column, ignores the line filter, and why the plan guide can promise that filtering to line 3 does not change the plant figure. The filters page adds that, for relatively small datasets, field filters are often applied in the browser without re-running the query. A parameter is different: the dataset's SQL carries a named marker such as `:business_day`, the viewer's selection is substituted before the query runs, and aggregation happens after the substitution, so a parameter can change the population a sum is taken over.\n\nDesign rules that follow. Connect each filter deliberately to the widgets it should govern; an unconnected tile is not a bug but a decision to record. Prefer a parameter when the value must reach the WHERE clause before aggregation (the business day), and a field filter when the viewer is choosing among rows the dataset already computed (the line). Refuse free-text filters on the morning page: there is nothing to type that the two allowed selections do not cover, and a free-text filter invites a search for rows the viewer should not see. Query-based parameters, which draw their allowed values from a dataset, are the documented way to offer a list that follows the data.\n\nWhat to inspect when a tile does not respond: the filter's connections, the field name the filter is bound to, and whether the dataset returns that field at all. A filter is a reading aid and not a security boundary; the permissions beats say why.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-binding"
+    ]
+   },
+   "recap": "Field filters narrow returned rows by a field the dataset has; parameters are substituted into the SQL before aggregation.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-bi-permissions",
+   "version": "1.0.0",
+   "title": "The page and the data have separate doors",
+   "outcome": "Write an access matrix that separates a principal's dashboard permission from its privileges on the underlying tables.",
+   "explanation": "A dashboard has its own permission levels, Can View to Can Manage, and the tables behind it carry Unity Catalog privileges. Those are two doors, and a [[dbxfe-bi-permission-concept|dashboard permission]] opens only the first. The matrix shows Cinderline's principals: the analysts group views the page and holds SELECT on the accepted table, the stewards also reach the quarantine table, the data team edits, the nightly job's principal writes the table with no page door, and everyone else has neither. Notice in the second state that revoking the analysts' SELECT leaves the page door open yet empties their tiles, because the page runs each viewer's own grants.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-access",
+   "conceptIds": [
+    "dbxfe-bi-permission-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-permissions",
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-permissions-visual",
+   "questionIds": [
+    "dbxfe-bi-permissions-question"
+   ],
+   "handbook": {
+    "markdown": "The documentation for the permissions API lists four levels on an AI/BI dashboard: CAN_READ (shown as Can View) views it; CAN_RUN also runs it; CAN_EDIT also edits the draft; CAN_MANAGE also changes its permissions. Legacy dashboards are a different object with their own permission model, so an access review names which kind of dashboard it is reading. The draft and the published version are distinct: editors work on the draft, viewers see the published version, and publishing is the act that decides whose data permissions apply, which the next beat takes up.\n\nThe second door is Unity Catalog. Whether a query behind a tile returns rows is decided by privileges on the catalog, schema and table for whichever principal the query runs as. A page permission never grants a table privilege, and a table privilege never grants page access. Cinderline's matrix therefore has two columns per principal: `north-reporting-analysts` gets Can View on the page and SELECT on `accepted.daily_line_rate`, and must not reach raw or quarantine rows through any filter; `quality-stewards` gets Can View plus SELECT on the quarantine table; the data team gets Can Edit and works with its own grants, never those of `sp-north-nightly`, the service principal that writes the accepted table and holds no page permission at all, because the identity that writes the data is not the identity that shows it; everyone else gets nothing on either door. The page is published with individual data permissions, so these grants, not the publisher's, protect the rows.\n\nHow to review it: list the page's access control entries through the permissions API or the share dialog, run `SHOW GRANTS ON TABLE accepted.daily_line_rate`, then open the page as a test analyst identity and as an outsider identity and record what each sees. The plan guide's matrix is a design until this review executes it. What fails: granting Can Manage to fix a data error, or granting SELECT on a raw schema because a filter \"needs it\".",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-access"
+    ]
+   },
+   "recap": "Can View, Can Run, Can Edit, Can Manage open the page; only Unity Catalog privileges open the tables, and neither door grants the other.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "hint": "A permission on an object never implies a privilege on what the object reads."
+  },
+  {
+   "id": "dbxfe-bi-credentials",
+   "version": "1.0.0",
+   "title": "Embedded credentials make the publisher the reader",
+   "outcome": "Choose between embedded and individual data permissions for a page and name what each choice exposes and requires.",
+   "explanation": "When a dashboard is published, the publisher chooses whose data permissions run its queries. With [[dbxfe-bi-credentials-concept|embedded credentials]], the documented shared data permissions option, every viewer's query runs as the publisher, so the catalog checks the publisher's grants and a viewer needs only Can View. With [[dbxfe-bi-viewer-credentials-concept|individual data permissions]], each viewer's own grants are checked and a viewer without SELECT sees no data. Follow the request in the diagram: the privilege check moves from the publisher to the viewer. Notice that under embedded credentials a filter is not a wall; whatever the publisher's queries can return, a viewer can reach.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-access",
+   "conceptIds": [
+    "dbxfe-bi-credentials-concept",
+    "dbxfe-bi-viewer-credentials-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-claim-api",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-credentials-visual",
+   "questionIds": [
+    "dbxfe-bi-credentials-self"
+   ],
+   "handbook": {
+    "markdown": "The share documentation describes the publish step as a choice, with shared data permissions the default: share data permissions, where the publisher's credentials determine access to the underlying data and queries run with the publisher's permissions, or individual data permissions, where each viewer must have explicit access to the underlying data to see results. The API exposes the same choice as `embed_credentials` on the publish call, and the API tutorial shows publishing as a service principal: obtain an OAuth token for the principal, call publish with `embed_credentials` true, and viewers then use the principal's permissions for data and compute while needing permission only on the dashboard object; the tutorial adds that audit logs then show the principal as the query executor.\n\nThe trade is exposure against administration. Embedded credentials mean one grant to maintain, a shared result cache that a schedule refreshes, and no per-viewer table privileges; they also mean that every row the publisher's datasets can return is reachable by anyone with Can View, through a filter, a table view or an export. If the publisher is a human analyst with SELECT on raw and quarantine schemas, the page has quietly widened that person's access to every viewer. Individual permissions mean each viewer needs the table grants and whatever compute access the current page requires, more administration and a per-user cache rather than a shared one, but the catalog decides per person.\n\nCinderline's rule: publish the morning page with individual data permissions, because the access matrix already grants each group exactly the rows it may read and the page must not widen that; the price is a per-user cache and grants to maintain. The quarantine link then works only for stewards who hold SELECT on the quarantine table. Shared data permissions would be defensible only through the API as a service principal whose sole data grant is the accepted table, and never from a personal login: the data team's development grants reach raw and quarantine schemas, and they leave when a person does. What to inspect: the published page's data-permission mode, the identity it was published as, and that identity's grants.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-access"
+    ]
+   },
+   "recap": "Embedded credentials check the publisher's grants for every viewer; individual permissions check each viewer's own; embed only a least-privilege service principal, never a personal login.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Socho ek society ka guard aur ek flat ki chaabi. Guard gate pe naam check karke andar aane deta hai; yeh page ka Can View hai. Par flat ke andar kya dikhega, woh chaabi tay karti hai. Embedded credentials ka matlab: page banane wale ne apni chaabi darwaze pe hi latka di, ab jo bhi gate paar kare, usi chaabi se saare kamre khol sakta hai. Individual permissions mein har mehmaan apni chaabi laata hai, aur jiske paas nahi hai, woh darwaze pe hi ruk jaata hai.",
+    "mapping": "The guard is the dashboard's Can View permission, the flat is the set of underlying tables, and the key hanging on the door is the publisher's credential embedded at publish time.",
+    "boundary": "A key opens every room of the flat, whereas embedded credentials expose only what the page's datasets return, so the exposure is bounded by the datasets and the publishing identity's grants, not by every table the publisher can read."
+   }
+  },
+  {
+   "id": "dbxfe-bi-freshness",
+   "version": "1.0.0",
+   "title": "Freshness is a sentence the reader can act on",
+   "outcome": "Write the freshness statement for a page in its normal and not-updated states and say what data it reads.",
+   "explanation": "A timestamp in a corner tells a supervisor nothing about whether yesterday is in the numbers. A [[dbxfe-bi-freshness-concept|freshness statement]] says, in words where the eye lands, which business day the page covers, when it was published, that restated days are marked, and what the page says when it was not updated. The timeline runs from the plant's day through the nightly job at 02:10 and the scheduled refresh at 06:30 to the 7:45 meeting. In the second state the job finishes late, and the page must say not updated, showing Monday, rather than showing Monday's rows under Tuesday's heading.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-freshness",
+   "conceptIds": [
+    "dbxfe-bi-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-schedule",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-freshness-visual",
+   "questionIds": [
+    "dbxfe-bi-freshness-self"
+   ],
+   "handbook": {
+    "markdown": "Freshness has two clocks that readers confuse: the period the numbers cover and the moment they were published. The plan guide puts both in words at the top of the page: \"Covers Tuesday (the previous business day). Published 06:32. Restated days are marked.\" When the nightly run has not published by 7:30, the same position reads \"Not updated: showing Monday. See the operator note,\" and the note appears beneath it. A report held while a conflicting inspection is adjudicated uses the same position with its own reason, \"Held: conflict under adjudication\", and the owner's note. A refresh timestamp alone would have said 06:30 on both mornings and been true both times, which is the problem.\n\nThe statement is a tile like any other, and it needs a dataset. The nightly job writes one row per run to `ops.publish_run` with the business day it published, the completion time and a status. The freshness dataset reads the latest successful row and compares its business day with the expected one:\n\n```sql\nSELECT business_day, completed_at,\n       CASE WHEN business_day = :expected_day THEN 'current'\n            ELSE 'not updated' END AS state\nFROM ops.publish_run\nWHERE status = 'published'\nORDER BY completed_at DESC LIMIT 1\n```\n\nThe restatement mark reads the `restated` flag and previous value that the contract requires the published table to carry, so a day changed since it was first shown is marked with what it replaced. What fails: a page whose header is typed text rather than a dataset, which says Tuesday forever; a freshness line in a tooltip; and a late job that nobody is told about, which the plan's ownership row fixes by notifying the operator and the analyst before 7:30. What to inspect on a doubtful morning: the latest `publish_run` row, the published table's maximum business day, and the schedule's last run time, in that order.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-freshness"
+    ]
+   },
+   "recap": "Period covered, publish time, restatement mark and the not-updated wording, read from a run table, where the eye lands.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Akhbaar par sirf 'chhapa 5 baje' likha ho toh kya fayda? Padhne wale ko chahiye: yeh kal ki khabar hai ya parso ki, aur agar aaj ka akhbaar hi nahi aaya toh kya kal wala rakha hai. Dashboard ki freshness bhi ek line mein bolo: kaunsa din, kab chhapa, kya badla, aur agar nahi aaya toh saaf likha ho ki purana dikh raha hai.",
+    "mapping": "The newspaper's date line is the period covered, the print time is the publish time, a corrections box is the restatement mark, and today's edition not delivered is the not-updated state.",
+    "boundary": "A printed edition is never changed in place, while a dashboard's day can change on the next run, so the mark and the previous value matter more than they do in print."
+   }
+  },
+  {
+   "id": "dbxfe-bi-refresh",
+   "version": "1.0.0",
+   "title": "A refresh cannot make data newer than its source",
+   "outcome": "Place a dashboard refresh relative to the job that publishes its table and predict what a snapshot and the page show when the order is wrong.",
+   "explanation": "A [[dbxfe-bi-refresh-concept|refresh schedule]] re-runs a page's dataset queries on a cadence, refreshes the shared cache when the page uses shared data permissions, and can send subscribers a snapshot by email, Slack or Microsoft Teams. What it cannot do is produce rows the nightly job has not published. In the diagram, a 06:30 refresh after a 02:10 job snapshots Tuesday; the same refresh before a job that finishes at 08:20 snapshots Monday and posts it to the supervisors' channel at 06:35 without a word. Notice that the trigger belongs after the job, not on the clock.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-freshness",
+   "conceptIds": [
+    "dbxfe-bi-refresh-concept",
+    "dbxfe-bi-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-schedule",
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-claim-task",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-refresh-visual",
+   "questionIds": [
+    "dbxfe-bi-refresh-question"
+   ],
+   "handbook": {
+    "markdown": "The schedule documentation describes a periodic cadence: at each scheduled update all the SQL that defines the datasets runs, and for a page published with shared data permissions the shared cache is refreshed. Subscribers additionally receive a snapshot by email, Slack or Microsoft Teams, and a subscriber can choose to refresh data without receiving the email. Each run executes the page's dataset queries on the dashboard's warehouse, so it costs compute and returns whatever the tables hold at that moment.\n\nThat last clause is the design constraint. Cinderline's nightly job normally completes at 02:10; the page's schedule runs at 06:30 and posts a snapshot to the supervisors' Teams channel at 06:35. On a slow night the job finishes at 08:20. The schedule does not wait, does not fail and does not know the job was late: it snapshots Monday's rows and posts them on Tuesday morning with no operator note. Supervisors who open the page at 07:45 run their own queries under individual data permissions and see what the table holds, which is still Monday.\n\nTwo mitigations belong together. First, make the freshness line read the publish-run table, so lateness is visible in words on the page and inside every snapshot. Second, trigger the refresh from the job rather than the clock: the documented dashboard task, added to the nightly job after the publishing task, refreshes the dashboard and can send a snapshot to its own subscriber list, and it needs a serverless or pro SQL warehouse. Where that is not available, the schedule sits after the job's expected completion plus a buffer that the operator reviews when the job's duration drifts.\n\nWhat to inspect on a doubtful morning: the schedule's or task's last run time and warehouse, the published table's maximum business day, and the snapshot's send time relative to the job. A per-user cache under individual data permissions is a cost and permission question, not a freshness one.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-freshness"
+    ]
+   },
+   "recap": "A schedule or snapshot shows whatever the table holds when it runs; trigger it after the job and let the freshness line say when it ran early.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-bi-metricview",
+   "version": "1.0.0",
+   "title": "A metric view defines the measure once for every grain",
+   "outcome": "Explain what a metric view separates and predict its result for a line-level and a plant-level query.",
+   "explanation": "A [[dbxfe-bi-metricview-concept|metric view]] is a Unity Catalog object that separates [[dbxfe-bi-measure-concept|measures]], the numbers defined once as expressions such as the sum of defective units over the sum of inspected units, from dimensions, the fields you group and filter by. A query names a measure and any dimensions, and the engine computes the ratio over the sums for that grouping. The table shows one definition answering a line question and a plant question: 4.8% for line 3 and 4.5% for the plant, never the 4.6% mean of rates. Notice that the contract's numerator and denominator now live in one governed definition that dashboards and other clients share.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-semantic",
+   "conceptIds": [
+    "dbxfe-bi-metricview-concept",
+    "dbxfe-bi-measure-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-metricviews",
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-metricview-visual",
+   "questionIds": [
+    "dbxfe-bi-metricview-question"
+   ],
+   "handbook": {
+    "markdown": "The documentation describes metric views as the core of Unity Catalog semantics: measure definitions are separated from the dimensions used to group, filter and aggregate them, the definition is written in YAML and registered in Unity Catalog through SQL or Catalog Explorer, and a query can group by any available dimension while the engine generates the correct computation. A standard view locks its aggregation at creation time; a metric view defers it to the query. Schematically, the definition names a source, dimensions with expressions, and measures with aggregate expressions:\n\n```yaml\n# schematic shape; the YAML reference owns the exact keys, including the version key it requires first\nsource: cinderline.accepted.inspections\ndimensions:\n  - name: line_id\n    expr: line_id\n  - name: business_day\n    expr: business_day\nmeasures:\n  - name: unit_defect_rate\n    expr: try_divide(SUM(defective_units), SUM(inspected_units))\n```\n\nA query then asks for the measure at a grain: grouped by `line_id` it returns 4.8% for line 3; with no dimension it returns 47 over 1,040, which is 4.5%, because the ratio is recomputed over sums at each grouping. That is exactly the contract's plant rule, now enforced by the object rather than by every dashboard author remembering it. The documentation names a `MEASURE` function for selecting a measure in a query; check the current syntax page before writing one.\n\nAn AI/BI dataset can be based on a metric view directly, so the page's tiles read the governed definition instead of copying its SQL. What a metric view does not do: it does not decide the empty rule by itself (`try_divide` keeps a zero denominator as NULL, and the tile still has to show it in the contract's words, \"no inspections\" or \"no inspected units\"), it does not carry the restatement mark, and it helps only a client that sends SQL to the warehouse; a BI tool with its own semantic model re-expresses the definition and must be reconciled by the acceptance script. What to inspect: `DESCRIBE` the view, compare each measure's expression to the contract text, and run the two-grain query above against the reconciliation sheet.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-semantic"
+    ]
+   },
+   "recap": "Measures defined once, dimensions chosen at query time, the ratio recomputed over sums at every grain; the contract lives in the catalog.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Halwai ke paas ek recipe card hota hai: 'ek kilo besan pe itna ghee, itni cheeni'. Chahe do kilo banao ya bees, anupaat wahi rehta hai, kyunki card anupaat likhta hai, taiyaar plate nahi. Metric view bhi recipe card hai: rate ka formula ek baar likha, aur line, plant ya poora mahina, jis bhi size pe poochho, formula wahi lagta hai aur jawab us size ke liye naya nikalta hai.",
+    "mapping": "The recipe card is the metric view's measure definition, the batch size is the grouping dimension, and the ratio of ingredients is the ratio of sums the engine recomputes for each grouping.",
+    "boundary": "A recipe scales linearly by design, while a metric view recomputes a ratio over sums, so a larger grouping is not a scaled copy of a smaller one and can differ from the mean of its parts."
+   }
+  },
+  {
+   "id": "dbxfe-bi-consumer",
+   "version": "1.0.0",
+   "title": "AI/BI meets the business user where they read",
+   "outcome": "Describe the business user's path to a published page and what must be true of the page, the entitlement and the grants for it to work.",
+   "explanation": "[[dbxfe-bi-aibi-concept|AI/BI]] is the documentation's name for dashboards, Genie and the consumer experience built on the same governed tables. A supervisor does not open a workspace: the documentation describes [[dbxfe-bi-genie-one-concept|Genie One]], formerly Databricks One, as the simplified interface where business users view AI/BI dashboards, ask questions in natural language and run Databricks Apps, with consumer access as the least-privileged option. The comparison sets the supervisor's path beside the author's. Notice that the page, its permissions and its freshness line are one object on both paths; only the surface differs. Genie's natural-language answers belong to the Genie module and are only a neighbour here.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-semantic",
+   "conceptIds": [
+    "dbxfe-bi-aibi-concept",
+    "dbxfe-bi-genie-one-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-aibi",
+    "dbxfe-bi-claim-genie-one",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-consumer-visual",
+   "questionIds": [
+    "dbxfe-bi-consumer-self"
+   ],
+   "handbook": {
+    "markdown": "The AI/BI overview lists three things: dashboards, described as low-code with visualizations and cross-filtering; Genie Agents, domain-specific environments where data teams configure trusted data, metrics and business rules that power Genie One answers; and Genie One, the simplified UI for business users to view AI/BI dashboards, ask questions in natural language and run Databricks Apps. The Genie One page adds that it was previously known as Databricks One and that consumer access, the least-privileged option, is enough for its chat. Names in this family have changed more than once, so the release-notes page is the place to check what the current names are before writing a runbook.\n\nFor Cinderline's supervisors the path is: an entitlement that admits them to the consumer surface, Can View on the published page, and, because the page is published with individual data permissions, SELECT on the accepted table through their group. The author's path is the workspace: the draft, the datasets, the publish dialog and the schedule, worked with the data team's own grants. On the quarantine link, the steward's own SELECT on the quarantine table decides.\n\nWhat the business user can do on the page: read the tiles, use the connected filters, subscribe to the schedule, and, where a Genie Agent is configured for the same data, ask a question in words. What they cannot: edit a tile, change a definition, or see a row their own grants do not allow. What to verify with a workspace, and only there: the analysts group's entitlement, the phone rendering of the first screen, and the exact consumer-surface behaviour on the current release. How to demonstrate honestly without one: walk the storyboard over the schematic page and say which steps are unverified.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-semantic"
+    ]
+   },
+   "recap": "Dashboards, Genie and the consumer surface share one governed page; a business user needs an entitlement, Can View and, on Cinderline's page, their group's SELECT, not a workspace.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-bi-storyboard",
+   "version": "1.0.0",
+   "title": "A storyboard rehearses the meeting before the page exists",
+   "outcome": "Draw a morning meeting as frames that each name a reader, a surface, a sentence read and an action taken.",
+   "explanation": "A [[dbxfe-bi-storyboard-concept|storyboard]] is the meeting drawn as frames: who opens what, reads which sentence, chooses what, and where they go next. Cinderline's morning runs in five frames: the analyst confirms the numbers at 7:30, the supervisors open the page at 7:45, read the freshness line, compare four line tiles and choose line 2, the highest at 6.0%, and the quality lead opens the excluded inspection. The second state is the same meeting on a not-updated morning. Notice that every frame names the tile it reads and the action it produces, which is how a storyboard exposes a tile nobody reads.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-example",
+   "conceptIds": [
+    "dbxfe-bi-storyboard-concept",
+    "dbxfe-bi-decision-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-storyboard-visual",
+   "questionIds": [
+    "dbxfe-bi-storyboard-self"
+   ],
+   "handbook": {
+    "markdown": "A storyboard frame has six fields: time, actor, surface, what is read, what is decided, and where the actor goes next. Cinderline's morning page, drawn before it is built:\n\n| Frame | Time | Actor | Surface | Reads | Decides / next |\n|---|---|---|---|---|---|\n| 1 | 07:30 | Plant analyst | Workspace | Freshness line, line 3 tile, counts | Confirms against the sheet; notes exclusions |\n| 2 | 07:45 | Supervisors | Phone, consumer surface | Freshness line first | Trusts the day, or reads the operator note |\n| 3 | 07:47 | Supervisors | Same page | Four line tiles, seven-day lines | Line 2 first: 6.0%, 15 of 250 |\n| 4 | 07:50 | Supervisors | Same page | Line 2's seven-day line, day 2 marked | Accepts 5.1%, previous 5.3%, no argument |\n| 5 | 08:05 | Quality lead | Quarantine page | Excluded count and link | Opens the excluded inspection |\n\nThe not-updated variant replaces frame 2's sentence with \"Not updated: showing Monday\" and frame 3 with a decision to use Monday knowingly or wait for the operator. Drawing it shows what the page must do on that morning, which is the case most pages never design for.\n\nEach frame becomes a row of the acceptance script: frame 3 is the four tile values, among them \"line 3, day 4 equals 4.8%\", and line 2 ranking first; frame 4 is \"line 2's day-2 mark shows 5.3%\"; frame 5 is \"the quarantine link is refused under the analyst identity\". Frame 2 on a phone decides the layout: the freshness line and the four tiles must fit the first screen at 390 pixels, so the seven-day lines go below. What fails: a storyboard that is a list of screenshots, which names no sentence and no decision; and a storyboard reviewed only by the builder. Review it with the operations director and the plant analyst, ask them to point at the tile they would read first, and write down what they did today instead.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-example"
+    ]
+   },
+   "recap": "Time, actor, surface, sentence read, decision, next: five frames plus the not-updated variant, each becoming an acceptance row.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-bi-external",
+   "version": "1.0.0",
+   "title": "External BI tools read the warehouse, not the page",
+   "outcome": "State what Power BI, Tableau and an ODBC or JDBC client each do with a Databricks table and which parts of an AI/BI page do not travel with them.",
+   "explanation": "Power BI, Tableau and any ODBC or JDBC client connect to a SQL warehouse under their own identity and read tables and views through Unity Catalog. That is [[dbxfe-bi-external-concept|external BI integration]]: the documented connectors, Partner Connect and the [[dbxfe-bi-driver-concept|ODBC and JDBC drivers]] carry queries, not pages. The comparison table shows what travels, SQL, catalog privileges and a metric view as an object, and what does not, the AI/BI page's permissions, its filters, its freshness line and its schedule. Notice that a Power BI report of the same table is a second page that needs its own labels and its own acceptance script.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-external",
+   "conceptIds": [
+    "dbxfe-bi-external-concept",
+    "dbxfe-bi-driver-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-powerbi",
+    "dbxfe-bi-claim-tableau",
+    "dbxfe-bi-claim-drivers",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-external-visual",
+   "questionIds": [
+    "dbxfe-bi-external-question"
+   ],
+   "handbook": {
+    "markdown": "**Power BI.** The documentation covers connecting Power BI Desktop through Partner Connect, manually with the server hostname and HTTP path, or through the Power BI Delta Sharing connector; publishing data from Databricks to the Power BI service; and orchestrating semantic-model refreshes with a Power BI task. The Desktop page recommends SQL warehouses for DirectQuery, where each visual sends live SQL, and describes Import, where the data is copied into Power BI's engine at refresh time. The page lists the current authentication methods, which include OAuth for a user and a service principal's credentials for unattended refresh, and the connector supports the ADBC driver as an alternative to ODBC. In Import mode the copy leaves Unity Catalog's reach: Power BI's own workspace sharing and row-level rules govern who sees it, and freshness is the semantic model's last refresh.\n\n**Tableau.** Partner Connect connects a SQL warehouse to Tableau Desktop in a few clicks; Tableau Cloud can create data sources from Unity Catalog tables from the Databricks side; a manual connection takes the hostname, HTTP path and an authentication method. Live connections send SQL per interaction; extracts copy, with the same consequences as Import.\n\n**ODBC and JDBC.** Databricks provides an ODBC driver and a JDBC driver for any other tool; the connection string names the host, HTTP path and authentication mechanism. The drivers page notes that some tools need the ODBC driver installed, Tableau Desktop among them, while recent Power BI Desktop releases include it. Every client above runs as the identity in its connection, so the catalog's grants apply to that identity and nothing else does.\n\nWhat does not travel: the AI/BI page's Can View list, its data-permission choice, its connected filters and defaults, its freshness dataset and its schedule. A metric view is a catalog object, so a client that passes SQL through can query it; a tool with its own semantic layer re-expresses the measure and must be reconciled. Cinderline's supplier contact who wants line 2 in Tableau therefore gets a grant on a view that returns only line 2, a separate acceptance row, and a freshness caption written in Tableau, not a copy of the page.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-external"
+    ]
+   },
+   "recap": "Connectors and drivers carry SQL under their own identity; the page's permissions, filters, freshness line and schedule stay behind.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-bi-acceptance",
+   "version": "1.0.0",
+   "title": "An acceptance script names the value before the page shows it",
+   "outcome": "Write an acceptance script with expected values from outside the page, the states to try and who signs each row.",
+   "explanation": "An [[dbxfe-bi-acceptance-concept|acceptance script]] is written before the page exists: a fixed input snapshot, the exact value every tile must show, the filter states to try, the empty, restated and not-updated cases, the identity tests, and who signs which row. The table's first state lists Cinderline's script with expected values from the five-day reconciliation sheet; the second is the same script after a run, with one failure: line 4 on day 5 shows 0.0% where the contract says no inspections. Notice that a script whose expected values were copied from the page could never fail.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-example",
+   "conceptIds": [
+    "dbxfe-bi-acceptance-concept",
+    "dbxfe-bi-binding-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-dashboards",
+    "dbxfe-bi-claim-permissions",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "visualId": "dbxfe-bi-acceptance-visual",
+   "questionIds": [
+    "dbxfe-bi-acceptance-self"
+   ],
+   "handbook": {
+    "markdown": "The script has one row per check, and each row has an expected value that exists before the page does. Cinderline's rows come from the plan guide, on the retained five-day synthetic snapshot: line 3 on day 4 equals 4.8% to one decimal; the counts beside line 2's day-2 tile equal 20 accepted, 1 excluded, 1 quarantined; after the day-4 correction line 2's day-2 restatement mark appears with the previous value 5.3%; a line with no inspections on day 5 shows \"no inspections\", not 0.0%; filtering to line 3 leaves the plant tile at 4.5%; the page under a test analyst identity shows the tiles and refuses the quarantine link; the page under the outsider identity does not load. Three signers: the plant analyst for values, the quality lead for counts and marks, the security lead for access.\n\nRunning it means loading the snapshot into a test schema the page's datasets can be pointed at, opening the page under each identity, and recording observed values with the date and the identity used. The not-updated case is simulated by pointing the freshness dataset at a `publish_run` row for the wrong day. Every failure is recorded against the row, and the fix is made in the dataset, not in the tile: the 0.0% failure above means a COALESCE crept into the empty case, and the cure is the NULL the contract requires. Re-run the whole script after each metric contract version, not only the row that changed.\n\nWhat fails: acceptance by looking, expected values copied from the page, a script run only by its author, or a script with no identity rows. How to explain it: the script is the plan's promise turned into evidence, and the signatures say who checked which promise. How to demonstrate honestly: attach the run log with observed values; a page with no run log is not accepted, however right it looks.",
+    "sourceSectionIds": [
+     "dbxfe-bi-l01-example"
+    ]
+   },
+   "recap": "Expected values from the reconciliation sheet, states and identities to try, signers per row, and a run log; fix failures in the dataset.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "hint": "Ask where each expected value came from; if the answer is the page, the row proves nothing."
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-bi-l01-card1",
+   "beatId": "dbxfe-bi-decision"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card2",
+   "beatId": "dbxfe-bi-labels"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card3",
+   "beatId": "dbxfe-bi-binding"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card4",
+   "beatId": "dbxfe-bi-filters"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card5",
+   "beatId": "dbxfe-bi-permissions"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card6",
+   "beatId": "dbxfe-bi-credentials"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card7",
+   "beatId": "dbxfe-bi-freshness"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card8",
+   "beatId": "dbxfe-bi-refresh"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card9",
+   "beatId": "dbxfe-bi-metricview"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card10",
+   "beatId": "dbxfe-bi-consumer"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card11",
+   "beatId": "dbxfe-bi-storyboard"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card12",
+   "beatId": "dbxfe-bi-external"
+  },
+  {
+   "cardId": "dbxfe-bi-l01-card13",
+   "beatId": "dbxfe-bi-acceptance"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-bi-extension-caching",
+   "revision": "1",
+   "prompt": "Why do supervisors on a page with shared data permissions all see the same numbers, and when might one of them not?",
+   "answer": "They read one shared cache the schedule refreshed; a draft, or a page under individual data permissions, keeps a per-user cache instead.",
+   "explanation": "Dashboards keep a best-effort [[dbxfe-bi-extension-caching-concept|result cache]] for 24 hours. A page published with shared data permissions uses one cache for every viewer, which a scheduled update populates, so every viewer reads the 06:30 result. Under individual data permissions, which Cinderline's morning page uses, each viewer's queries fill their own cache, so two supervisors opening the page minutes apart can see results from different moments. Because the cache is best effort, the freshness line must read the run table rather than assume the cache is current.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-freshness",
+   "conceptIds": [
+    "dbxfe-bi-extension-caching-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-caching",
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "beatId": "dbxfe-bi-refresh",
+   "whyItMatters": "Explains why one publishing choice also decides whether the whole meeting sees one result or several."
+  },
+  {
+   "id": "dbxfe-bi-extension-account-share",
+   "revision": "1",
+   "prompt": "What happens to Can Edit granted to someone who is in the Databricks account but not in the workspace?",
+   "answer": "The sharing dialog shows it, but their actual permission on the page is limited to Can Run.",
+   "explanation": "A published dashboard can be shared with [[dbxfe-bi-extension-account-share-concept|anyone registered to the Databricks account]], even without workspace access, which is how a plant contact outside the data team can read it. The documentation states that such users are limited to Can Run whatever higher level appears in the dialog, so an access review lists the effective level, not the displayed one. The data door is unchanged: under shared data permissions the publisher's grants still decide what they can reach.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-access",
+   "conceptIds": [
+    "dbxfe-bi-extension-account-share-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-account-share",
+    "dbxfe-bi-claim-permissions",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "beatId": "dbxfe-bi-permissions",
+   "whyItMatters": "Prevents an access review from recording a permission a user cannot actually exercise, or missing a reader outside the workspace."
+  },
+  {
+   "id": "dbxfe-bi-extension-embedding",
+   "revision": "1",
+   "prompt": "How can the line 2 page reach a supplier's own portal without giving the supplier's staff Databricks accounts?",
+   "answer": "Through embedding for external users: a service principal with read access authorizes the page, and the portal's server issues each viewer a short-lived scoped token.",
+   "explanation": "[[dbxfe-bi-extension-embedding-concept|Embedding for external users]] places a published dashboard in an external application for viewers without Databricks accounts. The service principal is granted read access to the dashboard and its underlying data, the application's server exchanges the principal's secret for a token and then a token scoped to the individual viewer, and those tokens last one hour. The exposure question is the one this module asks of embedded credentials: the principal's grants bound what any viewer can see, so it gets a view of line 2 only. Availability is checked on the current page before design.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-access",
+   "conceptIds": [
+    "dbxfe-bi-extension-embedding-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-embedding",
+    "dbxfe-bi-claim-share",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "beatId": "dbxfe-bi-credentials",
+   "whyItMatters": "Shows that external delivery is an identity design, not a link, and reuses the least-privilege publishing rule."
+  },
+  {
+   "id": "dbxfe-bi-extension-filter-url",
+   "revision": "1",
+   "prompt": "How can an acceptance script record a filtered state so a second tester opens exactly the same view?",
+   "answer": "By recording the published page's URL, which stores the field filter and parameter selections, and opening that link.",
+   "explanation": "A published dashboard writes its field filter and parameter selections into the [[dbxfe-bi-extension-filter-url-concept|page address]], so a bookmarked or shared link reopens with those values applied. An acceptance row such as \"line = 3, business day 4, plant tile 4.5%\" can therefore carry the exact link the tester used, and a supervisor's bookmark opens the meeting's state. The link records selections, not permissions: a viewer without access still cannot open it.",
+   "lessonId": "dbxfe-bi-l01",
+   "sectionId": "dbxfe-bi-l01-binding",
+   "conceptIds": [
+    "dbxfe-bi-extension-filter-url-concept"
+   ],
+   "claimIds": [
+    "dbxfe-bi-claim-filter-url",
+    "dbxfe-bi-claim-filters",
+    "dbxfe-bi-guidance",
+    "dbxfe-bi-fiction"
+   ],
+   "beatId": "dbxfe-bi-filters",
+   "whyItMatters": "Makes filter states reproducible evidence rather than a description of clicks, and warns that a link is not an access grant."
+  }
+ ],
+ "recap": {
+  "title": "Audience, contract, two doors, one clock, a script",
+  "markdown": "**A page is worth building only when an audience makes a decision from it.** Write the decision chain first, then label every tile so it can be read aloud as a sentence: unit, period, denominator, axis and freshness. Bind each tile to one metric contract, so the plant figure is a ratio of sums and an empty line says no inspections. Filters narrow returned rows; parameters rewrite the query. The page door (Can View to Can Manage) and the data door (table privileges) are separate, and the publish-time choice decides whose grants run the queries: Cinderline runs each viewer's own, and a shared publisher is only ever a least-privilege service principal. A refresh cannot make data newer than the job that published it, so put it after the job and say freshness in words. A metric view holds the contract in the catalog; Genie One is where business users read the page; Power BI, Tableau and ODBC or JDBC clients read the warehouse, not the page. An acceptance script with outside values and signers is the proof. **Transfer challenge:** redraw the schematic dashboard for a hospital's morning bed-occupancy huddle, naming the contract's denominator, the not-updated wording and the one access-matrix row that would leak patient-level rows if the page were published from the wrong identity.",
+  "visualId": "dbxfe-bi-labels-visual"
+ },
+ "appliedTask": {
+  "title": "The South plant joins the morning page",
+  "prompt": "Cinderline's South plant adopts the morning page. Its nightly job usually finishes around 04:40 plant local time, its supervisors meet at 7:00, its three lines report to the same unit_defect_rate contract, and its quality stewards must not see North's quarantine rows. The finance controller also wants South's rate in an existing Power BI report refreshed in Import mode. Write the decision chain, the freshness statement in both states, the access-matrix rows that change, how the plant and two-plant figures are computed, the refresh order, four acceptance rows with their source and signer, and what the Power BI report needs that the page does not give it.",
+  "modelAnswer": "Decision chain: South supervisors at 7:00 choose which of their three lines to investigate first; action, send a technician and open that line's excluded inspections; metric, unit_defect_rate v1 per line, previous business day. Freshness: \"Covers Tuesday. Published 06:05. Restated days are marked.\"; late: \"Not updated: showing Monday. See the operator note.\" Access: a south-reporting group with Can View and SELECT on South's accepted rows only; south-stewards with SELECT on South's quarantine only; the page stays under individual data permissions, so each group's own grants decide and North's groups gain nothing. Figures: South is the sum of South's defective units over the sum of its inspected units; any two-plant figure is sums over sums, never a mean of plant rates; both come from the metric view. Refresh: a dashboard task after South's publishing task, since a single 06:30 schedule would miss the 7:00 meeting on a late night. Acceptance rows from South's reconciliation sheet: one line value, the South plant value, an empty line reading no inspections, and the North steward identity refused South's quarantine link, signed by the South analyst, quality lead and security lead. Power BI: its own connection identity with SELECT on the accepted view only, its own freshness caption from the semantic model's refresh time, a refresh scheduled after the job, the measure re-expressed or read from the metric view by SQL, and its own acceptance row, because none of the page's permissions, filters or freshness travel.",
+  "reasoning": "The answer changes only what South changes, the time, the audience, the grants and the order, and keeps the contract, the empty rule and the ratio-of-sums rule fixed. It treats Power BI as a second page with its own identity, freshness and acceptance rather than as a copy of the first.",
+  "beatIds": [
+   "dbxfe-bi-decision",
+   "dbxfe-bi-binding",
+   "dbxfe-bi-permissions",
+   "dbxfe-bi-credentials",
+   "dbxfe-bi-freshness",
+   "dbxfe-bi-refresh",
+   "dbxfe-bi-external",
+   "dbxfe-bi-acceptance"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-bi-scenario"
+ ]
+}
