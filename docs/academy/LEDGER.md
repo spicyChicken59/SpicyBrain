@@ -50,6 +50,6 @@ distinguishes **authored** (files exist), **integrated** (registered in
 | 2026-09-23 | Engine: two-tier catalog lazy loading | in progress (agent) | no | no | no | design in agent brief; SCALE.md expected |
 | 2026-09-23 | Labs L02, L03 (retained A3); L06, L10 (retained B3) | in progress (agents) | no | no | no | |
 | 2026-09-23 | Field guides FG01–FG16, FG17–FG32 | in progress (agents) | no | no | no | |
-| 2026-09-23 | Eight case analyses + crosswalk | in progress (agent) | no | no | no | search-level evidence only |
+| 2026-09-23 | Eight case analyses + crosswalk | yes (17 files) | no | shape + refs | pending editorial | search-level evidence only; publishedAt unknown for all eight |
 | 2026-09-23 | Capstones: Cinderline deepening, service knowledge, coexistence | in progress (agents) | no | no | no | fragments under `content/courses/dbxfe/capstones/` |
 | 2026-09-23 | Retained-module deepening (cards ≥10, Samajh ≥2, windows beat, adoption) | in progress (agent) | no | no | no | |
