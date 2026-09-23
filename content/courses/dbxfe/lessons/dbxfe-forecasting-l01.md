@@ -8,7 +8,7 @@ Bring the habits from [Start ML with a baseline and a valid target](#/lesson/dbx
 
 <!-- section:dbxfe-forecasting-l01-horizon -->
 
-A forecast is made at an **origin**, the last day whose data may be used, for a **horizon** of steps. Cinderline plans rosters on Friday for Saturday to Friday: origin Friday, steps 1 to 7. Each input must exist at the origin for every step it feeds: units seven or fourteen days back and the published calendar qualify, yesterday's units only for step 1, the target day's run hours never.
+A forecast is made at an **origin**, the last day whose data may be used, for a **horizon** of steps. Cinderline sets rosters at 23:00 on Friday, once the night shift's count is posted, for Saturday to Friday: origin Friday, steps 1 to 7. Each input must exist at the origin for every step it feeds: units seven or fourteen days back and the published calendar qualify, yesterday's units only for step 1, the target day's run hours never.
 
 Two baselines need no fitting. The **naive** forecast repeats Friday's 409 units for every day, 240 units wrong on the one-shift Saturday. The **seasonal naive** forecast repeats the same weekday last week, following L4's weekly seasonality:
 

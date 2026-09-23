@@ -25,7 +25,7 @@ The **request contract** is the signature made external, enforced in two layers.
 
 <!-- section:dbxfe-serving-l01-capacity -->
 
-**Provisioned concurrency** counts requests in flight; the documentation estimates the need as queries per second times model execution time. The station's 0.05 requests per second at 41 ms need 0.002 units of a Small endpoint's 4 (as read at search time). The planner's 3,000 parts at 60 per second and 80 ms would offer 4.8 units to 4: capacity is 50 per second, so a backlog of about 500 builds over the 50-second burst and station requests wait seconds. Scale to zero drops the floor to zero after 30 minutes idle; the next request waits for a cold start, usually ten to twenty seconds, sometimes minutes, with no SLA, so this endpoint stays provisioned. **Automatic feature lookup** fetches `line_defect_rate_8h` and `supplier_lot_reject_rate_30d` from an online store by key. A key the store lacks returns a null the model imputes, and the endpoint answers 200: a silent skew.
+**Provisioned concurrency** counts requests in flight; the documentation estimates the need as queries per second times model execution time. The station's 0.05 requests per second at 41 ms need 0.002 units of a Small endpoint's 4 (as read at search time). The planner's 3,000 parts at 60 per second and 80 ms would offer 4.8 units to 4: capacity is 50 per second, so a backlog of about 500 builds over the 50-second burst and station requests wait seconds. Scale to zero drops the floor to zero after 30 minutes idle; the next request waits for a cold start, usually ten to twenty seconds, sometimes minutes, with no SLA, so this endpoint stays provisioned. **Automatic feature lookup** fetches `line_defect_rate_8h` and `supplier_lot_reject_rate_30d` from an online store by key. A key the store lacks returns a null the model imputes, and the endpoint answers 200: a silent skew. Imputing zero there breaks the features module's missingness policy; an explicit no-score that the station handles by a written rule is the safer contract.
 
 <!-- section:dbxfe-serving-l01-release -->
 
@@ -45,7 +45,7 @@ Classify an **incident** by the layer that produced its evidence: endpoint healt
 
 <!-- section:dbxfe-serving-l01-example -->
 
-The contract test is local and **NOT executed in this build**; it calls no endpoint. It wraps the version's signature around a constant stand-in and sends JSON through open-source MLflow's request handler, testing the contract, not the model.
+The contract test is local and **NOT executed in this build**; it calls no endpoint and needs no workspace credentials once the version's model directory has been downloaded. It wraps the version's signature around a constant stand-in and sends JSON through open-source MLflow's request handler, testing the contract, not the model.
 
 ```python
 # contract_test.py -- local, NOT executed here
@@ -54,8 +54,11 @@ import mlflow
 from mlflow.exceptions import MlflowException
 from mlflow.pyfunc import scoring_server
 
-URI = "models:/cinderline.ml.defect_risk/8"
-SIGNATURE = mlflow.models.get_model_info(URI).signature  # reads the MLmodel file only
+# A local copy of version 8's model directory, downloaded once by someone with workspace
+# access: mlflow.artifacts.download_artifacts("models:/cinderline.ml.defect_risk/8",
+# dst_path="defect_risk_v8") after mlflow.set_registry_uri("databricks-uc").
+MODEL_DIR = "defect_risk_v8"
+SIGNATURE = mlflow.models.get_model_info(MODEL_DIR).signature  # reads the MLmodel file only
 
 class Twin(mlflow.pyfunc.PythonModel):
     def predict(self, context, model_input, params=None):

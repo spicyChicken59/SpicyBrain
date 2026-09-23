@@ -38,9 +38,9 @@ A run is **reproducible from its record** when its parameters, training data and
 
 A logged model is a directory whose `MLmodel` file lists its **flavors**: `python_function`, the generic interface MLflow's tools load, and a library flavor such as `sklearn`. MLflow 3.16.1 saved the lab's pipeline as `model.skops` by default and wrote `requirements.txt`, `python_env.yaml` and `conda.yaml` pinning the **environment** that loads it.
 
-A **signature** names six `double` inputs and `fault_next_24h` as a `long` output. Loading as `python_function` enforces it before the model runs; loading with the native flavor does not. A versioned **model contract** adds what the signature leaves out: no unexpected inputs, the output clause, thresholds and required evidence.
+A **signature** names six `double` inputs and `fault_next_24h` as a `long` output. Loading as `python_function` enforces it before the model runs; loading with the native flavor does not. A versioned **model contract** adds what the signature leaves out: no unexpected inputs, the output clause, thresholds and required evidence. The contract is checked against a candidate's logged signature at promotion, so its column below is a model logged from the drifted frame; it never sees a request, and refusing an extra column in a request needs a check in front of `predict`.
 
-| drift | pyfunc enforcement | contract 1.0.0 |
+| drift | pyfunc enforcement (a request) | contract 1.0.0 (a signature logged from that frame) |
 |---|---|---|
 | `humidity_pct` renamed | error: missing input | missing and unexpected input |
 | `door_cycles` as int64 | error: unsafe conversion | type mismatch |
@@ -57,7 +57,7 @@ A **registered model** holds numbered **versions**, each with lineage to the run
 2. Thresholds, only for runs that passed: recall ≥ 0.75, precision ≥ 0.2, at most 2.0 warnings a day.
 3. Register only the run decided `promote-candidate`, tag the version with the contract version and the run, move the alias, and write every run's reasons to a decision file.
 
-Promotion here deploys nothing.
+Promotion here deploys nothing. Days 85–120 both choose between C = 1 and C = 0.01 and supply the numbers the decision quotes, so they act as the selection (validation) period: confirm the frozen candidate on a later, untouched period before quoting its recall as an estimate.
 
 <!-- section:dbxfe-mlflow-l01-managed -->
 
@@ -95,7 +95,7 @@ Evidence before metrics. `split=random` puts days before the end of training int
 - Logging only the chosen columns as the dataset, so two feature sets look like different data.
 - Treating a digest as a quality check; it fingerprints rows, in MLflow 3.16.1 at most the first 10,000.
 - Calling a run with an unseeded random split reproducible.
-- Expecting pyfunc enforcement to stop an extra column; it ignores it.
+- Expecting pyfunc enforcement to stop an extra column; it ignores it, and a contract check on logged signatures does not see requests either.
 - Loading with the native flavor and assuming the signature was enforced.
 - Treating an alias as a deployment, or carrying stages into Unity Catalog, which does not support them.
 

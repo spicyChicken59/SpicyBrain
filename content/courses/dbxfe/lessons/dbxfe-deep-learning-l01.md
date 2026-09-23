@@ -84,24 +84,24 @@ On *CUDA out of memory*, shrink the batch or accumulate gradients first; mixed p
 
 <!-- section:dbxfe-deep-learning-l01-scaling -->
 
-"Make the model better" hides two requests. Fine-tuning continues training a model on your examples, so its weights change: format, tone, task pattern and vocabulary move. Retrieval leaves the weights alone and puts relevant passages into the input at inference, so what the model can cite changes when the index is rebuilt. Weekly bulletins fit retrieval: facts change and need citations. A fixed output format fits a prompt first, fine-tuning only after a measured gap. Databricks documents Foundation Model Fine-tuning as deprecated, removal scheduled for 14 August 2026, and points to AI Runtime.
+"Make the model better" hides two requests. Fine-tuning continues training a model on your examples, so its weights change: format, tone, task pattern and vocabulary move. Retrieval leaves the weights alone and puts relevant passages into the input at inference, so what the model can cite changes when the index is rebuilt. Weekly bulletins fit retrieval: facts change and need citations. A fixed output format fits a prompt first, fine-tuning only after a measured gap. Databricks documents Foundation Model Fine-tuning as deprecated; its removal was scheduled for 14 August 2026, before this review, so check whether any part remains available. The documentation points to AI Runtime.
 
-Data parallelism splits the work: every worker holds a full model copy and a different slice of the batch, an all-reduce averages their gradients, and every copy applies the same update. PyTorch's DistributedDataParallel synchronizes gradients during the backward pass; TorchDistributor launches such jobs as Spark jobs. The exchange costs about one gradient's bytes per step, so the documentation prefers one node with four GPUs to four one-GPU workers.
+Data parallelism splits the work: every worker holds a full model copy and a different slice of the batch, an all-reduce averages their gradients, and every copy applies the same update. After an initial broadcast so every copy starts identical, only gradients travel each step. PyTorch's DistributedDataParallel synchronizes gradients during the backward pass; TorchDistributor launches such jobs as Spark jobs. The exchange costs about one gradient's bytes per step, so the documentation prefers one node with four GPUs to four one-GPU workers.
 
 <!-- section:dbxfe-deep-learning-l01-platform -->
 
 Three documented routes reach GPUs. **GPU-enabled compute**: the Machine learning checkbox, a GPU instance type as worker, optionally Single node, and Photon off, because Photon does not support GPU instance types. **AI Runtime**: serverless GPU with an A10 or H100 accelerator chosen for a notebook; single-node use was Public Preview and multi-GPU training Beta when read. **Distributors** in Databricks Runtime ML: TorchDistributor, DeepSpeed and Ray. A single-node GPU cluster is typically fastest and most cost-effective for development.
 
-First ask whether a simpler model, or no model, meets the evidence. **Synthetic** held-out recall at 5% false alarms: an amplitude rule 55%, at no running cost; gradient-boosted trees on forty hand features 78%, on CPU; a one-dimensional CNN on raw audio 83%, after unpriced GPU hours. The CNN earns its place only if the extra defects caught, priced per miss, exceed the GPU and upkeep cost.
+First ask whether a simpler model, or no model, meets the evidence. **Synthetic** held-out recall at 5% false alarms: an amplitude rule 55%, at no running cost; gradient-boosted trees on forty hand features 78%, on CPU; a two-dimensional CNN on the clips' (64, 126) spectrograms 83%, after unpriced GPU hours. The CNN earns its place only if the extra defects caught, priced per miss, exceed the GPU and upkeep cost.
 
 <!-- section:dbxfe-deep-learning-l01-design -->
 
-Designed before any GPU is requested: a weld clip becomes a `(64, 126)` spectrogram, a batch `(32, 1, 64, 126)`.
+Designed before any GPU is requested: a weld clip becomes a `(64, 126)` spectrogram, a batch `(32, 1, 64, 126)`, the `(N, C, H, W)` input a 2-D CNN (`Conv2d`) takes; a 1-D CNN (`Conv1d`) would need `(32, 64, 126)`, the 64 frequency bins as channels.
 
 | step | status | evidence |
 |---|---|---|
 | CPU smoke test, 512 clips | planned first | shapes, one loss, one step |
-| single-node GPU, MLflow autolog | **NOT EXECUTED** | epoch time, recall |
+| single-node GPU, metrics logged per epoch | **NOT EXECUTED** | epoch time, recall |
 | same node, several GPUs | **NOT EXECUTED**; if epoch time limits | epoch time vs one GPU |
 | TorchDistributor across nodes | **NOT EXECUTED**; if a node is outgrown | step time vs one node |
 | compare to trees | after the first GPU run | priced recall gain |
@@ -109,15 +109,21 @@ Designed before any GPU is requested: a weld clip becomes a `(64, 126)` spectrog
 ```python
 # NOT EXECUTED in this build. Needs GPU-enabled compute (ML runtime,
 # GPU instance type, Photon off) or AI Runtime (Public Preview; verify).
-import torch, mlflow
-mlflow.autolog()
-model = Net().to("cuda")              # 1-D CNN defined elsewhere
+import time, torch, mlflow
+model = Net().to("cuda")              # 2-D CNN (Conv2d) defined elsewhere
 opt = torch.optim.Adam(model.parameters(), lr=1e-3)
-for X, y in loader:                   # X: (32, 1, 64, 126), y: (32,)
-    loss = torch.nn.functional.binary_cross_entropy_with_logits(
-        model(X.to("cuda")).squeeze(1), y.to("cuda"))
-    opt.zero_grad(); loss.backward(); opt.step()
+with mlflow.start_run():
+    for epoch in range(epochs):
+        start = time.time()
+        for X, y in loader:           # X: (32, 1, 64, 126), y: (32,) integer labels
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(
+                model(X.to("cuda")).squeeze(1), y.float().to("cuda"))  # the loss needs a float target
+            opt.zero_grad(); loss.backward(); opt.step()
+        mlflow.log_metric("epoch_seconds", time.time() - start, step=epoch)
+        mlflow.log_metric("val_recall", val_recall(model), step=epoch)  # defined elsewhere
 ```
+
+`mlflow.autolog()` is full only for PyTorch Lightning; for a plain loop like this it records just TensorBoard `SummaryWriter` scalars, with no notion of an epoch, so the loop logs the stop rule's evidence itself.
 
 Stop if recall does not clear the priced threshold above the trees. Unknown: instance availability, AI Runtime status, quota, pricing, cost of a miss.
 
