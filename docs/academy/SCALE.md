@@ -21,7 +21,9 @@ guide and case under `public/teaching/bodies/<id>.json`, fetched on demand,
 Zod-validated and identity-checked against the catalog before it is cached
 (`src/bodies.ts`, `src/catalog.ts`). Extension-card text stays inside each
 module's JSON, which the index references by `{id, revision, lessonId,
-sectionId, beatId}`.
+sectionId, beatId}`. (That was the first split. At 48 modules the source,
+claim, concept and rubric-level text moved again, into the reference tier and
+the bodies: see "The reference tier" below.)
 
 ## Sizes at 16 modules
 
@@ -30,17 +32,17 @@ the same content inputs for the initial bundle and the generated catalog
 files (other content files were being edited concurrently, which is why the
 lazy module and search totals differ slightly between the two rows).
 
-| Artifact                                  |  Before (raw) | Before (gzip) |  After (raw) | After (gzip) |
-| ----------------------------------------- | ------------: | ------------: | -----------: | -----------: |
-| `dist/assets/index-*.js` (initial JS)     |     1,384,441 |       363,613 |  **916,247** |  **226,797** |
-| `dist/assets/index-*.css`                 |       130,115 |        24,460 |      130,115 |       24,460 |
-| `src/generated/catalog.json` (inlined)    |       598,464 |       143,785 |      212,215 |       31,260 |
-| `src/generated/teaching-index.json`       |       173,018 |        41,636 |       84,529 |       14,951 |
-| `src/generated/paths.json` (inlined)      |        10,099 |         2,744 |       10,099 |        2,744 |
-| `public/teaching/bodies/*.json` (56 files) |             0 |             0 |      454,722 |      164,715 |
-| `public/teaching/<course>-<module>.json`  |     1,012,185 |       256,817 |    1,038,364 |      264,859 |
-| `public/teaching/search.json`             |       786,975 |       210,069 |      798,697 |      214,283 |
-| `public/teaching/media.json`              |        43,370 |        10,489 |       43,370 |       10,489 |
+| Artifact                                   | Before (raw) | Before (gzip) | After (raw) | After (gzip) |
+| ------------------------------------------ | -----------: | ------------: | ----------: | -----------: |
+| `dist/assets/index-*.js` (initial JS)      |    1,384,441 |       363,613 | **916,247** |  **226,797** |
+| `dist/assets/index-*.css`                  |      130,115 |        24,460 |     130,115 |       24,460 |
+| `src/generated/catalog.json` (inlined)     |      598,464 |       143,785 |     212,215 |       31,260 |
+| `src/generated/teaching-index.json`        |      173,018 |        41,636 |      84,529 |       14,951 |
+| `src/generated/paths.json` (inlined)       |       10,099 |         2,744 |      10,099 |        2,744 |
+| `public/teaching/bodies/*.json` (56 files) |            0 |             0 |     454,722 |      164,715 |
+| `public/teaching/<course>-<module>.json`   |    1,012,185 |       256,817 |   1,038,364 |      264,859 |
+| `public/teaching/search.json`              |      786,975 |       210,069 |     798,697 |      214,283 |
+| `public/teaching/media.json`               |       43,370 |        10,489 |      43,370 |       10,489 |
 
 The initial JavaScript shrank by 468,194 B raw (−33.8%) and 136,816 B gzip
 (−37.6%). The bundle shrank by almost exactly the raw bytes removed from the
@@ -74,15 +76,15 @@ made when the view opens (the first row includes the document, script,
 stylesheet, fonts and icons; later rows are hash navigations within the
 same document, so they list only what the view itself fetched).
 
-| View                                                       | Requests | Teaching files fetched                                                          |
-| ---------------------------------------------------------- | -------: | ------------------------------------------------------------------------------- |
-| Today (`#/`)                                               |       10 | none                                                                            |
-| Course map (`#/course/dbxfe`)                              |        1 | none                                                                            |
-| One lesson (`#/lesson/dbxfe-m01-l01`)                      |        3 | `bodies/dbxfe-m01-l01.json`                                                     |
-| One module beat (`#/module/dbxfe-delta/<beat>`)            |        4 | `dbxfe-dbxfe-delta.json`, `bodies/dbxfe-m03-l02.json`, `media.json`             |
-| Practice page (`#/practice/dbxfe-m02-scenario`)            |        2 | `bodies/dbxfe-m02-scenario.json`                                                |
-| Review page (`#/review`)                                   |        1 | none (due counts come from the catalog tier)                                    |
-| Review session (introduce 3 new cards)                     |        1 | `bodies/dbxfe-m03-l01.json` (one lesson body per lesson in the session pool)    |
+| View                                            | Requests | Teaching files fetched                                                       |
+| ----------------------------------------------- | -------: | ---------------------------------------------------------------------------- |
+| Today (`#/`)                                    |       10 | none                                                                         |
+| Course map (`#/course/dbxfe`)                   |        1 | none                                                                         |
+| One lesson (`#/lesson/dbxfe-m01-l01`)           |        3 | `bodies/dbxfe-m01-l01.json`                                                  |
+| One module beat (`#/module/dbxfe-delta/<beat>`) |        4 | `dbxfe-dbxfe-delta.json`, `bodies/dbxfe-m03-l02.json`, `media.json`          |
+| Practice page (`#/practice/dbxfe-m02-scenario`) |        2 | `bodies/dbxfe-m02-scenario.json`                                             |
+| Review page (`#/review`)                        |        1 | none (due counts come from the catalog tier)                                 |
+| Review session (introduce 3 new cards)          |        1 | `bodies/dbxfe-m03-l01.json` (one lesson body per lesson in the session pool) |
 
 A module workspace loads its module and the bodies of its owned lessons,
 plus any lesson whose check a beat reuses, in parallel. A review session
@@ -163,3 +165,106 @@ parser. It parses each lesson section, scenario text and lab, guide or case
 body once per build, about 0.6 ms a body (`validateCourses` over 26 modules:
 30 ms before, 370 ms after on a first call; repeated calls on the same text
 reuse the parse).
+
+## The reference tier: the second split (48 modules, measured 2026-09-23)
+
+The projection above was right. Measured at `7640e9f`, with all 48 modules, 24 labs, 32 guides,
+8 cases and 3 capstones registered, `npm run measure:bundle` measured the
+initial JavaScript at **2,213,006 B raw and 476,565 B gzip**:
++59.8% over the 1,384,441 B baseline, against the 15% ceiling of
+1,592,107 B. The inline catalog alone was 1,195,400 B. Gate G21 failed, and
+this split is its correction.
+
+What was in the catalog, measured by serialized size of each field:
+
+| Field (all 48 modules)                             | Raw bytes |
+| -------------------------------------------------- | --------: |
+| Course `sources` (caveat, context, URL, publisher) |   238,855 |
+| Lesson sections' `claimIds` and `conceptIds`       |   124,654 |
+| Course `claims` (description, context, sources)    |   131,182 |
+| Scenario `rubric`, `requirements`, `claimIds`      |   107,437 |
+| Course glossary `concepts` (definition, aliases)   |    95,534 |
+
+Nothing on Today, the course map, the lab shelf, a guide list or the Review
+page reads any of these. They are read only by views that already fetch a
+lazy file: a lesson's Sources panels, a practice page, a module workspace
+(its glossary popovers, card topics and Sources), and a case analysis.
+
+What moved where:
+
+- **Reference tier, new.** One `public/teaching/references/<course-id>.json`
+  per course holds the course's full `sources`, `claims` and glossary
+  `concepts`, in catalog order. The catalog keeps only their `{id}`, which
+  runtime validation of a module still resolves against. The file is
+  schema-validated and must carry exactly the catalog's identities in the
+  same order, so a file from another course version is refused. It is
+  promise-cached per document, and a failed load is evicted so Retry fetches
+  again (`createReferenceLoader`, `src/bodies.ts`).
+- **Lesson bodies** now carry `sectionClaims` (section id → claim ids), checked
+  against the catalog's section ids like the Markdown. The runtime never read
+  a section's `conceptIds`, so the build validates them and the catalog drops
+  them.
+- **Scenario bodies** now carry `requirements`, the rubric's level
+  descriptions and `claimIds`. The catalog keeps each rubric dimension's id
+  and criterion, because saved self-assessments are keyed by those ids and
+  are named by them even when a body fails to load. A body must carry
+  exactly the catalog's rubric and cite only the course's claims, or it is
+  refused. The practice page shows the requirements, the rubric form and its
+  Sources once the body has loaded, with a hint until then.
+- **Card text never needs the reference tier.** A review session loads lesson
+  bodies and, for extension cards, their modules, and a failed reference
+  file blocks none of its prompts.
+
+When the reference file is fetched:
+
+| View              | Reference request                                                                 |
+| ----------------- | --------------------------------------------------------------------------------- |
+| Today, course map | none                                                                              |
+| Lesson            | none on open; one when a _Sources & context_ panel is first opened (then cached)  |
+| Practice          | none on open; one when its Sources panel is first opened                          |
+| Module workspace  | one, beside the module file, awaited with it (glossary popovers need definitions) |
+| Handbook          | one, beside its modules                                                           |
+| Review session    | none                                                                              |
+| Case analysis     | one, for its source list                                                          |
+
+The file is 548,817 B raw and 110,693 B gzip, about four average module
+files, and is fetched at most once per document.
+
+Before is `7640e9f`; after is `09cba75`, the same content plus the editorial fixes (a scenario and some text; the index grows by 377 B) and the review's fixes, which put each rubric dimension's id and criterion back in the catalog (+15 KB).
+
+| Artifact                                | Before (raw) | Before (gzip) |   After (raw) | After (gzip) |
+| --------------------------------------- | -----------: | ------------: | ------------: | -----------: |
+| `dist/assets/index-*.js` (initial JS)   |    2,213,006 |       476,565 | **1,477,751** |  **337,148** |
+| `src/generated/catalog.json` (inlined)  |    1,195,400 |       218,770 |       456,328 |       78,627 |
+| `src/generated/teaching-index.json`     |      370,381 |        69,824 |       370,758 |       70,007 |
+| `public/teaching/references/dbxfe.json` |            0 |             0 |       548,817 |      110,693 |
+
+The initial JavaScript is now **+6.7% over the baseline raw** (ceiling
++15%) and **−7.3% against the baseline's 363,613 B gzip**. The margin under
+the ceiling is 114,356 B. The inline tier that remains is the catalog's
+identities, titles, mappings, counts, card and question references and rubric
+dimension names, plus the teaching index, which the course map, Today, Review
+and resumption read.
+
+Checked by `tests/catalog-split.test.ts`:
+
+- the catalog's sources, claims and concepts are `{id}` only;
+- sections carry no Markdown, claims or concepts;
+- scenarios carry no requirements or claims, and each rubric dimension only
+  its id and criterion;
+- none of that text appears in the serialized catalog;
+- the bodies and the reference file reconstruct the full content;
+- a body with another rubric, or citing a claim the catalog lacks, is
+  refused;
+- the reference loader refuses another course version, a malformed file and
+  failed requests, evicts each, serves one cached copy and tells waiting
+  panels only when a load succeeds.
+
+`tests/browser/lazy-bodies.spec.ts` records each view's requests. A lesson
+fetches no reference file until a Sources panel opens, then exactly one. A
+module workspace fetches one, and a practice page none. With the reference
+file failing, a review session that includes extension cards still opens
+every prompt. A Retry in one Sources panel clears the alert in every panel
+and keeps focus on the panel's summary. A failed practice body shows no
+rubric form, only a hint, and a saved self-assessment is still named by its
+criteria.
