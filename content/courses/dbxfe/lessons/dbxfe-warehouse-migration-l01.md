@@ -43,7 +43,9 @@ Classify every difference as loud at compile, loud at run time, or silent. The s
 -- Basalt (fictional): 7 / 2 = 3; 5 / 0 = NULL; NULLs sort last
 -- Spark 4.0: / is floating point (3.5); ANSI mode raises on 5 / 0;
 -- ascending sorts put NULLs first unless NULLS LAST is written
-SELECT plant, defects * 100 div inspected AS pct_truncated
+SELECT plant,
+       CASE WHEN inspected = 0 THEN NULL          -- div also raises on 0 under ANSI
+            ELSE defects * 100 div inspected END AS pct_truncated
 FROM quality_day
 ORDER BY reject_code ASC NULLS LAST;
 ```
@@ -98,7 +100,7 @@ A strong answer:
 - Gives the Snowflake supplier analytics one disposition and one driver; coexistence by federation or sharing is defensible once its connector and security review are verified.
 - Bridges the finance view whenever its producer moves in a different wave from it.
 - Fills Snowflake cells only from Snowflake's own current pages; its role model and export path stay unknown, with owners, until read.
-- Flags the move from Spark 3.1 to a current runtime (ANSI mode on by default since 4.0) and compares the placeholder dates, because files written by older engines may differ under the calendar change.
+- Flags the move from Spark 3.1 to a current runtime, where the engine risk is ANSI mode on by default since 4.0. No 1582 calendar rebase is expected for files Spark 3.1 wrote, because the calendar changed at 3.0; the 0001-01-01 placeholders need a before-and-after comparison only if the inventory finds files written by Spark 2.x or Hive.
 - Writes persona tests for Snowflake roles before mapping them.
 - Sets finance as class 1 and supplier analytics as class 2, and makes wave 1's exit test countable.
 

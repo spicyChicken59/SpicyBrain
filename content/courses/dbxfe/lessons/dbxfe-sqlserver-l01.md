@@ -24,7 +24,8 @@ The procedure's core lines, shown as text and never executed:
 SELECT DISTINCT i.plant_code, CAST(DATEADD(HOUR, -6, i.inspected_at) AS DATE) AS business_day
   INTO #affected_days
   FROM erp.inspection AS i
- WHERE i.updated_at > @since AND i.updated_at <= @until;
+ WHERE i.plant_code = @plant_code
+   AND i.updated_at > @since AND i.updated_at <= @until;
 -- LEFT JOIN erp.inspector AS s ON s.inspector_code = i.inspector_code AND s.plant_code = @plant_code
 -- defect_pct = s.units_defective * 100 / s.units_inspected
 ```

@@ -54,7 +54,7 @@ At 06:12 a quality lead reports that Line 3's 0.4% looks too good. Triage sorts 
 | Unavailable | Query history, warehouse state | Point readers to yesterday's export |
 | Stale | Run history, completeness gate | Keep the stale label; hold publish |
 | Wrong | Table history, recent changes, recount | Label under review; pause the writer |
-| Lost | Table history, retention, backups | Stop writers and VACUUM |
+| Lost | Table history, retention, backups | Stop writers; suspend VACUUM and other cleanup |
 
 A wrong figure used at the 06:00 review makes it severity 2, declared at 06:30. The timeline keeps facts (time and source) apart from hypotheses (label and test):
 

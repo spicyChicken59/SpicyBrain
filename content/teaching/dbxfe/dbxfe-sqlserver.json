@@ -566,7 +566,7 @@
     "dbxfe-sqlserver-source-ntz",
     "dbxfe-sqlserver-source-timezone"
    ],
-   "context": "Databricks SQL types and parameters; TIMESTAMP_NTZ was marked Public Preview when read."
+   "context": "Databricks SQL types and parameters; TIMESTAMP_NTZ is documented for Databricks SQL and Runtime 13.3 LTS and above, and the snippet read on 2026-09-23 marked it Public Preview, so check its release status for your workspace."
   },
   {
    "id": "dbxfe-sqlserver-claim-ansi",
@@ -1106,7 +1106,7 @@
    "title": "Same shape, different report",
    "alt": "Same shape, different report. The legacy report for 3 March beside the line-by-line translation's report, then the verdict of each reconciliation check.",
    "caption": "Six report rows on both sides, yet every check but the report row count fails. Values reflect Lab L24's local run on synthetic fixtures.",
-   "textEquivalent": "Legacy report, 3 March: What the procedure's rules produce: collation keys, the plant filter in ON, the server clock, integer division and exact money. Table columns: Shift, Inspections, Units, Defective, Rework cost, Defect %. Rows: DAY, 3, 300, 8, 8.35, 2 | NIGHT, 2, 120, 3, 2.90, 2 | UNASSIGNED, 2, 70, 5, 15.30, 7.\n\nLine-by-line translation, 3 March: The same day from code that compiles: binary keys, the filter moved to WHERE, a UTC day, fractional division and DOUBLE money. Table columns: Shift, Inspections, Units, Defective, Rework cost, Defect %. Rows: DAY, 1, 110, 3, 1.1, 2.727272727272727 | NIGHT, 2, 130, 3, 2.4000000000000004, 2.3076923076923075 | UNASSIGNED, missing, missing, missing, missing, missing.\n\nWhat each check says: Row counts alone would have passed; every other check names a defect. Table columns: Check, Result, Cause. Rows: Report row count, 6 = 6, pass, none visible | Keys, 1 missing, 1 extra, 4 changed, binary keys, WHERE filter, UTC day | Day totals, 3 of 3 days differ, rows dropped and moved | Nulls, inspector_code 1 → 0, NULL-key row dropped | Types, money and rate are DOUBLE, cast and fractional '/'.",
+   "textEquivalent": "Legacy report, 3 March: What the procedure's rules produce: collation keys, the plant filter in ON, the server clock, integer division and exact money. Table columns: Shift, Inspections, Units, Defective, Rework cost, Defect %. Rows: DAY, 3, 300, 8, 8.35, 2 | NIGHT, 2, 120, 3, 2.90, 2 | UNASSIGNED, 2, 70, 5, 15.30, 7.\n\nLine-by-line translation, 3 March: The same day from code that compiles: binary keys, the filter moved to WHERE, a UTC day, fractional division and DOUBLE money. Table columns: Shift, Inspections, Units, Defective, Rework cost, Defect %. Rows: DAY, 1, 110, 3, 1.1, 2.727272727272727 | NIGHT, 2, 130, 3, 2.4000000000000004, 2.3076923076923075 | UNASSIGNED, missing, missing, missing, missing, missing.\n\nWhat each check says: The report row count alone would have passed; the detail row count (11 vs 7) already fails, and every other check names a defect. Table columns: Check, Result, Cause. Rows: Report row count, 6 = 6, pass, none visible | Detail row count, 11 vs 7, fail, WHERE filter drops 4 unmatched rows | Keys, 1 missing, 1 extra, 4 changed, binary keys, WHERE filter, UTC day | Day totals, 3 of 3 days differ, rows dropped and moved | Nulls, inspector_code 1 → 0, NULL-key row dropped | Types, money and rate are DOUBLE, cast and fractional '/'.",
    "provenance": "Original SpicyBrain authored visual; synthetic fixtures; values reflect Lab L24's local Apache Spark 4.0.4 run on one machine; no SQL Server or Databricks execution.",
    "claimIds": [
     "dbxfe-sqlserver-claim-division",
@@ -1206,7 +1206,7 @@
     {
      "id": "checks",
      "title": "What each check says",
-     "explanation": "Row counts alone would have passed; every other check names a defect.",
+     "explanation": "The report row count alone would have passed; the detail row count (11 vs 7) already fails, and every other check names a defect.",
      "nodes": [],
      "connections": [],
      "table": {
@@ -1220,6 +1220,11 @@
         "Report row count",
         "6 = 6, pass",
         "none visible"
+       ],
+       [
+        "Detail row count",
+        "11 vs 7, fail",
+        "WHERE filter drops 4 unmatched rows"
        ],
        [
         "Keys",
@@ -2477,7 +2482,7 @@
    "title": "The business day belongs to a clock",
    "alt": "The business day belongs to a clock. Three rows assigned by the server clock, the same rows assigned in a UTC session where the cutoff moves to 01:00 local, and two Chicago rows that move when the intended plant-local rule is applied.",
    "caption": "Name the clock of every cutoff; a session default is not a business rule. Values reflect Lab L24's local run on synthetic fixtures.",
-   "textEquivalent": "Server clock rule: Local wall-clock time minus six hours: the cutoff is 06:00 in New York. Nodes: 02:10 on 3 March: Business day 2 March. (selected); 05:59:59.997 on 4 March: Business day 3 March. (selected); Cutoff 06:00 local: Server clock, America/New_York. (context); 06:00:00.000 on 4 March: Business day 4 March. (selected). Relationships: 02:10 on 3 March → 05:59:59.997 on 4 March: then; 05:59:59.997 on 4 March → Cutoff 06:00 local: before; Cutoff 06:00 local → 06:00:00.000 on 4 March: at.\n\nUTC session rule: The instant is right, but the date is taken in UTC: 06:00 UTC is 01:00 in New York in early March. Nodes: 02:10 local = 07:10Z: Moves to 3 March. (warning); 05:59:59.997 = 10:59Z: Moves to 4 March. (warning); Cutoff 01:00 local: Five hours early. (warning); 06:00 local = 11:00Z: Still 4 March. (selected). Relationships: Cutoff 01:00 local → 02:10 local = 07:10Z: before; 02:10 local = 07:10Z → 05:59:59.997 = 10:59Z: then; 05:59:59.997 = 10:59Z → 06:00 local = 11:00Z: then.\n\nPlant in Chicago: P2's rows are recorded on the New York server; 06:00 there is 05:00 in Chicago, so the plant-local rule moves two rows a day earlier. Nodes: 06:05 NY = 05:05 CT: Legacy 11 March; plant rule 10 March. (warning); 06:25 NY = 05:25 CT: Legacy 11 March; plant rule 10 March. (warning); 07:10 NY = 06:10 CT: 10 March either way. (selected). Relationships: 06:05 NY = 05:05 CT → 06:25 NY = 05:25 CT: then; 06:25 NY = 05:25 CT → 07:10 NY = 06:10 CT: then.",
+   "textEquivalent": "Server clock rule: Local wall-clock time minus six hours: the cutoff is 06:00 in New York. Nodes: 02:10 on 3 March: Business day 2 March. (selected); 05:59:59.997 on 4 March: Business day 3 March. (selected); Cutoff 06:00 local: Server clock, America/New_York. (context); 06:00:00.000 on 4 March: Business day 4 March. (selected). Relationships: 02:10 on 3 March → 05:59:59.997 on 4 March: then; 05:59:59.997 on 4 March → Cutoff 06:00 local: before; Cutoff 06:00 local → 06:00:00.000 on 4 March: at.\n\nUTC session rule: The instant is right, but the date is taken in UTC: 06:00 UTC is 01:00 in New York in early March. Nodes: 02:10 local = 07:10Z: Moves to 3 March. (warning); 05:59:59.997 = 10:59Z: Moves to 4 March. (warning); Cutoff 01:00 local: Five hours early. (warning); 06:00 local = 11:00Z: Still 4 March. (selected). Relationships: Cutoff 01:00 local → 02:10 local = 07:10Z: before; 02:10 local = 07:10Z → 05:59:59.997 = 10:59Z: then; 05:59:59.997 = 10:59Z → 06:00 local = 11:00Z: then.\n\nPlant in Chicago: P2's rows are recorded on the New York server; 06:00 there is 05:00 in Chicago, so the plant-local rule moves two 11 March rows a day earlier. Row 204, before 05:00 in Chicago, is 10 March under both rules. Nodes: 11 Mar 05:45 NY = 04:45 CT: 10 March either way. (selected); 11 Mar 06:05 NY = 05:05 CT: Legacy 11 March; plant rule 10 March. (warning); 11 Mar 06:25 NY = 05:25 CT: Legacy 11 March; plant rule 10 March. (warning). Relationships: 11 Mar 05:45 NY = 04:45 CT → 11 Mar 06:05 NY = 05:05 CT: then; 11 Mar 06:05 NY = 05:05 CT → 11 Mar 06:25 NY = 05:25 CT: then.",
    "provenance": "Original SpicyBrain authored visual; synthetic fixtures; values reflect Lab L24's local Apache Spark 4.0.4 run on one machine; no SQL Server or Databricks execution.",
    "claimIds": [
     "dbxfe-sqlserver-claim-ntz",
@@ -2585,36 +2590,36 @@
     {
      "id": "plant",
      "title": "Plant in Chicago",
-     "explanation": "P2's rows are recorded on the New York server; 06:00 there is 05:00 in Chicago, so the plant-local rule moves two rows a day earlier.",
+     "explanation": "P2's rows are recorded on the New York server; 06:00 there is 05:00 in Chicago, so the plant-local rule moves two 11 March rows a day earlier. Row 204, before 05:00 in Chicago, is 10 March under both rules.",
      "nodes": [
       {
+       "id": "r204",
+       "label": "11 Mar 05:45 NY = 04:45 CT",
+       "detail": "10 March either way.",
+       "status": "selected"
+      },
+      {
        "id": "r206",
-       "label": "06:05 NY = 05:05 CT",
+       "label": "11 Mar 06:05 NY = 05:05 CT",
        "detail": "Legacy 11 March; plant rule 10 March.",
        "status": "warning"
       },
       {
        "id": "r205",
-       "label": "06:25 NY = 05:25 CT",
+       "label": "11 Mar 06:25 NY = 05:25 CT",
        "detail": "Legacy 11 March; plant rule 10 March.",
        "status": "warning"
-      },
-      {
-       "id": "r201",
-       "label": "07:10 NY = 06:10 CT",
-       "detail": "10 March either way.",
-       "status": "selected"
       }
      ],
      "connections": [
       {
-       "from": "r206",
-       "to": "r205",
+       "from": "r204",
+       "to": "r206",
        "label": "then"
       },
       {
-       "from": "r205",
-       "to": "r201",
+       "from": "r206",
+       "to": "r205",
        "label": "then"
       }
      ]
@@ -3378,7 +3383,7 @@
    "version": "1.0.0",
    "title": "Code that compiles can still mean something else",
    "outcome": "Predict which reconciliation check catches each difference between a line-by-line translation and the legacy procedure.",
-   "explanation": "A line-by-line translation of sp_daily_inspections compiles on Spark and returns six report rows, exactly like the legacy job. [[dbxfe-sqlserver-equivalence-concept|Semantic equivalence]] asks a different question: the same rows and values on the same basis. Notice in the first two states how 3 March differs: DAY shrinks, UNASSIGNED disappears, rates gain decimals and money gains binary noise. The third state shows why evidence needs several checks: the report row count passes while keys, totals, nulls and types all fail.",
+   "explanation": "A line-by-line translation of sp_daily_inspections compiles on Spark and returns six report rows, exactly like the legacy job. [[dbxfe-sqlserver-equivalence-concept|Semantic equivalence]] asks a different question: the same rows and values on the same basis. Notice in the first two states how 3 March differs: DAY shrinks, UNASSIGNED disappears, rates gain decimals and money gains binary noise. The third state shows why evidence needs several checks: the report row count passes while the detail count, keys, totals, nulls and types all fail.",
    "lessonId": "dbxfe-sqlserver-l01",
    "sectionId": "dbxfe-sqlserver-l01-example",
    "conceptIds": [
@@ -3397,7 +3402,7 @@
     "dbxfe-sqlserver-semantic-question"
    ],
    "handbook": {
-    "markdown": "Syntax conversion rewrites text; semantic migration preserves behaviour. Lab L24 makes the difference executable. Its target and its naive translation share every line except five decisions:\n\n```python\nTARGET = Rules(key_rule=\"collation\", join_rule=\"on\", day_rule=\"server_local\",\n               division=\"integer\", amount_type=\"decimal\")\nNAIVE  = Rules(key_rule=\"binary\",    join_rule=\"where\", day_rule=\"session\",\n               division=\"fractional\", amount_type=\"double\")\n```\n\nEach naive choice is what a careful line-by-line reader would write: `==` for `=`, a filter gathered into one `where`, `to_date(ts - INTERVAL 6 HOURS)` for the DATEADD, `/` for `/`, and a DOUBLE for a number. Run on local Spark 4.0.4 against the same synthetic extract, the naive path keeps 7 of 11 detail rows, moves two to a later day, and still returns six report rows. Flipping one choice at a time assigns each defect to the check that owns it: binary keys fail only the keyed comparisons; the WHERE filter also fails the null count; the session day fails keys and totals; fractional division fails report values and types; DOUBLE money fails types and exact totals.\n\nWhen is a translation good enough? Only when every check passes on a stated basis, or every difference is registered and owned. A converter's 'zero errors' and equal row counts establish neither. To demonstrate this honestly, say what ran: local Spark with synthetic fixtures, and legacy results derived from the procedure text and the documented type behaviour, not from a SQL Server.",
+    "markdown": "Syntax conversion rewrites text; semantic migration preserves behaviour. Lab L24 makes the difference executable. Its target and its naive translation share every line except five decisions:\n\n```python\nTARGET = Rules(key_rule=\"collation\", join_rule=\"on\", day_rule=\"server_local\",\n               division=\"integer\", amount_type=\"decimal\")\nNAIVE  = Rules(key_rule=\"binary\",    join_rule=\"where\", day_rule=\"session\",\n               division=\"fractional\", amount_type=\"double\")\n```\n\nEach naive choice is what a careful line-by-line reader would write: `==` for `=`, a filter gathered into one `where`, `to_date(ts - INTERVAL 6 HOURS)` for the DATEADD, `/` for `/`, and a DOUBLE for a number. Run on local Spark 4.0.4 against the same synthetic extract, the naive path keeps 7 of 11 detail rows, moves two to a later day, and still returns six report rows. Flipping one choice at a time assigns each defect to the check that owns it: binary keys fail only the keyed comparisons; the WHERE filter fails row counts (9 of 11 detail rows, 5 of 6 report rows), keys, totals and the null count; the session day fails row counts (a seventh report row), keys and totals; fractional division fails report values and types; DOUBLE money fails report values, types and exact totals.\n\nWhen is a translation good enough? Only when every check passes on a stated basis, or every difference is registered and owned. A converter's 'zero errors' and equal row counts establish neither. To demonstrate this honestly, say what ran: local Spark with synthetic fixtures, and legacy results derived from the procedure text and the documented type behaviour, not from a SQL Server.",
     "sourceSectionIds": [
      "dbxfe-sqlserver-l01-example"
     ]
@@ -3428,7 +3433,7 @@
     "dbxfe-sqlserver-decompose-self"
    ],
    "handbook": {
-    "markdown": "Decompose along the procedure's real seams: selection, rules, writes and state. For the pilot that gives four functions, each with a test Lab L24 runs:\n\n```python\ndays = affected_days(spark, rows, \"P1\", since, until)      # [[\"P1\",\"2026-03-02\"], ...]\ndetail, report = build(spark, rows, \"P1\", TARGET, as_of=until, days=[d for _, d in days])\nstate[\"detail\"] = keep_other_days(state[\"detail\"]) + rows_of(detail)\nstate[\"report\"] = keep_other_days(state[\"report\"]) + rows_of(report)\nstate[\"watermark\"] = until                                  # last, after both writes\n```\n\nReplacing whole affected days is what the procedure's DELETE and INSERT did, and it makes retries idempotent. The procedure's MERGE never deletes a group that disappears after a correction; the target's day replacement does. No fixture exercises that difference, so it is written into the inventory as a known behaviour change to confirm with the report owner.\n\nOn Databricks the rebuild can use MERGE INTO on a Delta table, which fails with DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE when two source rows match one target row, or a replace of the affected partitions. Keep business rules (key normalization, the cutoff, the rate) in named functions so the same rule serves every step.\n\nWhen not to decompose: a procedure that only wraps one SELECT for a report can become a view or a single query. Decompose when the procedure mixes state, rules and writes, which is when a single translated block cannot tell you where a difference came from.",
+    "markdown": "Decompose along the procedure's real seams: selection, rules, writes and state. For the pilot that gives four steps, each with a test Lab L24 runs. The block is the core of `run_window()` in the lab's `solutions/migration.py`, with its empty-window guard, sorting and failure injection left out:\n\n```python\ndays = affected_days(spark, rows, \"P1\", since, until)      # [[\"P1\",\"2026-03-02\"], ...]\ndetail, report = build(spark, rows, \"P1\", TARGET, as_of=until, days=[d for _, d in days])\ntouched = {tuple(d) for d in days}\nkeep = lambda r: (r[\"plant_code\"], r[\"business_day\"]) not in touched\nstate[\"detail\"] = [r for r in state[\"detail\"] if keep(r)] + rows_of(detail, DETAIL_COLUMNS, detail_key)\nstate[\"report\"] = [r for r in state[\"report\"] if keep(r)] + rows_of(report, REPORT_COLUMNS, report_key)\nstate[\"watermark\"] = until                                  # last, after both writes\n```\n\nReplacing whole affected days is what the procedure's DELETE and INSERT did, and it makes retries idempotent. The procedure's MERGE never deletes a group that disappears after a correction; the target's day replacement does. No fixture exercises that difference, so it is written into the inventory as a known behaviour change to confirm with the report owner.\n\nOn Databricks the rebuild can use MERGE INTO on a Delta table, which fails with DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE when two source rows match one target row, or a replace of the affected partitions. Keep business rules (key normalization, the cutoff, the rate) in named functions so the same rule serves every step.\n\nWhen not to decompose: a procedure that only wraps one SELECT for a report can become a view or a single query. Decompose when the procedure mixes state, rules and writes, which is when a single translated block cannot tell you where a difference came from.",
     "sourceSectionIds": [
      "dbxfe-sqlserver-l01-decompose"
     ]
@@ -3565,7 +3570,7 @@
     "dbxfe-sqlserver-temp-self"
    ],
    "handbook": {
-    "markdown": "SQL Server offers local temporary tables (`#name`, one session, dropped with the session or the procedure that created them) and global ones (`##name`, visible to every session). Search the inventory for both prefixes and classify each object:\n\n| Object | Scope in the source | Target home |\n|---|---|---|\n| `#affected_days` | one procedure run | a DataFrame or temporary view inside the task |\n| `##line_handoff` | shared between two procedures | a named, owned table plus a task dependency |\n| a temporary table added for an index | one run, for speed | usually nothing: test whether the query needs it |\n\nOn Databricks, temporary views and temporary tables are session-scoped: a temporary table lives only in the session that created it and is dropped when that session ends (at most seven days). Two tasks in a job do not share that session, so neither can carry a handoff.\n\n```python\naffected = silver.where(changed_in_window).select(\"plant_code\", \"business_day\").distinct()\naffected.createOrReplaceTempView(\"affected_days\")   # visible inside this task only\n```\n\nA global temporary table is the migration's hidden coupling: sp_line_summary quietly depends on sp_sensor_rollup having run first in the same window. Making it a named table forces the questions the source never answered: who owns it, what its columns mean, how long it is kept, and what happens when the writer fails. What to inspect: tempdb-heavy procedures, objects created in one procedure and read in another, and reports that read a temporary table indirectly through a view.",
+    "markdown": "SQL Server offers local temporary tables (`#name`, one session, dropped with the session or the procedure that created them) and global ones (`##name`, visible to every session). Search the inventory for both prefixes and classify each object:\n\n| Object | Scope in the source | Target home |\n|---|---|---|\n| `#affected_days` | one procedure run | a DataFrame or temporary view inside the task |\n| `##line_handoff` | shared between two procedures | a named, owned table plus a task dependency |\n| a temporary table added for an index | one run, for speed | usually nothing: test whether the query needs it |\n\nOn Databricks, temporary views and temporary tables are session-scoped: a temporary table lives only in the session that created it and is dropped when that session ends (at most seven days). Two tasks in a job do not share that session, so neither can carry a handoff. Spark's global temporary views (the `global_temp` schema) span the sessions of one Spark application, but they vanish when it stops, tasks on separate job clusters run in separate applications, and they carry no owner or history, so they do not replace a named, owned table either.\n\n```python\naffected = silver.where(changed_in_window).select(\"plant_code\", \"business_day\").distinct()\naffected.createOrReplaceTempView(\"affected_days\")   # visible inside this task only\n```\n\nA global temporary table is the migration's hidden coupling: sp_line_summary quietly depends on sp_sensor_rollup having run first in the same window. Making it a named table forces the questions the source never answered: who owns it, what its columns mean, how long it is kept, and what happens when the writer fails. What to inspect: tempdb-heavy procedures, objects created in one procedure and read in another, and reports that read a temporary table indirectly through a view.",
     "sourceSectionIds": [
      "dbxfe-sqlserver-l01-semantics"
     ]

@@ -25,7 +25,7 @@ The delta makes the scope reviewable. It also exposes that a metric agreement an
 
 <!-- section:deeper -->
 
-Data copies create responsibilities: retention, deletion, sensitivity, synchronization, and reconciliation. A simplified diagram should state what it omits, such as detailed network routing or disaster-recovery configuration. Under the AWS teaching choice, classic/serverless compute boundaries must match the intended deployment. A conceptual sketch is not evidence that permissions, network paths, or production recovery have been configured.
+Data copies create responsibilities: retention, deletion, sensitivity, synchronization, and reconciliation. A simplified diagram should state what it omits, such as detailed network routing or disaster-recovery configuration. On AWS, the course's teaching cloud, say where compute runs: classic compute runs in the customer's own AWS account and network, beside its storage, while serverless compute runs in a serverless compute plane in the Databricks account and reaches customer storage from there. The network boundary, and therefore what a security review inspects and how the ERP source is reached, sits in a different place for each, so the sketch names the one the deployment uses; [D3 AWS](#/module/dbxfe-aws) teaches both. A conceptual sketch is not evidence that permissions, network paths, or production recovery have been configured.
 
 <!-- section:customer -->
 
