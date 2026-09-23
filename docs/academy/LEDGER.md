@@ -44,8 +44,6 @@ distinguishes **authored** (files exist), **integrated** (registered in
 | 2026-09-23 | Academy contract manifest `content/courses/dbxfe/academy.json` | yes | yes | — | — | 48 modules, 24 labs, 32 guides |
 | 2026-09-23 | Baseline browser walk of `main` build (16 routes × desktop/phone × dark/light) | yes | — | yes | — | `docs/academy/evidence/baseline/manifest.json`; fresh profile, synthetic only |
 | 2026-09-23 | `scripts/package-labs.py` deterministic lab packaging | yes | — | smoke | — | |
-| 2026-09-23 | Pilot module A4 `dbxfe-spark-execution` + lab L04 | in progress (agent) | no | no | no | |
-| 2026-09-23 | Module C2 `dbxfe-analytical-sql` + lab L12 | in progress (agent) | no | no | no | |
 | 2026-09-23 | Module D3 `dbxfe-aws` | yes | yes (registered) | academy-check PASS | spot-checked | 13 beats, 12 core, 4 ext, 4 Samajh |
 | 2026-09-23 | Engine: two-tier catalog lazy loading | yes | yes | unit 145, e2e 47, extension PASS (agent copy); clone re-validation in progress | — | initial JS 916,247 B raw / 226,797 B gzip; `docs/academy/SCALE.md` |
 | 2026-09-23 | Labs L02, L03 (retained A3); L06, L10 (retained B3) | yes | packaged, indexed; not yet in course.json | run-labs.py re-execution PASS (9/9/24/19) | — | |
@@ -56,4 +54,14 @@ distinguishes **authored** (files exist), **integrated** (registered in
 | 2026-09-23 | Wave 2 modules: B2+L05, B4+L08, B5+L07, A2+L01, C1+L11, C6+L13, E2+L18, E3+L17 | in progress (agents) | no | no | no | |
 | 2026-09-23 | Wave 3 modules: D4, D5, D6, C4, C5, E4, F5, F6 | in progress (agents) | no | no | no | |
 | 2026-09-23 | Engine: tracks course map, lab shelf, guides, cases, crosswalk, capstone notices | in progress (agent) | no | no | no | |
+| 2026-09-23 | Container restart (about 05:17 UTC); authoring resumed in four workflows (two authors each) plus the engine-views workflow | — | — | — | — | assignments in the integrator's scratch assignment file; partial work reused only where correct |
+| 2026-09-23 | Labs CI job (`package-labs --check`, per-runtime pins, `run-labs --from-zip`) | yes | yes | CI green at 34665ad | — | a relative-path defect found by CI and fixed |
+| 2026-09-23 | Gates: download identity (root + nested), public safety, original ZIP extracted and executed in CI | yes | yes | clean-clone PASS | — | public-safety test caught build-machine paths in two lab packages; fixed |
+| 2026-09-23 | Disposition check (`scripts/academy-disposition.py`) | yes | yes | 2,435 retained identities, 0 removed | — | 12 materially deepened retained beats versioned 1.1.0 |
+| 2026-09-23 | Reader: saved place kept above the first section (G16) | yes | yes | regression test fails without fix; flaky detour test 8/8 | — | found by an intermittent e2e failure |
+| 2026-09-23 | A2 `dbxfe-python` + L01 (36 tests) | yes | registered | academy-check PASS; lab from source and ZIP | pending | mutation check shipped in the package |
+| 2026-09-23 | A4 `dbxfe-spark-execution` + L04 (14 tests) | yes | registered | academy-check PASS; lab from source and ZIP | pending | adaptive build side varies; test accepts either |
+| 2026-09-23 | C2 `dbxfe-analytical-sql` + L12 (51 tests) | yes | registered | academy-check PASS; lab from source and ZIP | pending | |
+| 2026-09-23 | E2 `dbxfe-features` + L18 (25 tests) | yes | registered | academy-check PASS; lab from source and ZIP | pending | |
+| 2026-09-23 | G5 `dbxfe-lakebase` + L23 (18 tests, platform guide on local PostgreSQL 16) | yes | registered | academy-check PASS; lab from source and ZIP | pending | ten Lakebase steps recorded as not executed |
 | 2026-09-23 | Registration policy | — | — | — | — | teaching JSON is auto-discovered, so a module is committed only together with its `course.json` registration; guides/cases/labs/capstones register once every linked module exists |
