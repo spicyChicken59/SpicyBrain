@@ -109,6 +109,28 @@
       "context": "Apache Spark primary API reference identifies PySpark 4.2.0 on 2026-09-20. APIs predate the unchanged Spark 4.0.4 exercise pin; these additional examples are hand-worked, not newly executed.",
       "caveat": "The operation changes output grain; a null placeholder is not a known list element. API dates to 2.3.",
       "reviewedEvidence": "explode_outer emits a row per array/map element and emits a null result for empty or null input, unlike ordinary explode."
+    },
+    {
+      "id": "dbxfe-transformations-source-window",
+      "title": "Window Functions - Spark 4.2.0 Documentation",
+      "url": "https://spark.apache.org/docs/latest/sql-ref-syntax-qry-select-window.html",
+      "publisher": "Apache Spark",
+      "reviewedAt": "2026-09-23",
+      "publishedAt": null,
+      "context": "Apache Spark SQL reference, latest (4.2.0 at review); the lesson’s pinned local Spark is 4.0.4, so confirm behaviour there before quoting a result.",
+      "caveat": "A syntax reference; the default frame with ORDER BY and tie behaviour should be confirmed by a local run on the pinned version, and Databricks Runtime is a separate context.",
+      "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: the page defines window functions as operating over a group of rows (partition) with PARTITION BY, ORDER BY and an optional window frame, lists ranking (RANK, DENSE_RANK, ROW_NUMBER), analytic and aggregate window functions, and states that frame_end defaults to CURRENT ROW when omitted."
+    },
+    {
+      "id": "dbxfe-transformations-source-window-api",
+      "title": "pyspark.sql.Window — PySpark 4.2.0 documentation",
+      "url": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Window.html",
+      "publisher": "Apache Spark",
+      "reviewedAt": "2026-09-23",
+      "publishedAt": null,
+      "context": "PySpark API reference, latest (4.2.0 at review); the same class exists in the pinned local 4.0.4.",
+      "caveat": "API reference for the DataFrame side; a growing range frame as the ordered default is the documented behaviour, but confirm it with the lesson’s local assertions rather than from memory.",
+      "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: Window.partitionBy/orderBy/rowsBetween/rangeBetween define a window specification; when ordering is not defined an unbounded row frame is used by default, and when ordering is defined a growing window frame (rangeFrame, unboundedPreceding, currentRow) is used by default."
     }
   ],
   "claims": [
@@ -197,6 +219,16 @@
         "dbxfe-transformations-source-explode-outer"
       ],
       "context": "The operation changes output grain; a null placeholder is not a known list element. API dates to 2.3."
+    },
+    {
+      "id": "dbxfe-transformations-claim-window",
+      "description": "A window function computes a value for every row over a partition, ordering and frame without collapsing rows; RANK, DENSE_RANK and ROW_NUMBER treat ties differently, and with ORDER BY but no frame clause the default is a growing range frame from unbounded preceding to the current row, which includes peers of the current row.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-transformations-source-window",
+        "dbxfe-transformations-source-window-api"
+      ],
+      "context": "Apache Spark SQL and PySpark references at review; the pinned local Spark is 4.0.4. A tie-inclusive running total is documented default behaviour, not a defect, and no Databricks Runtime or performance claim is made."
     }
   ],
   "concepts": [
@@ -303,6 +335,22 @@
       "example": "Inspection A with tags [scratch,dent] expands into two inspection-tag rows.",
       "sourceIds": [
         "dbxfe-transformations-source-explode-outer"
+      ]
+    },
+    {
+      "id": "dbxfe-transformations-window-concept",
+      "term": "window function",
+      "aliases": [
+        "OVER clause",
+        "PARTITION BY",
+        "analytic function",
+        "ranking function"
+      ],
+      "definition": "A function evaluated once per row over a partition, ordering and frame of related rows, keeping every input row.",
+      "example": "RANK() OVER (PARTITION BY plant ORDER BY inspected DESC) gives A rank 1 and C rank 2 while both inspection rows remain in the output.",
+      "sourceIds": [
+        "dbxfe-transformations-source-window",
+        "dbxfe-transformations-source-window-api"
       ]
     }
   ],
@@ -793,6 +841,129 @@
       ]
     },
     {
+      "id": "dbxfe-transformations-window-visual",
+      "kind": "table",
+      "title": "A window keeps the rows a GROUP BY would collapse",
+      "alt": "Four tables over the same synthetic North inspections. Grouped: one row per plant with inspected 20. Ranked in a window: A rank 1, C rank 2, both rows kept. Running total in the same window: A 12, C 20. A tie added: A, C and E, where RANK gives 1, 2, 2 and ROW_NUMBER gives 1 then 2 or 3 in an order the engine chooses.",
+      "caption": "Grouping answers per-key questions; a window answers per-row questions over related rows. Synthetic teaching example.",
+      "textEquivalent": "Grouped: one row per plant. GROUP BY plant collapses A and C into one North row. Columns: Plant; Inspected. Rows: North — 20.\n\nRanked in a window: every row kept. RANK() OVER (PARTITION BY plant ORDER BY inspected DESC) adds a column and keeps both rows. Columns: Inspection; Inspected; Rank. Rows: A — 12 — 1; C — 8 — 2.\n\nRunning total in the same window. SUM(inspected) OVER the same partition and ordering accumulates 12 then 20. Columns: Inspection; Inspected; Running total. Rows: A — 12 — 12; C — 8 — 20.\n\nA tie: RANK shares, ROW_NUMBER guesses. Adding E with 8 units makes C and E peers; RANK gives both 2, ROW_NUMBER separates them in an order the engine chooses unless a tiebreaker is stated. Columns: Inspection; Inspected; RANK; ROW_NUMBER. Rows: A — 12 — 1 — 1; C — 8 — 2 — 2 or 3; E — 8 — 2 — 3 or 2.",
+      "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+      "claimIds": [
+        "dbxfe-transformations-claim-window",
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "states": [
+        {
+          "id": "grouped",
+          "title": "Grouped: one row per plant",
+          "explanation": "GROUP BY plant collapses A and C into one North row.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Plant",
+              "Inspected"
+            ],
+            "rows": [
+              [
+                "North",
+                "20"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "ranked",
+          "title": "Ranked in a window: every row kept",
+          "explanation": "RANK() OVER (PARTITION BY plant ORDER BY inspected DESC) adds a column and keeps both rows.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspection",
+              "Inspected",
+              "Rank"
+            ],
+            "rows": [
+              [
+                "A",
+                "12",
+                "1"
+              ],
+              [
+                "C",
+                "8",
+                "2"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "running",
+          "title": "Running total in the same window",
+          "explanation": "SUM(inspected) OVER the same partition and ordering accumulates 12 then 20.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspection",
+              "Inspected",
+              "Running total"
+            ],
+            "rows": [
+              [
+                "A",
+                "12",
+                "12"
+              ],
+              [
+                "C",
+                "8",
+                "20"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "tie",
+          "title": "A tie: RANK shares, ROW_NUMBER guesses",
+          "explanation": "Adding E with 8 units makes C and E peers; RANK gives both 2, ROW_NUMBER separates them in an order the engine chooses unless a tiebreaker is stated.",
+          "nodes": [],
+          "connections": [],
+          "table": {
+            "columns": [
+              "Inspection",
+              "Inspected",
+              "RANK",
+              "ROW_NUMBER"
+            ],
+            "rows": [
+              [
+                "A",
+                "12",
+                "1",
+                "1"
+              ],
+              [
+                "C",
+                "8",
+                "2",
+                "2 or 3"
+              ],
+              [
+                "E",
+                "8",
+                "2",
+                "3 or 2"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "dbxfe-transformations-plan-visual",
       "kind": "nodes",
       "title": "Read a plan as an explanation of work",
@@ -1254,6 +1425,43 @@
         "dbxfe-transformations-guidance",
         "dbxfe-transformations-fiction"
       ]
+    },
+    {
+      "id": "dbxfe-transformations-window-question",
+      "revision": "1",
+      "prompt": "North holds inspections A=12, C=8 and E=8. What does RANK() OVER (PARTITION BY plant ORDER BY inspected DESC) return for C and E?",
+      "options": [
+        {
+          "id": "dbxfe-transformations-window-question-a",
+          "text": "Both get rank 2; a fourth, smaller row would get rank 4",
+          "rationale": "RANK assigns equal ordering values the same rank and leaves a gap after the tie, so C and E share 2."
+        },
+        {
+          "id": "dbxfe-transformations-window-question-b",
+          "text": "2 and 3, in an order the engine chooses",
+          "rationale": "That is ROW_NUMBER behaviour without a tiebreaker; RANK never separates rows whose ordering values are equal."
+        },
+        {
+          "id": "dbxfe-transformations-window-question-c",
+          "text": "Both get rank 2 and the two rows merge into one",
+          "rationale": "A window function keeps every input row; only a grouping step collapses rows to one per key."
+        },
+        {
+          "id": "dbxfe-transformations-window-question-d",
+          "text": "Both restart at rank 1 because a tie begins a new partition",
+          "rationale": "The partition is defined by plant, not by the ordered value; a tie stays inside the same partition."
+        }
+      ],
+      "correctOptionId": "dbxfe-transformations-window-question-a",
+      "conceptIds": [
+        "dbxfe-transformations-window-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-window",
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ]
     }
   ],
   "selfQuestions": [],
@@ -1458,6 +1666,39 @@
       ]
     },
     {
+      "id": "dbxfe-transformations-window",
+      "version": "1.0.0",
+      "title": "A window adds context without collapsing rows",
+      "outcome": "Compute a per-row rank or running total while keeping inspection grain.",
+      "explanation": "Grouping collapses rows to one per key; a [[dbxfe-transformations-window-concept|window function]] keeps every row and computes a value over the partition of related rows. Rank North’s inspections by inspected units: A (12) gets rank 1, C (8) rank 2, and both rows remain. A running total over the same ordering gives 12, then 20. Notice that the output still has two rows at inspection grain; only new columns appeared. Ties and the frame decide which neighbours each row sees, so state both before trusting the numbers.",
+      "lessonId": "dbxfe-m04-l01",
+      "sectionId": "dbxfe-m04-l01-foundation-mechanism",
+      "conceptIds": [
+        "dbxfe-transformations-window-concept"
+      ],
+      "claimIds": [
+        "dbxfe-transformations-claim-window",
+        "dbxfe-transformations-claim-frame",
+        "dbxfe-transformations-guidance",
+        "dbxfe-transformations-fiction"
+      ],
+      "visualId": "dbxfe-transformations-window-visual",
+      "questionIds": [
+        "dbxfe-transformations-window-question"
+      ],
+      "hint": "Count the output rows first, then read the new column; a tie is still inside the partition.",
+      "handbook": {
+        "markdown": "Grouping and windowing answer different questions. `GROUP BY plant` returns one row per plant, so the inspection identity is gone. A window function keeps the inspection row and computes a value over its partition, the rows sharing the same plant, in a stated order and frame. The lesson’s pipeline projects, then groups; a window is a third kind of step that adds columns without changing what one row means.\n\nWorked example (synthetic): North holds A=12, C=8 and E=8 inspected units.\n\n```sql\nSELECT inspection_id, inspected,\n       RANK() OVER (PARTITION BY plant ORDER BY inspected DESC) AS rnk,\n       SUM(inspected) OVER (PARTITION BY plant ORDER BY inspected DESC) AS running\nFROM inspections;\n```\n\n```python\nfrom pyspark.sql import Window, functions as F\nw = Window.partitionBy(\"plant\").orderBy(F.col(\"inspected\").desc())\nranked = (inspections\n          .withColumn(\"rnk\", F.rank().over(w))\n          .withColumn(\"running\", F.sum(\"inspected\").over(w)))\n```\n\nExpected rows: A gets rank 1; C and E share rank 2, because RANK leaves a gap rather than guessing between equals. The running column is 12 for A but 28 for both C and E: with ORDER BY and no frame clause, the documented default is a growing range frame from unbounded preceding to the current row, and a range frame includes the current row’s peers. If you mean a strict row-by-row total, add a deterministic tiebreaker to the ordering or state `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`. ROW_NUMBER would give C and E 2 and 3 in an order the engine chooses unless that tiebreaker exists.\n\nWhat to inspect: the output row count equals the input row count; the partition column matches the intended population; ties follow a stated rule; the frame is explicit whenever the answer depends on it. A window is evaluated after the FROM and WHERE stages, so filtering on a window result needs a subquery or a later DataFrame filter. Windows do not repair a multiplied join: compute them at the correct grain. Assert the expected rows on the pinned local Spark before quoting any of these numbers.",
+        "sourceSectionIds": [
+          "dbxfe-m04-l01-foundation-mechanism",
+          "dbxfe-grain-joins-totals-reference"
+        ]
+      },
+      "recap": "A window computes per-row context over related rows; grouping computes per-key totals.",
+      "changeNote": "New academy beat.",
+      "mediaIds": []
+    },
+    {
       "id": "dbxfe-transformations-plan",
       "version": "1.0.0",
       "title": "Read a plan as an explanation of work",
@@ -1580,6 +1821,10 @@
     {
       "cardId": "dbxfe-grain-joins-foundation-card3",
       "beatId": "dbxfe-transformations-plan"
+    },
+    {
+      "cardId": "dbxfe-m04-l01-card4",
+      "beatId": "dbxfe-transformations-window"
     }
   ],
   "extensionCards": [
@@ -1618,13 +1863,13 @@
         "dbxfe-transformations-claim-join"
       ],
       "beatId": "dbxfe-transformations-schema",
-      "whyItMatters": "Technical null handling must not invent identity."
+      "whyItMatters": "Technical null handling must not invent identity: two missing keys are not evidence of the same business record."
     },
     {
       "id": "dbxfe-transformations-extension-anti",
-      "revision": "1",
+      "revision": "2",
       "prompt": "Which join expresses left-side records with no matching right-side key?",
-      "answer": "A left-anti join.",
+      "answer": "A left anti join: it returns only the left rows whose key has no match on the right side, with no right-side columns.",
       "explanation": "It is useful for reconciliation, such as accepted inspections whose plant key has no approved dimension record. Inspect missingness and key rules; the join does not itself decide how to repair unmatched records.",
       "lessonId": "dbxfe-grain-joins",
       "sectionId": "dbxfe-grain-joins-cardinality",
@@ -1659,7 +1904,7 @@
   ],
   "recap": {
     "title": "Preserve meaning through the transformation",
-    "markdown": "**Declare grain → type and validate → transform → align joins → aggregate counts → divide.** Check independently expected keys and totals in both interfaces. Use the preserved bridge/code depth when needed, then review the linked canonical cards.",
+    "markdown": "**Declare grain → type and validate → transform → align joins → aggregate counts → divide.** Check independently expected keys and totals in both interfaces. Use the preserved bridge/code depth when needed, then review the linked canonical cards.\n\n**Next learning action:** continue with A4 Distributed execution and reading Spark evidence (`#/module/dbxfe-spark-execution`), where the plan you read here is connected to partitions, shuffles and measured runtime.",
     "visualId": "dbxfe-transformations-transfer-visual"
   },
   "appliedTask": {

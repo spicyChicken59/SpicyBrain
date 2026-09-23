@@ -2,7 +2,7 @@
   "id": "dbxfe-m07-l01",
   "title": "Start ML with a baseline and a valid target",
   "summary": "Explain model lifecycle and avoid misleading evaluation.",
-  "contentVersion": "1.0.0",
+  "contentVersion": "1.0.1",
   "estimatedMinutes": 4,
   "objectives": [
     "Explain model lifecycle and avoid misleading evaluation.",
@@ -243,6 +243,122 @@
         "dbxfe-fiction",
         "dbxfe-fact-ml",
         "dbxfe-fact-leakage"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-l01-card4",
+      "revision": "1",
+      "prompt": "Readings from one machine are shuffled randomly into training and test. What claim does that split fail to test?",
+      "answer": "Next-month warnings and new-machine generalization; nearby readings from the same machine leak its near future and its identity.",
+      "explanation": "A split is an argument about what generalization means. Future warnings need a later-period test; rollout to unseen machines needs held-out machines. Keep a frozen final set untouched while choosing features, models and thresholds, and inspect overlap at the boundaries.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-deeper",
+      "conceptIds": [
+        "dbxfe-m07-l01-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-leakage",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-l01-card5",
+      "revision": "1",
+      "prompt": "Training rows are 60→no, 70→no, 80→yes, 90→yes. Why does a cutpoint of 75 not prove future performance?",
+      "answer": "It only makes zero mistakes on those four examples; fitting selects a rule from training data and says nothing about unseen periods or machines.",
+      "explanation": "Fitting compares candidate parameters against an objective on the training rows: 65 and 85 each miss one row while 75 misses none. Held-out evidence, not training error, shows whether the rule transfers, and a richer model family fits noise even more easily than this one-parameter rule.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-l01-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-ml",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-l01-card6",
+      "revision": "1",
+      "prompt": "A model reports 80% accuracy on a cohort where 16 of 20 opportunities have no failure. What is the majority baseline?",
+      "answer": "Also 80%: always predicting no failure is right sixteen times and catches none of the four failures.",
+      "explanation": "Accuracy hides which errors occur under imbalance. Recall for failure is 0 of 4, and precision has no warnings to condition on, so state that convention instead of inventing a rate. Compare the candidate and the existing maintenance rule on the same split with each error tied to its consequence.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-l01-concept"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-l01-card7",
+      "revision": "1",
+      "prompt": "Lowering the warning threshold from 0.60 to 0.35 changes which two rates in the six-row example?",
+      "answer": "Recall rises from 2 of 3 to 3 of 3, while precision falls from 2 of 3 to 3 of 5 as a second false alarm appears.",
+      "explanation": "The score orders opportunities; the threshold turns them into actions. Choose the cutoff with the workflow owner from validation evidence and alert capacity, then assess the frozen choice on held-out data. A score of 0.80 is not automatically a calibrated 80% failure probability.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-l01-concept"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-l01-card8",
+      "revision": "1",
+      "prompt": "A new machine reading arrives after the nightly batch scored the fleet. What does the dashboard show?",
+      "answer": "The stored prediction from that batch, unchanged until the next scheduled inference or a request-time path recalculates it.",
+      "explanation": "Training creates the artifact, inference applies it and serving presents the result. Batch scoring stores predictions with model version, feature cut-off and threshold, so a displayed warning can be traced to the version that produced it; a request-time endpoint trades that simplicity for different latency and access requirements.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-understand",
+      "conceptIds": [
+        "dbxfe-m07-l01-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-ml",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-l01-card9",
+      "revision": "1",
+      "prompt": "Feature distributions shift after a sensor is replaced. Should the model be retrained immediately?",
+      "answer": "No. Drift is a signal to investigate the input pipeline and labels first; retraining on corrupted measurements can preserve the defect.",
+      "explanation": "A population change, a new sensor, a parsing defect and a different operating regime need different responses. Monitor data quality and service behaviour promptly, evaluate predictive errors when labels mature, and check whether warnings actually led to the intended review or action.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-deeper",
+      "conceptIds": [
+        "dbxfe-m07-l01-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-ml",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m07-l01-card10",
+      "revision": "1",
+      "prompt": "A new cohort yields 4 true warnings, 6 false warnings, 1 miss and 9 true negatives. What are precision and recall?",
+      "answer": "Precision 40% (4 of 10 warnings), recall 80% (4 of 5 failures) and accuracy 65% (13 of 20 opportunities).",
+      "explanation": "Recompute from the matrix rather than reusing the earlier cohort’s figures. Whether ten alerts are acceptable depends on the maintenance owner’s review capacity and error priorities; the numbers support a rollout decision only together with their split, threshold and label-maturity basis.",
+      "lessonId": "dbxfe-m07-l01",
+      "sectionId": "dbxfe-m07-l01-try",
+      "conceptIds": [
+        "dbxfe-m07-l01-concept"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction"
       ]
     }
   ]

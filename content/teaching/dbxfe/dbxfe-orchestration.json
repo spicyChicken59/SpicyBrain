@@ -1344,7 +1344,7 @@
         "dbxfe-orchestration-raw-failure-question"
       ],
       "handbook": {
-        "markdown": "Compute the expected result before recovering. The accepted business keys are A and C. A’s replacement rises from 12 to 14; C remains 8. The new total is 22 inspected and 1 defective. B’s nonconflicting baseline exclusion remains disclosed. The old 20/1 report is visible only as previous evidence while recovery is incomplete.\n\nThe canonical example below imports the retained-history pipeline and deliberately injects the named failure. It asserts the stale previous snapshot, recovery totals and replay behavior. These exact statements belong to the preserved locally executed exercise; opening this page or stepping the visual does not execute them.\n\nIf a conflicting payload also arrived, the expected outcome would change: recovery would preserve stale_previous and withhold publication. A retry must re-evaluate the gate, not assume the valid correction guarantees permission. In a production runbook, retain durable input references and compare all boundary outputs. The toy’s in-memory object explains the logic but does not promise process-crash durability.\n\n~~~python\nimport json\nfrom solutions.reference import LocalPipeline\n\nwith open(\"fixtures/baseline.json\", encoding=\"utf-8\") as handle:\n    baseline = json.load(handle)\nwith open(\"fixtures/batches.json\", encoding=\"utf-8\") as handle:\n    correction = json.load(handle)[\"correction\"]\npipeline = LocalPipeline()\npipeline.ingest(baseline)\nold_id = pipeline.published[\"snapshot_id\"]\ntry:\n    pipeline.ingest(correction, fail_after=\"retained_raw\")\nexcept RuntimeError:\n    pass  # Expected injected failure only, not a general error suppression policy.\nassert pipeline.status == \"stale_previous\"\nassert pipeline.published[\"totals\"][\"inspected_units\"] == 20\npipeline.recover()\nassert pipeline.published[\"totals\"][\"inspected_units\"] == 22\nassert pipeline.published[\"totals\"][\"defective_units\"] == 1\nassert pipeline.published[\"snapshot_id\"] != old_id\npipeline.recover()\nassert len(pipeline.outbox) == 2  # One local effect per distinct published snapshot.\n~~~",
+        "markdown": "Compute the expected result before recovering. The accepted business keys are A and C. A’s replacement rises from 12 to 14; C remains 8. The new total is 22 inspected and 1 defective. B’s nonconflicting baseline exclusion remains disclosed. The old 20/1 report is visible only as previous evidence while recovery is incomplete.\n\nThe canonical example below imports the retained-history pipeline and deliberately injects the named failure. It asserts the stale previous snapshot, recovery totals and replay behavior. These exact statements belong to the preserved locally executed exercise; opening this page or stepping the visual does not execute them.\n\nIf a conflicting payload also arrived, the expected outcome would change: recovery would preserve stale_previous and withhold publication. A retry must re-evaluate the gate, not assume the valid correction guarantees permission. In a production runbook, retain durable input references and compare all boundary outputs. The toy’s in-memory object explains the logic but does not promise process-crash durability.\n\n~~~python\nimport json\nfrom solutions.reference import LocalPipeline\n\nwith open(\"fixtures/baseline.json\", encoding=\"utf-8\") as handle:\n    baseline = json.load(handle)\nwith open(\"fixtures/batches.json\", encoding=\"utf-8\") as handle:\n    correction = json.load(handle)[\"correction\"]\npipeline = LocalPipeline()\npipeline.ingest(baseline)\nold_id = pipeline.published[\"snapshot_id\"]\ntry:\n    pipeline.ingest(correction, fail_after=\"retained_raw\")\nexcept RuntimeError:\n    pass  # Expected injected failure only, not a general error suppression policy.\nassert pipeline.status == \"stale_previous\"\nassert pipeline.published[\"totals\"][\"inspected_units\"] == 20\npipeline.recover()\nassert pipeline.published[\"totals\"][\"inspected_units\"] == 22\nassert pipeline.published[\"totals\"][\"defective_units\"] == 1\nassert pipeline.published[\"snapshot_id\"] != old_id\npipeline.recover()\nassert len(pipeline.outbox) == 2  # One local effect per distinct published snapshot.\n~~~\n\n**Backfill is the same reasoning over a chosen past range.** A backfill reruns resolution for periods that already ran, for example after a late correction or a repaired rule. Bound the range by retained durable input, not by whatever files happen to be present; resolve each period with the same rules and the same publication gate; key every effect by snapshot identity so a period whose content did not change adds no second notification; and reconcile rows, totals and coverage per period against an independent ledger before calling the backfill complete. A backfill that silently re-publishes an unchanged period, or that relabels an older partial candidate as current, has repeated the failure this module exists to prevent.",
         "sourceSectionIds": [
           "dbxfe-m04-l03-foundation-example",
           "dbxfe-m04-l03-pipeline-code"
@@ -1402,6 +1402,11 @@
         "dbxfe-orchestration-fiction"
       ],
       "visualId": "dbxfe-orchestration-effects-visual",
+      "samajh": {
+        "text": "Dost ko paisa bheja, app par “sending…” dikhta raha aur phir network chala gaya. Bank ne shayad transfer kar diya, shayad nahi. Dobara bhejoge toh double ja sakta hai; nahi bhejoge toh dost ko kuch nahi mila. Isliye har transfer ka ek reference number hota hai, aur bank usi number se pehchaan leta hai ki yeh wahi transfer hai. Outbox ka stable key waisa hi reference hai, lekin bank ki taraf ka duplicate check alag responsibility hai.",
+        "mapping": "The stuck “sending” screen is the lost acknowledgment; the reference number is the stable intent key; the bank’s duplicate check is receiver-side idempotency.",
+        "boundary": "A payment network provides reconciliation guarantees that a custom notification sink does not have unless you build and test them."
+      },
       "questionIds": [
         "dbxfe-orchestration-effects-question"
       ],
@@ -1532,6 +1537,22 @@
     {
       "cardId": "dbxfe-m04-l03-foundation-card3",
       "beatId": "dbxfe-orchestration-reconcile"
+    },
+    {
+      "cardId": "dbxfe-m04-l03-card4",
+      "beatId": "dbxfe-orchestration-effects"
+    },
+    {
+      "cardId": "dbxfe-m04-l03-card5",
+      "beatId": "dbxfe-orchestration-checkpoint"
+    },
+    {
+      "cardId": "dbxfe-m04-l03-card6",
+      "beatId": "dbxfe-orchestration-raw-failure"
+    },
+    {
+      "cardId": "dbxfe-m04-l03-card7",
+      "beatId": "dbxfe-orchestration-transfer"
     }
   ],
   "extensionCards": [
@@ -1612,7 +1633,7 @@
   ],
   "recap": {
     "title": "Recover the boundary that remains",
-    "markdown": "**Inspect retained evidence → resolve again → check gate → reconcile publication → reconcile effects.** A checkpoint is query state; a green task is execution evidence. Use the current report label honestly and retain the previous snapshot when required.",
+    "markdown": "**Inspect retained evidence → resolve again → check gate → reconcile publication → reconcile effects.** A checkpoint is query state; a green task is execution evidence. Use the current report label honestly and retain the previous snapshot when required.\n\n**Next learning action:** Track B ends here; continue with C1 Data modeling and metric contracts (`#/module/dbxfe-modeling`), where the business grain these recoveries protect becomes an explicit model.",
     "visualId": "dbxfe-orchestration-boundaries-visual"
   },
   "appliedTask": {

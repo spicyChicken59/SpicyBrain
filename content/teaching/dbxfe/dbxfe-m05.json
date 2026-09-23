@@ -1282,11 +1282,16 @@
         "dbxfe-m05-fiction"
       ],
       "visualId": "dbxfe-m05-latency-visual",
+      "samajh": {
+        "text": "Clinic mein aaj 45 minute lage: 30 minute line mein, 5 minute doctor ke saath, 10 minute dawai ke counter par. Kal bhi 45 minute lage, par line zero thi aur doctor ke saath 35 minute. Dono din “slow” lage, lekin ilaaj alag hai: ek din extra counter chahiye tha, doosre din consultation hi lambi thi. Query ka bhi waise hi breakdown karo: queue, execution aur result render ko alag alag dekho, phir remedy chuno.",
+        "mapping": "The line is queueing, the consultation is execution, and the medicine counter is result transfer and rendering.",
+        "boundary": "A query profile measures only its own scope; the clinic clock includes travel that a profile never sees."
+      },
       "questionIds": [
         "dbxfe-m05-latency-question"
       ],
       "handbook": {
-        "markdown": "Define measurement start and end before comparing runs. A user may include dashboard loading, waiting for compute, query planning/execution, result transfer and browser rendering. A query profile has its own scope. Neither is wrong, but subtracting differently scoped durations can produce an invented bottleneck.\n\nOur ledger holds execution and presentation constant for A versusB, isolating a queue difference. That suggests investigating peak concurrency, workload arrival and capacity. B versusC instead changes execution while queue and presentation remain equal; inspect the changed join and its rows/operators. Neither table proves the ultimate root cause without run evidence.\n\nRecord query text, input snapshot, warehouse type/configuration, user population, cache conditions and failures. Compare representative cases rather than one lucky run. A remedy that makes execution faster may have little effect when most user time is waiting or rendering. Conversely, reducing queues will not repair a multiplying join. The next beat looks inside execution while preserving the end-to-end view.",
+        "markdown": "Define measurement start and end before comparing runs. A user may include dashboard loading, waiting for compute, query planning/execution, result transfer and browser rendering. A query profile has its own scope. Neither is wrong, but subtracting differently scoped durations can produce an invented bottleneck.\n\nOur ledger holds execution and presentation constant for A versusB, isolating a queue difference. That suggests investigating peak concurrency, workload arrival and capacity. B versusC instead changes execution while queue and presentation remain equal; inspect the changed join and its rows/operators. Neither table proves the ultimate root cause without run evidence.\n\nRecord query text, input snapshot, warehouse type/configuration, user population, cache conditions and failures. Compare representative cases rather than one lucky run. A remedy that makes execution faster may have little effect when most user time is waiting or rendering. Conversely, reducing queues will not repair a multiplying join. The next beat looks inside execution while preserving the end-to-end view.\n\n**Startup and queueing are waiting, not work.** If the warehouse was stopped, the first morning request pays a compute startup delay before any planning begins; if twelve refreshes arrive together, later ones wait in a queue for a slot. Both appear inside the user’s 45 seconds and neither appears in the execution operators. Record whether the warehouse was already running, how many queries were queued at arrival, and how long each waited; a quiet-hour test with a warm warehouse cannot reproduce the 08:00 experience. The remedy for startup (keep it warm, or schedule the first refresh) differs from the remedy for a queue (capacity, scheduling or fewer redundant refreshes), and both differ from a query rewrite.",
         "sourceSectionIds": [
           "dbxfe-m05-l02-understand"
         ]
@@ -1317,7 +1322,7 @@
         "dbxfe-m05-execution-question"
       ],
       "handbook": {
-        "markdown": "Start with correctness: compare input and output row counts around joins. An unexpectedly large relation may reflect the many-to-many behavior taught in transformations. Next inspect whether work is balanced. If one partition or task receives much more data, adding parallel resources may leave much of that capacity idle while the hot task dominates.\n\nSpill occurs when execution work moves from memory to disk. It can accompany joins, sorts and aggregations. Connect spill metrics to the relevant operator and data volume before deciding between reducing work, changing distribution or testing capacity. A tiny final result can hide a large intermediate relation.\n\nThe visual numbers are synthetic and do not prescribe a tuning threshold. A real profile needs permissions and actual run context. Operator labels from a video about another Spark execution engine illustrate concepts; they do not establish Databricks Photon implementation or benchmark claims. The remedy should be a falsifiable hypothesis: for example, correcting the join grain should reduce intermediate rows while preserving independently expected totals. Measure the result rather than accepting an operator-name explanation.",
+        "markdown": "Start with correctness: compare input and output row counts around joins. An unexpectedly large relation may reflect the many-to-many behavior taught in transformations. Next inspect whether work is balanced. If one partition or task receives much more data, adding parallel resources may leave much of that capacity idle while the hot task dominates.\n\nSpill occurs when execution work moves from memory to disk. It can accompany joins, sorts and aggregations. Connect spill metrics to the relevant operator and data volume before deciding between reducing work, changing distribution or testing capacity. A tiny final result can hide a large intermediate relation.\n\nThe visual numbers are synthetic and do not prescribe a tuning threshold. A real profile needs permissions and actual run context. Operator labels from a video about another Spark execution engine illustrate concepts; they do not establish Databricks Photon implementation or benchmark claims. The remedy should be a falsifiable hypothesis: for example, correcting the join grain should reduce intermediate rows while preserving independently expected totals. Measure the result rather than accepting an operator-name explanation.\n\n**Pruning and shuffle are two different questions about the same plan.** Pruning asks how much data the scan could skip: a predicate on the plant or date can let the engine avoid files or partitions it does not need, so compare bytes and files scanned with the population the filter actually names. A shuffle asks how much data had to move: a join or aggregation on a key redistributes rows so matching keys meet, and the exchange volume tells you the size of the relation being moved. A scan that reads everything for a one-plant answer suggests a missed pruning opportunity; a large exchange feeding a tiny result suggests a multiplied or skewed intermediate relation. Diagnose each with rows in and out, then form one falsifiable hypothesis per observation.",
         "sourceSectionIds": [
           "dbxfe-m05-l02-understand"
         ]
@@ -1487,6 +1492,14 @@
     {
       "cardId": "dbxfe-m05-l03-card3",
       "beatId": "dbxfe-m05-transfer"
+    },
+    {
+      "cardId": "dbxfe-m05-l02-card4",
+      "beatId": "dbxfe-m05-execution"
+    },
+    {
+      "cardId": "dbxfe-m05-l03-card4",
+      "beatId": "dbxfe-m05-capacity"
     }
   ],
   "extensionCards": [
@@ -1505,7 +1518,7 @@
         "dbxfe-m05-claim-profile"
       ],
       "beatId": "dbxfe-m05-latency",
-      "whyItMatters": "Prevents a misleading bottleneck or savings calculation."
+      "whyItMatters": "Prevents a misleading bottleneck or savings calculation when summed parallel task time is mistaken for elapsed time."
     },
     {
       "id": "dbxfe-m05-extension-profile-access",
@@ -1522,7 +1535,7 @@
         "dbxfe-m05-claim-profile"
       ],
       "beatId": "dbxfe-m05-execution",
-      "whyItMatters": "Diagnostic plans need the right observer identity."
+      "whyItMatters": "Diagnostic plans need the right observer identity, or a missing profile looks like a missing problem."
     },
     {
       "id": "dbxfe-m05-extension-approximate-percentile",
@@ -1565,7 +1578,7 @@
   ],
   "recap": {
     "title": "Meaning first, evidence second, one test next",
-    "markdown": "**Metric contract → traced rows/freshness → queue/execution/presentation → operator evidence → controlled test → threshold and cost decision.** Review linked core cards before adding extensions. All benchmark-like numbers here are synthetic.",
+    "markdown": "**Metric contract → traced rows/freshness → queue/execution/presentation → operator evidence → controlled test → threshold and cost decision.** Review linked core cards before adding extensions. All benchmark-like numbers here are synthetic.\n\n**Next learning action:** continue with C4 Business intelligence and semantic delivery (`#/module/dbxfe-bi`), where the metric contract and freshness cut-off you traced here reach the dashboard reader.",
     "visualId": "dbxfe-m05-latency-visual"
   },
   "appliedTask": {
