@@ -1,0 +1,594 @@
+{
+  "module": {
+    "id": "dbxfe-warehouse-migration",
+    "title": "Warehouse and distributed-platform migrations",
+    "summary": "Inventory an estate by its readers, segment workloads into dispositions, bridge the dependencies each wave cuts, profile legacy, Hadoop and cloud platforms in their vendors' own words, and prove results, performance and permissions through a pilot, parallel run, cutover and rollback.",
+    "objectives": [
+      "Build a usage-based inventory, segment workloads into dispositions with drivers, and bridge every dependency a wave boundary cuts.",
+      "Profile legacy, Hadoop and cloud warehouse sources from their own documentation, and separate silent dialect, engine and security differences from loud ones.",
+      "Set reconciliation depth by risk class and sequence waves through pilot, parallel run, cutover and rollback with written tests."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m08"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-warehouse-migration-l01.json"
+    ],
+    "scenarioId": "dbxfe-warehouse-migration-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-warehouse-migration-scenario",
+      "title": "Write Cinderline's migration assessment and first-wave plan",
+      "context": "Fictional Cinderline Components runs three analytics estates. Basalt is an on-premises warehouse appliance whose support renewal is due next June; it holds finance close marts, a plant-quality mart behind 14 dashboards, a supplier extract fixed by contract, and 220 tables with no reader in 90 days. An on-premises Hadoop sensor cluster holds HDFS files, Hive tables and 64 Spark 2.4 jobs, one of which writes daily line_health aggregates into Basalt. Pellworth Castings, an acquired business, runs Amazon Redshift with its own identity provider, row-level security policies and masked supplier prices. The steering group wants 'everything on the lakehouse by the renewal date'. A year-end close blackout covers months 7 and 8 of the plan. Connector support, product versions, regions and costs are unconfirmed, and nothing may be provisioned for this assessment.",
+      "task": "Write a migration assessment and first-wave plan for the steering group: segmentation with dispositions, drivers and evidence; the dependencies wave 1 cuts and their bridges; a platform profile with its unknowns; dialect and engine risks; the security mapping and how it is proven; data movement per dataset; BI continuity steps; a reconciliation risk class for each workload; the wave order; and wave 1's pilot, parallel run, cutover and rollback sequence.",
+      "requirements": [
+        "Give every workload one disposition, one driver and the evidence still needed, including at least one 'not yet' with a dated, owned condition.",
+        "Name each dependency the wave-1 boundary cuts, with its bridge's direction, owner and end date.",
+        "Fill the platform profile only from vendor pages you can cite, marking every other cell unknown with an owner.",
+        "Separate results, performance and permission equivalence and give the test for each.",
+        "Write wave 1's exit tests, cutover entry conditions and rollback triggers so a named person can check them."
+      ],
+      "model": "### Segmentation\n| Workload | Disposition | Driver | Evidence still needed |\n|---|---|---|---|\n| Plant-quality mart and 14 dashboards | Migrate, wave 1 (pilot) | contract | Pilot criteria met; quality lead named |\n| Sensor history jobs | Migrate, wave 2 | dependency | Runtime behaviour tests; file and partition counts |\n| Finance close marts | Not yet, reconsidered 15 February | blackout | Financial controller's sign-off; one full close in parallel |\n| Pellworth finance mart | Coexist, federate aggregates | security-review | Connector verified for the source and version; Pellworth's written scope |\n| 220 unread tables, 25 unopened reports | Retire | no-consumer | Owners' confirmation; archived definitions and final copies |\n| Supplier extract | Stay | contract | Supplier's date for accepting a new feed |\n\n### Dependencies and bridges\nWave 1 cuts two edges. line_health feeds the dashboards: a forward read (federated if a supported connector exists, otherwise a nightly copy), owned by the sensor team lead, ending at wave 2. Scrap cost feeds the finance marts: a read-only sync-back into Basalt, owned by the data lead, ending when the finance marts move. Both are reconciled daily.\n\n### Platform profile\nRedshift cells from AWS's archived guides (managed storage on S3, leader and compute nodes, PostgreSQL-based SQL, owner, group, role, row-level security and masking permissions), marked for re-reading on the live pages. Unknown with owners: Pellworth's export path and node type (Pellworth's platform lead), its policy list (Pellworth's security lead), federation connector support (Cinderline's data lead).\n\n### Risks and equivalence\nBasalt integer division, NULL ordering and the business-day function; Spark 2.4 store assignment and the calendar change for old dates. Results by keyed reconciliation, performance by replaying recorded dashboard queries against a 10-second p95 target, permissions by a persona matrix run after every grant change.\n\n### Movement and BI\nQuality history: bulk copy, then daily loads with Basalt as writer until cutover. Dashboards: the 06:00 cutoff and test-lot rules moved into one governed definition, refresh as a service principal, parity per plant and day.\n\n### Classes and waves\nFinance class 1, plant-quality class 2, sensor exploration tables class 3. Waves: foundations, the pilot, the sensor cluster, finance after the blackout, then decommissioning.\n\n### Wave 1 sequence\nPilot: plant 1 for one week, keys and persona tests equal, accepted by the quality lead. Parallel run: five consecutive clean days for all plants, restarted by any fix. Cutover entry: those records, a rehearsed rollback inside 30 minutes, a named operator and backup, users told the fallback link. Triggers: dashboards not ready by 07:30, a keyed difference outside the exception register, or an access anomaly. Basalt stays readable for 20 working days after cutover; nothing is deleted until the owners accept.\n\n### Answer to the steering group\nNot everything by the renewal date: one wave proven, two planned, finance deliberately after the close, Pellworth coexisting by decision.",
+      "reasoning": "The model treats 'everything by the renewal date' as a claim to test, moves only what the evidence supports, keeps finance behind the fixed blackout, lets Pellworth coexist by decision rather than by delay, and turns each remaining uncertainty into an owner and a date.",
+      "rubric": [
+        {
+          "id": "dbxfe-warehouse-migration-scenario-rubric-1",
+          "criterion": "Segmentation and dispositions",
+          "weak": "One disposition for a whole platform, with no drivers.",
+          "partial": "Dispositions per workload, but no evidence column or no dated 'not yet'.",
+          "strong": "Every workload has one disposition, one driver and named evidence; 'not yet' is dated and owned."
+        },
+        {
+          "id": "dbxfe-warehouse-migration-scenario-rubric-2",
+          "criterion": "Dependencies and bridges",
+          "weak": "No dependency map; waves drawn by size.",
+          "partial": "Cut edges found, but bridges lack owners, directions or end dates.",
+          "strong": "Every cut edge is bridged, with its direction, owner, freshness and end date."
+        },
+        {
+          "id": "dbxfe-warehouse-migration-scenario-rubric-3",
+          "criterion": "Equivalence and validation",
+          "weak": "A conversion rate reported as progress.",
+          "partial": "Results reconciled, but performance or permissions untested, or the class chosen after the results.",
+          "strong": "Results, performance and permissions each have a test at a risk class set before the run."
+        },
+        {
+          "id": "dbxfe-warehouse-migration-scenario-rubric-4",
+          "criterion": "Sequence and rollback",
+          "weak": "A cutover date with no exit tests.",
+          "partial": "Exit tests stated, but triggers vague or the rollback unrehearsed.",
+          "strong": "Checkable exit tests, entry conditions, written triggers, a rehearsal and a recovery window."
+        },
+        {
+          "id": "dbxfe-warehouse-migration-scenario-rubric-5",
+          "criterion": "Honesty about unknowns",
+          "weak": "Vendor behaviour and connector support asserted from memory.",
+          "partial": "Some unknowns listed, without owners or sources.",
+          "strong": "Every unread cell is unknown with an owner, no vendor is ranked, and synthetic figures are labelled."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can the finance close marts move before year-end if the team works weekends?",
+          "response": "No. The financial controller will not accept a platform change inside the close blackout; the earliest discussion is 15 February, after the audit fieldwork."
+        },
+        {
+          "question": "Who owns line_health?",
+          "response": "The sensor team runs the job, but the plant operations lead owns the numbers, and she wants the line-health panel unchanged throughout wave 1."
+        },
+        {
+          "question": "Will Pellworth allow federated access from the group workspace?",
+          "response": "Pellworth's security lead allows aggregated finance tables only, read-only, after a review in month 3; row-level supplier prices stay inside Pellworth."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-warehouse-migration-l01"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-warehouse-migration-course-claim-platforms",
+        "dbxfe-warehouse-migration-course-claim-redshift-security",
+        "dbxfe-warehouse-migration-course-claim-spark",
+        "dbxfe-warehouse-migration-course-claim-movement",
+        "dbxfe-warehouse-migration-course-claim-waves",
+        "dbxfe-warehouse-migration-course-claim-lakebridge"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-warehouse-migration-course-source-migration",
+      "title": "Migrate data applications to Databricks",
+      "url": "https://docs.databricks.com/aws/en/migration",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; migrating data warehouses, ETL pipelines and other data applications.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Guidance, not a guarantee of equivalence. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-warehouse-to-lakehouse",
+      "title": "Migrate your data warehouse to the Databricks lakehouse",
+      "url": "https://docs.databricks.com/aws/en/migration/warehouse-to-lakehouse",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; replacing an enterprise data warehouse with the lakehouse.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The page's 'minimal code refactoring' is a claim each workload proves by reconciliation. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-lakebridge",
+      "title": "databricks-labs-lakebridge release 0.15.2",
+      "url": "https://pypi.org/project/databricks-labs-lakebridge/",
+      "publisher": "Databricks Labs (Python Package Index listing)",
+      "type": "primary reference",
+      "context": "Lakebridge release 0.15.2 (Databricks Labs), read from its package: metadata, README and command-line code.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Read on 2026-09-23 through the PyPI JSON API and the 0.15.2 wheel, whose SHA-256 matched the index; the rendered PyPI page returned a browser challenge. One release's labels, not a support policy; nothing was installed against a workspace."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-fabric",
+      "title": "What is Microsoft Fabric",
+      "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview",
+      "publisher": "Microsoft (Microsoft Fabric documentation on Microsoft Learn)",
+      "type": "official documentation",
+      "context": "Microsoft Fabric overview; source dated 18 March 2026.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); the page's published Markdown source was read on 2026-09-23 through raw.githubusercontent.com. Workload lists and preview labels change."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-redshift",
+      "title": "What is Amazon Redshift?",
+      "url": "https://docs.aws.amazon.com/redshift/latest/mgmt/welcome.html",
+      "publisher": "Amazon Web Services (Amazon Redshift Management Guide)",
+      "type": "official documentation",
+      "context": "Amazon Redshift Management Guide introduction.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); the page's published Markdown source was read on 2026-09-23 through raw.githubusercontent.com. The source is AWS's archived documentation repository, which AWS marks out of date since June 2023; the live page may differ."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-redshift-architecture",
+      "title": "Data warehouse system architecture",
+      "url": "https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html",
+      "publisher": "Amazon Web Services (Amazon Redshift Database Developer Guide)",
+      "type": "official documentation",
+      "context": "Amazon Redshift Database Developer Guide: system architecture.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); the page's published Markdown source was read on 2026-09-23 through raw.githubusercontent.com. The source is AWS's archived documentation repository, which AWS marks out of date since June 2023; the live page may differ. The URL is generated from the archived file name."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-redshift-security",
+      "title": "Database security",
+      "url": "https://docs.aws.amazon.com/redshift/latest/dg/r_Database_objects.html",
+      "publisher": "Amazon Web Services (Amazon Redshift Database Developer Guide)",
+      "type": "official documentation",
+      "context": "Amazon Redshift Database Developer Guide: database security.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); the page's published Markdown source was read on 2026-09-23 through raw.githubusercontent.com. The source is AWS's archived documentation repository, which AWS marks out of date since June 2023; the live page may differ. The archived source's title was 'Managing database security'."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-redshift-rls",
+      "title": "Row-level security",
+      "url": "https://docs.aws.amazon.com/redshift/latest/dg/t_rls.html",
+      "publisher": "Amazon Web Services (Amazon Redshift Database Developer Guide)",
+      "type": "official documentation",
+      "context": "Amazon Redshift Database Developer Guide: row-level security.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The source is AWS's archived documentation repository, which AWS marks out of date since June 2023; the live page may differ."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-snowflake",
+      "title": "Snowflake key concepts and architecture",
+      "url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts",
+      "publisher": "Snowflake",
+      "type": "official documentation",
+      "context": "Snowflake documentation: key concepts and architecture.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); statements beyond the snippet are as previously read and marked so."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-snowflake-access",
+      "title": "Overview of Access Control",
+      "url": "https://docs.snowflake.com/en/user-guide/security-access-control-overview",
+      "publisher": "Snowflake",
+      "type": "official documentation",
+      "context": "Snowflake documentation: overview of access control.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); statements beyond the snippet are as previously read and marked so."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-bigquery",
+      "title": "BigQuery overview",
+      "url": "https://docs.cloud.google.com/bigquery/docs/introduction",
+      "publisher": "Google Cloud",
+      "type": "official documentation",
+      "context": "BigQuery documentation: overview.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); statements beyond the snippet are as previously read and marked so."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-hdfs",
+      "title": "HDFS Architecture",
+      "url": "https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html",
+      "publisher": "Apache Software Foundation (Apache Hadoop)",
+      "type": "official documentation",
+      "context": "Apache Hadoop documentation: HDFS architecture.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); the page's published Markdown source was read on 2026-09-23 through raw.githubusercontent.com. Read at the trunk branch, which can be newer than the stable release."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-hdfs-permissions",
+      "title": "HDFS Permissions Guide",
+      "url": "https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsPermissionsGuide.html",
+      "publisher": "Apache Software Foundation (Apache Hadoop)",
+      "type": "official documentation",
+      "context": "Apache Hadoop documentation: HDFS permissions guide.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); the page's published Markdown source was read on 2026-09-23 through raw.githubusercontent.com. Read at the trunk branch, which can be newer than the stable release."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-spark-migration",
+      "title": "Migration Guide: SQL, Datasets and DataFrame",
+      "url": "https://spark.apache.org/docs/4.0.2/sql-migration-guide.html",
+      "publisher": "Apache Software Foundation (Apache Spark)",
+      "type": "official documentation",
+      "context": "Apache Spark: SQL, Datasets and DataFrame migration guide and Hive compatibility (4.0.2 rendered page).",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); the page's published Markdown source was read on 2026-09-23 through raw.githubusercontent.com. Read at the v4.0.4 tag, cited at the 4.0.2 page; a vendor runtime can set other defaults."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-ansi",
+      "title": "ANSI Compliance",
+      "url": "https://spark.apache.org/docs/4.0.2/sql-ref-ansi-compliance.html",
+      "publisher": "Apache Software Foundation (Apache Spark)",
+      "type": "official documentation",
+      "context": "Apache Spark SQL reference: ANSI compliance (4.0.2 rendered page).",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); the page's published Markdown source was read on 2026-09-23 through raw.githubusercontent.com. Read at the v4.0.4 tag, cited at the 4.0.2 page."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-functions",
+      "title": "Spark SQL, Built-in Functions",
+      "url": "https://spark.apache.org/docs/latest/api/sql/index.html",
+      "publisher": "Apache Software Foundation (Apache Spark)",
+      "type": "official documentation",
+      "context": "Apache Spark built-in SQL functions (latest rendered page), generated from each expression's usage text.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title confirmed 2026-09-23; the generated page was not fetched; the Divide and IntegralDivide usage text it is built from was read at the apache/spark v4.0.4 tag on 2026-09-23 through raw.githubusercontent.com. Confirm zero-divisor behaviour on the target runtime."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-orderby",
+      "title": "ORDER BY Clause",
+      "url": "https://spark.apache.org/docs/latest/sql-ref-syntax-qry-select-orderby.html",
+      "publisher": "Apache Software Foundation (Apache Spark)",
+      "type": "official documentation",
+      "context": "Apache Spark SQL reference: ORDER BY clause (latest rendered page).",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy); the page's published Markdown source was read on 2026-09-23 through raw.githubusercontent.com. Read at the v4.0.4 tag, cited at the latest page."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-federation",
+      "title": "Connect to external databases and catalogs",
+      "url": "https://docs.databricks.com/aws/en/query-federation/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; query federation and catalog federation.",
+      "accessDate": "2026-09-19",
+      "reviewDate": "2026-09-19",
+      "caveat": "Connector support and requirements vary by source. Title and URL from this repository's retained Architecture and migration module's record (page-level review 2026-09-19, HTTP 200 availability probe 2026-09-20); not re-searched or re-read in this build, the earlier review standing as confirmation (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-opensharing",
+      "title": "What is OpenSharing?",
+      "url": "https://docs.databricks.com/aws/en/opensharing",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the sharing product family formerly documented as Delta Sharing.",
+      "accessDate": "2026-09-20",
+      "reviewDate": "2026-09-20",
+      "caveat": "Revoking access does not erase copies already obtained. Title and URL from this repository's retained Unity Catalog, security and deployment module's record (page-level review 2026-09-20, HTTP 200 availability probe 2026-09-20); not re-searched or re-read in this build, the earlier review standing as confirmation (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-metric-views",
+      "title": "Unity Catalog metric views",
+      "url": "https://docs.databricks.com/aws/en/uc-semantics/metric-views/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog metric views.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Feature status and runtime requirements vary. Title and URL from this build's data-modeling module record, whose author confirmed them by search on 2026-09-23; page body not fetched in this build."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-waves",
+      "title": "Wave planning",
+      "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/application-portfolio-assessment-guide/wave-planning.html",
+      "publisher": "Amazon Web Services",
+      "type": "official documentation",
+      "context": "AWS prescriptive guidance: application portfolio assessment, wave planning.",
+      "accessDate": "2026-09-19",
+      "reviewDate": "2026-09-19",
+      "caveat": "Example durations are not commitments. Title and URL from this repository's retained Architecture and migration module's record (page-level review 2026-09-19, HTTP 200 availability probe 2026-09-20); not re-searched or re-read in this build, the earlier review standing as confirmation (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-source-cutover",
+      "title": "Pre-cutover stage",
+      "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/best-practices-migration-cutover/pre-cutover-stage.html",
+      "publisher": "Amazon Web Services",
+      "type": "official documentation",
+      "context": "AWS prescriptive guidance: migration cutover, pre-cutover stage.",
+      "accessDate": "2026-09-19",
+      "reviewDate": "2026-09-19",
+      "caveat": "Adapted to an original read-path example. Title and URL from this repository's retained Architecture and migration module's record (page-level review 2026-09-19, HTTP 200 availability probe 2026-09-20); not re-searched or re-read in this build, the earlier review standing as confirmation (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-migration",
+      "description": "Databricks documents migrating data warehouses, ETL pipelines and other data applications onto the platform, and says most warehouse workloads, queries and dashboards can run with minimal code refactoring once the initial data migration and governance configuration are complete.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-warehouse-migration-course-source-migration",
+        "dbxfe-warehouse-migration-course-source-warehouse-to-lakehouse"
+      ],
+      "context": "Vendor guidance; 'minimal refactoring' is a claim each workload proves by reconciliation."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-lakebridge",
+      "description": "Lakebridge is a Databricks Labs migration toolkit with analyze, transpile and reconcile commands; release 0.15.2 is classified Beta, its README says it is provided for exploration only and AS-IS without formal support SLAs, and its reconcile commands are labelled experimental.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-warehouse-migration-course-source-lakebridge"
+      ],
+      "context": "One release's own labels; re-check for the release in use."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-platforms",
+      "description": "Each vendor describes its own platform: Snowflake as a self-managed service with storage, virtual warehouses and cloud services layers, granting privileges on securable objects to roles; Microsoft Fabric as a SaaS platform over OneLake whose warehouse stores Delta Lake tables; BigQuery as a fully managed, serverless platform with independent storage and compute layers queried with GoogleSQL; Amazon Redshift as a managed warehouse of Serverless or provisioned clusters with managed storage on S3 and SQL based on PostgreSQL.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-warehouse-migration-course-source-snowflake",
+        "dbxfe-warehouse-migration-course-source-snowflake-access",
+        "dbxfe-warehouse-migration-course-source-fabric",
+        "dbxfe-warehouse-migration-course-source-bigquery",
+        "dbxfe-warehouse-migration-course-source-redshift",
+        "dbxfe-warehouse-migration-course-source-redshift-architecture"
+      ],
+      "context": "Every title and snippet confirmed by search 2026-09-23; Snowflake and BigQuery detail beyond the snippets as previously read; Redshift details archived since June 2023."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-redshift-security",
+      "description": "In Amazon Redshift, permissions start with the object owner, users gain permissions directly or through groups, roles can inherit from other roles, row-level security policies apply to SELECT, UPDATE and DELETE but not to INSERT, COPY or ALTER TABLE APPEND, and dynamic data masking transforms values at query time.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-warehouse-migration-course-source-redshift-security",
+        "dbxfe-warehouse-migration-course-source-redshift-rls"
+      ],
+      "context": "Live titles and snippets confirmed 2026-09-23; details from AWS's archived source."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-hadoop",
+      "description": "HDFS keeps write-once files with one writer at a time as blocks on DataNodes under a NameNode, is designed to move computation to the data, and applies POSIX-like owner, group and other permissions with optional ACLs and identity from the operating system or Kerberos.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-warehouse-migration-course-source-hdfs",
+        "dbxfe-warehouse-migration-course-source-hdfs-permissions"
+      ],
+      "context": "Apache Hadoop documentation sources, trunk branch."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-spark",
+      "description": "Spark 3.0 moved to the Proleptic Gregorian calendar and ANSI store assignment; since Spark 4.0 ANSI mode is on by default, so invalid inputs raise errors; / always performs floating point division while div returns the integral part; NULLs sort first in ascending order unless NULLS LAST is written.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-warehouse-migration-course-source-spark-migration",
+        "dbxfe-warehouse-migration-course-source-ansi",
+        "dbxfe-warehouse-migration-course-source-functions",
+        "dbxfe-warehouse-migration-course-source-orderby"
+      ],
+      "context": "Open-source Apache Spark documentation, read at the v4.0.4 tag."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-inheritance",
+      "description": "In Unity Catalog a grant on a parent object can be inherited by current and future child objects, and reading a table still needs SELECT with USE CATALOG and USE SCHEMA.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-src-privileges"
+      ],
+      "context": "Privilege model 1.0; older metastores differ."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-movement",
+      "description": "Query and catalog federation read external sources in place and are read-only; OpenSharing revokes future access but does not erase recipients' copies; Lakeflow Connect's connector categories include change-data-capture database, file, streaming and query-based ingestion.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-warehouse-migration-course-source-federation",
+        "dbxfe-warehouse-migration-course-source-opensharing",
+        "dbxfe-src-connect"
+      ],
+      "context": "Connector and client support vary; verify per source."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-bi",
+      "description": "Databricks SQL warehouses serve BI tools, and Unity Catalog metric views define a measure once, separately from the dimensions used to group and filter it.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-src-sql",
+        "dbxfe-warehouse-migration-course-source-metric-views"
+      ],
+      "context": "Feature status varies; check current documentation."
+    },
+    {
+      "id": "dbxfe-warehouse-migration-course-claim-waves",
+      "description": "AWS migration guidance groups dependent workloads into waves, confirms ownership, rehearses cutover and rollback, and runs an ordered runbook with owners and times.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-warehouse-migration-course-source-waves",
+        "dbxfe-warehouse-migration-course-source-cutover"
+      ],
+      "context": "AWS prescriptive guidance adapted to an original example."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-warehouse-migration-l01-usage-concept",
+      "term": "usage evidence",
+      "aliases": [
+        "query history"
+      ],
+      "definition": "Records of which people, reports and jobs read each object over a stated window, joined to the catalog.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-inventory"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-disposition-concept",
+      "term": "workload disposition",
+      "aliases": [
+        "stay",
+        "coexist",
+        "migrate",
+        "retire",
+        "not yet"
+      ],
+      "definition": "One decision per workload, with the driver that decided it and the evidence that would make it agreed.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-inventory"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-bridge-concept",
+      "term": "dependency bridge",
+      "aliases": [
+        "cut dependency",
+        "sync-back"
+      ],
+      "definition": "A temporary, owned and dated path carrying data across a dependency that a wave boundary cuts.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-dependencies"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-profile-concept",
+      "term": "platform profile",
+      "aliases": [
+        "source platform matrix"
+      ],
+      "definition": "A description of a source platform built only from its own vendor's current documentation, with unread cells marked unknown.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-platforms"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-engine-concept",
+      "term": "engine version change",
+      "aliases": [
+        "runtime upgrade"
+      ],
+      "definition": "Moving jobs to a newer engine release whose documented defaults and semantics differ from the old one's.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-platforms"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-silent-concept",
+      "term": "silent dialect difference",
+      "aliases": [
+        "semantic drift"
+      ],
+      "definition": "A statement that runs on both engines and returns different results, invisible to compilation and row counts.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-dialect"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-equivalence-concept",
+      "term": "three equivalences",
+      "aliases": [
+        "results, performance and permissions"
+      ],
+      "definition": "The separate proofs that a migrated workload returns the same keyed results, performs acceptably and grants the same access.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-dialect"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-persona-concept",
+      "term": "persona outcome test",
+      "aliases": [
+        "permission outcome matrix"
+      ],
+      "definition": "The same queries run as each persona on the source and target, comparing access, visible rows and masked values.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-security"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-movement-concept",
+      "term": "data movement option",
+      "aliases": [
+        "copy",
+        "federation",
+        "sharing"
+      ],
+      "definition": "How one dataset reaches the target during migration: copied and kept current, queried in place, shared by its owner, or re-derived.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-security"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-meaning-concept",
+      "term": "report meaning",
+      "aliases": [
+        "semantic layer"
+      ],
+      "definition": "The measures, rules, refresh mode and identity that together decide a report's numbers.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-security"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-riskclass-concept",
+      "term": "reconciliation risk class",
+      "aliases": [
+        "validation depth"
+      ],
+      "definition": "A class set before the run by the consequence of a wrong number, which decides the depth of every check beyond basis and keys.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-validation"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-writer-concept",
+      "term": "authoritative writer",
+      "aliases": [
+        "one-writer rule"
+      ],
+      "definition": "The single path allowed to write a dataset at a given moment during coexistence; every other copy is derived and read-only.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-sequence"
+    },
+    {
+      "id": "dbxfe-warehouse-migration-l01-sequence-concept",
+      "term": "pilot-to-rollback sequence",
+      "aliases": [
+        "pilot",
+        "parallel run",
+        "cutover",
+        "rollback"
+      ],
+      "definition": "The ordered steps of a wave, each ending in a written test: pilot, parallel run, cutover, rollback readiness and recovery window.",
+      "lessonId": "dbxfe-warehouse-migration-l01",
+      "sectionId": "dbxfe-warehouse-migration-l01-sequence"
+    }
+  ]
+}
