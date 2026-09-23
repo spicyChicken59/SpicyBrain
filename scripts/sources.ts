@@ -93,3 +93,8 @@ await writeFile(
 console.log(
   `${rows.length} source/media records across ${urls.length} URLs; ${[...results.values()].filter((r) => r.probeStatus === "reachable").length} URLs reachable. Report: docs/evidence/source-availability.json`,
 );
+// Unreachable URLs are listed in the log too, so they can be inspected where
+// the artifact cannot be downloaded. A failed probe is not a finding by itself.
+for (const [url, r] of results)
+  if (r.probeStatus !== "reachable")
+    console.log(`not reachable: ${r.httpStatus ?? r.probeStatus} ${url}`);
