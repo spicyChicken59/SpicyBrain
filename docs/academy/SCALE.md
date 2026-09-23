@@ -99,3 +99,67 @@ every module of the course, only on request.
 study schema and its migrations, and the content-only extension proof, whose
 runtime-change filter already treats `public/teaching/**` as generated
 output.
+
+## Course collection views (measured 2026-09-23)
+
+`npm run measure:bundle` in two isolated copies of the same commit and the
+same content (17 registered modules and 8 tracks, no labs, guides, cases or
+routes yet), before and after the generic collection views: track-grouped
+course map, named routes, lab shelf, field guides with a notebook draft, case
+analyses, crosswalk, capstone revision notice and data packs, per-track
+handbook, re-entry cue and next-in-track. Every generated catalog, search and
+lazy file is byte-identical in both rows; only the code and the stylesheet
+changed.
+
+| Artifact                                      | Before (raw) | Before (gzip) | After (raw) | After (gzip) |
+| --------------------------------------------- | -----------: | ------------: | ----------: | -----------: |
+| `dist/assets/index-*.js` (initial JS)         |      946,094 |       232,703 | **972,208** |  **239,140** |
+| `dist/assets/index-*.css`                     |      130,115 |        24,460 |     136,061 |       25,476 |
+| `src/generated/catalog.json` (inlined)        |      234,591 |        35,694 |     234,591 |       35,694 |
+| `src/generated/teaching-index.json`           |       91,937 |        16,541 |      91,937 |       16,541 |
+| `public/teaching/search.json`                 |      866,695 |       232,439 |     866,695 |      232,439 |
+| `public/teaching/bodies/*.json` (58 files)    |      485,606 |       174,144 |     485,606 |      174,144 |
+| `public/teaching/<course>-<module>.json` (17) |    1,196,947 |       299,042 |   1,196,947 |      299,042 |
+
+The initial JavaScript grows by 26,114 B raw (+2.8% over the previous build,
+1.9% of the 1,384,441 B baseline) and 6,437 B gzip, and stays at 70.2% of the
+baseline (ceiling 1,592,107 B). Of the new code, `src/collections.tsx` is
+about 18 KB minified and `src/collections-model.ts` about 2.4 KB;
+`src/academy.css` adds 5.9 KB of CSS. Today and the course map make no new
+request; a lab, guide or case page fetches its one body file;
+`#/handbook/<course>?track=<track>` fetches only that track's modules (request
+logs in `npm run test:collections` and
+`tests/browser/course-collections.spec.ts`).
+
+Projection, not a measurement. The final gate run, after modules E2 and G5
+were registered (19 modules), measured the initial JavaScript at 1,034,218 B
+raw and 250,623 B gzip (74.7% of the baseline) with an inline content tier of
+398,635 B (catalog 278,884 + index 109,652 + paths 10,099). The two added
+modules cost about 31 KB of inline JSON each, against an average of about
+19.8 KB for the first 17, because their packages bring more course-level
+sources, claims and concepts. If the remaining 29 modules cost the same, the
+inline tier reaches about 1.30 MB and the initial JavaScript about 1.93 MB
+(+40% over the baseline); scaling the 19-module tier proportionally (×48/19)
+still gives about 1,643 KB (+18.7%). The collections' own catalog entries come
+on top: the 32 guides, 8 cases with their sources and 10 crosswalk rows on
+disk strip to 33,473 B, and 24 labs at the size of the four indexed so far to
+about 19 KB. The views added here are 26 KB of that total; the 15% ceiling
+needs a second split of the inline tier before the full course is registered
+(for example source context and caveats, claim descriptions and concept
+definitions in lazily loaded files, and lab outcome, environment and evidence
+or guide and case summaries in their bodies). The collection pages could also
+become a lazily loaded chunk (about 13 KB).
+
+The review fixes that followed (handbook scope links instead of a select,
+an explained empty track handbook, an h2 per field-guide part, the
+crosswalk's unpinned first column and "More columns" hint on a phone, own-key
+title lookups) add 1,503 B raw and 704 B gzip to the initial JavaScript and
+915 B raw and 90 B gzip to the stylesheet, measured with
+`npm run measure:bundle` in two isolated copies of the same 33-module content
+before and after them. The build-time Markdown audit (`src/markdown-audit.ts`,
+the renderer's own remark-parse with remark-gfm) adds nothing to the bundle:
+`validateCourses` never reaches the app, and react-markdown already ships that
+parser. It parses each lesson section, scenario text and lab, guide or case
+body once per build, about 0.6 ms a body (`validateCourses` over 26 modules:
+30 ms before, 370 ms after on a first call; repeated calls on the same text
+reuse the parse).

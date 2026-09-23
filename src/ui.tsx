@@ -80,6 +80,33 @@ export function StudyDownload({
     </>
   );
 }
+/**
+ * A course download (an exercise bundle or data pack): a same-origin static
+ * archive whose bytes the build checked against the declared SHA-256.
+ * Downloading never executes anything or records completion.
+ */
+export function ContentDownload({
+  course,
+  downloadId,
+}: {
+  course: CatalogCourse;
+  downloadId: string;
+}) {
+  const file = course.downloads?.find((d) => d.id === downloadId);
+  return file ? (
+    <>
+      <a
+        href={baseAsset(
+          `content-downloads/${file.path.replace(/^downloads\//, "")}`,
+        )}
+        download
+      >
+        {file.title}
+      </a>
+      <p>{file.description}</p>
+    </>
+  ) : null;
+}
 export function MD({
   children,
   pathId,

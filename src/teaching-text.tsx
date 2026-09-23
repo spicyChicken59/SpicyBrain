@@ -200,12 +200,19 @@ export function Concept({
     </span>
   );
 }
-function ScrollableTable({
+/**
+ * A focusable, labelled table region that shows a written "More columns"
+ * hint whenever its table is wider than the region. Teaching tables and the
+ * course crosswalk share it.
+ */
+export function ScrollableTable({
   children,
   label,
+  className = "teaching-table",
 }: {
   children: React.ReactNode;
   label: string;
+  className?: string;
 }) {
   const region = useRef<HTMLDivElement>(null),
     [overflow, setOverflow] = useState(false);
@@ -228,7 +235,7 @@ function ScrollableTable({
       )}
       <div
         ref={region}
-        className="teaching-table"
+        className={className}
         role="region"
         aria-label={label}
         tabIndex={0}

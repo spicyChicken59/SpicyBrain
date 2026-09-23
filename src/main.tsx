@@ -6,6 +6,7 @@ import "@fontsource/ibm-plex-mono/500.css";
 import "./generated/design.css";
 import "./styles.css";
 import "./teaching.css";
+import "./academy.css";
 import App from "./App";
 import { store, StudyProvider } from "./ui";
 void store.init();

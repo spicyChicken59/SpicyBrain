@@ -16,7 +16,15 @@ import {
 import type { Card } from "./content-schema";
 import type { CardRef, ScenarioBody } from "./catalog-types";
 import { applyReview, nowISO, reviewQueue, type Rating } from "./study";
-import { MD, PageTitle, SaveStatus, Sources, useStudy, uuid } from "./ui";
+import {
+  ContentDownload,
+  MD,
+  PageTitle,
+  SaveStatus,
+  Sources,
+  useStudy,
+  uuid,
+} from "./ui";
 
 export function Practice({ id }: { id?: string }) {
   const { data, store } = useStudy(),
@@ -122,6 +130,11 @@ export function Practice({ id }: { id?: string }) {
         }
         title={s.title}
       />
+      {s.revisionNotice && (
+        <p className="sc-notice academy-revision">
+          <strong>Revised practice item.</strong> {s.revisionNotice}
+        </p>
+      )}
       <div className="practice-workspace">
         <article className="sc-doc sc-doc--flat">
           {bodyError ? (
@@ -170,6 +183,27 @@ export function Practice({ id }: { id?: string }) {
               <li key={r}>{r}</li>
             ))}
           </ul>
+          {!!s.downloadIds?.length && (
+            <section className="academy-data-pack">
+              <h2>Data pack</h2>
+              <p>
+                Optional files for working this item locally. Downloading does
+                not execute anything or record completion.
+              </p>
+              <ul>
+                {s.downloadIds.map((downloadId) =>
+                  course.downloads?.some((d) => d.id === downloadId) ? (
+                    <li key={downloadId}>
+                      <ContentDownload
+                        course={course}
+                        downloadId={downloadId}
+                      />
+                    </li>
+                  ) : null,
+                )}
+              </ul>
+            </section>
+          )}
           <label className="sc-field">
             Your response
             <textarea

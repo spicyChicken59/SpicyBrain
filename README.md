@@ -27,6 +27,7 @@ APP_BASE=/SpicyBrain/ APP_OUT=dist-nested npm run build
 npx playwright install --with-deps chromium webkit
 npm run test:e2e
 npm run test:content-extension
+npm run test:collections
 npm run report:sources
 # Optional exercise runtime: Python 3.12, Java 17
 python -m pip install -r content/exercises/reliable-data/requirements.txt

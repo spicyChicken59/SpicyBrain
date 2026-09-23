@@ -15,7 +15,12 @@ import { readFile, writeFile, mkdir, access, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { loadCourses, loadTeaching, root } from "./content.ts";
+import {
+  diskTeachingLinkTargets,
+  loadCourses,
+  loadTeaching,
+  root,
+} from "./content.ts";
 import type { Course } from "../src/content-schema.ts";
 import {
   validateTeaching,
@@ -358,6 +363,9 @@ export async function checkModules(moduleIds: string[]) {
     : undefined;
   const results: Record<string, ReturnType<typeof auditModule>> = {};
   let failed = false;
+  // One module is validated per call, so its links to other modules resolve
+  // against every teaching module file present on disk.
+  const linkTargets = await diskTeachingLinkTargets(join(root, "content"));
   for (const id of moduleIds) {
     const teachingPath = join(root, "content/teaching/dbxfe", `${id}.json`);
     const mediaPath = join(root, "content/teaching/dbxfe", `media-${id}.json`);
@@ -378,6 +386,7 @@ export async function checkModules(moduleIds: string[]) {
       courses,
       mediaRaw,
       true,
+      linkTargets,
     );
     const contractModule = contract?.tracks
       .flatMap((t) => t.modules)

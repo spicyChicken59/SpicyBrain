@@ -6,7 +6,12 @@ import type {
   TeachingModule,
   TeachingMedia,
 } from "./teaching-schema";
-import { validateTeaching, mediaSchema } from "./teaching-schema";
+import {
+  validateTeaching,
+  mediaSchema,
+  teachingLinkTargets,
+  type TeachingLinkTargets,
+} from "./teaching-schema";
 import rawPaths from "./generated/paths.json";
 import type { Card, LearningPath } from "./content-schema";
 import type {
@@ -17,6 +22,7 @@ import type {
   ScenarioBody,
 } from "./catalog-types";
 import { bodyErrors, bodyExpectations, createBodyLoader } from "./bodies";
+import { collectKnownIds } from "./collections-model";
 export type { CatalogCourse, CatalogLesson } from "./catalog-types";
 export type ExtensionCard = TeachingModule["extensionCards"][number];
 /** The catalog tier: identities, titles, mappings and counts, never lesson prose or card text. */
@@ -62,6 +68,14 @@ export async function loadSearch(): Promise<SearchEntry[]> {
   return result.data;
 }
 const moduleCache = new Map<string, Promise<TeachingModule>>();
+let linkTargets: TeachingLinkTargets | undefined;
+/**
+ * A module is validated alone at runtime, so its links to other modules are
+ * checked against the teaching index (the build already checked them against
+ * the complete set of modules).
+ */
+const moduleLinkTargets = () =>
+  (linkTargets ??= teachingLinkTargets(teachingIndex));
 export function loadTeachingModule(moduleId: string) {
   const entry = teachingIndex.find((m) => m.moduleId === moduleId);
   if (!entry)
@@ -82,6 +96,7 @@ export function loadTeachingModule(moduleId: string) {
               courses,
               [],
               false,
+              moduleLinkTargets(),
             ).modules[0];
           } catch {
             throw Error(
@@ -239,27 +254,13 @@ const questionOwner = new Map(
 export const scenarios = courses.flatMap((course) =>
   course.scenarios.map((scenario) => ({ course, scenario })),
 );
-export const knownIds = new Set([
-  ...paths.map((path) => path.id),
-  ...teachingIndex.flatMap((m) => [
-    ...m.beats.map((b) => b.id),
-    ...m.extensionCards.map((c) => c.id),
-    ...(m.referenceIds ?? []),
-  ]),
-  ...courses.flatMap((c) => [
-    c.id,
-    ...c.modules.flatMap((m) => [
-      m.id,
-      ...m.lessons.flatMap((l) => [
-        l.id,
-        ...l.sections.map((s) => s.id),
-        ...l.cards.map((v) => v.id),
-        ...l.questions.map((v) => v.id),
-      ]),
-    ]),
-    ...c.scenarios.map((s) => s.id),
-  ]),
-]);
+export const knownIds = collectKnownIds(courses, teachingIndex, paths);
+/** Field guides by identity; a guide draft note cites its guide as its section. */
+export const guideEntries = courses.flatMap((course) =>
+  (course.guides ?? []).map((guide) => ({ course, guide })),
+);
+export const findGuide = (id: string) =>
+  guideEntries.find((entry) => entry.guide.id === id);
 export const lessonHref = (id: string, section?: string, pathId?: string) =>
   `#/lesson/${id}${section ? `/${section}` : ""}${pathId ? `?path=${encodeURIComponent(pathId)}` : ""}`;
 export const findLesson = (id: string) =>
@@ -283,6 +284,15 @@ export async function loadScenarioBody(id: string): Promise<ScenarioBody> {
   const body = await loadBody(id);
   if (body.kind !== "scenario") throw Error(bodyErrors.mismatch);
   return body;
+}
+/** A lab, guide or case body, refused when the file is another kind. */
+export async function loadCollectionBody<K extends "lab" | "guide" | "case">(
+  kind: K,
+  id: string,
+): Promise<Extract<ContentBody, { kind: K }>> {
+  const body = await loadBody(id);
+  if (body.kind !== kind) throw Error(bodyErrors.mismatch);
+  return body as Extract<ContentBody, { kind: K }>;
 }
 /** Lessons a module workspace needs: the owned lessons plus any lesson whose check a beat reuses. */
 export function moduleLessonIds(entry: TeachingIndexEntry) {

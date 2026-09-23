@@ -113,4 +113,7 @@ any remaining path.
    lets a reader study the lab without installing anything: purpose, the
    fixture in a small table, each task with its intermediate output, the
    failure case, what the tests prove and do not prove, and setup/cleanup.
+   Its headings start at `###` (the lab page already shows the title and a
+   "Lab instructions" heading): a `#` or `##` heading, or a Markdown image,
+   fails the build once the lab is registered in `course.json`.
 4. A one-paragraph report of what was run, versions, and any limitation.

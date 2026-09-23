@@ -11,6 +11,7 @@ import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import {
+  teachingLinkTargets,
   validateTeaching,
   type TeachingIndexEntry,
 } from "../src/teaching-schema.ts";
@@ -482,6 +483,56 @@ export function contentBodies(course: Course): ContentBody[] {
     })),
   ];
 }
+/** Search entries for a course's labs, field guides and case analyses, linking to their own routes. */
+export function collectionSearchEntries(c: Course) {
+  return [
+    ...(c.labs ?? []).map((lab) => ({
+      id: lab.id,
+      type: "Lab",
+      courseId: c.id,
+      title: lab.title,
+      text: [
+        lab.title,
+        lab.summary,
+        lab.outcome,
+        lab.environment,
+        lab.evidence,
+        lab.body,
+      ].join(" "),
+      href: `#/course/${c.id}/labs/${lab.id}`,
+    })),
+    ...(c.guides ?? []).map((guide) => ({
+      id: guide.id,
+      type: "Field guide",
+      courseId: c.id,
+      title: guide.title,
+      text: [
+        guide.title,
+        guide.question,
+        guide.summary,
+        guide.body.action,
+        guide.body.example,
+        guide.body.template,
+        guide.body.limits,
+      ].join(" "),
+      href: `#/course/${c.id}/guides/${guide.id}`,
+    })),
+    ...(c.cases ?? []).map((item) => ({
+      id: item.id,
+      type: "Case analysis",
+      courseId: c.id,
+      title: item.title,
+      text: [
+        item.title,
+        item.domain,
+        item.summary,
+        item.reporter,
+        item.body,
+      ].join(" "),
+      href: `#/course/${c.id}/cases/${item.id}`,
+    })),
+  ];
+}
 export async function buildContent(
   contentRoot = join(root, "content"),
   destination = root,
@@ -536,6 +587,7 @@ export async function buildContent(
       text: [g.term, ...g.aliases, g.definition].join(" "),
       href: `#/lesson/${g.lessonId}/${g.sectionId}`,
     })),
+    ...collectionSearchEntries(c),
   ]);
   const teachingIndex: TeachingIndexEntry[] = [];
   const teachingDirectory = join(destination, "public/teaching");
@@ -754,6 +806,53 @@ export async function loadTeaching(
       else raw.push(data);
     }
   return validateTeaching(raw, courses, media);
+}
+/**
+ * Link targets from every teaching module file present on disk, registered
+ * or not, so a single module checked alone may link to its neighbours. A file
+ * that cannot be read as a module (for example one still being written)
+ * contributes no targets; a link to it then fails as broken.
+ */
+export async function diskTeachingLinkTargets(
+  contentRoot = join(root, "content"),
+) {
+  const entries: { moduleId: string; beats: { id: string }[] }[] = [];
+  let dirs: import("node:fs").Dirent[] = [];
+  try {
+    dirs = await readdir(join(contentRoot, "teaching"), {
+      withFileTypes: true,
+    });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  for (const dir of dirs.filter((d) => d.isDirectory()))
+    for (const name of (await readdir(join(contentRoot, "teaching", dir.name)))
+      .filter(
+        (n) =>
+          n.endsWith(".json") &&
+          n !== "media.json" &&
+          !/^media-[a-z0-9-]+\.json$/.test(n),
+      )
+      .sort()) {
+      try {
+        const data = JSON.parse(
+          await readFile(
+            await confinedFile(join(contentRoot, "teaching", dir.name), name),
+            "utf8",
+          ),
+        ) as { moduleId?: unknown; beats?: { id?: unknown }[] };
+        if (typeof data.moduleId === "string" && Array.isArray(data.beats))
+          entries.push({
+            moduleId: data.moduleId,
+            beats: data.beats.flatMap((b) =>
+              typeof b?.id === "string" ? [{ id: b.id }] : [],
+            ),
+          });
+      } catch {
+        // Not a readable teaching module: it offers no link targets.
+      }
+    }
+  return teachingLinkTargets(entries);
 }
 export async function verifyDesign() {
   const directory = join(root, "public/design-system");

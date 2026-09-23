@@ -328,11 +328,31 @@ export const mediaSchema = z
   });
 export type TeachingMedia = z.infer<typeof mediaSchema>;
 
+/**
+ * Module → beat identities that `#/module/<id>[/<beat>]` teaching links may
+ * target. The runtime loader validates one module per call, so it passes a
+ * map built from the teaching index; a single-module content check passes a
+ * map built from every teaching file present. Without a map, links resolve
+ * against the modules in the same call (the full build passes all of them).
+ */
+export type TeachingLinkTargets = Map<string, Set<string>>;
+export function teachingLinkTargets(
+  entries: { moduleId: string; beats: { id: string }[] }[],
+): TeachingLinkTargets {
+  const targets: TeachingLinkTargets = new Map();
+  for (const entry of entries) {
+    const beats = targets.get(entry.moduleId) ?? new Set<string>();
+    for (const beat of entry.beats) beats.add(beat.id);
+    targets.set(entry.moduleId, beats);
+  }
+  return targets;
+}
 export function validateTeaching(
   raw: unknown[],
   courses: CatalogCourse[],
   mediaRaw: unknown[] = [],
   validateMediaReferences = true,
+  linkTargets?: TeachingLinkTargets,
 ) {
   const modules = raw.map((m) => teachingModuleSchema.parse(m)),
     media = mediaRaw.map((m) => mediaSchema.parse(m));
@@ -345,6 +365,14 @@ export function validateTeaching(
       ...c.concepts.map((s) => s.id),
       ...c.assets.map((s) => s.id),
       ...(c.downloads ?? []).map((s) => s.id),
+      // Course collections share the one identity space: a beat that reused
+      // a guide's ID would share its note (`note-<id>`) with the guide draft.
+      ...(c.tracks ?? []).map((s) => s.id),
+      ...(c.routes ?? []).map((s) => s.id),
+      ...(c.labs ?? []).map((s) => s.id),
+      ...(c.guides ?? []).map((s) => s.id),
+      ...(c.cases ?? []).map((s) => s.id),
+      ...(c.crosswalk ?? []).map((s) => s.id),
       ...c.scenarios.flatMap((s) => [s.id, ...s.rubric.map((r) => r.id)]),
       ...c.modules.flatMap((m) =>
         m.lessons.flatMap((l) => [
@@ -397,11 +425,13 @@ export function validateTeaching(
       fail(`Broken teaching lesson link ${url}`);
     if (
       kind === "module" &&
-      !modules.some(
-        (m) =>
-          m.moduleId === id &&
-          (!section || m.beats.some((b) => b.id === section)),
-      )
+      !(linkTargets
+        ? linkTargets.has(id) && (!section || linkTargets.get(id)!.has(section))
+        : modules.some(
+            (m) =>
+              m.moduleId === id &&
+              (!section || m.beats.some((b) => b.id === section)),
+          ))
     )
       fail(`Broken teaching module link ${url}`);
   };
