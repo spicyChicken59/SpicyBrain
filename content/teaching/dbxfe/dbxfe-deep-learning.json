@@ -1,0 +1,3101 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-deep-learning",
+ "title": "Deep learning and accelerated workloads",
+ "summary": "Shapes as contracts, a two-layer network computed by hand, how a loss and its gradient move weights, what embeddings store, what training holds in GPU memory that inference does not, when to fine-tune and when to retrieve, how data parallelism shares gradients, and how to place GPU compute on the platform only after a simpler model has fallen short.",
+ "outcomes": [
+  "Read what each axis of a tensor counts, predict the shape of a matrix product and diagnose a shape mismatch from its error text.",
+  "Compute a two-layer forward pass, its log loss and an output-layer gradient by hand, and explain why a switched-off unit receives no update.",
+  "Separate training from inference, size a batch against a GPU memory budget, choose fine-tuning or retrieval for a stated need, and explain data parallelism.",
+  "Name the documented routes to GPUs on Databricks with their status, and write an accelerated-workload design with unexecuted steps labelled, a CPU smoke test first and a simpler baseline to beat."
+ ],
+ "startingAssumptions": [
+  "The machine learning fundamentals module has taught baselines, held-out evaluation and training versus serving at a conceptual level.",
+  "Multiplying a row by a column and summing is familiar; no calculus beyond 'the slope of a curve' is assumed."
+ ],
+ "lessonIds": [
+  "dbxfe-deep-learning-l01"
+ ],
+ "optionalBridgeLessonIds": [
+  "dbxfe-python-bridge"
+ ],
+ "editorialRationale": "Deep learning is usually taught either as magic or as calculus. This module takes one Cinderline reading through a network small enough to compute by hand, with the numbers reproduced by a NumPy run on CPU, so every later idea (gradients, embeddings, batches, memory, data parallelism) is a change to arithmetic the learner has already done. Platform material comes last and is written as verification items with preview and deprecation status, and the module ends by making the network earn its cost against a simpler model, because the most common field mistake is starting a GPU project before a baseline exists.",
+ "sources": [
+  {
+   "id": "dbxfe-deep-learning-source-network",
+   "title": "But what is a Neural Network?",
+   "url": "https://www.3blue1brown.com/lessons/neural-networks/",
+   "publisher": "3Blue1Brown",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": "2017-10-05",
+   "context": "3Blue1Brown deep learning chapter 1 (lesson page for the 2017-10-05 video); the structure of a layered network explained on handwritten digits.",
+   "caveat": "An intuition-building lesson, not a specification; its digit example and layer sizes are the author's teaching choices.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: the lesson motivates the structure and mathematical description of a neural network (what the neurons are, why there are layers, and the math underlying them) and leaves training with labelled examples to the next lesson."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-gradient",
+   "title": "Gradient descent, how neural networks learn",
+   "url": "https://www.3blue1brown.com/lessons/gradient-descent/",
+   "publisher": "3Blue1Brown",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": "2017-10-16",
+   "context": "3Blue1Brown deep learning chapter 2 (lesson page for the 2017-10-16 video); cost function and gradient descent on the digit network.",
+   "caveat": "Intuition, not an optimizer specification; real optimizers add momentum, adaptive step sizes and schedules.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: a cost function measures how badly the network classifies its training examples, and gradient descent repeatedly moves the weights and biases in the downhill direction of that cost."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-ndarray",
+   "title": "The N-dimensional array (ndarray)",
+   "url": "https://numpy.org/doc/stable/reference/arrays.ndarray.html",
+   "publisher": "NumPy",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "NumPy reference manual (stable, v2.5 when searched); the array type used by the lesson's executed example.",
+   "caveat": "The stable manual tracks the current NumPy release; the example was run with NumPy 2.5.3.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: the number of dimensions and items in an array is defined by its shape, a tuple of N non-negative integers giving the size of each dimension; the type of the items is a separate data-type object (dtype) associated with each array."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-tensor",
+   "title": "torch.Tensor",
+   "url": "https://docs.pytorch.org/docs/stable/tensors.html",
+   "publisher": "PyTorch",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "PyTorch stable documentation (2.14 when searched) for the tensor type, dtypes and constructors.",
+   "caveat": "The stable page tracks the current release; constructor and dtype defaults are checked against the installed version. PyTorch is not installed or run in this build.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: a sequence passed to torch.tensor() produces a tensor of the default dtype, typically torch.float32, for floating-point data; the legacy torch.Tensor() constructor always builds a float tensor even from integer inputs, so torch.tensor() is preferred."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-embedding",
+   "title": "Embedding",
+   "url": "https://docs.pytorch.org/docs/2.13/generated/torch.nn.Embedding.html",
+   "publisher": "PyTorch",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "PyTorch 2.13 reference page for torch.nn.Embedding.",
+   "caveat": "A version-pinned page (2.13); argument names and behaviour are checked against the installed release.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: torch.nn.Embedding is a simple lookup table that stores embeddings of a fixed dictionary and size; it is often used to store word embeddings and retrieve them using indices, the input being a list of indices and the output the corresponding embeddings."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-amp",
+   "title": "Automatic Mixed Precision package - torch.amp",
+   "url": "https://docs.pytorch.org/docs/stable/amp.html",
+   "publisher": "PyTorch",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "PyTorch stable documentation for torch.amp, autocast and GradScaler.",
+   "caveat": "Which operations run in lower precision depends on the device and release; memory savings are workload-specific and not quoted here.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: torch.amp runs some operations in torch.float32 and others in a lower-precision floating-point type, torch.float16 or torch.bfloat16; linear layers and convolutions are much faster in lower precision while reductions often need float32's range; float16 training ordinarily uses autocast with GradScaler."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-ddp",
+   "title": "Getting Started with Distributed Data Parallel",
+   "url": "https://docs.pytorch.org/tutorials/intermediate/ddp_tutorial.html",
+   "publisher": "PyTorch",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "PyTorch tutorials (2.14 when searched); DistributedDataParallel basics.",
+   "caveat": "A tutorial, not a sizing guide; launch commands and backends depend on the cluster and release.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: DistributedDataParallel implements data parallelism at the module level and can run across machines; it spawns multiple processes with a single DDP instance per process; gradient synchronization happens during the backward pass and overlaps with it, so when backward() returns each parameter's grad already holds the synchronized gradient."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-dl",
+   "title": "Deep learning",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/deep-learning",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; introduction to PyTorch, TensorFlow and distributed training on Databricks.",
+   "caveat": "An overview page; library versions come from the specific Databricks Runtime ML release notes.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: PyTorch, TensorFlow and TensorBoard are included in Databricks Runtime ML; PyTorch provides GPU-accelerated tensor computation for single-node and distributed training; distributed training examples use Ray, TorchDistributor and DeepSpeed; MLflow tracks deep learning training runs."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-practices",
+   "title": "Best practices for deep learning on Databricks",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/dl-best-practices",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; cluster shape, data loading and tracking recommendations for deep learning.",
+   "caveat": "Recommendations, not guarantees; the single-node preference assumes the model and data fit one machine.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: Databricks recommends Databricks Runtime for Machine Learning with MLflow tracking and autologging for all model training; a single-node (driver only) GPU cluster is typically fastest and most cost-effective for deep learning model development; one node with 4 GPUs is likely faster than 4 worker nodes with 1 GPU each because distributed training incurs network communication overhead."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-gpu",
+   "title": "GPU-enabled compute",
+   "url": "https://docs.databricks.com/aws/en/compute/gpu",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS (the Azure and Google Cloud pages carry the same settings); classic compute with GPU instance types.",
+   "caveat": "Instance types, runtime versions and regional availability change and are verified on the current page and in the workspace.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: to create GPU compute, the Machine learning checkbox is checked, the worker type is a GPU instance type, and the Single node checkbox can be checked for a single GPU instance; Photon is not supported with GPU instance types; Databricks installs the NVIDIA driver and libraries, including the CUDA Toolkit, on the driver and worker instances."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-ai-runtime",
+   "title": "AI Runtime",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/ai-runtime",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; serverless GPU compute for deep learning. Single-node AI Runtime was documented as Public Preview when searched.",
+   "caveat": "Public Preview: availability, accelerators, regions, quota and pricing are verified in the workspace and never presented as generally available.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: AI Runtime is a compute offering intended for deep learning workloads that brings GPU support to Databricks serverless; AI Runtime for single-node tasks is in Public Preview; a notebook connects by choosing A10 or H100 in the Accelerator field and a default or AI base environment; there is no cluster configuration or driver selection to manage."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-ai-runtime-multi",
+   "title": "Multi-GPU distributed training",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/ai-runtime/examples/gpu-distributed-training",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; multi-GPU training on AI Runtime through the Serverless GPU Python API, documented as Beta when searched.",
+   "caveat": "Beta: workspace admins control access from the Previews page; the accelerator requirements differed between related pages in the search snippets, so the live page decides.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: multi-GPU distributed training on AI Runtime is in Beta and controlled from the Previews page; training code is wrapped in a function decorated with @distributed from the Serverless GPU Python API, which integrates with PyTorch DDP and FSDP."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-distributed",
+   "title": "Distributed training",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/distributed-training",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; when to distribute training and the distributors included in Databricks Runtime ML.",
+   "caveat": "The page recommends single-machine training first; distributor APIs and arguments are read from the current page.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: when possible, Databricks recommends training neural networks on a single machine, because distributed code for training and inference is more complex than single-machine code and slower due to communication overhead; Databricks Runtime ML includes TorchDistributor, DeepSpeed and Ray to move from single-node to distributed training."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-torchdistributor",
+   "title": "Distributed training with TorchDistributor",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/distributed-training/spark-pytorch-distributor",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the PySpark TorchDistributor module on classic Spark compute.",
+   "caveat": "Arguments, supported runtimes and GPU counts are read from the current page before use.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: TorchDistributor is an open-source PySpark module that launches PyTorch training jobs as Spark jobs; it initializes the environment and communication channels between workers and uses torch.distributed.run to run training across worker nodes."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-pyspark-td",
+   "title": "TorchDistributor",
+   "url": "https://spark.apache.org/docs/latest/api/python/reference/api/pyspark.ml.torch.distributor.TorchDistributor.html",
+   "publisher": "Apache Spark",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "PySpark API reference (4.2.0 when searched) for pyspark.ml.torch.distributor.TorchDistributor.",
+   "caveat": "The latest reference tracks the newest Spark release; the runtime's Spark version decides which arguments exist. Nothing was run.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: TorchDistributor supports distributed training with PyTorch and PyTorch Lightning using PySpark; its constructor takes num_processes (default 1), local_mode (default True, single-node) and use_gpu (default True); run() invokes a training function with the given arguments, or runs torchrun on a file path."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-deepspeed",
+   "title": "Distributed training with DeepSpeed distributor",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/distributed-training/deepspeed",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the DeepSpeed distributor for models limited by memory.",
+   "caveat": "Configuration files and supported versions change; nothing here is sized or run.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: DeepSpeed is an open-source library from Microsoft offering optimized memory usage, reduced communication overhead and pipeline parallelism; the DeepSpeed distributor is built on top of TorchDistributor and is recommended for models that need more compute but are limited by memory constraints."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-finetune",
+   "title": "Foundation Model Fine-tuning (deprecated)",
+   "url": "https://docs.databricks.com/aws/en/large-language-models/foundation-model-training",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the Foundation Model Fine-tuning feature, marked deprecated. The AWS result surfaced by URL; the exact title was confirmed on the Microsoft Learn counterpart and on the AWS data-preparation page's title.",
+   "caveat": "Deprecated with removal scheduled for 2026-08-14, before this review; no plan relies on it, and AI Runtime is the documented migration path.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: Foundation Model Fine-tuning is deprecated and scheduled for removal on August 14, 2026; existing runs continue to work, while new installations of the databricks_genai package and the fine-tuning UI are blocked after that date; Databricks recommends migrating to AI Runtime, a serverless GPU-backed environment for training and fine-tuning; the feature supported instruction fine-tuning, chat completion and continued pre-training."
+  },
+  {
+   "id": "dbxfe-deep-learning-source-search",
+   "title": "Databricks AI Search",
+   "url": "https://docs.databricks.com/aws/en/ai-search/ai-search",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the managed retrieval service, current name formerly Vector Search.",
+   "caveat": "Endpoint types, limits, preview features and pricing are checked on the live page before any design relies on them.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as stated in the search-result snippets read in this session: Databricks AI Search was formerly Vector Search; an index is created from a Delta table of embedded data with metadata and queried for the most similar vectors; hybrid keyword-similarity search is supported; Databricks can compute embeddings for a text column or use precomputed embeddings; use cases include retrieval-augmented generation, semantic search and recommendations."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-deep-learning-claim-network",
+   "description": "A neural network is layers of units that each hold a number, the next layer's numbers computed from the previous layer's; a cost function measures how badly its predictions fit labelled examples, and gradient descent repeatedly moves weights and biases downhill on that cost.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-network",
+    "dbxfe-deep-learning-source-gradient"
+   ],
+   "context": "3Blue1Brown deep learning chapters 1 and 2; intuition, not a product specification."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-tensor",
+   "description": "An array's shape is a tuple giving the size of each dimension and its dtype is a separate object; PyTorch creates floating-point tensors as float32 by default and prefers torch.tensor() to the legacy torch.Tensor() constructor.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-ndarray",
+    "dbxfe-deep-learning-source-tensor"
+   ],
+   "context": "NumPy and PyTorch reference documentation; NumPy was run in this build, PyTorch was not."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-embedding",
+   "description": "torch.nn.Embedding is a lookup table storing embeddings of a fixed dictionary and size, returning the vectors for the indices it receives.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-embedding"
+   ],
+   "context": "PyTorch 2.13 reference page."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-amp",
+   "description": "Automatic mixed precision runs some operations in float32 and others in float16 or bfloat16, matching each operation to a suitable type; float16 training ordinarily pairs autocast with a gradient scaler.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-amp"
+   ],
+   "context": "PyTorch stable documentation; savings depend on the model and device."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-ddp",
+   "description": "DistributedDataParallel runs one process per replica and synchronizes gradients during the backward pass, so every replica holds the same averaged gradient before the optimizer step.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-ddp"
+   ],
+   "context": "PyTorch tutorial; backends and launch commands vary."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-dl",
+   "description": "Databricks Runtime ML includes PyTorch, TensorFlow and TensorBoard, supports distributed training through Ray, TorchDistributor and DeepSpeed, and uses MLflow to track deep learning runs.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-dl"
+   ],
+   "context": "Databricks on AWS overview; versions come from the runtime release notes."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-practices",
+   "description": "Databricks recommends Databricks Runtime ML with MLflow tracking and autologging for model training, a single-node GPU cluster as typically fastest and most cost-effective for deep learning development, and notes one node with four GPUs is likely faster than four one-GPU workers because of communication overhead.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-practices"
+   ],
+   "context": "Databricks on AWS best practices; depends on the model and data fitting one machine."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-gpu",
+   "description": "GPU-enabled compute is created with the Machine learning checkbox checked, a GPU instance type as the worker type and optionally Single node for one GPU instance; Photon is not supported with GPU instance types; Databricks installs the NVIDIA driver and CUDA libraries.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-gpu"
+   ],
+   "context": "Databricks on AWS classic compute; instance availability varies by region and account."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-ai-runtime",
+   "description": "AI Runtime brings serverless GPU compute to Databricks for deep learning; single-node AI Runtime was documented as Public Preview, with A10 or H100 chosen in a notebook's Accelerator field.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-ai-runtime"
+   ],
+   "context": "Public Preview when searched; verify availability, quota and pricing in the workspace."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-ai-runtime-multi",
+   "description": "Multi-GPU distributed training on AI Runtime was documented as Beta, gated from the workspace Previews page, with training wrapped in an @distributed function that integrates with DDP and FSDP.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-ai-runtime-multi"
+   ],
+   "context": "Beta when searched; accelerator requirements are read from the live page."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-distributed",
+   "description": "Databricks recommends training neural networks on a single machine when possible, because distributed training is more complex and slower due to communication overhead, and includes TorchDistributor, DeepSpeed and Ray in Databricks Runtime ML for when it is needed.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-distributed",
+    "dbxfe-deep-learning-source-practices"
+   ],
+   "context": "Databricks on AWS; recommendation depends on model and data size."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-torchdistributor",
+   "description": "TorchDistributor is an open-source PySpark module that launches PyTorch training jobs as Spark jobs and runs them across workers with torch.distributed.run; its constructor takes num_processes, local_mode and use_gpu, and run() invokes a training function.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-torchdistributor",
+    "dbxfe-deep-learning-source-pyspark-td"
+   ],
+   "context": "Databricks on AWS classic compute; PySpark API reference."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-deepspeed",
+   "description": "The DeepSpeed distributor, built on TorchDistributor, is recommended for models that need more compute but are limited by memory, using DeepSpeed's memory and communication optimizations.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-deepspeed"
+   ],
+   "context": "Databricks on AWS; nothing sized or run here."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-finetune",
+   "description": "Databricks Foundation Model Fine-tuning, which supported instruction fine-tuning, chat completion and continued pre-training, is documented as deprecated with removal scheduled for 2026-08-14, and Databricks recommends AI Runtime for training and fine-tuning instead.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-finetune",
+    "dbxfe-deep-learning-source-ai-runtime"
+   ],
+   "context": "Deprecated; the scheduled removal date precedes this review."
+  },
+  {
+   "id": "dbxfe-deep-learning-claim-search",
+   "description": "Databricks AI Search, formerly Vector Search, indexes embeddings computed by Databricks or supplied precomputed from a Delta table, queries for the most similar vectors, supports hybrid keyword-similarity search, and serves retrieval-augmented generation.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-search"
+   ],
+   "context": "Databricks on AWS; limits and preview features checked on the live page."
+  },
+  {
+   "id": "dbxfe-deep-learning-guidance",
+   "kind": "guidance",
+   "description": "Original SpicyBrain reasoning: the hand-computed network, the synthetic memory budget, the compute ladder, the stop rule and the baseline-first decision are teaching constructions, not Databricks or PyTorch guidance.",
+   "sourceIds": [],
+   "context": "Independent curriculum; adapt figures to the real model, data and account."
+  },
+  {
+   "id": "dbxfe-deep-learning-fiction",
+   "kind": "fictional",
+   "description": "Cinderline Components, its sensors, weld clips, supplier codes, recall figures, memory budgets and costs are synthetic teaching records.",
+   "sourceIds": [],
+   "context": "No GPU, workspace or cloud resource was used; the only executed code is the lesson's NumPy example on CPU."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-deep-learning-shape-concept",
+   "term": "tensor shape",
+   "aliases": [
+    "tensor",
+    "shape",
+    "ndarray",
+    "dtype"
+   ],
+   "definition": "The tuple giving how many items each axis of an array holds; the item type (dtype) is stored separately.",
+   "example": "A batch of 32 vibration windows of 256 steps and 3 axes has shape (32, 256, 3).",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-ndarray",
+    "dbxfe-deep-learning-source-tensor"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-matmul-concept",
+   "term": "matrix product contract",
+   "aliases": [
+    "matmul",
+    "@ operator",
+    "core dimension"
+   ],
+   "definition": "A product A @ B runs only when A's last axis and B's first axis have the same size, which the result then drops.",
+   "example": "(3, 2) @ (2, 2) returns (3, 2); (1, 3) @ (2, 2) raises a core-dimension mismatch.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-ndarray"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-layer-concept",
+   "term": "layer",
+   "aliases": [
+    "neural network layer",
+    "linear map",
+    "dense layer"
+   ],
+   "definition": "A weight-matrix multiplication plus a bias, followed by an activation function, turning one vector of numbers into the next.",
+   "example": "Layer 1 maps the reading [0.5, 1.0] to pre-activations [-1.0, 0.25] before ReLU.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-network"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-relu-concept",
+   "term": "ReLU activation",
+   "aliases": [
+    "nonlinearity",
+    "activation function",
+    "rectified linear unit"
+   ],
+   "definition": "The function max(z, 0), which passes positive values and turns negatives into zero, bending an otherwise linear network.",
+   "example": "ReLU turns the pre-activations [-1.0, 0.25] into [0, 0.25].",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-forward-concept",
+   "term": "forward pass",
+   "aliases": [
+    "forward computation",
+    "sigmoid output"
+   ],
+   "definition": "The ordered arithmetic that carries an input through every layer to the output, here ending in a sigmoid probability.",
+   "example": "The reading [0.5, 1.0] ends at score 0.5 and defect probability 0.6225.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-network"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-loss-concept",
+   "term": "loss function",
+   "aliases": [
+    "cost function",
+    "log loss",
+    "binary cross-entropy"
+   ],
+   "definition": "A number scoring how wrong a prediction is against its label; training tries to make its average small.",
+   "example": "Predicting 0.6225 for a real defect gives log loss -ln(0.6225) = 0.4741.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-gradient"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-gradient-concept",
+   "term": "gradient descent",
+   "aliases": [
+    "gradient",
+    "learning rate",
+    "backpropagation",
+    "backward pass"
+   ],
+   "definition": "Repeatedly moving each weight a small step against the gradient of the loss, the step scaled by a learning rate.",
+   "example": "W2[1] moves from 4.0 to about 4.0094 at learning rate 0.1.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-gradient"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-embedding-concept",
+   "term": "embedding",
+   "aliases": [
+    "embedding table",
+    "learned vector",
+    "nn.Embedding"
+   ],
+   "definition": "A learned lookup table mapping a categorical index to a vector the next layer can multiply, updated by gradients like other weights.",
+   "example": "Supplier code S-0331 is index 2 and returns a learned three-number row.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-embedding",
+    "dbxfe-deep-learning-source-search"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-training-concept",
+   "term": "training versus inference",
+   "aliases": [
+    "training loop",
+    "inference",
+    "frozen weights"
+   ],
+   "definition": "Training repeats forward, loss, backward and update over labelled batches; inference runs one forward pass with frozen weights.",
+   "example": "Scoring 200,000 production clips changes no weight; a new labelled run does.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-dl"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-batch-concept",
+   "term": "batch size",
+   "aliases": [
+    "mini-batch",
+    "steps per epoch"
+   ],
+   "definition": "The number of examples whose gradients are averaged into one update; it sets steps per epoch and activation memory.",
+   "example": "64,000 windows at batch 64 give 1,000 steps per epoch.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-memory-concept",
+   "term": "GPU memory budget",
+   "aliases": [
+    "CUDA out of memory",
+    "activation memory",
+    "VRAM"
+   ],
+   "definition": "Accelerator memory holding weights, gradients, optimizer state and one batch's activations during a training step.",
+   "example": "80 MB fixed plus 6 MB per window: batch 512 needs 3,152 MB against 2,048 MB (synthetic).",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-accumulation-concept",
+   "term": "gradient accumulation",
+   "aliases": [
+    "effective batch",
+    "accumulated gradients"
+   ],
+   "definition": "Adding gradients from several small batches before one optimizer step, keeping the effective batch while holding one small batch's activations.",
+   "example": "Batch 64 accumulated over four steps updates like batch 256 but needs 464 MB (synthetic).",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-finetune-concept",
+   "term": "fine-tuning",
+   "aliases": [
+    "continued training",
+    "instruction fine-tuning"
+   ],
+   "definition": "Continuing to train an existing model on new examples so that its weights, and therefore its habits, change.",
+   "example": "Examples of six-field defect codes change how the model formats answers.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-finetune",
+    "dbxfe-deep-learning-source-ai-runtime"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-retrieval-concept",
+   "term": "retrieval",
+   "aliases": [
+    "retrieval-augmented generation",
+    "RAG",
+    "vector search"
+   ],
+   "definition": "Finding relevant passages at request time and placing them in the model's input, leaving the weights unchanged.",
+   "example": "This Monday's bulletin is indexed and cited in answers the same day.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-search"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-parallel-concept",
+   "term": "data parallelism",
+   "aliases": [
+    "DistributedDataParallel",
+    "DDP",
+    "all-reduce"
+   ],
+   "definition": "Every worker keeps a full model copy, processes a different slice of the batch, and averages gradients with the others before each identical update.",
+   "example": "Two workers take 128 windows each of a 256 batch and exchange gradients every step.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-ddp",
+    "dbxfe-deep-learning-source-distributed"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-gpu-compute-concept",
+   "term": "GPU-enabled compute",
+   "aliases": [
+    "GPU cluster",
+    "classic GPU compute"
+   ],
+   "definition": "Classic Databricks compute created with the Machine learning checkbox, a GPU instance type as worker, and Photon off.",
+   "example": "A single-node GPU cluster for developing the weld-defect network.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-gpu",
+    "dbxfe-deep-learning-source-practices"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-ai-runtime-concept",
+   "term": "AI Runtime",
+   "aliases": [
+    "serverless GPU compute",
+    "Serverless GPU",
+    "serverless GPU"
+   ],
+   "definition": "Databricks serverless GPU compute for deep learning, chosen by accelerator from a notebook; single-node Public Preview and multi-GPU Beta when read.",
+   "example": "A notebook connected to an A10 accelerator without configuring a cluster.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-ai-runtime",
+    "dbxfe-deep-learning-source-ai-runtime-multi"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-distributor-concept",
+   "term": "TorchDistributor",
+   "aliases": [
+    "distributed PyTorch on Spark",
+    "DeepSpeed distributor",
+    "Ray"
+   ],
+   "definition": "A PySpark module that launches PyTorch training as Spark jobs across workers, one of the distributors in Databricks Runtime ML.",
+   "example": "Rung 4 of the ladder, used only if one node is outgrown.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-torchdistributor",
+    "dbxfe-deep-learning-source-distributed"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-ladder-concept",
+   "term": "compute ladder",
+   "aliases": [
+    "CPU smoke test",
+    "NOT EXECUTED label"
+   ],
+   "definition": "An ordered plan that proves shapes and one step on CPU, then climbs from one GPU to several to distributed, labelling every unrun step.",
+   "example": "CPU smoke test, single GPU, one node with several GPUs, then TorchDistributor.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-practices",
+    "dbxfe-deep-learning-source-distributed"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-baseline-concept",
+   "term": "simpler model",
+   "aliases": [
+    "simpler baseline",
+    "rule-based baseline",
+    "non-ML solution"
+   ],
+   "definition": "The rule or classical model a neural network must beat on the same held-out evidence by more than its extra cost.",
+   "example": "Gradient-boosted trees at 78% recall on CPU against a CNN at 83% on GPU.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-extension-amp-concept",
+   "term": "automatic mixed precision",
+   "aliases": [
+    "torch.amp",
+    "autocast",
+    "bfloat16",
+    "float16"
+   ],
+   "definition": "Running some operations in 16-bit floating point and precision-sensitive ones in float32 to save time and memory.",
+   "example": "Convolutions in bfloat16 while the loss reduction stays in float32.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-amp"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-extension-deepspeed-concept",
+   "term": "DeepSpeed distributor",
+   "aliases": [
+    "DeepSpeed",
+    "memory-constrained training"
+   ],
+   "definition": "A Databricks distributor built on TorchDistributor for models that need more compute but are limited by memory.",
+   "example": "A model too large for one GPU's memory even at batch 1.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-deepspeed"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-extension-deprecation-concept",
+   "term": "Foundation Model Fine-tuning deprecation",
+   "aliases": [
+    "Foundation Model Fine-tuning",
+    "Mosaic AI Model Training"
+   ],
+   "definition": "The documented retirement of Databricks' managed fine-tuning feature, with AI Runtime named as the migration path.",
+   "example": "A fine-tuning plan written in 2025 against the old UI now needs rework.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-finetune"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-extension-search-concept",
+   "term": "embeddings in an AI Search index",
+   "aliases": [
+    "Compute embeddings",
+    "Use existing embeddings",
+    "hybrid search"
+   ],
+   "definition": "An AI Search index either has Databricks compute embeddings for a text column or reads embeddings already stored in the source table.",
+   "example": "Bulletin text embedded by the service versus vectors computed upstream.",
+   "sourceIds": [
+    "dbxfe-deep-learning-source-search"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-deep-learning-shape-visual",
+   "kind": "table",
+   "title": "One reading, one window, one batch",
+   "alt": "Three tables growing an axis at a time: one reading of shape (2,), one window of shape (256, 3), a batch of shape (32, 256, 3), then the bytes the batch costs.",
+   "caption": "Each new axis counts something new; the batch axis comes first and the bytes follow from the product of the sizes. Synthetic teaching example.",
+   "textEquivalent": "One reading: Two standardized features from one bearing at one instant. Table columns: axis, size, counts. Rows: 0 | 2 | features: vibration RMS, temperature.\n\nOne window: Two seconds of vibration sampled as 256 steps of three axes. Table columns: axis, size, counts. Rows: 0 | 256 | time steps; 1 | 3 | vibration axes x, y, z.\n\nOne batch: Thirty-two windows travel together; the new axis goes first. Table columns: axis, size, counts. Rows: 0 | 32 | windows (the batch); 1 | 256 | time steps; 2 | 3 | vibration axes.\n\nWhat the batch costs: Memory is the product of the sizes times bytes per item. Equation: 32 × 256 × 3 = 24,576 values × 4 bytes (float32) = 98,304 bytes ≈ 98 KB of input",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-tensor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "reading",
+     "title": "One reading",
+     "explanation": "Two standardized features from one bearing at one instant.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "axis",
+       "size",
+       "counts"
+      ],
+      "rows": [
+       [
+        "0",
+        "2",
+        "features: vibration RMS, temperature"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "window",
+     "title": "One window",
+     "explanation": "Two seconds of vibration sampled as 256 steps of three axes.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "axis",
+       "size",
+       "counts"
+      ],
+      "rows": [
+       [
+        "0",
+        "256",
+        "time steps"
+       ],
+       [
+        "1",
+        "3",
+        "vibration axes x, y, z"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "batch",
+     "title": "One batch",
+     "explanation": "Thirty-two windows travel together; the new axis goes first.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "axis",
+       "size",
+       "counts"
+      ],
+      "rows": [
+       [
+        "0",
+        "32",
+        "windows (the batch)"
+       ],
+       [
+        "1",
+        "256",
+        "time steps"
+       ],
+       [
+        "2",
+        "3",
+        "vibration axes"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "bytes",
+     "title": "What the batch costs",
+     "explanation": "Memory is the product of the sizes times bytes per item.",
+     "nodes": [],
+     "connections": [],
+     "equation": "32 × 256 × 3 = 24,576 values × 4 bytes (float32) = 98,304 bytes ≈ 98 KB of input"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-matmul-visual",
+   "kind": "equation",
+   "title": "The inner sizes decide whether a product runs",
+   "alt": "Four equations: matching inner sizes that vanish, a stacked batch product, a mismatch error, and a product that runs but computes the wrong thing.",
+   "caption": "The two inner sizes must agree and disappear; outer axes carry through; a legal product can still be the wrong one.",
+   "textEquivalent": "Inner sizes agree: The 2 of the batch meets the 2 of the weight and disappears. Equation: X (3, 2) @ W (2, 2) → (3, 2): three readings in, three pairs of hidden values out\n\nLeading axes carry through: Batch and time axes are treated as a stack and kept. Equation: (32, 256, 3) @ (3, 8) → (32, 256, 8), as run with NumPy in this build\n\nInner sizes disagree: The product refuses before any arithmetic and names both sizes. Equation: (1, 3) @ (2, 2) → ValueError: matmul: … core dimension 0 … (size 2 is different from 3)\n\nLegal but wrong: Square weights accept either orientation, so the shape check cannot catch this. Equation: X (3, 2) @ W1 (2, 2) runs but computes W1ᵀx per row; the network needs X @ W1.T",
+   "provenance": "Original SpicyBrain authored visual; the stacked product and the error text were run with NumPy 2.5.3 on CPU in this build; no GPU or cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-tensor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction",
+    "dbxfe-deep-learning-claim-network"
+   ],
+   "states": [
+    {
+     "id": "agree",
+     "title": "Inner sizes agree",
+     "explanation": "The 2 of the batch meets the 2 of the weight and disappears.",
+     "nodes": [],
+     "connections": [],
+     "equation": "X (3, 2) @ W (2, 2) → (3, 2): three readings in, three pairs of hidden values out"
+    },
+    {
+     "id": "stack",
+     "title": "Leading axes carry through",
+     "explanation": "Batch and time axes are treated as a stack and kept.",
+     "nodes": [],
+     "connections": [],
+     "equation": "(32, 256, 3) @ (3, 8) → (32, 256, 8), as run with NumPy in this build"
+    },
+    {
+     "id": "mismatch",
+     "title": "Inner sizes disagree",
+     "explanation": "The product refuses before any arithmetic and names both sizes.",
+     "nodes": [],
+     "connections": [],
+     "equation": "(1, 3) @ (2, 2) → ValueError: matmul: … core dimension 0 … (size 2 is different from 3)"
+    },
+    {
+     "id": "legal",
+     "title": "Legal but wrong",
+     "explanation": "Square weights accept either orientation, so the shape check cannot catch this.",
+     "nodes": [],
+     "connections": [],
+     "equation": "X (3, 2) @ W1 (2, 2) runs but computes W1ᵀx per row; the network needs X @ W1.T"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-layer-visual",
+   "kind": "nodes",
+   "title": "Two linear maps and a bend",
+   "alt": "A two-input network: inputs feed two hidden units through ReLU into one output. Without ReLU the two layers collapse into one linear map; with ReLU, unit one switches off for this reading.",
+   "caption": "Remove the bend and the second layer adds nothing; keep it and different inputs switch different units off. Hand-chosen weights. Synthetic teaching example.",
+   "textEquivalent": "Two layers with a bend: Each hidden unit is a weighted sum plus a bias, passed through ReLU, then combined by the output layer. Nodes: x1 vibration: 0.5. Standardized input. (context); x2 temperature: 1.0. Standardized input. (context); hidden unit 1: 1.0·x1 − 2.0·x2 + 0.5, then ReLU. (selected); hidden unit 2: 0.5·x1 + 1.0·x2 − 1.0, then ReLU. (selected); output score: 2.0·h1 + 4.0·h2 − 0.5, then sigmoid. (selected). Relationships: x1 vibration → hidden unit 1: ×1.0; x2 temperature → hidden unit 1: ×−2.0; x1 vibration → hidden unit 2: ×0.5; x2 temperature → hidden unit 2: ×1.0; hidden unit 1 → output score: ×2.0; hidden unit 2 → output score: ×4.0.\n\nNo bend: one layer in disguise: Without ReLU the two products and biases fold into one weight row and one bias. Equation: W2(W1x + b1) + b2 = (W2W1)x + (W2b1 + b2) = [4.0, 0.0]·x − 3.5 → −1.5 for x = [0.5, 1.0]\n\nWith the bend: a unit switches off: ReLU zeroes unit one for this reading, so only unit two reaches the output. Nodes: x1 vibration: 0.5. Standardized input. (context); x2 temperature: 1.0. Standardized input. (context); hidden unit 1: 0. Pre-activation −1.0; ReLU outputs 0. (excluded); hidden unit 2: 0.25. Pre-activation 0.25 passes unchanged. (selected); output score: 0.5. 4.0 × 0.25 − 0.5 = 0.5 instead of −1.5. (selected). Relationships: x1 vibration → hidden unit 2: ×0.5; x2 temperature → hidden unit 2: ×1.0; hidden unit 2 → output score: ×4.0; hidden unit 1 → output score: contributes 0.",
+   "provenance": "Original SpicyBrain authored visual; hand-chosen synthetic weights. Every value shown was reproduced by the lesson's NumPy example, run on CPU in this build on 2026-09-23 (Python 3.12.3, NumPy 2.5.3, x86_64); no GPU, product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-network",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "net",
+     "title": "Two layers with a bend",
+     "explanation": "Each hidden unit is a weighted sum plus a bias, passed through ReLU, then combined by the output layer.",
+     "nodes": [
+      {
+       "id": "in1",
+       "label": "x1 vibration",
+       "detail": "Standardized input.",
+       "status": "context",
+       "value": "0.5"
+      },
+      {
+       "id": "in2",
+       "label": "x2 temperature",
+       "detail": "Standardized input.",
+       "status": "context",
+       "value": "1.0"
+      },
+      {
+       "id": "hid1",
+       "label": "hidden unit 1",
+       "detail": "1.0·x1 − 2.0·x2 + 0.5, then ReLU.",
+       "status": "selected"
+      },
+      {
+       "id": "hid2",
+       "label": "hidden unit 2",
+       "detail": "0.5·x1 + 1.0·x2 − 1.0, then ReLU.",
+       "status": "selected"
+      },
+      {
+       "id": "out",
+       "label": "output score",
+       "detail": "2.0·h1 + 4.0·h2 − 0.5, then sigmoid.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "in1",
+       "to": "hid1",
+       "label": "×1.0"
+      },
+      {
+       "from": "in2",
+       "to": "hid1",
+       "label": "×−2.0"
+      },
+      {
+       "from": "in1",
+       "to": "hid2",
+       "label": "×0.5"
+      },
+      {
+       "from": "in2",
+       "to": "hid2",
+       "label": "×1.0"
+      },
+      {
+       "from": "hid1",
+       "to": "out",
+       "label": "×2.0"
+      },
+      {
+       "from": "hid2",
+       "to": "out",
+       "label": "×4.0"
+      }
+     ]
+    },
+    {
+     "id": "collapse",
+     "title": "No bend: one layer in disguise",
+     "explanation": "Without ReLU the two products and biases fold into one weight row and one bias.",
+     "nodes": [],
+     "connections": [],
+     "equation": "W2(W1x + b1) + b2 = (W2W1)x + (W2b1 + b2) = [4.0, 0.0]·x − 3.5 → −1.5 for x = [0.5, 1.0]"
+    },
+    {
+     "id": "bend",
+     "title": "With the bend: a unit switches off",
+     "explanation": "ReLU zeroes unit one for this reading, so only unit two reaches the output.",
+     "nodes": [
+      {
+       "id": "in1",
+       "label": "x1 vibration",
+       "detail": "Standardized input.",
+       "status": "context",
+       "value": "0.5"
+      },
+      {
+       "id": "in2",
+       "label": "x2 temperature",
+       "detail": "Standardized input.",
+       "status": "context",
+       "value": "1.0"
+      },
+      {
+       "id": "hid1",
+       "label": "hidden unit 1",
+       "detail": "Pre-activation −1.0; ReLU outputs 0.",
+       "status": "excluded",
+       "value": "0"
+      },
+      {
+       "id": "hid2",
+       "label": "hidden unit 2",
+       "detail": "Pre-activation 0.25 passes unchanged.",
+       "status": "selected",
+       "value": "0.25"
+      },
+      {
+       "id": "out",
+       "label": "output score",
+       "detail": "4.0 × 0.25 − 0.5 = 0.5 instead of −1.5.",
+       "status": "selected",
+       "value": "0.5"
+      }
+     ],
+     "connections": [
+      {
+       "from": "in1",
+       "to": "hid2",
+       "label": "×0.5"
+      },
+      {
+       "from": "in2",
+       "to": "hid2",
+       "label": "×1.0"
+      },
+      {
+       "from": "hid2",
+       "to": "out",
+       "label": "×4.0"
+      },
+      {
+       "from": "hid1",
+       "to": "out",
+       "label": "contributes 0"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-forward-visual",
+   "kind": "equation",
+   "title": "One reading through the network, by hand",
+   "alt": "Four equations carry the reading [0.5, 1.0] through layer 1, ReLU, layer 2 and the sigmoid to 0.6225, then a table shows three readings as one batch.",
+   "caption": "Every intermediate value is printed so you can recompute it; the batch reuses the same weights for three readings. Hand-chosen, untrained weights.",
+   "textEquivalent": "Layer 1: linear map: Each hidden unit's weighted sum plus its bias. Equation: z1 = W1x + b1 = [1.0×0.5 − 2.0×1.0 + 0.5, 0.5×0.5 + 1.0×1.0 − 1.0] = [−1.0, 0.25]\n\nReLU: Negatives become zero; unit one is switched off. Equation: h = max(z1, 0) = [0, 0.25]\n\nLayer 2: the score: The output layer weighs the hidden values and adds its bias. Equation: z2 = W2h + b2 = 2.0×0 + 4.0×0.25 − 0.5 = 0.5\n\nSigmoid: a probability: The sigmoid squeezes any score into (0, 1). Equation: p = 1 / (1 + e^(−0.5)) = 0.6225, a 62% defect probability\n\nThree readings as one batch: A (3, 2) batch runs through the same weights in one product per layer. Table columns: reading x, hidden h, probability p. Rows: [0.5, 1.0] | [0, 0.25] | 0.6225; [2.0, 0.0] | [2.5, 0] | 0.989; [−1.0, 0.5] | [0, 0] | 0.3775.",
+   "provenance": "Original SpicyBrain authored visual; hand-chosen synthetic weights. Every value shown was reproduced by the lesson's NumPy example, run on CPU in this build on 2026-09-23 (Python 3.12.3, NumPy 2.5.3, x86_64); no GPU, product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-network",
+    "dbxfe-deep-learning-claim-tensor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "layer1",
+     "title": "Layer 1: linear map",
+     "explanation": "Each hidden unit's weighted sum plus its bias.",
+     "nodes": [],
+     "connections": [],
+     "equation": "z1 = W1x + b1 = [1.0×0.5 − 2.0×1.0 + 0.5, 0.5×0.5 + 1.0×1.0 − 1.0] = [−1.0, 0.25]"
+    },
+    {
+     "id": "relu",
+     "title": "ReLU",
+     "explanation": "Negatives become zero; unit one is switched off.",
+     "nodes": [],
+     "connections": [],
+     "equation": "h = max(z1, 0) = [0, 0.25]"
+    },
+    {
+     "id": "layer2",
+     "title": "Layer 2: the score",
+     "explanation": "The output layer weighs the hidden values and adds its bias.",
+     "nodes": [],
+     "connections": [],
+     "equation": "z2 = W2h + b2 = 2.0×0 + 4.0×0.25 − 0.5 = 0.5"
+    },
+    {
+     "id": "sigmoid",
+     "title": "Sigmoid: a probability",
+     "explanation": "The sigmoid squeezes any score into (0, 1).",
+     "nodes": [],
+     "connections": [],
+     "equation": "p = 1 / (1 + e^(−0.5)) = 0.6225, a 62% defect probability"
+    },
+    {
+     "id": "batch",
+     "title": "Three readings as one batch",
+     "explanation": "A (3, 2) batch runs through the same weights in one product per layer.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "reading x",
+       "hidden h",
+       "probability p"
+      ],
+      "rows": [
+       [
+        "[0.5, 1.0]",
+        "[0, 0.25]",
+        "0.6225"
+       ],
+       [
+        "[2.0, 0.0]",
+        "[2.5, 0]",
+        "0.989"
+       ],
+       [
+        "[−1.0, 0.5]",
+        "[0, 0]",
+        "0.3775"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-loss-visual",
+   "kind": "equation",
+   "title": "From a wrong-ish answer to a weight update",
+   "alt": "Four equations: the log loss of 0.6225 for a real defect, the output gradient, the gradient for each output weight, and one update with learning rate 0.1.",
+   "caption": "The error signal reaches only the weight whose unit was on; one small step raises the defect probability slightly. Hand-chosen weights, label y = 1.",
+   "textEquivalent": "Score the prediction: The reading was a real defect; the loss is small only if p is near 1. Equation: loss = −ln(p) = −ln(0.6225) = 0.4741 (label y = 1; a perfect prediction scores 0)\n\nOutput gradient: For a sigmoid with log loss the gradient at the score is prediction minus label. Equation: ∂loss/∂z2 = p − y = 0.6225 − 1 = −0.3775 (negative: the score should rise)\n\nGradients for the output weights: Each weight's gradient is the error times the value that flowed through it. Equation: ∂loss/∂W2 = (p − y) × h = −0.3775 × [0, 0.25] = [−0.0 (a signed zero), −0.0944]\n\nOne gradient-descent step: Move against the gradient, scaled by the learning rate. Equation: W2 ← W2 − 0.1 × [−0.0, −0.0944] = [2.0, 4.0094]; p rises from 0.6225 to 0.6230",
+   "provenance": "Original SpicyBrain authored visual; hand-chosen synthetic weights. Every value shown was reproduced by the lesson's NumPy example, run on CPU in this build on 2026-09-23 (Python 3.12.3, NumPy 2.5.3, x86_64); no GPU, product screenshot or executed cloud result. The one-step update was computed with the same NumPy setup in this build.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-network",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "loss",
+     "title": "Score the prediction",
+     "explanation": "The reading was a real defect; the loss is small only if p is near 1.",
+     "nodes": [],
+     "connections": [],
+     "equation": "loss = −ln(p) = −ln(0.6225) = 0.4741 (label y = 1; a perfect prediction scores 0)"
+    },
+    {
+     "id": "dz2",
+     "title": "Output gradient",
+     "explanation": "For a sigmoid with log loss the gradient at the score is prediction minus label.",
+     "nodes": [],
+     "connections": [],
+     "equation": "∂loss/∂z2 = p − y = 0.6225 − 1 = −0.3775 (negative: the score should rise)"
+    },
+    {
+     "id": "dw2",
+     "title": "Gradients for the output weights",
+     "explanation": "Each weight's gradient is the error times the value that flowed through it.",
+     "nodes": [],
+     "connections": [],
+     "equation": "∂loss/∂W2 = (p − y) × h = −0.3775 × [0, 0.25] = [−0.0 (a signed zero), −0.0944]"
+    },
+    {
+     "id": "step",
+     "title": "One gradient-descent step",
+     "explanation": "Move against the gradient, scaled by the learning rate.",
+     "nodes": [],
+     "connections": [],
+     "equation": "W2 ← W2 − 0.1 × [−0.0, −0.0944] = [2.0, 4.0094]; p rises from 0.6225 to 0.6230"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-embedding-visual",
+   "kind": "table",
+   "title": "Supplier codes become learned rows",
+   "alt": "A supplier embedding table: codes map to indices and rows of three numbers; after training two similar suppliers have close rows; an unseen code maps to the reserved unknown row.",
+   "caption": "An index selects a row; training moves the rows; a code the table never had needs a reserved row. Synthetic teaching example.",
+   "textEquivalent": "Lookup before training: Each code is an index; each row starts as small random numbers. Table columns: index, supplier code, vector (3 numbers). Rows: 0 | unknown (reserved) | [0.02, −0.01, 0.00]; 1 | S-0102 | [0.05, 0.03, −0.04]; 2 | S-0331 | [−0.02, 0.04, 0.01]; 3 | S-0450 | [0.01, −0.03, 0.02].\n\nAfter training: Rows moved with the gradients; suppliers that predict alike drifted together. Table columns: index, supplier code, vector (3 numbers), defect rate in data. Rows: 1 | S-0102 | [0.41, −0.30, 0.12] | low; 2 | S-0331 | [0.39, −0.28, 0.15] | low; 3 | S-0450 | [−0.52, 0.60, 0.05] | high.\n\nAn unseen code at inference: The table's size is fixed; a new code must map to the reserved row. Table columns: incoming code, index used, result. Rows: S-0331 | 2 | its own learned row; S-0917 (new) | 0 (unknown) | the learned unknown row, not an index error.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-embedding",
+    "dbxfe-deep-learning-claim-search",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "lookup",
+     "title": "Lookup before training",
+     "explanation": "Each code is an index; each row starts as small random numbers.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "index",
+       "supplier code",
+       "vector (3 numbers)"
+      ],
+      "rows": [
+       [
+        "0",
+        "unknown (reserved)",
+        "[0.02, −0.01, 0.00]"
+       ],
+       [
+        "1",
+        "S-0102",
+        "[0.05, 0.03, −0.04]"
+       ],
+       [
+        "2",
+        "S-0331",
+        "[−0.02, 0.04, 0.01]"
+       ],
+       [
+        "3",
+        "S-0450",
+        "[0.01, −0.03, 0.02]"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "trained",
+     "title": "After training",
+     "explanation": "Rows moved with the gradients; suppliers that predict alike drifted together.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "index",
+       "supplier code",
+       "vector (3 numbers)",
+       "defect rate in data"
+      ],
+      "rows": [
+       [
+        "1",
+        "S-0102",
+        "[0.41, −0.30, 0.12]",
+        "low"
+       ],
+       [
+        "2",
+        "S-0331",
+        "[0.39, −0.28, 0.15]",
+        "low"
+       ],
+       [
+        "3",
+        "S-0450",
+        "[−0.52, 0.60, 0.05]",
+        "high"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "unseen",
+     "title": "An unseen code at inference",
+     "explanation": "The table's size is fixed; a new code must map to the reserved row.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "incoming code",
+       "index used",
+       "result"
+      ],
+      "rows": [
+       [
+        "S-0331",
+        "2",
+        "its own learned row"
+       ],
+       [
+        "S-0917 (new)",
+        "0 (unknown)",
+        "the learned unknown row, not an index error"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-train-infer-visual",
+   "kind": "comparison",
+   "title": "Training rewrites weights; inference reads them",
+   "alt": "Two paths compared: a training step with labels, loss, backward pass and optimizer update; an inference request with frozen weights and only a forward pass.",
+   "caption": "Only the training path has a loss, a backward pass and an update; inference changes no weight. Synthetic teaching example.",
+   "textEquivalent": "Training step: Labelled batch in, weights rewritten out; repeated over many batches and epochs. Nodes: labelled batch: 32 clips and their inspection labels. (selected); forward pass: Scores for all 32 clips. (selected); loss: Average log loss against labels. (selected); backward pass: Gradients for every weight. (selected); optimizer update: Weights change; optimizer state updates. (selected). Relationships: labelled batch → forward pass: input; forward pass → loss: predictions; loss → backward pass: chain rule; backward pass → optimizer update: gradients.\n\nInference request: One clip in, one probability out; the weights are read, never written. Nodes: new clip: No label exists yet. (selected); forward pass: Frozen weights; one probability. (selected); loss: No label, so no loss. (excluded); backward pass: Not run; no gradients stored. (excluded); optimizer update: Not run; weights unchanged. (excluded). Relationships: new clip → forward pass: input.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-dl",
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "train",
+     "title": "Training step",
+     "explanation": "Labelled batch in, weights rewritten out; repeated over many batches and epochs.",
+     "nodes": [
+      {
+       "id": "data",
+       "label": "labelled batch",
+       "detail": "32 clips and their inspection labels.",
+       "status": "selected"
+      },
+      {
+       "id": "fwd",
+       "label": "forward pass",
+       "detail": "Scores for all 32 clips.",
+       "status": "selected"
+      },
+      {
+       "id": "loss",
+       "label": "loss",
+       "detail": "Average log loss against labels.",
+       "status": "selected"
+      },
+      {
+       "id": "back",
+       "label": "backward pass",
+       "detail": "Gradients for every weight.",
+       "status": "selected"
+      },
+      {
+       "id": "upd",
+       "label": "optimizer update",
+       "detail": "Weights change; optimizer state updates.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "data",
+       "to": "fwd",
+       "label": "input"
+      },
+      {
+       "from": "fwd",
+       "to": "loss",
+       "label": "predictions"
+      },
+      {
+       "from": "loss",
+       "to": "back",
+       "label": "chain rule"
+      },
+      {
+       "from": "back",
+       "to": "upd",
+       "label": "gradients"
+      }
+     ]
+    },
+    {
+     "id": "infer",
+     "title": "Inference request",
+     "explanation": "One clip in, one probability out; the weights are read, never written.",
+     "nodes": [
+      {
+       "id": "data",
+       "label": "new clip",
+       "detail": "No label exists yet.",
+       "status": "selected"
+      },
+      {
+       "id": "fwd",
+       "label": "forward pass",
+       "detail": "Frozen weights; one probability.",
+       "status": "selected"
+      },
+      {
+       "id": "loss",
+       "label": "loss",
+       "detail": "No label, so no loss.",
+       "status": "excluded"
+      },
+      {
+       "id": "back",
+       "label": "backward pass",
+       "detail": "Not run; no gradients stored.",
+       "status": "excluded"
+      },
+      {
+       "id": "upd",
+       "label": "optimizer update",
+       "detail": "Not run; weights unchanged.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "data",
+       "to": "fwd",
+       "label": "input"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-memory-visual",
+   "kind": "table",
+   "title": "Batch size against a 2,048 MB budget",
+   "alt": "Four tables of training memory: fixed weights, gradients and optimizer state plus activations growing with the batch at 32, 128 and 512, then batch 64 with gradient accumulation.",
+   "caption": "Only activations grow with the batch; accumulation keeps the effective batch while holding one small batch. Synthetic teaching example: 5 million float32 parameters, an assumed 6 MB of activations per window.",
+   "textEquivalent": "Batch 32: Fixed costs dominate; plenty of headroom. Table columns: item, MB. Rows: weights + gradients | 40; optimizer state | 40; activations 32 × 6 | 192; total vs 2,048 | 272, fits.\n\nBatch 128: Activations now dominate; still fits. Table columns: item, MB. Rows: weights + gradients | 40; optimizer state | 40; activations 128 × 6 | 768; total vs 2,048 | 848, fits.\n\nBatch 512: Activations alone exceed the budget: CUDA out of memory. Table columns: item, MB. Rows: weights + gradients | 40; optimizer state | 40; activations 512 × 6 | 3,072; total vs 2,048 | 3,152, out of memory.\n\nBatch 64, accumulated four times: Gradients from four small batches are summed before one update: effective batch 256. Table columns: item, MB. Rows: weights + gradients | 40; optimizer state | 40; activations 64 × 6 | 384; total vs 2,048 | 464, fits; updates like batch 256.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-claim-amp",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "b32",
+     "title": "Batch 32",
+     "explanation": "Fixed costs dominate; plenty of headroom.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "item",
+       "MB"
+      ],
+      "rows": [
+       [
+        "weights + gradients",
+        "40"
+       ],
+       [
+        "optimizer state",
+        "40"
+       ],
+       [
+        "activations 32 × 6",
+        "192"
+       ],
+       [
+        "total vs 2,048",
+        "272, fits"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "b128",
+     "title": "Batch 128",
+     "explanation": "Activations now dominate; still fits.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "item",
+       "MB"
+      ],
+      "rows": [
+       [
+        "weights + gradients",
+        "40"
+       ],
+       [
+        "optimizer state",
+        "40"
+       ],
+       [
+        "activations 128 × 6",
+        "768"
+       ],
+       [
+        "total vs 2,048",
+        "848, fits"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "b512",
+     "title": "Batch 512",
+     "explanation": "Activations alone exceed the budget: CUDA out of memory.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "item",
+       "MB"
+      ],
+      "rows": [
+       [
+        "weights + gradients",
+        "40"
+       ],
+       [
+        "optimizer state",
+        "40"
+       ],
+       [
+        "activations 512 × 6",
+        "3,072"
+       ],
+       [
+        "total vs 2,048",
+        "3,152, out of memory"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "accum",
+     "title": "Batch 64, accumulated four times",
+     "explanation": "Gradients from four small batches are summed before one update: effective batch 256.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "item",
+       "MB"
+      ],
+      "rows": [
+       [
+        "weights + gradients",
+        "40"
+       ],
+       [
+        "optimizer state",
+        "40"
+       ],
+       [
+        "activations 64 × 6",
+        "384"
+       ],
+       [
+        "total vs 2,048",
+        "464, fits; updates like batch 256"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-finetune-visual",
+   "kind": "comparison",
+   "title": "Change the weights or change the input",
+   "alt": "Two paths: fine-tuning feeds examples into a training run that changes the model's weights; retrieval searches an index at request time and puts passages into the input of an unchanged model. A table then matches needs to levers.",
+   "caption": "Fine-tuning moves habits into weights with no citation; retrieval moves facts into the input and is refreshed by re-indexing. Synthetic teaching example.",
+   "textEquivalent": "Fine-tuning: Examples change the weights once; every later answer carries the new habit. Nodes: example pairs: Questions with answers in the six-field format. (selected); training run: GPU time; continues from existing weights. (selected); model weights: Changed; the format habit is learned. (selected); citation: None: the model cannot point to its source. (warning). Relationships: example pairs → training run: train on; training run → model weights: updates; model weights → citation: cannot produce.\n\nRetrieval: The question finds passages; the model reads them in its input and cites them. Nodes: bulletins index: Rebuilt when Monday's bulletin arrives. (selected); search at request: Finds the most similar passages. (selected); model weights: Unchanged. (context); citation: Passage id returned with the answer. (selected). Relationships: bulletins index → search at request: searched by; search at request → model weights: passages in prompt; model weights → citation: answer cites.\n\nPick by need: Measure first; each lever answers a different gap. Table columns: need, first lever, then. Rows: fixed output format or tone | prompt with examples | fine-tune if a measured gap remains; facts that change, with citations | retrieval | better chunking or ranking; new domain vocabulary | prompt and retrieval | fine-tune, measured on an evaluation set.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-finetune",
+    "dbxfe-deep-learning-claim-search",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "tune",
+     "title": "Fine-tuning",
+     "explanation": "Examples change the weights once; every later answer carries the new habit.",
+     "nodes": [
+      {
+       "id": "source",
+       "label": "example pairs",
+       "detail": "Questions with answers in the six-field format.",
+       "status": "selected"
+      },
+      {
+       "id": "run",
+       "label": "training run",
+       "detail": "GPU time; continues from existing weights.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "model weights",
+       "detail": "Changed; the format habit is learned.",
+       "status": "selected"
+      },
+      {
+       "id": "cite",
+       "label": "citation",
+       "detail": "None: the model cannot point to its source.",
+       "status": "warning"
+      }
+     ],
+     "connections": [
+      {
+       "from": "source",
+       "to": "run",
+       "label": "train on"
+      },
+      {
+       "from": "run",
+       "to": "model",
+       "label": "updates"
+      },
+      {
+       "from": "model",
+       "to": "cite",
+       "label": "cannot produce"
+      }
+     ]
+    },
+    {
+     "id": "retrieve",
+     "title": "Retrieval",
+     "explanation": "The question finds passages; the model reads them in its input and cites them.",
+     "nodes": [
+      {
+       "id": "source",
+       "label": "bulletins index",
+       "detail": "Rebuilt when Monday's bulletin arrives.",
+       "status": "selected"
+      },
+      {
+       "id": "run",
+       "label": "search at request",
+       "detail": "Finds the most similar passages.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "model weights",
+       "detail": "Unchanged.",
+       "status": "context"
+      },
+      {
+       "id": "cite",
+       "label": "citation",
+       "detail": "Passage id returned with the answer.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "source",
+       "to": "run",
+       "label": "searched by"
+      },
+      {
+       "from": "run",
+       "to": "model",
+       "label": "passages in prompt"
+      },
+      {
+       "from": "model",
+       "to": "cite",
+       "label": "answer cites"
+      }
+     ]
+    },
+    {
+     "id": "choose",
+     "title": "Pick by need",
+     "explanation": "Measure first; each lever answers a different gap.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "need",
+       "first lever",
+       "then"
+      ],
+      "rows": [
+       [
+        "fixed output format or tone",
+        "prompt with examples",
+        "fine-tune if a measured gap remains"
+       ],
+       [
+        "facts that change, with citations",
+        "retrieval",
+        "better chunking or ranking"
+       ],
+       [
+        "new domain vocabulary",
+        "prompt and retrieval",
+        "fine-tune, measured on an evaluation set"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-parallel-visual",
+   "kind": "nodes",
+   "title": "Split the batch, share the gradients",
+   "alt": "A batch of 256 split between two workers that each hold a full model copy; their gradients are averaged by an all-reduce and both apply the same update; the exchange costs about 20 MB per step.",
+   "caption": "The data is split, the gradients are shared, the weights stay identical; each step pays for the exchange. Synthetic teaching example: 5 million float32 parameters.",
+   "textEquivalent": "Split the batch: Each worker takes a different half of the batch and a full copy of the model. Nodes: global batch: 256. 256 windows. (context); worker A: 128. Full model copy; windows 1–128. (selected); worker B: 128. Full model copy; windows 129–256. (selected). Relationships: global batch → worker A: first half; global batch → worker B: second half.\n\nAverage the gradients: Each worker computes its gradient; the all-reduce averages them and both apply the same update. Nodes: worker A: Gradient from its 128 windows. (selected); worker B: Gradient from its 128 windows. (selected); all-reduce: Averages the two gradients; both receive the result. (selected); identical update: Both copies stay the same weights. (selected). Relationships: worker A → all-reduce: sends gradient; worker B → all-reduce: sends gradient; all-reduce → identical update: average to both.\n\nWhat each step pays: The gradient is as large as the model, and it crosses the link every step. Equation: 5,000,000 parameters × 4 bytes ≈ 20 MB of gradient per worker per step, over the node's links or the network",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-ddp",
+    "dbxfe-deep-learning-claim-distributed",
+    "dbxfe-deep-learning-claim-torchdistributor",
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "split",
+     "title": "Split the batch",
+     "explanation": "Each worker takes a different half of the batch and a full copy of the model.",
+     "nodes": [
+      {
+       "id": "batch",
+       "label": "global batch",
+       "detail": "256 windows.",
+       "status": "context",
+       "value": "256"
+      },
+      {
+       "id": "worker-a",
+       "label": "worker A",
+       "detail": "Full model copy; windows 1–128.",
+       "status": "selected",
+       "value": "128"
+      },
+      {
+       "id": "worker-b",
+       "label": "worker B",
+       "detail": "Full model copy; windows 129–256.",
+       "status": "selected",
+       "value": "128"
+      }
+     ],
+     "connections": [
+      {
+       "from": "batch",
+       "to": "worker-a",
+       "label": "first half"
+      },
+      {
+       "from": "batch",
+       "to": "worker-b",
+       "label": "second half"
+      }
+     ]
+    },
+    {
+     "id": "reduce",
+     "title": "Average the gradients",
+     "explanation": "Each worker computes its gradient; the all-reduce averages them and both apply the same update.",
+     "nodes": [
+      {
+       "id": "worker-a",
+       "label": "worker A",
+       "detail": "Gradient from its 128 windows.",
+       "status": "selected"
+      },
+      {
+       "id": "worker-b",
+       "label": "worker B",
+       "detail": "Gradient from its 128 windows.",
+       "status": "selected"
+      },
+      {
+       "id": "allreduce",
+       "label": "all-reduce",
+       "detail": "Averages the two gradients; both receive the result.",
+       "status": "selected"
+      },
+      {
+       "id": "upd",
+       "label": "identical update",
+       "detail": "Both copies stay the same weights.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "worker-a",
+       "to": "allreduce",
+       "label": "sends gradient"
+      },
+      {
+       "from": "worker-b",
+       "to": "allreduce",
+       "label": "sends gradient"
+      },
+      {
+       "from": "allreduce",
+       "to": "upd",
+       "label": "average to both"
+      }
+     ]
+    },
+    {
+     "id": "cost",
+     "title": "What each step pays",
+     "explanation": "The gradient is as large as the model, and it crosses the link every step.",
+     "nodes": [],
+     "connections": [],
+     "equation": "5,000,000 parameters × 4 bytes ≈ 20 MB of gradient per worker per step, over the node's links or the network"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-platform-visual",
+   "kind": "table",
+   "title": "Three documented routes to a GPU, and what is still unknown",
+   "alt": "A table of three routes to GPUs on Databricks with how each is chosen and its documented status, followed by a table of Cinderline's verification items.",
+   "caption": "Classic GPU compute, AI Runtime in preview and the distributors each answer a different need; every workspace-specific fact is a verification item. Synthetic teaching example.",
+   "textEquivalent": "Three documented routes: How each route is chosen and what the documentation said about its status when read. Table columns: route, how it is chosen, status when read. Rows: GPU-enabled compute | Machine learning checked, GPU worker type, Single node optional, Photon off | documented classic compute; AI Runtime | notebook Accelerator field: A10 or H100 | single-node Public Preview; multi-GPU Beta; TorchDistributor, DeepSpeed, Ray | included in Databricks Runtime ML | documented; for when one machine is outgrown.\n\nWhat Cinderline must verify: None of these is known until someone checks the workspace and account. Table columns: item, status. Rows: GPU instance types in the region | unknown; AI Runtime enabled in the workspace | unknown (preview); GPU quota | not requested; price per hour | check current pricing.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-gpu",
+    "dbxfe-deep-learning-claim-ai-runtime",
+    "dbxfe-deep-learning-claim-ai-runtime-multi",
+    "dbxfe-deep-learning-claim-dl",
+    "dbxfe-deep-learning-claim-distributed",
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "routes",
+     "title": "Three documented routes",
+     "explanation": "How each route is chosen and what the documentation said about its status when read.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "route",
+       "how it is chosen",
+       "status when read"
+      ],
+      "rows": [
+       [
+        "GPU-enabled compute",
+        "Machine learning checked, GPU worker type, Single node optional, Photon off",
+        "documented classic compute"
+       ],
+       [
+        "AI Runtime",
+        "notebook Accelerator field: A10 or H100",
+        "single-node Public Preview; multi-GPU Beta"
+       ],
+       [
+        "TorchDistributor, DeepSpeed, Ray",
+        "included in Databricks Runtime ML",
+        "documented; for when one machine is outgrown"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "unknowns",
+     "title": "What Cinderline must verify",
+     "explanation": "None of these is known until someone checks the workspace and account.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "item",
+       "status"
+      ],
+      "rows": [
+       [
+        "GPU instance types in the region",
+        "unknown"
+       ],
+       [
+        "AI Runtime enabled in the workspace",
+        "unknown (preview)"
+       ],
+       [
+        "GPU quota",
+        "not requested"
+       ],
+       [
+        "price per hour",
+        "check current pricing"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-ladder-visual",
+   "kind": "timeline",
+   "title": "The compute ladder, as written and after the stop rule",
+   "alt": "A timeline of five rungs from a CPU smoke test to multi-node training; in the second state the stop rule fires after the first GPU run and the later rungs are never climbed.",
+   "caption": "Each rung produces the evidence that justifies the next; every GPU rung is labelled not executed until it runs. Synthetic teaching example.",
+   "textEquivalent": "The ladder as written: Only the smoke test is planned to run first; every GPU rung waits for its evidence. Nodes: 1 CPU smoke test: planned first. 512 clips: shapes, one loss, one step. (selected); 2 single-node GPU: NOT EXECUTED. One epoch, MLflow autologging; recall per epoch. (pending); 3 same node, several GPUs: NOT EXECUTED. Only if epoch time blocks iteration. (pending); 4 TorchDistributor across nodes: NOT EXECUTED. Only if model or data outgrow one node. (pending); compare with trees: Recall at 5% false alarms on the held-out week. (pending). Relationships: 1 CPU smoke test → 2 single-node GPU: shapes proven; 2 single-node GPU → compare with trees: first recall; 2 single-node GPU → 3 same node, several GPUs: if too slow; 3 same node, several GPUs → 4 TorchDistributor across nodes: if outgrown.\n\nStop rule fires: The first GPU run's recall does not clear the priced threshold, so rungs 3 and 4 are never climbed. Nodes: 1 CPU smoke test: Shapes and one step confirmed. (selected); 2 single-node GPU: Recall measured; gain below the priced threshold. (warning); 3 same node, several GPUs: Not climbed; recorded why. (excluded); 4 TorchDistributor across nodes: Not climbed. (excluded); compare with trees: Trees stay in production. (selected). Relationships: 1 CPU smoke test → 2 single-node GPU: shapes proven; 2 single-node GPU → compare with trees: gain too small.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-claim-distributed",
+    "dbxfe-deep-learning-claim-gpu",
+    "dbxfe-deep-learning-claim-ai-runtime",
+    "dbxfe-deep-learning-claim-torchdistributor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "written",
+     "title": "The ladder as written",
+     "explanation": "Only the smoke test is planned to run first; every GPU rung waits for its evidence.",
+     "nodes": [
+      {
+       "id": "cpu",
+       "label": "1 CPU smoke test",
+       "detail": "512 clips: shapes, one loss, one step.",
+       "status": "selected",
+       "value": "planned first"
+      },
+      {
+       "id": "gpu1",
+       "label": "2 single-node GPU",
+       "detail": "One epoch, MLflow autologging; recall per epoch.",
+       "status": "pending",
+       "value": "NOT EXECUTED"
+      },
+      {
+       "id": "gpun",
+       "label": "3 same node, several GPUs",
+       "detail": "Only if epoch time blocks iteration.",
+       "status": "pending",
+       "value": "NOT EXECUTED"
+      },
+      {
+       "id": "multi",
+       "label": "4 TorchDistributor across nodes",
+       "detail": "Only if model or data outgrow one node.",
+       "status": "pending",
+       "value": "NOT EXECUTED"
+      },
+      {
+       "id": "cmp",
+       "label": "compare with trees",
+       "detail": "Recall at 5% false alarms on the held-out week.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "cpu",
+       "to": "gpu1",
+       "label": "shapes proven"
+      },
+      {
+       "from": "gpu1",
+       "to": "cmp",
+       "label": "first recall"
+      },
+      {
+       "from": "gpu1",
+       "to": "gpun",
+       "label": "if too slow"
+      },
+      {
+       "from": "gpun",
+       "to": "multi",
+       "label": "if outgrown"
+      }
+     ]
+    },
+    {
+     "id": "stopped",
+     "title": "Stop rule fires",
+     "explanation": "The first GPU run's recall does not clear the priced threshold, so rungs 3 and 4 are never climbed.",
+     "nodes": [
+      {
+       "id": "cpu",
+       "label": "1 CPU smoke test",
+       "detail": "Shapes and one step confirmed.",
+       "status": "selected"
+      },
+      {
+       "id": "gpu1",
+       "label": "2 single-node GPU",
+       "detail": "Recall measured; gain below the priced threshold.",
+       "status": "warning"
+      },
+      {
+       "id": "gpun",
+       "label": "3 same node, several GPUs",
+       "detail": "Not climbed; recorded why.",
+       "status": "excluded"
+      },
+      {
+       "id": "multi",
+       "label": "4 TorchDistributor across nodes",
+       "detail": "Not climbed.",
+       "status": "excluded"
+      },
+      {
+       "id": "cmp",
+       "label": "compare with trees",
+       "detail": "Trees stay in production.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "cpu",
+       "to": "gpu1",
+       "label": "shapes proven"
+      },
+      {
+       "from": "gpu1",
+       "to": "cmp",
+       "label": "gain too small"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-baseline-visual",
+   "kind": "table",
+   "title": "The network must beat the simpler model by more than it costs",
+   "alt": "A table of three options with held-out recall, where each runs and its upkeep, followed by the priced inequality that decides whether the network is worth adopting.",
+   "caption": "The network scores highest, but the decision is the priced gain against its extra cost; with the cost of a miss unknown, the trees ship. Synthetic teaching example.",
+   "textEquivalent": "Held-out evidence: All three measured on the same held-out week at a 5% false-alarm rate. Table columns: option, recall, runs on, upkeep. Rows: amplitude rule | 55% | the line controller, no model | a threshold; gradient-boosted trees | 78% | CPU | forty features, one pipeline; 1-D CNN on raw audio | 83% | GPU to train | a second pipeline, GPU hours.\n\nThe priced decision: A higher score is a decision only once the gain is priced. Equation: adopt the CNN only if (83% − 78%) × defects × cost per miss > added GPU and upkeep cost; cost per miss unknown → trees ship, CNN stays an experiment",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "states": [
+    {
+     "id": "evidence",
+     "title": "Held-out evidence",
+     "explanation": "All three measured on the same held-out week at a 5% false-alarm rate.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "option",
+       "recall",
+       "runs on",
+       "upkeep"
+      ],
+      "rows": [
+       [
+        "amplitude rule",
+        "55%",
+        "the line controller, no model",
+        "a threshold"
+       ],
+       [
+        "gradient-boosted trees",
+        "78%",
+        "CPU",
+        "forty features, one pipeline"
+       ],
+       [
+        "1-D CNN on raw audio",
+        "83%",
+        "GPU to train",
+        "a second pipeline, GPU hours"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "priced",
+     "title": "The priced decision",
+     "explanation": "A higher score is a decision only once the gain is priced.",
+     "nodes": [],
+     "connections": [],
+     "equation": "adopt the CNN only if (83% − 78%) × defects × cost per miss > added GPU and upkeep cost; cost per miss unknown → trees ship, CNN stays an experiment"
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-deep-learning-shape-question",
+   "revision": "1",
+   "prompt": "Cinderline's vibration batch is stored batch-first with shape (64, 512, 6). A colleague says the batch holds 512 windows. What does each axis count?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-shape-question-a",
+     "text": "64 windows, each 512 time steps long, each step carrying 6 channel readings.",
+     "rationale": "Batch-first puts the count of examples on axis 0; 512 is the length of each window and 6 the channels per step."
+    },
+    {
+     "id": "dbxfe-deep-learning-shape-question-b",
+     "text": "512 windows of 64 time steps, each carrying 6 channels.",
+     "rationale": "This reads the middle axis as the batch; in a batch-first layout the first number counts examples, so 512 is the time axis."
+    },
+    {
+     "id": "dbxfe-deep-learning-shape-question-c",
+     "text": "6 windows of 64 by 512 readings each.",
+     "rationale": "The last axis is usually the channel count per step; treating it as the batch reverses the layout the model expects."
+    },
+    {
+     "id": "dbxfe-deep-learning-shape-question-d",
+     "text": "196,608 windows, because a shape multiplies out to the number of examples.",
+     "rationale": "64 x 512 x 6 = 196,608 is the number of individual values, which sets memory, not the number of examples."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-shape-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-shape-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-tensor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-matmul-question",
+   "revision": "1",
+   "prompt": "X holds 8 readings of 5 features, shape (8, 5). Which weight shape lets X @ W run and return (8, 3)?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-matmul-question-a",
+     "text": "(5, 3)",
+     "rationale": "The inner sizes 5 and 5 agree and disappear, leaving 8 rows of 3 outputs."
+    },
+    {
+     "id": "dbxfe-deep-learning-matmul-question-b",
+     "text": "(3, 5)",
+     "rationale": "The inner sizes are 5 and 3, so the product raises a core-dimension mismatch; this is the transpose, which needs X @ W.T."
+    },
+    {
+     "id": "dbxfe-deep-learning-matmul-question-c",
+     "text": "(8, 3)",
+     "rationale": "Shaped like the desired output, not like a weight; the inner sizes 5 and 8 disagree and the product fails."
+    },
+    {
+     "id": "dbxfe-deep-learning-matmul-question-d",
+     "text": "(3, 8)",
+     "rationale": "Neither inner size matches: X's last axis is 5 and this weight's first axis is 3, so no arithmetic runs."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-matmul-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-matmul-concept",
+    "dbxfe-deep-learning-shape-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-tensor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-forward-question",
+   "revision": "1",
+   "prompt": "With the worked weights (W1 = [[1.0, -2.0], [0.5, 1.0]], b1 = [0.5, -1.0], W2 = [2.0, 4.0], b2 = -0.5), the reading x = [1.0, 0.0] arrives. What does the network produce?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-forward-question-a",
+     "text": "h = [1.5, 0], z2 = 2.5, p = 0.9241",
+     "rationale": "z1 = [1.5, -0.5]; ReLU zeroes the second unit; 2.0 x 1.5 - 0.5 = 2.5; sigmoid(2.5) = 0.9241."
+    },
+    {
+     "id": "dbxfe-deep-learning-forward-question-b",
+     "text": "h = [1.5, -0.5], z2 = 0.5, p = 0.6225",
+     "rationale": "This skips ReLU, so the negative unit subtracts 4.0 x 0.5 from the score; the bend is exactly what removes that."
+    },
+    {
+     "id": "dbxfe-deep-learning-forward-question-c",
+     "text": "h = [1.5, 0], z2 = 3.0, p = 0.9526",
+     "rationale": "This forgets the output bias b2 = -0.5; every layer adds its bias after the product."
+    },
+    {
+     "id": "dbxfe-deep-learning-forward-question-d",
+     "text": "h = [1.5, 0], p = 2.5",
+     "rationale": "2.5 is the score before the sigmoid; a probability must lie between 0 and 1, which the sigmoid guarantees."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-forward-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-forward-concept",
+    "dbxfe-deep-learning-relu-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-network",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-loss-question",
+   "revision": "1",
+   "prompt": "In the worked backward step the gradient for W2 came out as [-0., -0.0944]. Why is its first entry zero?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-loss-question-a",
+     "text": "Hidden unit one output 0 after ReLU for this reading, and W2[0]'s gradient is (p - y) x h[0].",
+     "rationale": "A weight's gradient is scaled by the value flowing through it; h[0] = 0, so the error signal gives W2[0] no instruction."
+    },
+    {
+     "id": "dbxfe-deep-learning-loss-question-b",
+     "text": "The learning rate for W2[0] is zero.",
+     "rationale": "The learning rate scales the step after the gradient is computed and is the same for both weights here; it cannot make a gradient zero."
+    },
+    {
+     "id": "dbxfe-deep-learning-loss-question-c",
+     "text": "W2[0] has already reached its best value.",
+     "rationale": "The zero comes from the input to that weight, not from optimality; for x = [2.0, 0.0] unit one is active and the same weight gets a non-zero gradient."
+    },
+    {
+     "id": "dbxfe-deep-learning-loss-question-d",
+     "text": "The loss for this reading is already zero.",
+     "rationale": "The loss is 0.4741 and the output gradient p - y = -0.3775 is not zero; only the path through unit one is cut."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-loss-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-gradient-concept",
+    "dbxfe-deep-learning-loss-concept",
+    "dbxfe-deep-learning-relu-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-network",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-embedding-question",
+   "revision": "1",
+   "prompt": "The defect model has a 40-row supplier embedding table. A new supplier code, S-0917, appears in production and inference fails with an index error. What is the sound fix for the next training run?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-embedding-question-a",
+     "text": "Reserve an 'unknown' index, map codes unseen in training to it at both training and inference, and retrain so that row is learned.",
+     "rationale": "The table's size is fixed when built; an unknown row gives every new code a trained vector until enough data exists to give it its own."
+    },
+    {
+     "id": "dbxfe-deep-learning-embedding-question-b",
+     "text": "Append a random row for S-0917 at inference time.",
+     "rationale": "A random vector was never seen by the layers that follow, so its predictions are arbitrary, and resizing the table changes the model's parameters."
+    },
+    {
+     "id": "dbxfe-deep-learning-embedding-question-c",
+     "text": "Feed the supplier code as a raw integer instead.",
+     "rationale": "An integer imposes a false order and distance between suppliers, which is exactly what the learned vector avoided."
+    },
+    {
+     "id": "dbxfe-deep-learning-embedding-question-d",
+     "text": "Increase the embedding dimension.",
+     "rationale": "A wider vector adds numbers to each existing row; the missing piece is a row for the new index, which the dictionary size controls."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-embedding-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-embedding-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-embedding",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-train-infer-question",
+   "revision": "1",
+   "prompt": "A colleague says the defect model 'keeps learning' because it has scored 200,000 production clips since deployment. What has happened to its weights?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-train-infer-question-a",
+     "text": "Nothing: inference runs frozen forward passes; weights change only in a training run that computes losses against labels and applies updates.",
+     "rationale": "Serving computes predictions only; there is no loss, gradient or optimizer step without labels and a training loop."
+    },
+    {
+     "id": "dbxfe-deep-learning-train-infer-question-b",
+     "text": "They drift slightly with every clip scored.",
+     "rationale": "Drift of this kind would need a gradient and an update at request time, and neither exists in inference."
+    },
+    {
+     "id": "dbxfe-deep-learning-train-infer-question-c",
+     "text": "They are averaged across the clips each night.",
+     "rationale": "No mechanism averages weights over predictions; averaging gradients happens only inside a training step."
+    },
+    {
+     "id": "dbxfe-deep-learning-train-infer-question-d",
+     "text": "They update whenever a prediction is wrong.",
+     "rationale": "The service cannot know which predictions are wrong: inspection labels arrive later and feed a new, separate training run."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-train-infer-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-training-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-dl",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-memory-question",
+   "revision": "1",
+   "prompt": "Synthetic budget: 80 MB fixed for weights, gradients and optimizer state, 6 MB of activations per window, 2,048 MB of GPU memory. Which is the largest of these batch sizes that fits?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-memory-question-a",
+     "text": "320",
+     "rationale": "80 + 320 x 6 = 2,000 MB, inside 2,048 MB; the next option up does not fit."
+    },
+    {
+     "id": "dbxfe-deep-learning-memory-question-b",
+     "text": "341",
+     "rationale": "2,048 / 6 = 341 ignores the 80 MB fixed cost; weights, gradients and optimizer state are present at every batch size."
+    },
+    {
+     "id": "dbxfe-deep-learning-memory-question-c",
+     "text": "384",
+     "rationale": "80 + 384 x 6 = 2,384 MB, over the budget; this batch fails with out-of-memory."
+    },
+    {
+     "id": "dbxfe-deep-learning-memory-question-d",
+     "text": "256",
+     "rationale": "256 fits at 1,616 MB, but 320 also fits, so it is not the largest option."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-memory-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-memory-concept",
+    "dbxfe-deep-learning-batch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-finetune-question",
+   "revision": "1",
+   "prompt": "Cinderline wants its maintenance assistant to answer from this week's bulletins, cite each one, and stay current as bulletins change every Monday. Which approach fits?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-finetune-question-a",
+     "text": "Retrieval: index the bulletins, rebuild the index when they change, place matching passages in the prompt and cite them.",
+     "rationale": "Changing facts that need citations are what retrieval is for; refreshing the index updates answers without touching weights."
+    },
+    {
+     "id": "dbxfe-deep-learning-finetune-question-b",
+     "text": "Fine-tune the model every Monday on the new bulletins.",
+     "rationale": "Weekly retuning costs GPU time, still produces no citation, and leaves last week's facts in the weights."
+    },
+    {
+     "id": "dbxfe-deep-learning-finetune-question-c",
+     "text": "One continued pre-training run on all past bulletins.",
+     "rationale": "The weights would be frozen at the training date and would miss next Monday's bulletin."
+    },
+    {
+     "id": "dbxfe-deep-learning-finetune-question-d",
+     "text": "Raise the serving batch size so more bulletins fit.",
+     "rationale": "Batch size sets how many requests are processed together; it does not change what facts the model sees."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-finetune-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-retrieval-concept",
+    "dbxfe-deep-learning-finetune-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-search",
+    "dbxfe-deep-learning-claim-finetune",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-parallel-question",
+   "revision": "1",
+   "prompt": "A training step runs out of GPU memory at batch 64 on one GPU. A colleague proposes data parallelism over four GPUs, still with batch 64 on each. What happens to per-GPU memory?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-parallel-question-a",
+     "text": "It stays about the same: each GPU still holds a full model copy, its gradients, its optimizer state and 64 windows' activations.",
+     "rationale": "Data parallelism splits a global batch across workers; keeping 64 per worker keeps each worker's memory, so the failure remains."
+    },
+    {
+     "id": "dbxfe-deep-learning-parallel-question-b",
+     "text": "It falls to a quarter.",
+     "rationale": "It would fall only if each worker's local batch shrank; the model is copied to every worker, not divided among them."
+    },
+    {
+     "id": "dbxfe-deep-learning-parallel-question-c",
+     "text": "It disappears because the all-reduce moves activations off the GPU.",
+     "rationale": "The all-reduce exchanges gradients between workers; activations stay on each GPU for its own backward pass."
+    },
+    {
+     "id": "dbxfe-deep-learning-parallel-question-d",
+     "text": "The model is split across the four GPUs, so the weights take a quarter each.",
+     "rationale": "Splitting the model is sharded or model parallelism, such as FSDP; data parallelism keeps a full copy on every worker."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-parallel-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-parallel-concept",
+    "dbxfe-deep-learning-memory-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-ddp",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-platform-question",
+   "revision": "1",
+   "prompt": "A GPU compute configuration fails review: Machine learning unchecked, a GPU instance type as worker, Photon enabled. What must change, according to the documentation?",
+   "options": [
+    {
+     "id": "dbxfe-deep-learning-platform-question-a",
+     "text": "Check Machine learning and turn Photon off, keeping the GPU worker type.",
+     "rationale": "The documentation requires the Machine learning checkbox for GPU compute and states that Photon is not supported with GPU instance types."
+    },
+    {
+     "id": "dbxfe-deep-learning-platform-question-b",
+     "text": "Nothing; Photon accelerates GPU jobs.",
+     "rationale": "Photon is documented as not supported with GPU instance types, so the combination is invalid."
+    },
+    {
+     "id": "dbxfe-deep-learning-platform-question-c",
+     "text": "Switch the worker to a CPU type and select AI Runtime as the worker instead.",
+     "rationale": "AI Runtime is serverless GPU compute chosen by accelerator from a notebook, not a worker type on classic compute, and it was in preview."
+    },
+    {
+     "id": "dbxfe-deep-learning-platform-question-d",
+     "text": "Leave Machine learning unchecked; the drivers install when the job starts.",
+     "rationale": "The documentation lists the Machine learning checkbox as a requirement for GPU compute; leaving it unchecked is the error."
+    }
+   ],
+   "correctOptionId": "dbxfe-deep-learning-platform-question-a",
+   "conceptIds": [
+    "dbxfe-deep-learning-gpu-compute-concept",
+    "dbxfe-deep-learning-ai-runtime-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-gpu",
+    "dbxfe-deep-learning-claim-ai-runtime",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-deep-learning-layer-self",
+   "revision": "1",
+   "prompt": "A colleague fluent in SQL asks why the network needs ReLU at all: 'two matrix multiplications are already a model.' Explain, using the worked weights, what happens without the bend.",
+   "modelAnswer": "Without ReLU the two layers compose into one: W2(W1x + b1) + b2 = (W2W1)x + (W2b1 + b2). With the worked weights that is [4.0, 0.0] times x minus 3.5, a single linear map, so the second layer added no new shape of decision. With ReLU, unit one is switched off for x = [0.5, 1.0] and on for x = [2.0, 0.0]; different inputs use different units, which lets the network draw boundaries a single weighted sum cannot. It is like a CASE expression between two projections: remove it and the two projections merge into one.",
+   "reasoning": "The answer shows the algebraic collapse with numbers rather than asserting it, and then shows the mechanism ReLU adds. Using sigmoid or tanh as the bend is an acceptable alternative; the point is any nonlinearity.",
+   "conceptIds": [
+    "dbxfe-deep-learning-layer-concept",
+    "dbxfe-deep-learning-relu-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-network",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-ladder-self",
+   "revision": "1",
+   "prompt": "Cinderline's paint line wants an image classifier for surface defects. Write the compute ladder you would hand the team, marking what is executed, what is written but not executed, and what evidence each rung must produce before the next is climbed.",
+   "modelAnswer": "1. CPU smoke test on a few hundred images: confirm the batch shape, one loss value and one optimizer step. Executed first, locally or on small CPU compute. 2. Single-node GPU-enabled compute (Machine learning checkbox, GPU instance type, Photon off) or, if verified in the workspace, AI Runtime (Public Preview): one full epoch with MLflow autologging. Written, NOT EXECUTED until approved. Evidence: epoch time and validation recall. 3. The same node with several GPUs only if epoch time blocks iteration. NOT EXECUTED. 4. TorchDistributor across nodes only if the data or model outgrow one node. NOT EXECUTED. Stop after rung 2 if recall does not beat the current baseline by the priced margin.",
+   "reasoning": "The ladder follows the documented preference for single machines and one node with several GPUs, makes every unrun step visible, and ties each rung to the evidence that justifies the next. Using AI Runtime for rung 2 is acceptable if its status is verified.",
+   "conceptIds": [
+    "dbxfe-deep-learning-ladder-concept",
+    "dbxfe-deep-learning-gpu-compute-concept",
+    "dbxfe-deep-learning-distributor-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-claim-distributed",
+    "dbxfe-deep-learning-claim-gpu",
+    "dbxfe-deep-learning-claim-ai-runtime",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-deep-learning-baseline-self",
+   "revision": "1",
+   "prompt": "Synthetic figures: the amplitude rule catches 55% of weld defects, gradient-boosted trees 78% and a CNN 83%, all at 5% false alarms on the same held-out week. The plant manager asks which to deploy. Write your recommendation and the one number you still need.",
+   "modelAnswer": "Deploy the trees now: they beat the rule by 23 points on held-out data, run on CPU and can be explained through feature importance. The CNN's 5-point gain means 5 more defects caught per 100 defects; it is worth adopting only if 5 times the cost of one missed defect exceeds the extra GPU hours and upkeep of a second pipeline per 100 defects. The number still needed is the cost of one missed defect, which quality has not supplied. Until then, keep the CNN as a measured experiment, not a project.",
+   "reasoning": "The answer compares on the same held-out evidence, prices the gain instead of treating a higher score as a decision, and names the missing input. Recommending the rule is defensible only if running any model is impossible.",
+   "conceptIds": [
+    "dbxfe-deep-learning-baseline-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-deep-learning-shape",
+   "version": "1.0.0",
+   "title": "A tensor's shape says what each axis counts",
+   "outcome": "Read a batch-first shape axis by axis and state what each number counts and what the batch costs in bytes.",
+   "explanation": "A [[dbxfe-deep-learning-shape-concept|tensor shape]] is a tuple of counts, one per axis; the dtype, such as float32, is stored separately. Notice in the table how one Cinderline reading is (2,), a vibration window adds a time axis to become (256, 3), and a batch puts 32 windows on a new first axis: (32, 256, 3). Read each number as \"how many of what\". The last state multiplies the sizes: the shape alone fixes how many bytes the batch occupies.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-tensors",
+   "conceptIds": [
+    "dbxfe-deep-learning-shape-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-tensor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-shape-visual",
+   "questionIds": [
+    "dbxfe-deep-learning-shape-question"
+   ],
+   "hint": "Ask what a single example looks like before asking about the batch.",
+   "handbook": {
+    "markdown": "A tensor is an array with a shape and a dtype. NumPy's reference defines the shape as a tuple of non-negative integers, one per dimension, and keeps the item type as a separate data-type object; PyTorch creates floating-point tensors as float32 by default. The same data can therefore be the same shape in two dtypes with different memory, or the same bytes in two shapes with different meanings.\n\nThree habits make shapes readable:\n\n- **Name every axis.** Write `# (batch, time, channel)` beside every array you create. A comment is cheap; a transposed axis is a silent bug.\n- **Batch first.** Most layers expect examples on axis 0. When data arrives time-first from a sensor export, fix it once at load time with `x.transpose(1, 0, 2)` or its equivalent, and assert the result.\n- **Multiply it out.** `np.prod(x.shape) * x.itemsize` is the input's byte count. For (32, 256, 3) float32 that is 98,304 bytes. Inputs are rarely what exhausts memory, but the habit scales to activations, which are.\n\n```python\nimport numpy as np\nbatch = np.zeros((32, 256, 3), dtype=np.float32)   # (batch, time, channel)\nassert batch.shape[0] == 32 and batch.dtype == np.float32\nprint(batch.nbytes)                                 # 98304\n```\n\nWhat to inspect when a model misbehaves: `.shape` and `.dtype` at every boundary (after loading, after preprocessing, before the first layer). A shape can also be legal and wrong: an array of (256, 32, 3) passes a length check but has swapped time and batch. The shape states counts only; units, scaling and missing values are the preprocessing's contract, not the shape's.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-tensors"
+    ]
+   },
+   "recap": "A shape counts items per axis, batch first; multiply it out for bytes.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-matmul",
+   "version": "1.0.0",
+   "title": "A product runs only when the inner sizes agree",
+   "outcome": "Predict the shape a matrix product returns and read a core-dimension mismatch error to find the operand at fault.",
+   "explanation": "A [[dbxfe-deep-learning-matmul-concept|matrix product]] pairs the last axis of the left operand with the first axis of the right one and sums along it, so those two sizes must match and then vanish. Notice the second state: a (32, 256, 3) batch times a (3, 8) weight keeps its leading axes and returns (32, 256, 8). The third state shows NumPy refusing a mismatch by naming both sizes. The last state is the dangerous one: square weights run either way round.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-tensors",
+   "conceptIds": [
+    "dbxfe-deep-learning-matmul-concept",
+    "dbxfe-deep-learning-shape-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-tensor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction",
+    "dbxfe-deep-learning-claim-network"
+   ],
+   "visualId": "dbxfe-deep-learning-matmul-visual",
+   "questionIds": [
+    "dbxfe-deep-learning-matmul-question"
+   ],
+   "hint": "Write the two shapes one above the other and look at the touching numbers.",
+   "handbook": {
+    "markdown": "Every dense layer is a matrix product plus a bias, so the product's contract is the first thing a network enforces. For `A @ B`, NumPy pairs A's last axis with B's second-to-last (for a 2-D weight, its first) and sums over it. Any extra leading axes on A are treated as a stack of matrices and carried through unchanged.\n\nRun in this build with NumPy 2.5.3:\n\n```python\nimport numpy as np\nnp.ones((32, 256, 3)) @ np.ones((3, 8))        # shape (32, 256, 8)\nnp.ones((32, 256, 3)) @ np.ones((2, 2))\n# ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0,\n# with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 2 is different from 3)\n```\n\nHow to read the error: *operand 1* is the right-hand array; *core dimension 0* is its first axis; the sizes in brackets are the two that disagree. The usual causes are a feature added or dropped upstream (the data now has 3 columns, the weights expect 2), a weight stored as (out, in) and used as (in, out), or a batch that lost its batch axis.\n\nWhy a legal product can be wrong: with a square (2, 2) weight, `X @ W1` and `X @ W1.T` both run, and only one is the network's arithmetic. Frameworks fix a convention (PyTorch's linear layer stores weights as (out_features, in_features) and multiplies by the transpose), but hand-written code must check one reading against a hand calculation. That is the demonstration to give: compute one row by hand, then show the batch reproduces it. The shape check proves the arithmetic can run, never that it is the intended arithmetic.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-tensors"
+    ]
+   },
+   "recap": "Inner sizes must match and vanish; a square weight can hide a transpose.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-layer",
+   "version": "1.0.0",
+   "title": "A layer is a linear map followed by a bend",
+   "outcome": "Explain why a network needs a nonlinearity between linear layers, using the collapse of two linear maps into one.",
+   "explanation": "A [[dbxfe-deep-learning-layer-concept|layer]] multiplies by a weight matrix, adds a bias, then applies an activation such as [[dbxfe-deep-learning-relu-concept|ReLU]], which turns negatives into zero. Notice the middle state: without the bend, the two layers fold into a single weight row, [4.0, 0.0], and a single bias, −3.5, so the extra layer added nothing. In the last state ReLU switches hidden unit one off for this reading; another reading may switch it on. That switching is what lets stacked layers draw bent decision boundaries.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-forward",
+   "conceptIds": [
+    "dbxfe-deep-learning-layer-concept",
+    "dbxfe-deep-learning-relu-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-network",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-layer-visual",
+   "samajh": {
+    "text": "Socho paint ki dukaan. Har shade do base colours ko apne ratio mein milata hai aur thoda white daalta hai; yeh ek hidden unit hai. Agar kisi shade ka hisaab 'minus do chammach' paint maange, dukaandaar bolta hai, bhai, negative paint nahi hota, aur us shade ko zero rakh deta hai. Phir final colour in shades ko apne ratio se milata hai. Agar dukaandaar negative ko zero na kare, toh do baar milana ek hi baar milane jaisa ho jaata hai.",
+    "mapping": "The base colours are the inputs, each shade's recipe is a row of weights plus a bias, refusing a negative amount is ReLU, and the final mix is the output layer.",
+    "boundary": "Real weights are learned from data rather than chosen by a shopkeeper, and values after the output layer can be negative; paint has no equivalent of the sigmoid that turns a score into a probability."
+   },
+   "questionIds": [
+    "dbxfe-deep-learning-layer-self"
+   ],
+   "hint": "Multiply the two weight matrices together first and see what is left.",
+   "handbook": {
+    "markdown": "The 3Blue1Brown lesson pictures each unit as holding a number and each layer as computing its numbers from the previous layer's; in arithmetic, a layer is `activation(W @ x + b)`. The weight matrix has one row per output unit and one column per input; the bias shifts each unit; the activation bends the result.\n\nWhy the bend is required: composition of linear maps is linear. With the worked weights, W2 @ W1 = [2.0·1.0 + 4.0·0.5, 2.0·(−2.0) + 4.0·1.0] = [4.0, 0.0], and W2 @ b1 + b2 = 2.0·0.5 + 4.0·(−1.0) − 0.5 = −3.5. So the two-layer network without ReLU is exactly the one-layer model 4.0·x1 − 3.5, which ignores temperature entirely. Stacking a hundred linear layers would still give one weighted sum.\n\nReLU, `max(z, 0)`, is the most common bend in hidden layers: cheap, and its slope is 1 for positive inputs and 0 for negative ones. Its effect is membership: for each input, some units are on and some are off, and the network is a different linear map in each region of input space. That is how a network represents boundaries a single weighted sum cannot.\n\nFor a SQL-fluent reader: a layer is a projection (`SELECT w11*x1 + w12*x2 + b1 AS z1, …`) and ReLU is `GREATEST(z1, 0)`. Without the `GREATEST`, two projections compose into one projection.\n\nWhat this beat does not claim: that ReLU is always the right activation (sigmoid, tanh and others exist and have tradeoffs), or that more layers are always better. A unit whose pre-activation is negative for every example never updates; that is a diagnostic for later beats.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-forward"
+    ]
+   },
+   "recap": "No bend, no depth: two linear layers equal one; ReLU makes units switch per input.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-forward",
+   "version": "1.0.0",
+   "title": "Two layers by hand turn 0.5 and 1.0 into a 62% defect score",
+   "outcome": "Compute a two-layer forward pass by hand for a new reading and check it against printed intermediate values.",
+   "explanation": "A [[dbxfe-deep-learning-forward-concept|forward pass]] is the layers' arithmetic in order. Follow the equation states: layer 1 gives [−1.0, 0.25]; ReLU switches unit one off, leaving [0, 0.25]; layer 2 scores 4.0 × 0.25 − 0.5 = 0.5; the sigmoid turns 0.5 into 0.6225. Every value was reproduced by the lesson's NumPy code on CPU. Notice the batch table: the third reading switches both units off, so its probability, 0.3775, comes from the output bias alone.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-forward",
+   "conceptIds": [
+    "dbxfe-deep-learning-forward-concept",
+    "dbxfe-deep-learning-relu-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-network",
+    "dbxfe-deep-learning-claim-tensor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-forward-visual",
+   "questionIds": [
+    "dbxfe-deep-learning-forward-question"
+   ],
+   "hint": "Do layer 1 for both units before applying ReLU to either.",
+   "handbook": {
+    "markdown": "The NumPy example in the lesson was run on CPU in this build (Python 3.12.3, NumPy 2.5.3). Its first printed line is the forward pass you can recompute by hand:\n\n```text\nz1 [-1.    0.25] h [0.   0.25] z2 [0.5] p [0.6225]\n```\n\nThe weights are hand-chosen and untrained, so the 62% says nothing about real bearings; the point is that every number is traceable. The batch version is the same arithmetic on three rows at once:\n\n```python\nH = np.maximum(X @ W1.T + b1, 0.0)     # (3, 2) @ (2, 2) -> (3, 2)\nP = 1 / (1 + np.exp(-(H @ W2.T + b2))) # (3, 2) @ (2, 1) -> (3, 1)\n```\n\nwhich printed `P (3, 1) [0.6225 0.989 0.3775]`. Note the transposes: the weights are stored one row per output unit, so a batch with one row per reading multiplies by `W.T`.\n\nHow to demonstrate honestly: pick one reading, compute it by hand on a whiteboard, then show the code producing the same numbers, then change one weight and predict the direction of the change before running it. How to check your own code: the batch row for a reading must equal the single-reading result exactly; if not, a transpose or broadcast is wrong.\n\nLimits of this example: two inputs and two hidden units hide the scale of real networks (millions of weights, many layers, convolution or attention instead of dense products), but not the mechanism. Real inputs also need the same preprocessing (standardization, the same feature order) at inference as in training, or the arithmetic is right and the answer is wrong. The sigmoid output is a model score, not a calibrated probability until checked against held-out labels.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-forward"
+    ]
+   },
+   "recap": "Layer 1, ReLU, layer 2, sigmoid: 0.5 and 1.0 become 0.6225, and every step is checkable.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-loss",
+   "version": "1.0.0",
+   "title": "The loss scores the guess; the gradient says which way each weight moves",
+   "outcome": "Compute a log loss and an output-layer gradient by hand and explain why a switched-off unit's weight receives no update.",
+   "explanation": "A [[dbxfe-deep-learning-loss-concept|loss]] turns one prediction and its label into a number: −ln(0.6225) = 0.4741 for this real defect. Its gradient says how the loss changes as each weight moves. Follow the states: at the score the gradient is p − y = −0.3775; each output weight's gradient is that times the value it carried, so W2[0], fed by the switched-off unit, gets zero. [[dbxfe-deep-learning-gradient-concept|Gradient descent]] then steps W2[1] from 4.0 to 4.0094, and p rises to 0.6230.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-learning",
+   "conceptIds": [
+    "dbxfe-deep-learning-loss-concept",
+    "dbxfe-deep-learning-gradient-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-network",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-loss-visual",
+   "samajh": {
+    "text": "Socho dhund wali raat mein pahaadi se neeche utarna hai. Neeche ki ghaati dikhti nahi, sirf pairon ke neeche ki dhalaan mehsoos hoti hai. Tum usi taraf chhota sa kadam rakhte ho jahan zameen sabse zyada neeche jaa rahi hai, phir ruk kar dobara mehsoos karte ho. Kadam bahut bada ho toh gaddhe ke paar nikal jaaoge; bahut chhota ho toh subah ho jaayegi.",
+    "mapping": "Your height is the loss, the slope under your feet is the gradient, the length of each step is the learning rate, and each pause to feel the ground again is one batch.",
+    "boundary": "A real loss surface has millions of directions at once, and each batch gives a slightly different slope; walking downhill can stop in a local hollow rather than the lowest valley."
+   },
+   "questionIds": [
+    "dbxfe-deep-learning-loss-question"
+   ],
+   "hint": "A weight's gradient is the error multiplied by whatever flowed through that weight.",
+   "handbook": {
+    "markdown": "3Blue1Brown's second chapter describes the cost as a measure of how badly the network does on its training examples and gradient descent as repeatedly stepping downhill on that cost. Here is one step, small enough to check.\n\n**Loss.** For a yes/no label, log loss (binary cross-entropy) is −ln(p) when y = 1 and −ln(1 − p) when y = 0. Predicting 0.6225 for a real defect costs 0.4741; predicting 0.99 would cost 0.01; predicting 0.01 would cost 4.6. Confident mistakes are punished hardest.\n\n**Gradient at the output.** With a sigmoid feeding log loss the derivative with respect to the score simplifies to p − y. Here −0.3775: raising z2 lowers the loss.\n\n**Gradient for a weight.** By the chain rule, ∂loss/∂W2[j] = (p − y) × h[j]. The NumPy run printed `dW2 [[-0. -0.0944]]`. The `-0.` is a signed zero (−0.3775 × 0); it is simply zero. Unit one was off, so its outgoing weight gets no instruction from this reading.\n\n**The step.** With learning rate 0.1, W2[1] becomes 4.0 − 0.1 × (−0.0944) ≈ 4.0094, and the recomputed p is 0.6230. That is one example; training averages the gradient over a batch and repeats for many steps.\n\n```python\ndW2 = (p - y)[:, None] * h[None, :]   # (1, 1) * (1, 2) -> (1, 2)\nW2 = W2 - 0.1 * dW2\n```\n\nBackpropagation continues the chain rule into W1 and b1; libraries such as PyTorch's autograd do that bookkeeping. What to inspect when learning stalls: a loss that stops falling, gradients that are all near zero (units that are off for every example), or a learning rate so large that the loss jumps. A gradient is a local slope: it does not promise the best weights, only a better direction for this batch.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-learning"
+    ]
+   },
+   "recap": "Loss −ln(0.6225) = 0.4741; gradient (p − y) × h; the off unit's weight does not move.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-embedding",
+   "version": "1.0.0",
+   "title": "An embedding is a learned row in a lookup table",
+   "outcome": "Explain how an embedding turns a category into a vector, how training changes it, and how to handle a category unseen in training.",
+   "explanation": "A supplier code cannot be multiplied, so an [[dbxfe-deep-learning-embedding-concept|embedding]] gives each code an index and each index a row of numbers the next layer multiplies. PyTorch documents nn.Embedding as a lookup table of fixed dictionary and size. Notice the second state: rows start random and move with the gradients like any weight, so S-0102 and S-0331, which predict alike, drift together. The last state shows why an unknown row is reserved before training: the table cannot grow at inference.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-learning",
+   "conceptIds": [
+    "dbxfe-deep-learning-embedding-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-embedding",
+    "dbxfe-deep-learning-claim-search",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-embedding-visual",
+   "questionIds": [
+    "dbxfe-deep-learning-embedding-question"
+   ],
+   "hint": "Think about what the table can and cannot do once its size is fixed.",
+   "handbook": {
+    "markdown": "An embedding is the answer to \"how do I feed a category to a network?\" One-hot encoding a 40-supplier code gives 40 mostly-zero inputs and no notion that two suppliers are alike. An embedding table of shape (num_embeddings, embedding_dim), say (41, 3) with one reserved row, maps each code's index to a dense row, and those rows are weights: the backward pass updates the rows used in each batch.\n\n```python\n# NOT EXECUTED in this build (PyTorch is not installed here); shapes per the PyTorch reference.\nimport torch\ntable = torch.nn.Embedding(num_embeddings=41, embedding_dim=3)   # row 0 = unknown\nidx = torch.tensor([2, 0])        # S-0331, then an unseen code mapped to 0\nvectors = table(idx)              # shape (2, 3)\n```\n\nWhat the synthetic table shows: after training, rows for suppliers with similar defect behaviour sit close together, because similar rows produce similar downstream scores. Nobody hand-designs the numbers, and a single row means nothing on its own; distances between rows carry the meaning.\n\nWhat fails: an index outside the table raises an error at inference. Reserve an index for unknown codes, map rare or unseen codes to it during training so it is learned, and keep the code-to-index mapping versioned with the model: a mapping rebuilt in a different order silently gives every supplier someone else's row.\n\nThe transfer: a language model's token embeddings are the same mechanism with a dictionary of tokens, and the vectors a retrieval index such as Databricks AI Search stores are embeddings of whole passages, computed by an embedding model. Limits: embeddings reflect the training data's patterns, including its biases, and a row for a category with few examples is noisy.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-learning"
+    ]
+   },
+   "recap": "An id picks a row; gradients move the rows; reserve an unknown row before training.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-train-infer",
+   "version": "1.0.0",
+   "title": "Training rewrites the weights; inference only reads them",
+   "outcome": "Distinguish a training step from an inference request and predict what changes, and what is held in memory, in each.",
+   "explanation": "[[dbxfe-deep-learning-training-concept|Training]] loops over labelled batches: forward pass, loss, backward pass, optimizer update, and the weights change. Inference is one forward pass on a new input with frozen weights. Compare the two states: in the inference path the loss, backward pass and update are excluded, because there is no label and nothing to learn from. So scoring many clips teaches the model nothing, and serving needs far less memory than the training job did.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-resources",
+   "conceptIds": [
+    "dbxfe-deep-learning-training-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-dl",
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-train-infer-visual",
+   "questionIds": [
+    "dbxfe-deep-learning-train-infer-question"
+   ],
+   "hint": "Ask what the model would need in order to learn from a prediction.",
+   "handbook": {
+    "markdown": "Training is the only time weights change. One step: take a batch of inputs with labels, run the forward pass, compute the average loss, run the backward pass to get a gradient for every weight, and let the optimizer update the weights (and its own state, such as running averages). An epoch is one pass over the training data; a run is many epochs, checkpointed along the way. Databricks recommends Databricks Runtime for Machine Learning with MLflow tracking and autologging for model training, so each run's parameters, metrics and artifacts can be compared later.\n\nInference loads the trained weights once and runs forward passes on new inputs. There is no label, so no loss, no gradient and no update. In PyTorch this is written with the model in evaluation mode and gradient tracking off:\n\n```python\n# NOT EXECUTED in this build; PyTorch is not installed here.\nmodel.eval()\nwith torch.no_grad():\n    p = torch.sigmoid(model(x))\n```\n\nConsequences worth explaining to a customer:\n\n- A deployed model does not learn from traffic. Improvement requires collecting labels (here, inspection outcomes), running a new training job and deploying a new version.\n- Memory differs: training holds weights, gradients, optimizer state and the batch's saved activations; inference holds the weights and one request's transient activations. A model that needed a GPU to train may serve comfortably on CPU.\n- Preprocessing must be identical in both paths: the same standardization constants, feature order and embedding index mapping, versioned with the model.\n\nWhat to inspect when production predictions look wrong: the preprocessing at serving versus training, the model version actually loaded, and whether the input distribution has shifted, before assuming the weights are at fault.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-resources"
+    ]
+   },
+   "recap": "Training loops and rewrites weights with labels; inference runs one frozen forward pass.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-memory",
+   "version": "1.0.0",
+   "title": "Memory grows with the batch; the model's fixed cost does not",
+   "outcome": "Split training memory into fixed and batch-proportional terms, find the largest batch that fits, and choose the first knob on out-of-memory.",
+   "explanation": "During a training step a GPU holds weights, gradients, optimizer state and every layer's activations for the whole batch. Only the last grows with [[dbxfe-deep-learning-batch-concept|batch size]]. Step through the synthetic tables: batch 128 fits in 848 MB, batch 512 needs 3,152 MB and fails. The last state is the first fix: [[dbxfe-deep-learning-accumulation-concept|gradient accumulation]] runs four batches of 64 before one update, behaving like batch 256 while holding only 464 MB of the [[dbxfe-deep-learning-memory-concept|GPU memory budget]].",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-resources",
+   "conceptIds": [
+    "dbxfe-deep-learning-memory-concept",
+    "dbxfe-deep-learning-batch-concept",
+    "dbxfe-deep-learning-accumulation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-claim-amp",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-memory-visual",
+   "questionIds": [
+    "dbxfe-deep-learning-memory-question"
+   ],
+   "hint": "Subtract the fixed cost from the budget before dividing by the per-window cost.",
+   "handbook": {
+    "markdown": "A useful mental model of training memory, labelled as a model rather than a measurement:\n\n**memory ≈ weights + gradients + optimizer state + batch × activations per example**\n\nFor 5 million float32 parameters, the weights take 5,000,000 × 4 bytes = 20 MB, the gradients another 20 MB, and an optimizer that keeps two values per weight (as Adam does) 40 MB: 80 MB fixed. Activations are what each layer saves for the backward pass; the 6 MB per window here is an assumption, and in a real network it depends on layer sizes and input length. Real frameworks also reserve workspace and cache memory, so measure the first run rather than trusting arithmetic.\n\nBatch size trades three things: memory per step (linear in the batch), number of optimizer steps per epoch (64,000 windows at batch 64 is 1,000 steps, at 128 is 500), and the noise in each update. A bigger batch is not automatically better; the learning rate usually needs retuning and the validation curve decides.\n\nOn `CUDA out of memory`, in order:\n\n1. Halve the batch, or keep the effective batch with gradient accumulation:\n\n```python\n# NOT EXECUTED in this build; PyTorch is not installed here.\nfor i, (X, y) in enumerate(loader):          # batches of 64\n    loss = loss_fn(model(X), y) / 4          # scale so four add up to one mean\n    loss.backward()                          # gradients accumulate\n    if (i + 1) % 4 == 0:\n        opt.step(); opt.zero_grad()          # one update per 256 examples\n```\n\n2. Mixed precision (`torch.amp`), which changes numerics and must be validated.\n3. A larger GPU or, if even batch 1 does not fit, sharded training.\n\nAdding data-parallel workers does not fix it: each worker still holds its own batch's activations. All figures here are synthetic; no GPU was used.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-resources"
+    ]
+   },
+   "recap": "Fixed 80 MB plus 6 MB per window: shrink the batch or accumulate before anything else.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-finetune",
+   "version": "1.0.0",
+   "title": "Fine-tuning changes the weights; retrieval changes the input",
+   "outcome": "Choose between prompting, retrieval and fine-tuning for a stated need and justify the choice by what each lever changes.",
+   "explanation": "\"Make the model better\" hides two different requests. [[dbxfe-deep-learning-finetune-concept|Fine-tuning]] continues training on your examples, so the weights change: format, tone and task habits move, but the model still cannot cite a source. [[dbxfe-deep-learning-retrieval-concept|Retrieval]] leaves the weights alone and puts relevant passages into the input at request time. Compare the two states: only retrieval produces a citation and updates when Monday's bulletin is re-indexed. The last state orders the levers by need.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-scaling",
+   "conceptIds": [
+    "dbxfe-deep-learning-finetune-concept",
+    "dbxfe-deep-learning-retrieval-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-finetune",
+    "dbxfe-deep-learning-claim-search",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-finetune-visual",
+   "samajh": {
+    "text": "Naye mechanic ko do tarah se taiyaar kar sakte ho. Ek: usse mahino tak practice karwao, haath baith jaata hai, aadatein badal jaati hain, par poocho 'yeh kahan likha hai' toh bata nahi paata. Do: bench pe company ka manual rakh do; har kaam se pehle sahi panna kholta hai aur page number bhi bata deta hai. Manual ka naya edition aaye toh sirf kitaab badlo, mechanic ko dobara sikhana nahi padta.",
+    "mapping": "Months of practice are fine-tuning, which changes the weights; the manual on the bench is the retrieval index; opening the right page is the search; swapping in a new edition is re-indexing.",
+    "boundary": "A model does not understand a passage the way a mechanic reads a manual; retrieval can open the wrong page, and fine-tuning can also teach some facts, only without citations and frozen at the training date."
+   },
+   "questionIds": [
+    "dbxfe-deep-learning-finetune-question"
+   ],
+   "hint": "Ask whether the need is a habit or a fact, and whether it changes weekly.",
+   "handbook": {
+    "markdown": "Two levers, two different things changed.\n\n**Fine-tuning** is training again, starting from existing weights, on examples of the behaviour you want. It is the right lever for a stable habit: an output format, a tone, a classification scheme, domain vocabulary the base model handles poorly. It costs GPU time, an evaluation set to prove the gain, and a new model version to serve and monitor. It is the wrong lever for facts that change: a bulletin learned into weights is stale next week and the answer cannot say where it came from.\n\n**Retrieval** searches an index built from your documents when a request arrives and places the best passages in the model's input. Databricks AI Search (formerly Vector Search) is the platform's managed index: built from a Delta table of embedded text, queried for the most similar vectors, with hybrid keyword search. It is the right lever for changing facts that need citations; refreshing the index updates answers without retraining. It fails differently: the wrong passage wins, or the right one was never chunked well.\n\nThe order to try: a prompt with examples first (cheapest, fully reversible), then retrieval for knowledge, then fine-tuning for a behaviour gap that remains after measurement. Retrieval and fine-tuning can be combined.\n\nPlatform status matters here. Databricks documents its managed Foundation Model Fine-tuning feature as deprecated, with removal scheduled for 14 August 2026, and recommends AI Runtime, its serverless GPU environment, for training and fine-tuning. A fine-tuning plan therefore names your own training code on GPU compute and treats AI Runtime's preview status as a verification item. What to inspect before either lever: an evaluation set of real questions with expected answers, so the gain is measured, not asserted. The retrieval module goes deeper on index design.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-scaling"
+    ]
+   },
+   "recap": "Habits into weights by fine-tuning; changing facts into the input by retrieval; measure before either.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-parallel",
+   "version": "1.0.0",
+   "title": "Data parallelism splits the batch and shares the gradients",
+   "outcome": "Explain what data-parallel workers hold and exchange, and predict when adding workers helps speed but not memory.",
+   "explanation": "In [[dbxfe-deep-learning-parallel-concept|data parallelism]] every worker holds a full copy of the model and processes a different slice of the batch. Follow the states: each worker computes a gradient on its 128 windows; an all-reduce averages the gradients; both apply the identical update, so the copies never diverge. Notice the last state: every step moves a gradient as large as the model, which is why the documentation prefers one node with several GPUs and a single machine whenever it suffices.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-scaling",
+   "conceptIds": [
+    "dbxfe-deep-learning-parallel-concept",
+    "dbxfe-deep-learning-distributor-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-ddp",
+    "dbxfe-deep-learning-claim-distributed",
+    "dbxfe-deep-learning-claim-torchdistributor",
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-parallel-visual",
+   "samajh": {
+    "text": "Do surveyor ek hi naksha le kar nikalte hain. Ek purana mohalla naapta hai, doosra naya. Shaam ko dono apni-apni galtiyon ki list milaate hain, dono ka average nikaalte hain, aur dono apne naksha mein bilkul wahi sudhaar karte hain, taaki kal subah dono ke paas ek jaisa naksha ho. Agar dono alag shehron mein hon, toh list bhejne mein hi aadha din chala jaata hai.",
+    "mapping": "Each surveyor's copy of the map is a model replica, each neighbourhood is a slice of the batch, the evening average is the all-reduce of gradients, and the identical correction is the shared update.",
+    "boundary": "The exchange happens every training step, not once a day, and overlaps with the backward pass; what makes it slow is network bandwidth between machines, not the distance between cities."
+   },
+   "questionIds": [
+    "dbxfe-deep-learning-parallel-question"
+   ],
+   "hint": "List what each worker must keep on its own GPU regardless of how many workers there are.",
+   "handbook": {
+    "markdown": "Data parallelism is the first way to use more than one GPU for training, and the one to reach for last.\n\n**Mechanism.** PyTorch's DistributedDataParallel runs one process per model replica. Each process loads a different shard of every batch, runs forward and backward, and during the backward pass the replicas synchronize gradients so that when `backward()` returns, every replica holds the same averaged gradient. Each optimizer then applies the same update. The data is split, the gradients are shared, the weights never need to be sent.\n\n**On Databricks.** Databricks Runtime ML includes TorchDistributor, a PySpark module that launches PyTorch training as Spark jobs and runs it across workers with `torch.distributed.run`; DeepSpeed and Ray are also included. Written, not executed here:\n\n```python\n# NOT EXECUTED in this build: needs a GPU cluster with Databricks Runtime ML.\nfrom pyspark.ml.torch.distributor import TorchDistributor\nTorchDistributor(num_processes=2, local_mode=False, use_gpu=True).run(train_fn)\n```\n\nRead the current TorchDistributor page for arguments before running anything.\n\n**When it helps.** Throughput: two workers process twice the examples per step, minus the exchange cost. **When it does not.** Memory per GPU: each worker still holds the full model, its gradients, its optimizer state and its own local batch's activations. If one GPU runs out of memory at batch 64, four GPUs at batch 64 each run out too.\n\n**Why the documentation says single machine first.** Databricks recommends training on a single machine when possible, because distributed code is more complex and slower due to communication overhead, and notes that one node with four GPUs is likely faster than four one-GPU workers. The synthetic 20 MB per step shows why: inside one node the exchange uses fast local links; across nodes it crosses the network every step. Measure step time on one node before distributing.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-scaling"
+    ]
+   },
+   "recap": "Full copies, split batch, averaged gradients every step; distribute only when one node is outgrown.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-platform",
+   "version": "1.0.0",
+   "title": "Three documented routes reach a GPU on the platform",
+   "outcome": "Configure GPU-enabled compute correctly, place AI Runtime and the distributors by need, and state each route's status as a verification item.",
+   "explanation": "Databricks documents three routes. [[dbxfe-deep-learning-gpu-compute-concept|GPU-enabled compute]] is ordinary compute with the Machine learning checkbox, a GPU instance type and Photon off, because Photon does not support GPU instance types. [[dbxfe-deep-learning-ai-runtime-concept|AI Runtime]] is serverless GPU chosen by accelerator from a notebook, single-node Public Preview and multi-GPU Beta when read. The distributors ship in Databricks Runtime ML. Notice the second table: availability, quota and price are unknowns until checked.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-platform",
+   "conceptIds": [
+    "dbxfe-deep-learning-gpu-compute-concept",
+    "dbxfe-deep-learning-ai-runtime-concept",
+    "dbxfe-deep-learning-distributor-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-gpu",
+    "dbxfe-deep-learning-claim-ai-runtime",
+    "dbxfe-deep-learning-claim-ai-runtime-multi",
+    "dbxfe-deep-learning-claim-dl",
+    "dbxfe-deep-learning-claim-distributed",
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-platform-visual",
+   "questionIds": [
+    "dbxfe-deep-learning-platform-question"
+   ],
+   "hint": "Separate what the documentation states from what only the workspace can tell you.",
+   "handbook": {
+    "markdown": "**GPU-enabled compute (classic).** The GPU page describes GPU compute as ordinary compute creation with three settings kept in mind: the Machine learning checkbox checked, a GPU instance type as the worker type, and, for one GPU instance, the Single node checkbox. Photon is not supported with GPU instance types, so it stays off. Databricks installs the NVIDIA driver and libraries, including the CUDA Toolkit, and Databricks Runtime ML brings PyTorch, TensorFlow and TensorBoard. The best-practices page calls a single-node GPU cluster typically fastest and most cost-effective for deep learning development.\n\n**AI Runtime (serverless GPU).** Documented as a compute offering for deep learning that brings GPU support to Databricks serverless: a notebook connects by choosing an A10 or H100 accelerator and a base environment, with no cluster or driver configuration. When searched, single-node AI Runtime was in Public Preview, and multi-GPU distributed training on it was in Beta, gated from the workspace Previews page. Preview features change: accelerators, regions, quota and pricing are read from the live page and the workspace, and a design never presents them as generally available.\n\n**Distributors.** TorchDistributor, the DeepSpeed distributor and Ray are included in Databricks Runtime ML for training that outgrows one machine.\n\nA verification checklist before any design review:\n\n| item | how to check |\n|---|---|\n| GPU instance types | the compute UI's worker list in the target workspace and region |\n| AI Runtime | the notebook compute selector; the workspace Previews page |\n| quota | the cloud account's GPU quota for the instance family |\n| price | current Databricks and cloud pricing pages, dated |\n\nThis module creates nothing. The instructions above are written for a reader to verify, and no GPU was used in this build.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-platform"
+    ]
+   },
+   "recap": "Classic GPU compute (ML checked, Photon off), AI Runtime in preview, distributors in the ML runtime: verify each.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-ladder",
+   "version": "1.0.0",
+   "title": "Climb the compute ladder one rung at a time and label what did not run",
+   "outcome": "Write an accelerated-workload design as an ordered ladder with execution labels, the evidence each rung produces, and a stop rule.",
+   "explanation": "An honest accelerated design is a [[dbxfe-deep-learning-ladder-concept|compute ladder]]: a CPU smoke test proves shapes, one loss and one optimizer step before any GPU is requested; then one GPU on one node; then several GPUs on that node; distributed training last. Every GPU rung is labelled NOT EXECUTED until it runs. Notice the second state: when the first GPU run's recall does not beat the trees by the priced margin, the later rungs are never climbed, and the note records why.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-design",
+   "conceptIds": [
+    "dbxfe-deep-learning-ladder-concept",
+    "dbxfe-deep-learning-distributor-concept",
+    "dbxfe-deep-learning-gpu-compute-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-claim-distributed",
+    "dbxfe-deep-learning-claim-gpu",
+    "dbxfe-deep-learning-claim-ai-runtime",
+    "dbxfe-deep-learning-claim-torchdistributor",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-ladder-visual",
+   "questionIds": [
+    "dbxfe-deep-learning-ladder-self"
+   ],
+   "hint": "Start from what must be proven before a GPU is worth requesting.",
+   "handbook": {
+    "markdown": "The ladder is original SpicyBrain guidance built on two documented recommendations: prefer a single machine, and prefer one node with several GPUs to several nodes with one.\n\n**Rung 1, CPU smoke test (executed first).** A few hundred examples, the real preprocessing, the real model definition, one forward pass, one loss value and one optimizer step. It proves the shapes, the data loader and the loss before a GPU hour is spent. The lesson's NumPy example is the miniature of this rung; it is the only code this module actually ran.\n\n**Rung 2, single-node GPU (NOT EXECUTED).** GPU-enabled compute with the Machine learning checkbox, one GPU instance type and Photon off, or AI Runtime if verified in the workspace. MLflow autologging on. Evidence: epoch time, validation recall per epoch, peak memory.\n\n```python\n# NOT EXECUTED in this build. Rung 2 on GPU-enabled compute or AI Runtime (verify status).\nimport torch, mlflow\nmlflow.autolog()\nassert torch.cuda.is_available(), \"rung 2 needs a GPU\"\nmodel = Net().to(\"cuda\")\n```\n\n**Rung 3, several GPUs on one node (NOT EXECUTED).** Only if epoch time blocks iteration. Evidence: epoch time against rung 2.\n\n**Rung 4, TorchDistributor across nodes (NOT EXECUTED).** Only if the model or the data no longer fit one node. Evidence: step time against rung 3.\n\n**Stop rule.** After rung 2, compare with the baseline on the same held-out data. If the gain does not clear the threshold priced in outcomes, stop, keep the baseline, and record the evidence.\n\nHow to present it: a table with one row per rung, a status column that says *planned*, *executed on date*, or *NOT EXECUTED*, and an evidence column. Never quote a speedup that was not measured; the design promises evidence, not results.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-design"
+    ]
+   },
+   "recap": "CPU smoke test, one GPU, several GPUs, distributed: each rung earned, every unrun step labelled.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-deep-learning-baseline",
+   "version": "1.0.0",
+   "title": "A simpler model that meets the bar beats a network that only scores higher",
+   "outcome": "Decide between a rule, a classical model and a neural network by comparing the priced gain on the same held-out evidence with the added cost.",
+   "explanation": "A neural network must beat the [[dbxfe-deep-learning-baseline-concept|simpler model]] on the same held-out evidence by more than it costs. In the table, the CNN's 83% recall beats the trees' 78%, but notice the second state: five more defects caught per hundred is worth adopting only if five times the cost of one missed defect exceeds the GPU hours and a second pipeline. With that cost unknown, the trees ship now and the network stays a measured experiment.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-platform",
+   "conceptIds": [
+    "dbxfe-deep-learning-baseline-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-practices",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "visualId": "dbxfe-deep-learning-baseline-visual",
+   "questionIds": [
+    "dbxfe-deep-learning-baseline-self"
+   ],
+   "hint": "Write the inequality with the unknown left as a named variable.",
+   "handbook": {
+    "markdown": "When is a simpler model, or no model, the better answer? More often than a GPU request suggests.\n\n**Try the simplest thing that could meet the need.** A threshold rule has a physical meaning, no training pipeline and no drift monitoring. A classical model (logistic regression, gradient-boosted trees) on a few well-chosen features trains in minutes on CPU, is easier to explain, and is a strong baseline on tabular data. Neural networks tend to earn their cost on raw, high-dimensional signals such as audio, images and text, and at larger data scales; on small tabular data they often do not.\n\n**Compare on the same evidence.** Same held-out period, same false-alarm rate, same labels. A network evaluated on a different week, or at a different threshold, has not been compared at all.\n\n**Price the gain.** Five points of recall at 5% false alarms means five more defects caught per hundred defects. Multiply by the cost of a missed defect (scrap, rework, a returned assembly) and compare with the added cost: GPU hours to train and retrain, a second pipeline to maintain and monitor, and the time of whoever owns it. Pricing is a business input: if nobody can supply the cost of a miss, say so and do not pretend the decision is made.\n\n**Keep the experiment honest.** Ship the baseline now so the plant benefits while the network is measured. Write a stop rule before the experiment, not after. Record a negative result as carefully as a positive one.\n\nA non-ML answer is sometimes best of all: if most defects come from one worn tip, a maintenance schedule beats any detector. Ask what decision the model feeds before asking which model. All figures in this beat are synthetic.",
+    "sourceSectionIds": [
+     "dbxfe-deep-learning-l01-platform"
+    ]
+   },
+   "recap": "Compare on the same held-out data, price the gain, ship the simpler model while the network earns its place.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-deep-learning-l01-card1",
+   "beatId": "dbxfe-deep-learning-shape"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card2",
+   "beatId": "dbxfe-deep-learning-matmul"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card3",
+   "beatId": "dbxfe-deep-learning-layer"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card4",
+   "beatId": "dbxfe-deep-learning-forward"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card5",
+   "beatId": "dbxfe-deep-learning-loss"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card6",
+   "beatId": "dbxfe-deep-learning-embedding"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card7",
+   "beatId": "dbxfe-deep-learning-train-infer"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card8",
+   "beatId": "dbxfe-deep-learning-memory"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card9",
+   "beatId": "dbxfe-deep-learning-memory"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card10",
+   "beatId": "dbxfe-deep-learning-finetune"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card11",
+   "beatId": "dbxfe-deep-learning-parallel"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card12",
+   "beatId": "dbxfe-deep-learning-platform"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card13",
+   "beatId": "dbxfe-deep-learning-platform"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card14",
+   "beatId": "dbxfe-deep-learning-ladder"
+  },
+  {
+   "cardId": "dbxfe-deep-learning-l01-card15",
+   "beatId": "dbxfe-deep-learning-baseline"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-deep-learning-extension-amp",
+   "revision": "1",
+   "prompt": "What does automatic mixed precision change in a training step, and what must be re-checked afterwards?",
+   "answer": "Some operations, such as linear layers and convolutions, run in float16 or bfloat16 while precision-sensitive ones such as reductions stay in float32; the loss curve and validation metric must be re-checked.",
+   "explanation": "PyTorch's [[dbxfe-deep-learning-extension-amp-concept|automatic mixed precision]] (torch.amp) matches each operation to a type: lower precision where it is much faster, float32 where the range matters. Float16 training ordinarily pairs autocast with a gradient scaler so small gradients do not round to zero. A 16-bit value takes half the bytes of a float32, which is why it relieves activation memory, but the saving is workload-specific and the numerics change, so it comes after the batch-size knob and is judged on the validation curve, not on memory alone.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-resources",
+   "conceptIds": [
+    "dbxfe-deep-learning-extension-amp-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-amp",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "beatId": "dbxfe-deep-learning-memory",
+   "whyItMatters": "It names the second memory lever and why it is second: it changes numbers, not just bytes."
+  },
+  {
+   "id": "dbxfe-deep-learning-extension-deepspeed",
+   "revision": "1",
+   "prompt": "When the model itself no longer fits on one GPU, why does plain data parallelism not help, and what does the platform document instead?",
+   "answer": "Data parallelism copies the whole model to every worker, so a model too large for one GPU is too large for each; the DeepSpeed distributor is documented for memory-limited models.",
+   "explanation": "Data parallelism divides the batch, never the model: every worker holds full weights, gradients and optimizer state. When those alone exceed one GPU, the documented option on Databricks is the [[dbxfe-deep-learning-extension-deepspeed-concept|DeepSpeed distributor]], built on TorchDistributor and recommended for models that need more compute but are limited by memory; DeepSpeed offers optimized memory usage and pipeline parallelism. Sharding approaches such as PyTorch FSDP split those states across workers. None of this is needed until measurement shows the model does not fit.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-scaling",
+   "conceptIds": [
+    "dbxfe-deep-learning-extension-deepspeed-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-deepspeed",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "beatId": "dbxfe-deep-learning-parallel",
+   "whyItMatters": "It marks the boundary where data parallelism stops helping and names the documented next tool."
+  },
+  {
+   "id": "dbxfe-deep-learning-extension-deprecation",
+   "revision": "1",
+   "prompt": "What happened to Databricks Foundation Model Fine-tuning, and where does a fine-tuning plan go now?",
+   "answer": "It is documented as deprecated with removal scheduled for 14 August 2026; Databricks recommends AI Runtime, its serverless GPU environment, for training and fine-tuning.",
+   "explanation": "The managed feature supported instruction fine-tuning, chat completion and continued pre-training. Its [[dbxfe-deep-learning-extension-deprecation-concept|deprecation]] notice says existing runs continue to work while new installations of the databricks_genai package and the fine-tuning UI are blocked after the removal date, which falls before this module's review. A fine-tuning plan therefore names AI Runtime and your own training code, with AI Runtime's preview status as a verification item, and first shows that prompting and retrieval were measured and fell short.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-scaling",
+   "conceptIds": [
+    "dbxfe-deep-learning-extension-deprecation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-finetune",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "beatId": "dbxfe-deep-learning-finetune",
+   "whyItMatters": "It stops a design from resting on a retired managed feature and names the documented replacement."
+  },
+  {
+   "id": "dbxfe-deep-learning-extension-search",
+   "revision": "1",
+   "prompt": "Who computes the embeddings stored in a Databricks AI Search index?",
+   "answer": "Either Databricks computes them from a text column in the source Delta table, or the table already holds precomputed embeddings that the index uses.",
+   "explanation": "Databricks AI Search, formerly Vector Search, builds an index from a Delta table and returns the most similar vectors for a query; it also supports hybrid keyword-similarity search. When creating the index you choose [[dbxfe-deep-learning-extension-search-concept|Compute embeddings or Use existing embeddings]]. Either way the vectors are learned representations of the kind this module builds by hand: an id or a passage becomes a row of numbers, and nearby rows mean similar things. Limits and features are checked on the live page.",
+   "lessonId": "dbxfe-deep-learning-l01",
+   "sectionId": "dbxfe-deep-learning-l01-learning",
+   "conceptIds": [
+    "dbxfe-deep-learning-extension-search-concept"
+   ],
+   "claimIds": [
+    "dbxfe-deep-learning-claim-search",
+    "dbxfe-deep-learning-guidance",
+    "dbxfe-deep-learning-fiction"
+   ],
+   "beatId": "dbxfe-deep-learning-embedding",
+   "whyItMatters": "It connects the learned vectors of the embedding beat to the retrieval index a later design will use."
+  }
+ ],
+ "recap": {
+  "title": "One reading through the network, then the cost of doing it at scale",
+  "markdown": "**A shape is a contract; a layer is a linear map and a bend; a loss and its gradient say which way each weight moves; an embedding is a learned row.** Training holds weights, gradients, optimizer state and a batch of activations; inference holds weights and one request. Batch size is the first memory knob, gradient accumulation keeps the effective batch, and data parallelism shares gradients, never the model's memory burden. Fine-tuning changes weights; retrieval changes the input. On the platform, classic GPU compute, AI Runtime in preview and the distributors are climbed one rung at a time, every unrun step labelled, and only after a simpler model has fallen short. **Transfer challenge:** for a paint-line image model with batches of shape (32, 3, 224, 224), write the fixed and per-image memory terms, the first knob on out-of-memory, and the baseline it must beat.",
+  "visualId": "dbxfe-deep-learning-ladder-visual"
+ },
+ "appliedTask": {
+  "title": "Size and place a paint-line image model honestly",
+  "prompt": "Cinderline's paint line has 12,000 labelled surface images, each resized to 224 by 224 pixels with 3 colour channels, 4% defective. A colour-threshold rule catches 60% of defects at a 5% false-alarm rate. Using the synthetic figures 100 MB fixed training memory and 20 MB of activations per image against a 2,048 MB GPU budget, give the shape of one batch of 16 and its input bytes in float32, the largest batch of 16, 32, 64 or 96 that fits, the first knob on out-of-memory, the compute ladder with execution labels, and the evidence that decides whether a network is worth it.",
+  "modelAnswer": "One batch of 16 in a channels-first layout is (16, 3, 224, 224): 16 x 3 x 224 x 224 = 2,408,448 values, about 9.6 MB of input in float32 at 4 bytes each. Memory: 100 + 20B MB, so batch 64 needs 1,380 MB and fits, batch 96 needs 2,020 MB and also fits, just under 2,048 MB, which leaves too little headroom to trust; start at 64. On out-of-memory, halve the batch or accumulate gradients over two batches of 32; adding GPUs keeps each one's batch. Ladder: CPU smoke test on 200 images (shapes, one loss, one step), executed first; single-node GPU-enabled compute with MLflow autologging, NOT EXECUTED; several GPUs on that node only if epoch time blocks iteration, NOT EXECUTED; TorchDistributor only if a node is outgrown, NOT EXECUTED. AI Runtime is an option to verify, not assume. The network must beat the 60% rule, and ideally a gradient-boosted model on simple colour statistics, on the same held-out images at 5% false alarms, by a gain priced in missed defects.",
+  "reasoning": "The answer multiplies the shape out before sizing memory, keeps fixed and per-image terms separate, picks a batch with headroom rather than the arithmetic maximum, labels every unrun rung, and makes the network earn its cost against the existing rule on held-out evidence.",
+  "beatIds": [
+   "dbxfe-deep-learning-shape",
+   "dbxfe-deep-learning-memory",
+   "dbxfe-deep-learning-parallel",
+   "dbxfe-deep-learning-platform",
+   "dbxfe-deep-learning-ladder",
+   "dbxfe-deep-learning-baseline"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-deep-learning-scenario"
+ ]
+}

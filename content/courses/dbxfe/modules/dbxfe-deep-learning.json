@@ -1,0 +1,548 @@
+{
+  "module": {
+    "id": "dbxfe-deep-learning",
+    "title": "Deep learning and accelerated workloads",
+    "summary": "Read a tensor's shape as a contract, carry one reading through a two-layer network by hand, see how a loss and its gradient move weights and how embeddings are learned, then size batches against GPU memory, choose fine-tuning or retrieval, explain data parallelism, and place accelerated compute on the platform only after a simpler model has been shown to fall short.",
+    "objectives": [
+      "Name what each axis of a tensor counts, predict the shape a matrix product returns, and diagnose a shape mismatch from its error text.",
+      "Compute a two-layer forward pass, its loss and an output-layer gradient by hand, and explain what training changes that inference does not.",
+      "Size a batch against a GPU memory budget, choose between fine-tuning and retrieval for a stated need, explain data parallelism, and design an accelerated workload on the platform with unexecuted steps labelled and a simpler baseline compared first."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m07"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-deep-learning-l01.json"
+    ],
+    "scenarioId": "dbxfe-deep-learning-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-deep-learning-scenario",
+      "title": "Decide whether Cinderline's weld-defect detector needs deep learning, and design the accelerated run if it does",
+      "context": "Fictional Cinderline Components records a two-second audio clip of every weld seam on line 4. A Delta table holds 40,000 labelled clips, 3% marked defective by inspection. An amplitude threshold rule is in place and catches about 55% of defects at a 5% false-alarm rate. A data analyst has a gradient-boosted model on forty hand-made features that reaches 78% recall at the same false-alarm rate on a held-out week, on CPU. The plant manager has read that deep learning on GPUs finds defects that rules miss and wants a GPU project started. GPU instance availability, AI Runtime status in the workspace, quota and cost are unconfirmed. Nothing in this scenario is executed; every number is synthetic.",
+      "task": "Write a one-page design note for the plant manager and the data team: whether a neural network is warranted now, the baseline it must beat and on what evidence, the tensor shapes and batch and memory figures as verification items, the compute ladder on the platform from a CPU smoke test upward, which steps are written but not executed, and what stays unknown until checked.",
+      "requirements": [
+        "State the baseline to beat, the held-out evidence it was measured on, and the gain that would justify the extra cost, priced in missed defects.",
+        "Give the tensor shape of one clip and of one batch, a batch size and a memory estimate labelled synthetic, and the first knob to turn on an out-of-memory failure.",
+        "Order the compute ladder: CPU smoke test, single-node GPU, one node with several GPUs, then distributed, with the documented reason for preferring one node.",
+        "Label every GPU step as not executed, mark AI Runtime as a preview to verify, and list instance availability, quota and pricing as unknowns."
+      ],
+      "model": "### Verdict\nShip the gradient-boosted model now; run the neural network as a measured experiment, not a project. The threshold rule catches 55% of defects and the trees 78% on the same held-out week at a 5% false-alarm rate. A convolutional network earns a place only if its gain on that week, priced at the cost of a missed defect, exceeds the GPU hours and the upkeep of a second pipeline. That price does not exist yet, so the note asks quality for it.\n\n### Shapes and budget (synthetic; verify on the first run)\nOne clip becomes a (64, 126) spectrogram; a batch of 32 is (32, 1, 64, 126). Memory during a training step is weights plus gradients plus optimizer state plus batch times per-clip activations. For an assumed 5-million-parameter float32 network with Adam that is 80 MB fixed and an assumed 6 MB per clip: batch 32 needs about 272 MB, batch 512 about 3,152 MB, over a 2,048 MB budget. On CUDA out of memory, halve the batch or accumulate gradients; adding workers does not shrink a worker's batch.\n\n### Compute ladder\n1. CPU smoke test on 512 clips: shapes, one loss value, one optimizer step. Planned first; nothing in this note has run.\n2. Single-node GPU-enabled compute (Machine learning checkbox, one GPU instance type, Photon off because it is not supported with GPU instance types), MLflow autologging on. Written, NOT EXECUTED.\n3. The same node with several GPUs only if epoch time is the limit: the documentation says one node with four GPUs is likely faster than four one-GPU workers. NOT EXECUTED.\n4. TorchDistributor across nodes only if the model or data no longer fit one machine. NOT EXECUTED.\nAI Runtime (serverless GPU) could replace rung 2 for notebook runs; single-node AI Runtime was documented as Public Preview, so availability here is a verification item.\n\n### Stop rule\nAfter rung 2, compare recall at 5% false alarms on the same held-out week. If the gain does not clear the priced threshold, stop and record why.\n\n### Unknowns\nGPU instance availability and quota in the region, AI Runtime status in this workspace, current pricing (check current pricing), and the cost of one missed defect.",
+      "reasoning": "The note answers the manager's request with the evidence already in hand, makes the neural network earn its cost against a working baseline, turns every GPU figure into a verification item, and separates written-but-unexecuted steps from executed ones so nobody reads the design as a result.",
+      "rubric": [
+        {
+          "id": "dbxfe-deep-learning-scenario-rubric-1",
+          "criterion": "Baseline and stop rule",
+          "weak": "Starts the GPU project because it was requested; no baseline named.",
+          "partial": "Names the trees baseline but sets no measurable gain or price for the comparison.",
+          "strong": "Trees ship now; the network must beat 78% recall on the same held-out week by a gain priced in missed defects, with an explicit stop rule."
+        },
+        {
+          "id": "dbxfe-deep-learning-scenario-rubric-2",
+          "criterion": "Shapes, batch and memory",
+          "weak": "No shapes or memory reasoning; 'use a big GPU'.",
+          "partial": "Shapes given but memory treated as one number, with no fixed-versus-per-example split or first knob.",
+          "strong": "Clip and batch shapes stated, memory split into fixed and batch-proportional parts labelled synthetic, batch size or gradient accumulation named as the first knob."
+        },
+        {
+          "id": "dbxfe-deep-learning-scenario-rubric-3",
+          "criterion": "Compute ladder and honesty",
+          "weak": "Jumps to a multi-node cluster; GPU steps read as if they ran.",
+          "partial": "Ladder ordered but unexecuted steps unlabelled, or serverless GPU treated as generally available.",
+          "strong": "CPU smoke test first, single node preferred with the documented reason, distributed last, every GPU step labelled not executed, preview status and unknowns listed."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "What does one missed weld defect cost the plant?",
+          "response": "Quality has not given a figure; scrap and rework of returned assemblies are logged but not per defect. Until a number exists the gain that would justify the network cannot be priced, and the note says so."
+        },
+        {
+          "question": "Is serverless GPU compute available in our workspace and region?",
+          "response": "Unknown. The documentation describes single-node AI Runtime as Public Preview; nobody has opened the compute selector in the production workspace to check, and no quota has been requested."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-deep-learning-l01"
+      ],
+      "claimIds": [
+        "dbxfe-fact-ml",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-deep-learning-course-claim-network",
+        "dbxfe-deep-learning-course-claim-tensor",
+        "dbxfe-deep-learning-course-claim-practices",
+        "dbxfe-deep-learning-course-claim-gpu",
+        "dbxfe-deep-learning-course-claim-ai-runtime",
+        "dbxfe-deep-learning-course-claim-distributed",
+        "dbxfe-deep-learning-course-claim-dl"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-deep-learning-course-source-network",
+      "title": "But what is a Neural Network?",
+      "url": "https://www.3blue1brown.com/lessons/neural-networks/",
+      "publisher": "3Blue1Brown",
+      "type": "primary reference",
+      "context": "3Blue1Brown deep learning chapter 1 (lesson page for the 2017-10-05 video); the structure of a layered network explained on handwritten digits.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "An intuition-building lesson, not a specification; its digit example and layer sizes are the author's teaching choices. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-gradient",
+      "title": "Gradient descent, how neural networks learn",
+      "url": "https://www.3blue1brown.com/lessons/gradient-descent/",
+      "publisher": "3Blue1Brown",
+      "type": "primary reference",
+      "context": "3Blue1Brown deep learning chapter 2 (lesson page for the 2017-10-16 video); cost function and gradient descent on the digit network.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Intuition, not an optimizer specification; real optimizers add momentum, adaptive step sizes and schedules. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-ndarray",
+      "title": "The N-dimensional array (ndarray)",
+      "url": "https://numpy.org/doc/stable/reference/arrays.ndarray.html",
+      "publisher": "NumPy",
+      "type": "official documentation",
+      "context": "NumPy reference manual (stable, v2.5 when searched); the array type used by the lesson's executed example.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The stable manual tracks the current NumPy release; the example was run with NumPy 2.5.3. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-tensor",
+      "title": "torch.Tensor",
+      "url": "https://docs.pytorch.org/docs/stable/tensors.html",
+      "publisher": "PyTorch",
+      "type": "official documentation",
+      "context": "PyTorch stable documentation (2.14 when searched) for the tensor type, dtypes and constructors.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The stable page tracks the current release; constructor and dtype defaults are checked against the installed version. PyTorch is not installed or run in this build. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-embedding",
+      "title": "Embedding",
+      "url": "https://docs.pytorch.org/docs/2.13/generated/torch.nn.Embedding.html",
+      "publisher": "PyTorch",
+      "type": "official documentation",
+      "context": "PyTorch 2.13 reference page for torch.nn.Embedding.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A version-pinned page (2.13); argument names and behaviour are checked against the installed release. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-amp",
+      "title": "Automatic Mixed Precision package - torch.amp",
+      "url": "https://docs.pytorch.org/docs/stable/amp.html",
+      "publisher": "PyTorch",
+      "type": "official documentation",
+      "context": "PyTorch stable documentation for torch.amp, autocast and GradScaler.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Which operations run in lower precision depends on the device and release; memory savings are workload-specific and not quoted here. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-ddp",
+      "title": "Getting Started with Distributed Data Parallel",
+      "url": "https://docs.pytorch.org/tutorials/intermediate/ddp_tutorial.html",
+      "publisher": "PyTorch",
+      "type": "official documentation",
+      "context": "PyTorch tutorials (2.14 when searched); DistributedDataParallel basics.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A tutorial, not a sizing guide; launch commands and backends depend on the cluster and release. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-dl",
+      "title": "Deep learning",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/deep-learning",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; introduction to PyTorch, TensorFlow and distributed training on Databricks.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "An overview page; library versions come from the specific Databricks Runtime ML release notes. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-practices",
+      "title": "Best practices for deep learning on Databricks",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/dl-best-practices",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; cluster shape, data loading and tracking recommendations for deep learning.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Recommendations, not guarantees; the single-node preference assumes the model and data fit one machine. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-gpu",
+      "title": "GPU-enabled compute",
+      "url": "https://docs.databricks.com/aws/en/compute/gpu",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS (the Azure and Google Cloud pages carry the same settings); classic compute with GPU instance types.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Instance types, runtime versions and regional availability change and are verified on the current page and in the workspace. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-ai-runtime",
+      "title": "AI Runtime",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/ai-runtime",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; serverless GPU compute for deep learning. Single-node AI Runtime was documented as Public Preview when searched.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Public Preview: availability, accelerators, regions, quota and pricing are verified in the workspace and never presented as generally available. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-ai-runtime-multi",
+      "title": "Multi-GPU distributed training",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/ai-runtime/examples/gpu-distributed-training",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; multi-GPU training on AI Runtime through the Serverless GPU Python API, documented as Beta when searched.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Beta: workspace admins control access from the Previews page; the accelerator requirements differed between related pages in the search snippets, so the live page decides. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-distributed",
+      "title": "Distributed training",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/distributed-training",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; when to distribute training and the distributors included in Databricks Runtime ML.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The page recommends single-machine training first; distributor APIs and arguments are read from the current page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-torchdistributor",
+      "title": "Distributed training with TorchDistributor",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/distributed-training/spark-pytorch-distributor",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the PySpark TorchDistributor module on classic Spark compute.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Arguments, supported runtimes and GPU counts are read from the current page before use. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-pyspark-td",
+      "title": "TorchDistributor",
+      "url": "https://spark.apache.org/docs/latest/api/python/reference/api/pyspark.ml.torch.distributor.TorchDistributor.html",
+      "publisher": "Apache Spark",
+      "type": "official documentation",
+      "context": "PySpark API reference (4.2.0 when searched) for pyspark.ml.torch.distributor.TorchDistributor.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The latest reference tracks the newest Spark release; the runtime's Spark version decides which arguments exist. Nothing was run. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-deepspeed",
+      "title": "Distributed training with DeepSpeed distributor",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/train-model/distributed-training/deepspeed",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the DeepSpeed distributor for models limited by memory.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Configuration files and supported versions change; nothing here is sized or run. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-finetune",
+      "title": "Foundation Model Fine-tuning (deprecated)",
+      "url": "https://docs.databricks.com/aws/en/large-language-models/foundation-model-training",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the Foundation Model Fine-tuning feature, marked deprecated. The AWS result surfaced by URL; the exact title was confirmed on the Microsoft Learn counterpart and on the AWS data-preparation page's title.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Deprecated with removal scheduled for 2026-08-14, before this review; no plan relies on it, and AI Runtime is the documented migration path. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-source-search",
+      "title": "Databricks AI Search",
+      "url": "https://docs.databricks.com/aws/en/ai-search/ai-search",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the managed retrieval service, current name formerly Vector Search.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Endpoint types, limits, preview features and pricing are checked on the live page before any design relies on them. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-deep-learning-course-claim-network",
+      "description": "A neural network is layers of units that each hold a number, the next layer's numbers computed from the previous layer's; a cost function measures how badly its predictions fit labelled examples, and gradient descent repeatedly moves weights and biases downhill on that cost.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-network",
+        "dbxfe-deep-learning-course-source-gradient"
+      ],
+      "context": "3Blue1Brown deep learning chapters 1 and 2; intuition, not a product specification."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-tensor",
+      "description": "An array's shape is a tuple giving the size of each dimension and its dtype is a separate object; PyTorch creates floating-point tensors as float32 by default and prefers torch.tensor() to the legacy torch.Tensor() constructor.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-ndarray",
+        "dbxfe-deep-learning-course-source-tensor"
+      ],
+      "context": "NumPy and PyTorch reference documentation; NumPy was run in this build, PyTorch was not."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-embedding",
+      "description": "torch.nn.Embedding is a lookup table storing embeddings of a fixed dictionary and size, returning the vectors for the indices it receives.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-embedding"
+      ],
+      "context": "PyTorch 2.13 reference page."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-amp",
+      "description": "Automatic mixed precision runs some operations in float32 and others in float16 or bfloat16, matching each operation to a suitable type; float16 training ordinarily pairs autocast with a gradient scaler.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-amp"
+      ],
+      "context": "PyTorch stable documentation; savings depend on the model and device."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-ddp",
+      "description": "DistributedDataParallel runs one process per replica and synchronizes gradients during the backward pass, so every replica holds the same averaged gradient before the optimizer step.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-ddp"
+      ],
+      "context": "PyTorch tutorial; backends and launch commands vary."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-dl",
+      "description": "Databricks Runtime ML includes PyTorch, TensorFlow and TensorBoard, supports distributed training through Ray, TorchDistributor and DeepSpeed, and uses MLflow to track deep learning runs.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-dl"
+      ],
+      "context": "Databricks on AWS overview; versions come from the runtime release notes."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-practices",
+      "description": "Databricks recommends Databricks Runtime ML with MLflow tracking and autologging for model training, a single-node GPU cluster as typically fastest and most cost-effective for deep learning development, and notes one node with four GPUs is likely faster than four one-GPU workers because of communication overhead.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-practices"
+      ],
+      "context": "Databricks on AWS best practices; depends on the model and data fitting one machine."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-gpu",
+      "description": "GPU-enabled compute is created with the Machine learning checkbox checked, a GPU instance type as the worker type and optionally Single node for one GPU instance; Photon is not supported with GPU instance types; Databricks installs the NVIDIA driver and CUDA libraries.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-gpu"
+      ],
+      "context": "Databricks on AWS classic compute; instance availability varies by region and account."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-ai-runtime",
+      "description": "AI Runtime brings serverless GPU compute to Databricks for deep learning; single-node AI Runtime was documented as Public Preview, with A10 or H100 chosen in a notebook's Accelerator field.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-ai-runtime"
+      ],
+      "context": "Public Preview when searched; verify availability, quota and pricing in the workspace."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-ai-runtime-multi",
+      "description": "Multi-GPU distributed training on AI Runtime was documented as Beta, gated from the workspace Previews page, with training wrapped in an @distributed function that integrates with DDP and FSDP.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-ai-runtime-multi"
+      ],
+      "context": "Beta when searched; accelerator requirements are read from the live page."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-distributed",
+      "description": "Databricks recommends training neural networks on a single machine when possible, because distributed training is more complex and slower due to communication overhead, and includes TorchDistributor, DeepSpeed and Ray in Databricks Runtime ML for when it is needed.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-distributed",
+        "dbxfe-deep-learning-course-source-practices"
+      ],
+      "context": "Databricks on AWS; recommendation depends on model and data size."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-torchdistributor",
+      "description": "TorchDistributor is an open-source PySpark module that launches PyTorch training jobs as Spark jobs and runs them across workers with torch.distributed.run; its constructor takes num_processes, local_mode and use_gpu, and run() invokes a training function.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-torchdistributor",
+        "dbxfe-deep-learning-course-source-pyspark-td"
+      ],
+      "context": "Databricks on AWS classic compute; PySpark API reference."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-deepspeed",
+      "description": "The DeepSpeed distributor, built on TorchDistributor, is recommended for models that need more compute but are limited by memory, using DeepSpeed's memory and communication optimizations.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-deepspeed"
+      ],
+      "context": "Databricks on AWS; nothing sized or run here."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-finetune",
+      "description": "Databricks Foundation Model Fine-tuning, which supported instruction fine-tuning, chat completion and continued pre-training, is documented as deprecated with removal scheduled for 2026-08-14, and Databricks recommends AI Runtime for training and fine-tuning instead.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-finetune",
+        "dbxfe-deep-learning-course-source-ai-runtime"
+      ],
+      "context": "Deprecated; the scheduled removal date precedes this review."
+    },
+    {
+      "id": "dbxfe-deep-learning-course-claim-search",
+      "description": "Databricks AI Search, formerly Vector Search, indexes embeddings computed by Databricks or supplied precomputed from a Delta table, queries for the most similar vectors, supports hybrid keyword-similarity search, and serves retrieval-augmented generation.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-deep-learning-course-source-search"
+      ],
+      "context": "Databricks on AWS; limits and preview features checked on the live page."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-deep-learning-l01-tensor-concept",
+      "term": "tensor shape",
+      "aliases": [
+        "shape",
+        "dimensions",
+        "ndarray shape"
+      ],
+      "definition": "The tuple that states how many items each axis of an array holds, which a layer or product must match before any arithmetic runs.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-tensors"
+    },
+    {
+      "id": "dbxfe-deep-learning-l01-forward-concept",
+      "term": "forward pass",
+      "aliases": [
+        "forward computation",
+        "layer"
+      ],
+      "definition": "The ordered arithmetic that carries an input through each layer's linear map and activation to the output score.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-forward"
+    },
+    {
+      "id": "dbxfe-deep-learning-l01-gradient-concept",
+      "term": "gradient",
+      "aliases": [
+        "gradient descent",
+        "backward pass",
+        "backpropagation",
+        "loss"
+      ],
+      "definition": "For each weight, how much the loss changes when that weight changes; one optimisation step moves each weight against it.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-learning"
+    },
+    {
+      "id": "dbxfe-deep-learning-l01-embedding-concept",
+      "term": "embedding",
+      "aliases": [
+        "embedding table",
+        "learned vector",
+        "nn.Embedding"
+      ],
+      "definition": "A learned lookup table that maps a categorical index to a vector of numbers that the next layer can multiply.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-learning"
+    },
+    {
+      "id": "dbxfe-deep-learning-l01-batch-concept",
+      "term": "batch size",
+      "aliases": [
+        "mini-batch",
+        "batch"
+      ],
+      "definition": "The number of examples whose gradients are averaged into one weight update; it sets steps per epoch and per-step memory.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-resources"
+    },
+    {
+      "id": "dbxfe-deep-learning-l01-memory-concept",
+      "term": "GPU memory budget",
+      "aliases": [
+        "CUDA out of memory",
+        "device memory",
+        "training versus inference memory"
+      ],
+      "definition": "The accelerator memory that must hold weights, gradients, optimizer state and a whole batch's activations during a training step.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-resources"
+    },
+    {
+      "id": "dbxfe-deep-learning-l01-finetune-concept",
+      "term": "fine-tuning versus retrieval",
+      "aliases": [
+        "fine-tuning",
+        "retrieval augmentation",
+        "RAG"
+      ],
+      "definition": "Fine-tuning changes a model's weights with your examples; retrieval leaves the weights alone and places relevant passages in the input at inference time.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-scaling"
+    },
+    {
+      "id": "dbxfe-deep-learning-l01-parallel-concept",
+      "term": "data parallelism",
+      "aliases": [
+        "DistributedDataParallel",
+        "DDP",
+        "all-reduce"
+      ],
+      "definition": "A distributed training scheme where every worker holds a full model copy, processes a different slice of the batch and shares averaged gradients each step.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-scaling"
+    },
+    {
+      "id": "dbxfe-deep-learning-l01-gpu-concept",
+      "term": "accelerated compute on the platform",
+      "aliases": [
+        "GPU-enabled compute",
+        "AI Runtime",
+        "serverless GPU compute",
+        "TorchDistributor"
+      ],
+      "definition": "The documented ways to run deep learning on GPUs on Databricks: classic GPU-enabled compute, AI Runtime serverless GPU compute in preview, and distributors in Databricks Runtime ML.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-platform"
+    },
+    {
+      "id": "dbxfe-deep-learning-l01-baseline-concept",
+      "term": "simpler baseline",
+      "aliases": [
+        "simpler model",
+        "rule-based baseline",
+        "non-ML solution"
+      ],
+      "definition": "The rule or classical model a neural network must beat on held-out evidence by more than its extra cost before it is adopted.",
+      "lessonId": "dbxfe-deep-learning-l01",
+      "sectionId": "dbxfe-deep-learning-l01-platform"
+    }
+  ]
+}
