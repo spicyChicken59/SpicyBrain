@@ -56,9 +56,22 @@ test("teacher-first release covers the actual sixteen modules while preserving c
     new Set(modules.flatMap((m) => m.lessonIds)),
     new Set(baseline.lessons.map((l) => l.id)),
   );
-  assert.deepEqual(
-    new Set(modules.flatMap((m) => m.cardLinks.map((link) => link.cardId))),
-    new Set(baseline.lessons.flatMap((l) => l.cardIds)),
+  // Every preserved card keeps its mapping; the academy may add core cards
+  // under new identities, and each of those must be mapped as well (the
+  // validator refuses an unmapped lesson card).
+  const mapped = new Set(
+    modules.flatMap((m) => m.cardLinks.map((link) => link.cardId)),
+  );
+  const preservedCards = new Set(baseline.lessons.flatMap((l) => l.cardIds));
+  for (const id of preservedCards)
+    assert.ok(mapped.has(id), `Preserved card ${id} remains mapped to a beat`);
+  const currentCards = lessons.flatMap((l) => l.cards.map((c) => c.id));
+  assert.equal(new Set(currentCards).size, currentCards.length);
+  for (const id of currentCards)
+    assert.ok(mapped.has(id), `Current card ${id} is mapped to a beat`);
+  assert.ok(
+    currentCards.length >= preservedCards.size,
+    "Card identities are added, never removed",
   );
   const extensionIds = modules.flatMap((m) =>
     m.extensionCards.map((c) => c.id),
