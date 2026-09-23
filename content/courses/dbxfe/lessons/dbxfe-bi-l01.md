@@ -4,7 +4,7 @@ After this lesson you can plan a dashboard that Cinderline's North plant morning
 
 <!-- section:dbxfe-bi-l01-start -->
 
-Bring SQL aggregation and a metric contract. [Build a metric people can trust](#/lesson/dbxfe-m05-l01) shows why two reports disagree, and [data modeling and metric contracts](#/module/dbxfe-modeling) writes the contract consumed here: `unit_defect_rate` v1, defective over inspected units of accepted inspections, per line per business day, one decimal, empty lines in words, restated days marked. [Design least-privilege access](#/lesson/dbxfe-m06-l02) supplies the grant vocabulary; Databricks SQL runs the queries on SQL warehouses.
+Bring SQL aggregation and a metric contract. [Build a metric people can trust](#/lesson/dbxfe-m05-l01) shows why two reports disagree, and [data modeling and metric contracts](#/module/dbxfe-modeling) writes the contract consumed here: `unit_defect_rate` v1, defective over inspected units of accepted inspections, per line per business day, empty cases named rather than zero. This module adds two display clauses without changing the definition, one decimal and restated days marked with their previous value, and reads that module's vocabulary as follows: its pieces are the units here, and its `no_units` and `no_inspections` statuses print as "no inspected units" and "no inspections". The North plant here is its own four-line synthetic snapshot, not the modeling lab's lines N1 and N2. The access section carries the grant vocabulary it needs; [Design least-privilege access](#/lesson/dbxfe-m06-l02), in the later governance track, owns the full model. Databricks SQL runs the queries on SQL warehouses.
 
 <!-- section:dbxfe-bi-l01-decision -->
 
@@ -24,27 +24,27 @@ Read the label aloud; if the sentence cannot be spoken, a part is missing.
 
 <!-- section:dbxfe-bi-l01-binding -->
 
-A tile inherits its contract. On day 4 the four lines inspected 300, 250, 250 and 240 units with 10, 15, 12 and 10 defective. The plant figure is 47 over 1,040, which is 4.5%; the mean of the four line rates is 4.6%, a number no contract defines. The per-line dataset starts from the line list and divides with `try_divide`, so an empty line returns NULL and the tile prints "no inspections" (or "no inspected units" when accepted inspections total zero units), never 0.0%.
+A tile inherits its contract. On day 4 of the reconciliation sheet, the Tuesday the morning page covers, the four lines inspected 300, 250, 250 and 240 units with 10, 15, 12 and 10 defective. The plant figure is 47 over 1,040, which is 4.5%; the mean of the four line rates is 4.6%, a number no contract defines. The per-line dataset reads the published `accepted.daily_line_rate`, which keeps a row for every line in the line list, and divides with `try_divide`, so an empty line returns NULL and the tile prints "no inspections" (or "no inspected units" when accepted inspections total zero units), never 0.0%.
 
 Two controls change what a tile shows. A **field filter** narrows rows a dataset already returned: setting line to 3 hides the other lines and leaves the plant dataset, which has no line field, untouched. A **parameter** such as `:business_day` is substituted into the SQL before aggregation, so every dataset using it recomputes. Choose each deliberately and give none of them the job of a permission.
 
 <!-- section:dbxfe-bi-l01-access -->
 
-An AI/BI dashboard has its own permission levels, Can View, Can Run, Can Edit and Can Manage. The tables behind it carry Unity Catalog privileges. Neither grants the other.
+An AI/BI dashboard has its own permission levels, Can View, Can Run, Can Edit and Can Manage. The tables behind it carry Unity Catalog privileges: reading a table takes `USE CATALOG` on its catalog, `USE SCHEMA` on its schema and `SELECT` on the table itself. Neither door grants the other. The page reads two objects, `accepted.daily_line_rate` and the freshness view `accepted.publish_status`.
 
-At publish time the publisher chooses whose data permissions run the queries. With **shared data permissions**, the default, every viewer's query runs with the publisher's grants and viewers share one cache, so a filter is not a wall. With **individual data permissions**, each viewer's own grants decide and a viewer without SELECT sees no data. Cinderline publishes the morning page with individual permissions, so the matrix's grants protect the rows; a shared publisher would have to be a service principal granted only the accepted table, never a personal login.
+At publish time the publisher chooses whose data permissions run the queries. With **shared data permissions**, the default, every viewer's query runs with the publisher's grants and viewers share one cache, so a filter is not a wall. With **individual data permissions**, each viewer's own grants decide and a viewer without them gets a failed tile, never the contract's "no inspections". Cinderline publishes the morning page with individual permissions, so the matrix's grants protect the rows; a shared publisher would have to be a service principal granted only the accepted table, never a personal login.
 
 | Principal | Page | Underlying data | Must not |
 |---|---|---|---|
-| north-reporting-analysts | Can View | SELECT accepted.daily_line_rate | Reach raw or quarantine rows |
-| quality-stewards | Can View, quarantine link | SELECT accepted and quarantine | Edit the page |
+| north-reporting-analysts | Can View | USE CATALOG, USE SCHEMA accepted; SELECT on both objects | Reach raw or quarantine rows |
+| quality-stewards | Can View, quarantine link | as analysts, plus USE SCHEMA and SELECT on quarantine | Edit the page |
 | data team | Can Edit | its own grants | Publish a tile with no contract |
 | sp-north-nightly | none | writes the accepted tables | Author or publish the page |
 | everyone else | none | none | Open the page |
 
 <!-- section:dbxfe-bi-l01-freshness -->
 
-Freshness has two clocks: the period the numbers cover and the moment they were published. Say both at the top of the page: "Covers Tuesday. Published 06:32. Restated days are marked." When the nightly run has not published by 7:30, the same place reads "Not updated: showing Monday. See the operator note."; a report held for a conflict reads "Held: conflict under adjudication". That line is a tile reading the latest successful row of a publish-run table.
+Freshness has two clocks: the period the numbers cover and the moment they were published. Say both at the top of the page: "Covers Tuesday. Published 06:32. Restated days are marked." When the nightly run has not published by 7:30, the same place reads "Not updated: showing Monday. See the operator note."; a report held for a conflict reads "Held: conflict under adjudication". That line is a tile reading the latest successful row of the publish-run table through the `accepted.publish_status` view.
 
 A dashboard schedule runs every dataset's SQL on a cadence, refreshes the shared cache for a page with shared data permissions, and can send snapshots to email, Slack or Microsoft Teams subscribers. It cannot produce rows the job has not published: if the job finishes at 08:20, a 06:30 snapshot posts Monday with no warning. Put the refresh after the job, for example as a dashboard task that follows the publishing task, and let the freshness line say when it did not.
 
@@ -110,7 +110,7 @@ Twenty Databricks documentation pages, from AI/BI, dashboards, sharing, filters,
 
 <!-- section:dbxfe-bi-l01-related -->
 
-[Data modeling and metric contracts](#/module/dbxfe-modeling) writes the contract and the metric view definition this lesson reads. [SQL analytics and performance diagnosis](#/module/dbxfe-m05) owns a slow page at the moment it is needed. [Unity Catalog and governance](#/module/dbxfe-m06) owns the privileges behind the access matrix. The Genie module takes the business user's natural-language questions over the same governed data.
+[Data modeling and metric contracts](#/module/dbxfe-modeling) writes the contract this lesson extends and shows a metric view over its own star; the view here applies the same idea to the published line-day table. [SQL analytics and performance diagnosis](#/module/dbxfe-m05) owns a slow page at the moment it is needed. [Unity Catalog and governance](#/module/dbxfe-m06) owns the privileges behind the access matrix. The Genie module takes the business user's natural-language questions over the same governed data.
 
 <!-- section:dbxfe-bi-l01-revisit -->
 

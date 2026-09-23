@@ -4,7 +4,7 @@ After this lesson you can take a stream of accepted inspections and give it a sh
 
 <!-- section:dbxfe-modeling-l01-start -->
 
-Two retained lessons carry the foundations and are not repeated here. [Build a metric people can trust](#/lesson/dbxfe-m05-l01) shows why "defect rate" needs a named numerator, denominator, time basis and owner before any dashboard exists. [Grain, joins, and execution behavior](#/lesson/dbxfe-grain-joins) shows a join multiplying rows and how to count matching pairs. This lesson builds the model those two assume. The metric contract field guide gives a one-page template, and the Lab L11 walkthrough runs everything below on local Spark with hand-derived answers. You need SQL joins and GROUP BY; no Databricks workspace is required.
+One retained lesson carries a foundation that is not repeated here: [Grain, joins, and execution behavior](#/lesson/dbxfe-grain-joins) shows a join multiplying rows and how to count matching pairs. The metric contract is taught from scratch below, so no metric lesson is needed first; [Build a metric people can trust](#/lesson/dbxfe-m05-l01), which comes later in this track, revisits why "defect rate" needs a named numerator, denominator, time basis and owner, and is an optional short read now. The metric contract field guide gives a one-page template, and the Lab L11 walkthrough runs everything below on local Spark with hand-derived answers. You need SQL joins and GROUP BY; no Databricks workspace is required.
 
 <!-- section:dbxfe-modeling-l01-grain -->
 

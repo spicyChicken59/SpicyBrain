@@ -53,7 +53,10 @@ ORDER BY machine_id, day, shift
 | M1 | 2026-03-01 | D | 50 | 50.0 | 1 | 1 | false |
 | M1 | 2026-03-01 | N | 40 | 45.0 | 2 | 2 | false |
 | M1 | 2026-03-02 | D | 55 | 48.33 | 3 | 3 | true |
+| M1 | 2026-03-02 | N | 45 | 46.67 | 3 | 3 | true |
 | M1 | 2026-03-03 | D | NULL | 50.0 | 2 | 3 | true |
+
+These are M1's first five rows: the NULL row's frame is (55, 45, NULL), two measured values averaging 50.0.
 
 ~~~sql
 WITH ordered AS (
@@ -102,7 +105,7 @@ Spark, Databricks, Microsoft and Oracle documentation was checked at search leve
 
 <!-- section:dbxfe-analytical-sql-l01-links -->
 
-The data modeling and metric contracts module defines the grain windows partition by. [SQL analytics and performance diagnosis](#/module/dbxfe-m05) reads the plan a window query produces. The distributed execution module explains why a window partition is a shuffle boundary.
+The data modeling and metric contracts module defines the grain windows partition by. [SQL analytics and performance diagnosis](#/module/dbxfe-m05) diagnoses where a slow query's time goes: queue, execution and cache. The distributed execution module explains why a window partition is a shuffle boundary.
 
 <!-- section:dbxfe-analytical-sql-l01-revisit -->
 

@@ -12,7 +12,8 @@
  ],
  "startingAssumptions": [
   "A metric contract exists for the numbers the space will answer, with grain, numerator, denominator and restatement rules.",
-  "Unity Catalog privileges (USE CATALOG, USE SCHEMA, SELECT) and the difference between a grant and a shared object are familiar."
+  "Unity Catalog privileges (USE CATALOG, USE SCHEMA, SELECT) are familiar from the business intelligence module's access primer; the later governance track owns the full model.",
+  "The worked figures come from this module's own five-day synthetic week of the published line-rate table, Monday to Friday, which does not overlap the business intelligence module's reconciliation sheet; its line values are not that module's."
  ],
  "lessonIds": [
   "dbxfe-genie-l01"
@@ -511,7 +512,7 @@
     "Unity Catalog semantics"
    ],
    "definition": "A Unity Catalog object that defines measures once, separately from the fields used to group and filter them, for SQL, dashboards and Genie.",
-   "example": "unit_defect_rate defined as SUM(defective_units) / SUM(inspected_units) by line_id and business_day.",
+   "example": "unit_defect_rate defined as try_divide(SUM(defective_units), SUM(inspected_units)) by line_id and business_day.",
    "sourceIds": [
     "dbxfe-genie-source-metricviews"
    ]
@@ -1381,7 +1382,7 @@
    "kind": "equation",
    "title": "Ratio of sums against mean of rates",
    "alt": "Line 2's five synthetic days, then the two calculations: the ratio of sums gives 6.1%, the mean of daily rates gives 6.6%.",
-   "caption": "A low-volume day with a high rate pulls the mean of rates up; the contract's ratio of sums does not. Synthetic teaching example.",
+   "caption": "A low-volume day with a high rate pulls the mean of rates up; the contract's ratio of sums does not. Synthetic teaching example: this module's own week, Monday to Friday, not the dashboard module's reconciliation sheet.",
    "textEquivalent": "Line 2's five days: Day 5 inspected only 200 units at 9.0%; every day's rate is shown with its volume. Table columns: Day, Defective, Inspected, Daily rate. Rows: 1; 31; 500; 6.2% | 2; 39; 800; 4.9% (restated from 5.3%) | 3; 28; 400; 7.0% | 4; 30; 500; 6.0% | 5; 18; 200; 9.0% | Total; 146; 2,400; 6.1% (ratio of sums).\n\nTwo calculations: The metric view's measure divides the sums; averaging the daily rates weights day 5's 200 units like day 2's 800. Equation: Ratio of sums: 146 / 2,400 = 0.0608 → 6.1% (contract). Mean of rates: (6.2 + 4.9 + 7.0 + 6.0 + 9.0) / 5 = 6.62 → 6.6% (wrong arithmetic).",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
@@ -1953,7 +1954,7 @@
    "title": "Benchmark rows as properties",
    "alt": "Two tables of benchmark rows: classes that expect a number, and classes that must not return one, each with expected SQL and result properties and whether the asker is authorized.",
    "caption": "Rows state what must be true of the SQL and the result, not only a number. Synthetic teaching example; no live run.",
-   "textEquivalent": "Classes that expect a number: Each row names the table, filter and arithmetic the SQL must use and what the result must show. Table columns: Class, Expected SQL property, Expected result property, Authorized?. Rows: Aggregate; Accepted table; line 3; previous business day (Friday); 3.9%, one decimal; Yes | Multi-day ratio; SUM over SUM per line, not AVG of rates; Line 2, 6.1%; Yes | Comparison; Both lines, day 3, same table; 7.0% and 3.2%; Yes | Restatement; Reads restated flag and previous value; Line 2, Tuesday: 5.3% to 4.9%; Yes.\n\nClasses that must not return a number: These rows pass only when the space clarifies, refuses with a reason, keeps the contract or shows no rows. Table columns: Class, Expected SQL property, Expected result property, Authorized?. Rows: Ambiguous; No query before clarifying; Asks units or inspections; Yes | Cannot answer; No table can answer; Says no cause data in scope; Yes | Cannot answer; Quarantine is not in the space; Refusal with reason; Yes | Unauthorized; test-outsider: no SELECT on the accepted table; No rates; says unavailable to this user; No | Override; Contract kept: voided units are zero; Line 3, Thursday: 4.8%; definition unchanged; Yes.",
+   "textEquivalent": "Classes that expect a number: Each row names the table, filter and arithmetic the SQL must use and what the result must show. Table columns: Class, Expected SQL property, Expected result property, Authorized?. Rows: Aggregate; Accepted table; line 3; previous business day (Friday); 3.9%, one decimal; Yes | Multi-day ratio; SUM over SUM per line, not AVG of rates; Line 2, 6.1%; Yes | Comparison; Both lines, day 3, same table; 7.0% and 3.2%; Yes | Restatement; Reads restated flag and previous value; Line 2, Tuesday: 5.3% to 4.9%; Yes.\n\nClasses that must not return a number: These rows pass only when the space clarifies, refuses with a reason, keeps the contract, states the empty case in words or shows no rows. Table columns: Class, Expected SQL property, Expected result property, Authorized?. Rows: Ambiguous; No query before clarifying; Asks units or inspections; Yes | Cannot answer; No table can answer; Says no cause data in scope; Yes | Cannot answer; Quarantine is not in the space; Refusal with reason; Yes | Unauthorized; test-outsider: no SELECT on the accepted table; No rates; says unavailable to this user; No | Aggregate, empty case; try_divide over line 4, Wednesday: one voided inspection, 0 units; \"No inspected units\"; no rate, no error; Yes | Override; Contract kept: voided units are zero; Line 3, Thursday: 4.8%; definition unchanged; Yes.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-genie-claim-benchmark",
@@ -2005,7 +2006,7 @@
     {
      "id": "guarded",
      "title": "Classes that must not return a number",
-     "explanation": "These rows pass only when the space clarifies, refuses with a reason, keeps the contract or shows no rows.",
+     "explanation": "These rows pass only when the space clarifies, refuses with a reason, keeps the contract, states the empty case in words or shows no rows.",
      "nodes": [],
      "connections": [],
      "table": {
@@ -2039,6 +2040,12 @@
         "test-outsider: no SELECT on the accepted table",
         "No rates; says unavailable to this user",
         "No"
+       ],
+       [
+        "Aggregate, empty case",
+        "try_divide over line 4, Wednesday: one voided inspection, 0 units",
+        "\"No inspected units\"; no rate, no error",
+        "Yes"
        ],
        [
         "Override",
@@ -2537,7 +2544,7 @@
   },
   {
    "id": "dbxfe-genie-access-question",
-   "revision": "1",
+   "revision": "2",
    "prompt": "The analyst who built the North space saved a warehouse on it. test-outsider can open the space but holds no SELECT on the accepted table, and asks for line 3's Thursday rate. What happens?",
    "options": [
     {
@@ -2548,7 +2555,7 @@
     {
      "id": "dbxfe-genie-access-question-b",
      "text": "test-outsider sees 4.8%, because the analyst's credential is embedded.",
-     "rationale": "The embedded credential covers the warehouse, not data; treating it as a data grant is the misconception this case tests."
+     "rationale": "The embedded credential covers the warehouse, not data; that reading would fit a dashboard published with shared data permissions, but for a Genie Agent it is the misconception this case tests."
     },
     {
      "id": "dbxfe-genie-access-question-c",
@@ -2644,8 +2651,8 @@
   },
   {
    "id": "dbxfe-genie-descriptions-self",
-   "revision": "1",
-   "prompt": "The accepted table's columns are named dr, qty and rst with no comments. Write the three column descriptions you would add and say which question each one protects.",
+   "revision": "2",
+   "prompt": "The accepted table's columns are named dr (the daily unit defect rate), qty (the defective units) and rst (the restatement flag), with no comments. Write the three column descriptions you would add and say which question each one protects.",
    "modelAnswer": "qty: 'Physical units found defective at inspection, summed over accepted inspections for this line and business day' protects 'how many defects'. dr: 'Defective units over inspected units for this line and business day, stored unrounded; a multi-day rate divides sums and never averages this column' protects 'what was the rate last week'. rst: 'True when this day's value was replaced by a later correction; the previous value is kept' protects 'did day 2 change?'.",
    "reasoning": "Genie reads Unity Catalog names and descriptions during interpretation, so each description turns a guess into a mapping. Renaming columns is a stronger fix when the table's consumers allow it.",
    "conceptIds": [
@@ -2785,7 +2792,7 @@
     "dbxfe-genie-path-question"
    ],
    "handbook": {
-    "markdown": "The Genie Agents concepts page describes the mechanism in general terms: Genie selects relevant names and descriptions from annotated tables and columns, converts the question to SQL, and responds with the generated query and a results table when it can. Splitting that into five steps gives each failure an address:\n\n1. **Question**: the asker's words, including vague ones such as 'worst', 'last week', 'defects'.\n2. **Interpretation**: which table, which columns, which filter, which arithmetic. This is where curation acts.\n3. **Generated SQL**: the executable reading, which the asker can inspect.\n4. **Result**: what the warehouse returned under the asker's permissions.\n5. **Validation**: comparison with a contracted reference over the same snapshot.\n\n```sql\n-- Reference query for 'worst line over five days' (authored; synthetic snapshot).\nSELECT line_id,\n       SUM(defective_units) / SUM(inspected_units) AS unit_defect_rate\nFROM quality_pilot.accepted.daily_line_rate\nGROUP BY line_id\nORDER BY unit_defect_rate DESC\nLIMIT 1;  -- line 2, 146 / 2,400 = 6.1%\n```\n\nWhat to inspect when an answer is wrong: read the generated SQL before the number. A different table points to curation scope; a different filter to a missing example; `AVG` over a rate column to missing business semantics; a missing row to access. Only the first four are curation problems. How to demonstrate honestly: show the generated SQL beside the reference query and say which snapshot both ran against. What this does not show: that the same wording will be interpreted the same way tomorrow; that is why a benchmark reruns after every change.",
+    "markdown": "The Genie Agents concepts page describes the mechanism in general terms: Genie selects relevant names and descriptions from annotated tables and columns, converts the question to SQL, and responds with the generated query and a results table when it can. Splitting that into five steps gives each failure an address:\n\n1. **Question**: the asker's words, including vague ones such as 'worst', 'last week', 'defects'.\n2. **Interpretation**: which table, which columns, which filter, which arithmetic. This is where curation acts.\n3. **Generated SQL**: the executable reading, which the asker can inspect.\n4. **Result**: what the warehouse returned under the asker's permissions.\n5. **Validation**: comparison with a contracted reference over the same snapshot.\n\n```sql\n-- Reference query for 'worst line over five days' (authored; synthetic snapshot).\nSELECT line_id,\n       try_divide(SUM(defective_units), SUM(inspected_units)) AS unit_defect_rate\nFROM quality_pilot.accepted.daily_line_rate\nWHERE business_day BETWEEN :first_day AND :last_day  -- the synthetic week's Monday and Friday\nGROUP BY line_id\nORDER BY unit_defect_rate DESC\nLIMIT 1;  -- line 2, 146 / 2,400 = 6.1%\n```\n\nWhat to inspect when an answer is wrong: read the generated SQL before the number. A different table points to curation scope; a different filter to a missing example; `AVG` over a rate column to missing business semantics; a missing row to access. Only the first four are curation problems. How to demonstrate honestly: show the generated SQL beside the reference query and say which snapshot both ran against. What this does not show: that the same wording will be interpreted the same way tomorrow; that is why a benchmark reruns after every change.",
     "sourceSectionIds": [
      "dbxfe-genie-l01-path"
     ]
@@ -2916,7 +2923,7 @@
     "dbxfe-genie-semantics-question"
    ],
    "handbook": {
-    "markdown": "The Unity Catalog metric views page describes a metric view as separating measure definitions from the fields used to group, filter and aggregate them, so a metric is defined once and the engine computes it correctly for whatever grouping is asked; metric views can be queried from SQL editors, notebooks, dashboards, Genie Agents and alerts, and synonyms help Genie find fields and measures. The best-practices page adds that metric views work well in Genie spaces because they pre-define metrics, dimensions and aggregations.\n\nFor Cinderline the measure is `unit_defect_rate = SUM(defective_units) / SUM(inspected_units)` with fields `line_id` and `business_day`. A consumer asks for the measure at any grain:\n\n```sql\n-- Querying a metric view (authored example; check the current syntax page).\nSELECT line_id, MEASURE(unit_defect_rate) AS unit_defect_rate\nFROM quality_pilot.accepted.line_quality_metrics\nGROUP BY line_id;\n```\n\nThe definition is written in YAML through SQL DDL or Catalog Explorer; the keys and version have changed over time, so copy them from the current YAML reference rather than from a course.\n\nThe arithmetic worked through: days 31/500, 39/800, 28/400, 30/500, 18/200 (day 2, a Tuesday, was restated from 5.3% to 4.9%). Daily rates 6.2, 4.9, 7.0, 6.0, 9.0; their mean is 6.6%. Sums 146 and 2,400; ratio 6.08%, reported 6.1%. The mean weights day 5's 200 units like day 2's 800.\n\nWhen a metric view is not available or is overkill, a space's own SQL expressions (a measure, filter or dimension with a name, SQL and synonyms, held in the knowledge store) do the same job inside one agent. Either way the definition is SQL, which runs; a sentence saying 'never average rates' is only read.",
+    "markdown": "The Unity Catalog metric views page describes a metric view as separating measure definitions from the fields used to group, filter and aggregate them, so a metric is defined once and the engine computes it correctly for whatever grouping is asked; metric views can be queried from SQL editors, notebooks, dashboards, Genie Agents and alerts, and synonyms help Genie find fields and measures. The best-practices page adds that metric views work well in Genie spaces because they pre-define metrics, dimensions and aggregations.\n\nFor Cinderline the measure is `unit_defect_rate = try_divide(SUM(defective_units), SUM(inspected_units))`, so a zero-unit grouping stays NULL, with fields `line_id` and `business_day`. A consumer asks for the measure at any grain:\n\n```sql\n-- Querying a metric view (authored example; check the current syntax page).\nSELECT line_id, MEASURE(unit_defect_rate) AS unit_defect_rate\nFROM quality_pilot.accepted.line_quality_metrics\nGROUP BY line_id;\n```\n\nThe definition is written in YAML through SQL DDL or Catalog Explorer; the keys and version have changed over time, so copy them from the current YAML reference rather than from a course.\n\nThe arithmetic worked through, on this module's own synthetic week (not the dashboard module's reconciliation sheet): days 31/500, 39/800, 28/400, 30/500, 18/200 (day 2, a Tuesday, was restated from 5.3% to 4.9%). Daily rates 6.2, 4.9, 7.0, 6.0, 9.0; their mean is 6.6%. Sums 146 and 2,400; ratio 6.08%, reported 6.1%. The mean weights day 5's 200 units like day 2's 800.\n\nWhen a metric view is not available or is overkill, a space's own SQL expressions (a measure, filter or dimension with a name, SQL and synonyms, held in the knowledge store) do the same job inside one agent. Either way the definition is SQL, which runs; a sentence saying 'never average rates' is only read.",
     "sourceSectionIds": [
      "dbxfe-genie-l01-inputs"
     ]
@@ -2969,6 +2976,7 @@
    ],
    "claimIds": [
     "dbxfe-genie-claim-trusted",
+    "dbxfe-modeling-course-claim-ansi",
     "dbxfe-genie-guidance",
     "dbxfe-genie-fiction"
    ],
@@ -2977,7 +2985,7 @@
     "dbxfe-genie-trusted-question"
    ],
    "handbook": {
-    "markdown": "The trusted-assets page (at an older address, titled with 'AI/BI Genie spaces') says example SQL queries that include parameters and SQL functions added to a space are treated as trusted assets, a response built from a parameterized example's exact text is labelled Trusted, users need `EXECUTE` on functions used as trusted assets, and function comments tell the space when and how to call them.\n\nA trusted function for Cinderline's most frequent question:\n\n```sql\nCREATE OR REPLACE FUNCTION quality_pilot.accepted.line_rate(p_line INT, p_day DATE)\nRETURNS TABLE (line_id INT, business_day DATE, unit_defect_rate DOUBLE)\nCOMMENT 'Contracted unit defect rate for one North plant line on one business day. Use for single-line, single-day rate questions.'\nRETURN SELECT line_id, business_day,\n              SUM(defective_units) / SUM(inspected_units)\n       FROM quality_pilot.accepted.daily_line_rate\n       WHERE line_id = p_line AND business_day = p_day\n       GROUP BY line_id, business_day;\n\nGRANT EXECUTE ON FUNCTION quality_pilot.accepted.line_rate TO `north-reporting-analysts`;\n```\n\nWhat the label means for a reader: this answer came from logic the curators wrote and reviewed. What it does not mean: that the question was read correctly (a misread onto the wrong asset still carries the label), that the asset is still correct after a contract change, or that unlabelled answers are wrong. Trusted assets therefore need their own benchmark rows, including a phrasing that should *not* match the asset. When to prefer one: frequent, high-stakes questions with fixed logic. When not: exploratory questions, where a trusted path can give false comfort about a neighbouring question it does not answer.",
+    "markdown": "The trusted-assets page (at an older address, titled with 'AI/BI Genie spaces') says example SQL queries that include parameters and SQL functions added to a space are treated as trusted assets, a response built from a parameterized example's exact text is labelled Trusted, users need `EXECUTE` on functions used as trusted assets, and function comments tell the space when and how to call them.\n\nA trusted function for Cinderline's most frequent question:\n\n```sql\nCREATE OR REPLACE FUNCTION quality_pilot.accepted.line_rate(p_line INT, p_day DATE)\nRETURNS TABLE (line_id INT, business_day DATE, unit_defect_rate DOUBLE)\nCOMMENT 'Contracted unit defect rate for one North plant line on one business day. Use for single-line, single-day rate questions.'\nRETURN SELECT line_id, business_day,\n              try_divide(SUM(defective_units), SUM(inspected_units))\n       FROM quality_pilot.accepted.daily_line_rate\n       WHERE line_id = p_line AND business_day = p_day\n       GROUP BY line_id, business_day;\n\nGRANT EXECUTE ON FUNCTION quality_pilot.accepted.line_rate TO `north-reporting-analysts`;\n```\n\n`try_divide` is part of the contract, not a style: a line-day whose accepted inspections were all voided carries zero inspected units, and plain `/` fails with DIVIDE_BY_ZERO wherever ANSI mode is on (Spark 4's default, as the data modeling module observed; check the warehouse's setting), where the contract wants NULL, said as \"no inspected units\".\n\nWhat the label means for a reader: this answer came from logic the curators wrote and reviewed. What it does not mean: that the question was read correctly (a misread onto the wrong asset still carries the label), that the asset is still correct after a contract change, or that unlabelled answers are wrong. Trusted assets therefore need their own benchmark rows, including a phrasing that should *not* match the asset. When to prefer one: frequent, high-stakes questions with fixed logic. When not: exploratory questions, where a trusted path can give false comfort about a neighbouring question it does not answer.",
     "sourceSectionIds": [
      "dbxfe-genie-l01-inputs"
     ]
@@ -2991,7 +2999,7 @@
    "version": "1.0.0",
    "title": "The asker's own permissions travel with every question",
    "outcome": "Predict what a Genie Agent returns for different askers and explain why a curator's test run proves nothing about them.",
-   "explanation": "Genie Agents return results governed by each user's own Unity Catalog permissions. The author's embedded compute credential opens the warehouse only; [[dbxfe-genie-access-concept|data access is checked as the asker]], with row filters and column masks per user. Notice that the test analyst gets line 3's rate while test-outsider, asking the same question through the same space, gets none; that a steward who may read quarantine still gets a refusal because it is outside the space; and that the curator's broad grants make any test run unrepresentative.",
+   "explanation": "Genie Agents return results governed by each user's own Unity Catalog permissions. The author's embedded compute credential opens the warehouse only; [[dbxfe-genie-access-concept|data access is checked as the asker]], with row filters and column masks per user. That is not a dashboard's shared data permissions, where viewers' queries run with the publisher's data grants. Notice that the test analyst gets line 3's rate while test-outsider, asking the same question through the same space, gets none; that a steward who may read quarantine still gets a refusal because it is outside the space; and that the curator's broad grants make any test run unrepresentative.",
    "lessonId": "dbxfe-genie-l01",
    "sectionId": "dbxfe-genie-l01-access",
    "conceptIds": [
@@ -2999,6 +3007,7 @@
    ],
    "claimIds": [
     "dbxfe-genie-claim-access",
+    "dbxfe-fact-privileges",
     "dbxfe-genie-guidance",
     "dbxfe-genie-fiction"
    ],
@@ -3012,7 +3021,7 @@
     "dbxfe-genie-access-question"
    ],
    "handbook": {
-    "markdown": "Two documentation statements fix the model. The Genie Agents page: agents turn questions into SQL and return results governed by each user's own Unity Catalog permissions. The set-up page: when a warehouse selection is saved, the author's compute credentials are embedded so all users can run queries on that warehouse; those credentials grant access to the warehouse only; data access is evaluated using each end user's own permissions; row filters and column masks are enforced per user; queries are attributed to the end user. Editing an agent needs the SQL workspace entitlement, CAN USE on a pro or serverless warehouse and at least CAN EDIT on the agent.\n\nCinderline's grants, from the access review:\n\n```sql\nGRANT USE CATALOG ON CATALOG quality_pilot TO `north-reporting-analysts`;\nGRANT USE SCHEMA ON SCHEMA quality_pilot.accepted TO `north-reporting-analysts`;\nGRANT SELECT ON TABLE quality_pilot.accepted.daily_line_rate TO `north-reporting-analysts`;\n-- No grant on quality_pilot.quarantine for analysts.\n```\n\nThree separate decisions: who may open the space (sharing), which tables the space contains (curation), which rows each person may read (Unity Catalog). A disclosure can only happen if the third is wrong; the first two cannot fix it. What to inspect when an unauthorized case shows rows: the asker's group memberships, grants on the table, row filters and masks, then whether the benchmark was run as the intended identity at all. How to demonstrate honestly: run the benchmark as a test identity in each audience group and say so; never demo with the curator's account and call the space tested.",
+    "markdown": "Two documentation statements fix the model. The Genie Agents page: agents turn questions into SQL and return results governed by each user's own Unity Catalog permissions. The set-up page: when a warehouse selection is saved, the author's compute credentials are embedded so all users can run queries on that warehouse; those credentials grant access to the warehouse only; data access is evaluated using each end user's own permissions; row filters and column masks are enforced per user; queries are attributed to the end user. Contrast the business intelligence module: a dashboard published with shared data permissions (embedded credentials) runs every viewer's query with the publisher's data grants, so there the credential does open the data; a Genie Agent's saved credential never does. Editing an agent needs the SQL workspace entitlement, CAN USE on a pro or serverless warehouse and at least CAN EDIT on the agent.\n\nCinderline's grants, from the access review:\n\n```sql\nGRANT USE CATALOG ON CATALOG quality_pilot TO `north-reporting-analysts`;\nGRANT USE SCHEMA ON SCHEMA quality_pilot.accepted TO `north-reporting-analysts`;\nGRANT SELECT ON TABLE quality_pilot.accepted.daily_line_rate TO `north-reporting-analysts`;\n-- No grant on quality_pilot.quarantine for analysts.\n```\n\n`SELECT` alone is not enough: the asker also needs `USE CATALOG` and `USE SCHEMA` on the parents, which is why the review grants all three.\n\nThree separate decisions: who may open the space (sharing), which tables the space contains (curation), which rows each person may read (Unity Catalog). A disclosure can only happen if the third is wrong; the first two cannot fix it. What to inspect when an unauthorized case shows rows: the asker's group memberships, grants on the table, row filters and masks, then whether the benchmark was run as the intended identity at all. How to demonstrate honestly: run the benchmark as a test identity in each audience group and say so; never demo with the curator's account and call the space tested.",
     "sourceSectionIds": [
      "dbxfe-genie-l01-access"
     ]
@@ -3048,7 +3057,7 @@
     "dbxfe-genie-benchmark-self"
    ],
    "handbook": {
-    "markdown": "The benchmarks page describes the product feature: a set of test questions, each optionally with a SQL Answer; Genie interprets each question, generates SQL and returns results, which are compared with the SQL Answer; questions without one need manual review; two to four phrasings of the same question are recommended. The authored benchmark in this module is what you write before using that feature, and it asks for more than a SQL Answer can express.\n\nCinderline's classes, each with at least three questions in the full set (the Genie benchmark field guide holds a 24-question version):\n\n| Class | What the row must say |\n|---|---|\n| Aggregate, time-bounded, comparison | Table, filters, arithmetic, precision, reference value |\n| Restatement | Reads the restated flag and previous value |\n| Ambiguous | No query before clarification; the readings named |\n| Cannot answer | Which data is missing; no invented figure |\n| Unauthorized | Asked as which identity; no rows; what is said instead |\n| Override attempt | The contract kept; the definition stated as unchanged |\n\nReference answers come from the contracted SQL over a retained snapshot, recorded with the snapshot's identifier. Phrasings come from the audience's words, not column names: 'how bad was line 2 last week' as well as 'line 2 defect rate'.\n\nWhat fails: rows with only a number (a lucky wrong query passes), no unauthorized rows (a disclosure goes unseen), references computed by the space itself (the test grades itself), and editing an expected property to match an output. How to demonstrate honestly: present the benchmark as authored expectations, show the empty or dated run log, and describe any pass as evidence for those questions, that snapshot and that configuration only.",
+    "markdown": "The benchmarks page describes the product feature: a set of test questions, each optionally with a SQL Answer; Genie interprets each question, generates SQL and returns results, which are compared with the SQL Answer; questions without one need manual review; two to four phrasings of the same question are recommended. The authored benchmark in this module is what you write before using that feature, and it asks for more than a SQL Answer can express.\n\nCinderline's classes, each with at least three questions in the full set (the Genie benchmark field guide holds a 24-question version):\n\n| Class | What the row must say |\n|---|---|\n| Aggregate, time-bounded, comparison | Table, filters, arithmetic, precision, reference value; the empty case in words |\n| Restatement | Reads the restated flag and previous value |\n| Ambiguous | No query before clarification; the readings named |\n| Cannot answer | Which data is missing; no invented figure |\n| Unauthorized | Asked as which identity; no rows; what is said instead |\n| Override attempt | The contract kept; the definition stated as unchanged |\n\nOne aggregate row targets the empty case: line 4 on Wednesday, whose only accepted inspection was voided, expects \"no inspected units\", never 0.0% or an error. Reference answers come from the contracted SQL over a retained snapshot, recorded with the snapshot's identifier. Phrasings come from the audience's words, not column names: 'how bad was line 2 last week' as well as 'line 2 defect rate'.\n\nWhat fails: rows with only a number (a lucky wrong query passes), no unauthorized rows (a disclosure goes unseen), references computed by the space itself (the test grades itself), and editing an expected property to match an output. How to demonstrate honestly: present the benchmark as authored expectations, show the empty or dated run log, and describe any pass as evidence for those questions, that snapshot and that configuration only.",
     "sourceSectionIds": [
      "dbxfe-genie-l01-example",
      "dbxfe-genie-l01-review"
@@ -3202,7 +3211,7 @@
    "revision": "1",
    "prompt": "What happens by default when Cinderline publishes its North plant dashboard, and what curation work does it leave?",
    "answer": "Publishing with the Enable Genie toggle on, the default, generates a Genie Agent from the dashboard's datasets; descriptions, examples, instructions and a benchmark still need an owner.",
-   "explanation": "The AI/BI documentation says that when a dashboard is published the Enable Genie toggle is on by default and Databricks generates a [[dbxfe-genie-extension-dashboard-concept|Genie Agent from the dashboard's datasets]], so viewers can ask questions beyond the tiles. Its scope is therefore whatever datasets the dashboard uses: helpful when those are the contracted tables, risky when a dataset was built for one tile with a shortcut definition. Before viewers rely on it, the analyst checks which datasets it holds, adds the metric view or examples the contract needs, and runs the benchmark as a viewer identity. Default toggles can change, so the publish dialog in the actual workspace is the evidence.",
+   "explanation": "The AI/BI documentation says that when a dashboard is published the Enable Genie toggle is on by default and Databricks generates a [[dbxfe-genie-extension-dashboard-concept|Genie Agent from the dashboard's datasets]], so viewers can ask questions beyond the tiles. Its scope is therefore whatever datasets the dashboard uses: helpful when those are the contracted tables, risky when a dataset was built for one tile with a shortcut definition. Before viewers rely on it, the analyst checks which datasets it holds, adds the metric view or examples the contract needs, and runs the benchmark as a viewer identity. Whose data grants the generated agent uses is not stated on the pages reviewed here: Genie Agents document the asker's own permissions, while the dashboard may have been published with shared data permissions, so test it as a viewer identity before relying on either rule. Default toggles can change, so the publish dialog in the actual workspace is the evidence.",
    "lessonId": "dbxfe-genie-l01",
    "sectionId": "dbxfe-genie-l01-curation",
    "conceptIds": [

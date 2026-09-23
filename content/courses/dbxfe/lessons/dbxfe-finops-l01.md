@@ -85,7 +85,7 @@ Lab L13's synthetic runs repeat the same 1,000 work items on each configuration,
 | large | 3 | 270 | 2.40 / 2.70 / 3.00 | an instance-hour row refused |
 | xlarge | 1 | 200 | 4.00 | one run: not ranked |
 
-Small is cheaper per unit of work across these runs and large is faster; with the nightly job due by 07:30, small fits unless measured production runs disagree. The runs show the method, not a benchmark.
+Small is cheaper per unit of work across these runs and large is faster; with the nightly job due before the morning page's 06:30 refresh, small fits unless measured production runs disagree. The runs show the method, not a benchmark.
 
 <!-- section:dbxfe-finops-l01-exercise -->
 

@@ -13,7 +13,7 @@
  "startingAssumptions": [
   "SQL aggregation, grouping and joins are familiar; the SQL performance module's metric lesson has introduced a trustworthy metric.",
   "The metric contract guide's unit_defect_rate definition, with its numerator, denominator, empty case and restatement rule, is the contract this module consumes rather than writes.",
-  "Unity Catalog privileges such as SELECT on a table were introduced in the governance module."
+  "Unity Catalog privileges are not assumed: the permissions beat carries a short primer (USE CATALOG, USE SCHEMA, SELECT, one GRANT example and SHOW GRANTS), and the later governance track owns the full model."
  ],
  "lessonIds": [
   "dbxfe-bi-l01"
@@ -913,7 +913,7 @@
    "title": "Schematic dashboard: misleading, then defensible",
    "alt": "A schematic dashboard drawn as a table of four tiles. The first state shows misleading labels; the second shows the same values with defensible labels bound to the unit_defect_rate contract.",
    "caption": "Schematic dashboard, not product UI. The same four tiles with the same values; only the labels change. Synthetic teaching example.",
-   "textEquivalent": "Misleading draft (schematic): Four tiles as first drawn. Each label leaves a reader unable to say what the value means. Table columns: Tile | Shown | What a reader cannot tell. Rows: Line 3 | Defects 4.8 | A count or a rate? Of what? Which day? || Trend, 7 bars | Axis 4.0 to 5.0 | A 0.2 point move looks like a doubling. || Plant | 4.6 | Averaged from line rates; which denominator? || Header | (no date, no time) | Whether yesterday is in the numbers..\n\nDefensible page (schematic): The same values, each bound to the contract and labelled with unit, period, denominator and freshness. Table columns: Tile | Shown | Label carried. Rows: Line 3 | 4.8% · 12 of 250 | unit_defect_rate v1; previous business day; per cent of inspected units; 1 excluded || Trend, 7 bars | Axis 0 to 8% | Same metric, seven business days; restated day marked || Plant | 4.5% · 47 of 1,040 | All lines, same calculation; never an average of lines || Header | Covers Tue; published 06:32 | Restated days are marked; not-updated wording defined.",
+   "textEquivalent": "Misleading draft (schematic): Four tiles as first drawn. Each label leaves a reader unable to say what the value means. Table columns: Tile | Shown | What a reader cannot tell. Rows: Line 3 | Defects 4.8 | A count or a rate? Of what? Which day? || Trend, 7 bars | Axis 4.0 to 5.0 | A 4% move (4.6 to 4.8) draws a bar a third taller. || Plant | 4.6 | Averaged from line rates; which denominator? || Header | (no date, no time) | Whether yesterday is in the numbers..\n\nDefensible page (schematic): The same values, each bound to the contract and labelled with unit, period, denominator and freshness. Table columns: Tile | Shown | Label carried. Rows: Line 3 | 4.8% · 12 of 250 | unit_defect_rate v1; previous business day; per cent of inspected units; 1 excluded || Trend, 7 bars | Axis 0 to 8% | Same metric, seven business days; restated day marked || Plant | 4.5% · 47 of 1,040 | All lines, same calculation; never an average of lines || Header | Covers Tue; published 06:32 | Restated days are marked; not-updated wording defined.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-bi-claim-dashboards",
@@ -942,7 +942,7 @@
        [
         "Trend, 7 bars",
         "Axis 4.0 to 5.0",
-        "A 0.2 point move looks like a doubling."
+        "A 4% move (4.6 to 4.8) draws a bar a third taller."
        ],
        [
         "Plant",
@@ -1215,13 +1215,14 @@
    "id": "dbxfe-bi-permissions-visual",
    "kind": "table",
    "title": "Access matrix: the page door and the data door",
-   "alt": "An access matrix with one row per principal and columns for page permission, underlying-data privileges and what the principal must not be able to do; the second state revokes the analysts' SELECT.",
+   "alt": "An access matrix with one row per principal and columns for page permission, underlying-data privileges and what the principal must not be able to do; the second state revokes the analysts' SELECT on both objects.",
    "caption": "Each principal has two doors. Revoking a table privilege leaves the page permission unchanged and vice versa. Synthetic teaching example.",
-   "textEquivalent": "Designed matrix: Five principals, two doors each. The page permission and the table privileges are granted and reviewed separately, and the page is published with individual data permissions. Table columns: Principal | Page | Underlying data | Must not. Rows: north-reporting-analysts | Can View | SELECT accepted.daily_line_rate | Reach raw or quarantine rows through any filter || quality-stewards | Can View, quarantine link | SELECT accepted + quarantine tables | Edit the page || data team (page owner) | Can Edit | Its own grants, never sp-north-nightly's | Publish a tile with no contract || sp-north-nightly | none | Writes the accepted tables | Author, publish or view the page || everyone else | none | none | Open the page at all.\n\nSELECT revoked on analysts: The analysts keep Can View; their SELECT is gone, so their tiles return nothing and the access review catches it. Under shared data permissions they would still render, which is the next beat's point. Table columns: Principal | Page | Underlying data | Effect on tiles. Rows: north-reporting-analysts | Can View (unchanged) | no SELECT (revoked) | Tiles show no data: their own grants run the queries || quality-stewards | Can View, quarantine link | SELECT accepted + quarantine tables | Unchanged || data team (page owner) | Can Edit | Its own grants, never sp-north-nightly's | Unchanged || sp-north-nightly | none | Writes the accepted tables | Unchanged || everyone else | none | none | Unchanged: no page.",
+   "textEquivalent": "Designed matrix: Five principals, two doors each; the page reads two accepted objects. The page permission and the table privileges are granted and reviewed separately, and the page is published with individual data permissions. Table columns: Principal | Page | Underlying data | Must not. Rows: north-reporting-analysts | Can View | USE CATALOG, USE SCHEMA accepted; SELECT accepted.daily_line_rate and accepted.publish_status | Reach raw or quarantine rows through any filter || quality-stewards | Can View, quarantine link | As analysts, plus USE SCHEMA and SELECT on quarantine.inspections | Edit the page || data team (page owner) | Can Edit | Its own grants, never sp-north-nightly's | Publish a tile with no contract || sp-north-nightly | none | Writes the accepted tables | Author, publish or view the page || everyone else | none | none | Open the page at all.\n\nSELECT revoked on analysts: The analysts keep Can View; their SELECT is gone, so their tiles fail rather than show results, and the access review catches it. Under shared data permissions they would still render, which is the next beat's point. Table columns: Principal | Page | Underlying data | Effect on tiles. Rows: north-reporting-analysts | Can View (unchanged) | SELECT revoked on both objects | Tiles fail with a permission error, never read as \"no inspections\" || quality-stewards | Can View, quarantine link | As analysts, plus USE SCHEMA and SELECT on quarantine.inspections | Unchanged || data team (page owner) | Can Edit | Its own grants, never sp-north-nightly's | Unchanged || sp-north-nightly | none | Writes the accepted tables | Unchanged || everyone else | none | none | Unchanged: no page.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-bi-claim-permissions",
     "dbxfe-bi-claim-share",
+    "dbxfe-fact-privileges",
     "dbxfe-bi-guidance",
     "dbxfe-bi-fiction"
    ],
@@ -1229,7 +1230,7 @@
     {
      "id": "designed",
      "title": "Designed matrix",
-     "explanation": "Five principals, two doors each. The page permission and the table privileges are granted and reviewed separately, and the page is published with individual data permissions.",
+     "explanation": "Five principals, two doors each; the page reads two accepted objects. The page permission and the table privileges are granted and reviewed separately, and the page is published with individual data permissions.",
      "nodes": [],
      "connections": [],
      "table": {
@@ -1243,13 +1244,13 @@
        [
         "north-reporting-analysts",
         "Can View",
-        "SELECT accepted.daily_line_rate",
+        "USE CATALOG, USE SCHEMA accepted; SELECT accepted.daily_line_rate and accepted.publish_status",
         "Reach raw or quarantine rows through any filter"
        ],
        [
         "quality-stewards",
         "Can View, quarantine link",
-        "SELECT accepted + quarantine tables",
+        "As analysts, plus USE SCHEMA and SELECT on quarantine.inspections",
         "Edit the page"
        ],
        [
@@ -1276,7 +1277,7 @@
     {
      "id": "revoked",
      "title": "SELECT revoked on analysts",
-     "explanation": "The analysts keep Can View; their SELECT is gone, so their tiles return nothing and the access review catches it. Under shared data permissions they would still render, which is the next beat's point.",
+     "explanation": "The analysts keep Can View; their SELECT is gone, so their tiles fail rather than show results, and the access review catches it. Under shared data permissions they would still render, which is the next beat's point.",
      "nodes": [],
      "connections": [],
      "table": {
@@ -1290,13 +1291,13 @@
        [
         "north-reporting-analysts",
         "Can View (unchanged)",
-        "no SELECT (revoked)",
-        "Tiles show no data: their own grants run the queries"
+        "SELECT revoked on both objects",
+        "Tiles fail with a permission error, never read as \"no inspections\""
        ],
        [
         "quality-stewards",
         "Can View, quarantine link",
-        "SELECT accepted + quarantine tables",
+        "As analysts, plus USE SCHEMA and SELECT on quarantine.inspections",
         "Unchanged"
        ],
        [
@@ -1328,7 +1329,7 @@
    "title": "Whose grants are checked when a tile runs",
    "alt": "A request path from a viewer through the published page and the SQL warehouse to a Unity Catalog privilege check and two tables. In the alternative the check uses a publishing service principal; in Cinderline's choice it uses the viewer.",
    "caption": "The path is the same; the identity at the privilege check changes with the publish choice, and with it which tables the viewer can reach. Synthetic teaching example.",
-   "textEquivalent": "Alternative: shared data permissions: The design Cinderline did not choose: the viewer holds Can View only and every query runs as a publishing service principal, whose single grant bounds what any viewer can reach. Nodes: Supervisor: Can View on the page; no table grants of their own. (context); Published page: Published with share data permissions. (selected); SQL warehouse: Runs the dataset queries. (selected); Privilege check: as the publisher. Unity Catalog checks the publishing principal's grants. (selected); accepted.daily_line_rate: SELECT granted to the principal; rows returned. (selected); quarantine.inspections: No grant to the principal; unreachable by any viewer. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as publisher; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied.\n\nCinderline's choice: individual data permissions: Each viewer's own grants are checked. A supervisor whose group holds SELECT on the accepted table sees it; the quarantine table stays closed unless the viewer is a steward. Nodes: Supervisor: Can View on the page; SELECT only on the accepted table. (selected); Published page: Published with individual data permissions. (selected); SQL warehouse: Runs the dataset queries; the viewer needs access to it. (selected); Privilege check: as the viewer. Unity Catalog checks the viewer's own grants. (warning); accepted.daily_line_rate: Viewer holds SELECT; rows returned. (selected); quarantine.inspections: Viewer lacks SELECT; the tile shows no data for them. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as viewer; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied for this viewer.",
+   "textEquivalent": "Alternative: shared data permissions: The design Cinderline did not choose: the viewer holds Can View only and every query runs as a publishing service principal, whose single grant bounds what any viewer can reach. Nodes: Supervisor: Can View on the page; no table grants of their own. (context); Published page: Published with share data permissions. (selected); SQL warehouse: Runs the dataset queries. (selected); Privilege check: as the publisher. Unity Catalog checks the publishing principal's grants. (selected); accepted.daily_line_rate: SELECT granted to the principal; rows returned. (selected); quarantine.inspections: No grant to the principal; unreachable by any viewer. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as publisher; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied.\n\nCinderline's choice: individual data permissions: Each viewer's own grants are checked. A supervisor whose group holds SELECT on the accepted table sees it; the quarantine table stays closed unless the viewer is a steward. Nodes: Supervisor: Can View on the page; SELECT only on the accepted objects. (selected); Published page: Published with individual data permissions. (selected); SQL warehouse: Runs the dataset queries; the viewer needs access to it. (selected); Privilege check: as the viewer. Unity Catalog checks the viewer's own grants. (warning); accepted.daily_line_rate: Viewer holds SELECT; rows returned. (selected); quarantine.inspections: Viewer lacks SELECT; the quarantine link fails for them. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as viewer; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied for this viewer.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-bi-claim-share",
@@ -1416,7 +1417,7 @@
       {
        "id": "viewer",
        "label": "Supervisor",
-       "detail": "Can View on the page; SELECT only on the accepted table.",
+       "detail": "Can View on the page; SELECT only on the accepted objects.",
        "status": "selected"
       },
       {
@@ -1447,7 +1448,7 @@
       {
        "id": "quar",
        "label": "quarantine.inspections",
-       "detail": "Viewer lacks SELECT; the tile shows no data for them.",
+       "detail": "Viewer lacks SELECT; the quarantine link fails for them.",
        "status": "excluded"
       }
      ],
@@ -1485,9 +1486,9 @@
    "id": "dbxfe-bi-freshness-visual",
    "kind": "timeline",
    "title": "From the plant's day to the meeting",
-   "alt": "A timeline from the end of the business day through the nightly job, the scheduled refresh and the freshness line to the 7:45 meeting; the second state shows the job finishing after the refresh.",
+   "alt": "A timeline from the end of the business day through the nightly job, the scheduled refresh and the freshness line to the supervisors' 07:45 read before the 8 a.m. meeting; the second state shows the job finishing after the refresh and the meeting.",
    "caption": "On a normal morning the refresh follows the job and the freshness line names Tuesday; on a late morning the line must say not updated. Synthetic teaching example.",
-   "textEquivalent": "Normal morning: The job publishes Tuesday's rows at 02:10, the refresh at 06:30 reads them, and the freshness line names the day it covers and when it was published. Nodes: Tuesday ends 23:59: Inspection times assign records to the business day. (context); Nightly job 02:10: Publishes Tuesday's accepted rows and a publish_run row. (selected); Scheduled refresh 06:30: Re-runs the page's datasets against the published table. (selected); Freshness line: Covers Tue · published 06:32 · restated days marked. Reads the latest publish_run row. (selected); Meeting 07:45: Supervisors read the line, then the tiles. (selected). Relationships: Tuesday ends 23:59 → Nightly job 02:10: then; Nightly job 02:10 → Scheduled refresh 06:30: then; Scheduled refresh 06:30 → Freshness line: then; Freshness line → Meeting 07:45: then.\n\nLate job: The job is still running at the meeting, so the page can show only Monday. The freshness line says so and the operator note follows. Nodes: Tuesday ends 23:59: Unchanged. (context); Scheduled refresh 06:30: Runs on time, over Monday's rows. (warning); Nightly job 08:20: Still running at 07:45; Tuesday's rows arrive after the meeting. (warning); Freshness line: Not updated: showing Mon · see operator note. Latest publish_run row is Monday's. (warning); Meeting 07:45: Supervisors read Monday knowingly, with the note. (context). Relationships: Tuesday ends 23:59 → Scheduled refresh 06:30: then; Scheduled refresh 06:30 → Nightly job 08:20: then; Nightly job 08:20 → Freshness line: not yet read; Freshness line → Meeting 07:45: then.",
+   "textEquivalent": "Normal morning: The job publishes Tuesday's rows at 02:10, the refresh at 06:30 reads them, and the freshness line names the day it covers and when it was published. Nodes: Tuesday ends 23:59: Inspection times assign records to the business day. (context); Nightly job 02:10: Publishes Tuesday's accepted rows and a publish_run row. (selected); Scheduled refresh 06:30: Re-runs the page's datasets against the published table. (selected); Freshness line: Covers Tue · published 06:32 · restated days marked. Reads the latest publish_run row. (selected); Supervisors read 07:45: They read the line, then the tiles, before the 8 a.m. meeting. (selected). Relationships: Tuesday ends 23:59 → Nightly job 02:10: then; Nightly job 02:10 → Scheduled refresh 06:30: then; Scheduled refresh 06:30 → Freshness line: then; Freshness line → Supervisors read 07:45: then.\n\nLate job: The job is still running when supervisors read the page, so it can show only Monday; Tuesday's rows arrive after the meeting. The freshness line says so and the operator note follows. Nodes: Tuesday ends 23:59: Unchanged. (context); Scheduled refresh 06:30: Runs on time, over Monday's rows. (warning); Freshness line: Not updated: showing Mon · see operator note. Latest publish_run row is Monday's. (warning); Supervisors read 07:45: They read Monday knowingly, with the note, before the 8 a.m. meeting. (context); Nightly job 08:20: Still running at 07:45; it publishes Tuesday's rows after the meeting, for the next refresh. (warning). Relationships: Tuesday ends 23:59 → Scheduled refresh 06:30: then; Scheduled refresh 06:30 → Freshness line: reads Monday's run; Freshness line → Supervisors read 07:45: then; Supervisors read 07:45 → Nightly job 08:20: later.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-bi-claim-schedule",
@@ -1527,8 +1528,8 @@
       },
       {
        "id": "meeting",
-       "label": "Meeting 07:45",
-       "detail": "Supervisors read the line, then the tiles.",
+       "label": "Supervisors read 07:45",
+       "detail": "They read the line, then the tiles, before the 8 a.m. meeting.",
        "status": "selected"
       }
      ],
@@ -1558,7 +1559,7 @@
     {
      "id": "late",
      "title": "Late job",
-     "explanation": "The job is still running at the meeting, so the page can show only Monday. The freshness line says so and the operator note follows.",
+     "explanation": "The job is still running when supervisors read the page, so it can show only Monday; Tuesday's rows arrive after the meeting. The freshness line says so and the operator note follows.",
      "nodes": [
       {
        "id": "day",
@@ -1573,12 +1574,6 @@
        "status": "warning"
       },
       {
-       "id": "job",
-       "label": "Nightly job 08:20",
-       "detail": "Still running at 07:45; Tuesday's rows arrive after the meeting.",
-       "status": "warning"
-      },
-      {
        "id": "line",
        "label": "Freshness line",
        "detail": "Latest publish_run row is Monday's.",
@@ -1587,9 +1582,15 @@
       },
       {
        "id": "meeting",
-       "label": "Meeting 07:45",
-       "detail": "Supervisors read Monday knowingly, with the note.",
+       "label": "Supervisors read 07:45",
+       "detail": "They read Monday knowingly, with the note, before the 8 a.m. meeting.",
        "status": "context"
+      },
+      {
+       "id": "job",
+       "label": "Nightly job 08:20",
+       "detail": "Still running at 07:45; it publishes Tuesday's rows after the meeting, for the next refresh.",
+       "status": "warning"
       }
      ],
      "connections": [
@@ -1600,18 +1601,18 @@
       },
       {
        "from": "refresh",
-       "to": "job",
-       "label": "then"
-      },
-      {
-       "from": "job",
        "to": "line",
-       "label": "not yet read"
+       "label": "reads Monday's run"
       },
       {
        "from": "line",
        "to": "meeting",
        "label": "then"
+      },
+      {
+       "from": "meeting",
+       "to": "job",
+       "label": "later"
       }
      ]
     }
@@ -1767,7 +1768,7 @@
    "title": "One definition, two grains",
    "alt": "A schematic metric view definition as a table of parts, then the same definition queried grouped by line and with no grouping, with the forbidden mean of rates shown for contrast.",
    "caption": "The definition is written once; the line result and the plant result are both computed from it, and the mean of line rates is not a query the view can answer. Synthetic teaching example.",
-   "textEquivalent": "Definition (schematic): The parts of the metric view: one source, two dimensions, three measures. Nothing here is aggregated yet. Table columns: Part | Name | Expression. Rows: source | cinderline.accepted.inspections | accepted rows only || dimension | line_id | line_id || dimension | business_day | business_day || measure | defective_units | SUM(defective_units) || measure | inspected_units | SUM(inspected_units) || measure | unit_defect_rate | try_divide(SUM(defective_units), SUM(inspected_units)).\n\nQueried at two grains: The same measure asked by line and for the whole plant on day 4. The engine sums first and divides after, at each grain. Table columns: Query | Grouping | Result. Rows: MEASURE(unit_defect_rate) | line_id = 3 | 12 / 250 = 4.8% || MEASURE(unit_defect_rate) | none (plant) | 47 / 1,040 = 4.5% || AVG of a rate column | not a metric view query | 4.6% (forbidden by the contract).",
+   "textEquivalent": "Definition (schematic): The parts of the metric view: one source, two dimensions, three measures. Nothing here is aggregated yet. Table columns: Part | Name | Expression. Rows: source | quality_pilot.accepted.daily_line_rate | one row per line-day, accepted inspections only || dimension | line_id | line_id || dimension | business_day | business_day || measure | defective_units | SUM(defective_units) || measure | inspected_units | SUM(inspected_units) || measure | unit_defect_rate | try_divide(SUM(defective_units), SUM(inspected_units)).\n\nQueried at two grains: The same measure asked by line and for the whole plant on day 4. The engine sums first and divides after, at each grain. Table columns: Query | Grouping | Result. Rows: MEASURE(unit_defect_rate) | line_id = 3 | 12 / 250 = 4.8% || MEASURE(unit_defect_rate) | none (plant) | 47 / 1,040 = 4.5% || AVG of a rate column | not a metric view query | 4.6% (forbidden by the contract).",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-bi-claim-metricviews",
@@ -1790,8 +1791,8 @@
       "rows": [
        [
         "source",
-        "cinderline.accepted.inspections",
-        "accepted rows only"
+        "quality_pilot.accepted.daily_line_rate",
+        "one row per line-day, accepted inspections only"
        ],
        [
         "dimension",
@@ -2502,18 +2503,18 @@
   },
   {
    "id": "dbxfe-bi-permissions-question",
-   "revision": "1",
-   "prompt": "A supervisor has Can View on the published morning page, which was published with individual data permissions. Every tile shows no data for them. Which fix respects Cinderline's access matrix?",
+   "revision": "2",
+   "prompt": "A supervisor has Can View on the published morning page, which was published with individual data permissions. Every tile fails for them instead of showing results. Which fix respects Cinderline's access matrix?",
    "options": [
     {
      "id": "dbxfe-bi-permissions-question-a",
-     "text": "Grant the north-reporting-analysts group SELECT on accepted.daily_line_rate, the table the matrix already assigns them.",
-     "rationale": "Under individual data permissions the viewer's own grants are checked at the table door; the matrix names exactly this grant for exactly this group."
+     "text": "Restore the grants the matrix assigns the north-reporting-analysts group: USE CATALOG and USE SCHEMA on the parents, and SELECT on accepted.daily_line_rate and accepted.publish_status, the two objects the page reads.",
+     "rationale": "Under individual data permissions each viewer's own grants run every dataset; SELECT is useless without USE CATALOG and USE SCHEMA, and the matrix names exactly these grants for exactly this group."
     },
     {
      "id": "dbxfe-bi-permissions-question-b",
      "text": "Raise the supervisor's dashboard permission to Can Manage.",
-     "rationale": "Can Manage opens more of the page door and none of the table door; the tiles would still return nothing under the viewer's grants."
+     "rationale": "Can Manage opens more of the page door and none of the table door; the tiles would still fail under the viewer's grants."
     },
     {
      "id": "dbxfe-bi-permissions-question-c",
@@ -2534,6 +2535,7 @@
    "claimIds": [
     "dbxfe-bi-claim-permissions",
     "dbxfe-bi-claim-share",
+    "dbxfe-fact-privileges",
     "dbxfe-bi-guidance",
     "dbxfe-bi-fiction"
    ]
@@ -2733,9 +2735,9 @@
   },
   {
    "id": "dbxfe-bi-acceptance-self",
-   "revision": "1",
+   "revision": "2",
    "prompt": "The morning page passes every acceptance row except one: line 4 on day 5 shows 0.0% where the script expects \"no inspections\". Explain why this is a contract failure rather than a cosmetic one, and what you change in the dataset rather than in the tile.",
-   "modelAnswer": "The contract says a line with no accepted inspections has no rate, and 0.0% asserts a perfect day that never happened; a supervisor comparing lines would rank line 4 best on a day it did not run. The failure is in the dataset: somewhere a zero denominator was coalesced to zero or a division was guarded with a default. The fix is to return NULL when the summed inspected units are zero and let the tile render NULL as \"no inspections\"; the tile's formatting stays as it is, and the row is re-run after the change.",
+   "modelAnswer": "The contract says a line with no accepted inspections has no rate, and 0.0% asserts a perfect day that never happened; a supervisor comparing lines would rank line 4 best on a day it did not run. The failure is in the dataset: somewhere a zero denominator was coalesced to zero or a division was guarded with a default. The fix is to return NULL for the rate and let the accepted-inspection count choose the words: \"no inspections\" when the count is 0, as for line 4 on day 5, and \"no inspected units\" when inspections exist but their units total zero; the tile's formatting stays as it is, and the row is re-run after the change.",
    "reasoning": "Locating the fix in the dataset keeps the tile a pure renderer of the contract and makes the correction visible to every consumer of that dataset. Adding the empty case to the metric view's definition is an acceptable alternative when the tile reads a metric view.",
    "conceptIds": [
     "dbxfe-bi-acceptance-concept",
@@ -2806,7 +2808,7 @@
     "dbxfe-bi-labels-question"
    ],
    "handbook": {
-    "markdown": "Five label parts make a rate tile defensible, and each one answers an argument that happens in the meeting.\n\n**Axis.** A bar chart whose axis runs 4.0 to 5.0 turns a move from 4.6 to 4.8 into a bar twice as tall. Start a rate axis at zero, or print the truncation in the axis label. **Units.** \"Defects 4.8\" could be a count, a rate or a percentage; write \"per cent of inspected units, one decimal\". **Period.** \"Previous business day, plant local time\" is a period; \"latest\" is not, and a seven-day rolling figure labelled as daily is the most common silent error. **Denominator.** The rate is defective units over inspected units of accepted inspections, so print the exclusion counts beside it: accepted, excluded, quarantined. **Freshness stamp.** The business day covered, the publish time, whether any shown day was restated, and the not-updated wording, where the eye lands rather than in a tooltip.\n\nA useful test is to read every label aloud as a sentence: \"4.8 per cent of the units line 3 inspected on the previous business day were defective; 250 inspected, 12 defective; one inspection excluded; published 06:32.\" If the sentence cannot be spoken, the label is missing a part. What fails without this: two percentages of different bases side by side, a plant tile that averages line rates, and a red colour rule that fires on a truncated axis. Nothing here needs a workspace; the schematic is a drawing, and a real page is checked against it by the acceptance script.",
+    "markdown": "Five label parts make a rate tile defensible, and each one answers an argument that happens in the meeting.\n\n**Axis.** A bar chart whose axis runs 4.0 to 5.0 draws a move from 4.6 to 4.8, about 4 per cent, as a bar a third taller: 0.8 against 0.6 above the 4.0 baseline. Start a rate axis at zero, or print the truncation in the axis label. **Units.** \"Defects 4.8\" could be a count, a rate or a percentage; write \"per cent of inspected units, one decimal\". **Period.** \"Previous business day, plant local time\" is a period; \"latest\" is not, and a seven-day rolling figure labelled as daily is the most common silent error. **Denominator.** The rate is defective units over inspected units of accepted inspections, so print the exclusion counts beside it: accepted, excluded, quarantined. **Freshness stamp.** The business day covered, the publish time, whether any shown day was restated, and the not-updated wording, where the eye lands rather than in a tooltip.\n\nA useful test is to read every label aloud as a sentence: \"4.8 per cent of the units line 3 inspected on the previous business day were defective; 250 inspected, 12 defective; one inspection excluded; published 06:32.\" If the sentence cannot be spoken, the label is missing a part. What fails without this: two percentages of different bases side by side, a plant tile that averages line rates, and a red colour rule that fires on a truncated axis. Nothing here needs a workspace; the schematic is a drawing, and a real page is checked against it by the acceptance script.",
     "sourceSectionIds": [
      "dbxfe-bi-l01-decision"
     ]
@@ -2837,7 +2839,7 @@
     "dbxfe-bi-binding-question"
    ],
    "handbook": {
-    "markdown": "Binding means the tile's dataset computes exactly what the contract defines and the tile adds nothing. For `unit_defect_rate` version 1 the dataset returns one row per line per business day with the summed numerator, the summed denominator and the rate, computed over accepted inspections only (shown here for one business day):\n\n```sql\nSELECT l.line_id,\n       COUNT(i.inspection_id) AS accepted_inspections,\n       SUM(i.defective_units) AS defective_units,\n       SUM(i.inspected_units) AS inspected_units,\n       try_divide(SUM(i.defective_units), SUM(i.inspected_units)) AS unit_defect_rate\nFROM ref.north_lines AS l\nLEFT JOIN accepted.inspections AS i\n  ON i.line_id = l.line_id AND i.business_day = :business_day\nGROUP BY l.line_id\n```\n\nThe plant tile is a second dataset with the same sums over all lines: 10 + 15 + 12 + 10 = 47 defective over 300 + 250 + 250 + 240 = 1,040 inspected, which is 4.519%, printed 4.5%. Averaging the four line rates (3.3, 6.0, 4.8, 4.2) gives 4.575%, printed 4.6%, and a reader who checks the sheet will find the page wrong by a tenth and stop trusting the rest. The query starts from the line list, because grouping inspections alone would drop a line that had none and the tile would silently vanish; with the left join that line returns NULL sums, and `try_divide` returns NULL rather than raising a division-by-zero error. That NULL is what the tile renders in words, and the inspection count tells the contract's two empty cases apart: no accepted inspections reads \"no inspections\", accepted inspections whose units total zero read \"no inspected units\". A COALESCE to zero at any layer breaks the contract.\n\nWhat fails: a tile widget configured to aggregate a rate column, a rolling average added in the chart settings, or rounding applied twice. What to inspect: the tile's dataset SQL against the contract text, the widget's aggregation setting, and the reconciliation sheet's value for one line and one day. The restatement rule needs a column too, a restated flag with the previous value, so that the restatement mark in the freshness line has something to read. The contract itself is the metric contract guide's subject; here it is consumed, not written.",
+    "markdown": "Binding means the tile's dataset computes exactly what the contract defines and the tile adds nothing. Every rate tile reads one published table, `accepted.daily_line_rate`: one row per line per business day with the accepted-inspection count and the summed defective and inspected units of accepted inspections only. The per-line dataset for `unit_defect_rate` version 1 adds the rate and nothing else (shown here for one business day):\n\n```sql\nSELECT line_id,\n       accepted_inspections,\n       defective_units,\n       inspected_units,\n       try_divide(defective_units, inspected_units) AS unit_defect_rate\nFROM accepted.daily_line_rate\nWHERE business_day = :business_day\n```\n\nDay 4 of the five-day reconciliation sheet is Tuesday, the business day the Wednesday page covers; day 3 is Monday. The plant tile is a second dataset with the same sums over all lines: 10 + 15 + 12 + 10 = 47 defective over 300 + 250 + 250 + 240 = 1,040 inspected, which is 4.519%, printed 4.5%. Averaging the four line rates (3.3, 6.0, 4.8, 4.2) gives 4.575%, printed 4.6%, and a reader who checks the sheet will find the page wrong by a tenth and stop trusting the rest. The nightly job builds the table from the line list, because grouping inspections alone would drop a line that had none and its tile would silently vanish; that line keeps its row with a count of 0 and NULL sums, and `try_divide` returns NULL rather than raising a division-by-zero error. That NULL is what the tile renders in words, and the inspection count tells the contract's two empty cases apart: a count of 0 reads \"no inspections\", accepted inspections whose units total zero read \"no inspected units\". A COALESCE to zero at any layer breaks the contract.\n\nWhat fails: a tile widget configured to aggregate a rate column, a rolling average added in the chart settings, or rounding applied twice. What to inspect: the tile's dataset SQL against the contract text, the widget's aggregation setting, and the reconciliation sheet's value for one line and one day. The restatement rule needs a column too, a restated flag with the previous value, so that the restatement mark in the freshness line has something to read. The contract itself is the metric contract guide's subject; here it is consumed, not written.",
     "sourceSectionIds": [
      "dbxfe-bi-l01-binding"
     ]
@@ -2883,7 +2885,7 @@
    "version": "1.0.0",
    "title": "The page and the data have separate doors",
    "outcome": "Write an access matrix that separates a principal's dashboard permission from its privileges on the underlying tables.",
-   "explanation": "A dashboard has its own permission levels, Can View to Can Manage, and the tables behind it carry Unity Catalog privileges. Those are two doors, and a [[dbxfe-bi-permission-concept|dashboard permission]] opens only the first. The matrix shows Cinderline's principals: the analysts group views the page and holds SELECT on the accepted table, the stewards also reach the quarantine table, the data team edits, the nightly job's principal writes the table with no page door, and everyone else has neither. Notice in the second state that revoking the analysts' SELECT leaves the page door open yet empties their tiles, because the page runs each viewer's own grants.",
+   "explanation": "A dashboard has its own permission levels, Can View to Can Manage, and the tables behind it carry Unity Catalog privileges. Those are two doors, and a [[dbxfe-bi-permission-concept|dashboard permission]] opens only the first. The matrix shows Cinderline's principals: the analysts group views the page and can read the two accepted objects it queries, the stewards also reach the quarantine table, the data team edits, the nightly job's principal writes the table with no page door, and everyone else has neither. Notice in the second state that revoking the analysts' SELECT leaves the page door open yet breaks their tiles, because the page runs each viewer's own grants.",
    "lessonId": "dbxfe-bi-l01",
    "sectionId": "dbxfe-bi-l01-access",
    "conceptIds": [
@@ -2892,6 +2894,7 @@
    "claimIds": [
     "dbxfe-bi-claim-permissions",
     "dbxfe-bi-claim-share",
+    "dbxfe-fact-privileges",
     "dbxfe-bi-guidance",
     "dbxfe-bi-fiction"
    ],
@@ -2900,7 +2903,7 @@
     "dbxfe-bi-permissions-question"
    ],
    "handbook": {
-    "markdown": "The documentation for the permissions API lists four levels on an AI/BI dashboard: CAN_READ (shown as Can View) views it; CAN_RUN also runs it; CAN_EDIT also edits the draft; CAN_MANAGE also changes its permissions. Legacy dashboards are a different object with their own permission model, so an access review names which kind of dashboard it is reading. The draft and the published version are distinct: editors work on the draft, viewers see the published version, and publishing is the act that decides whose data permissions apply, which the next beat takes up.\n\nThe second door is Unity Catalog. Whether a query behind a tile returns rows is decided by privileges on the catalog, schema and table for whichever principal the query runs as. A page permission never grants a table privilege, and a table privilege never grants page access. Cinderline's matrix therefore has two columns per principal: `north-reporting-analysts` gets Can View on the page and SELECT on `accepted.daily_line_rate`, and must not reach raw or quarantine rows through any filter; `quality-stewards` gets Can View plus SELECT on the quarantine table; the data team gets Can Edit and works with its own grants, never those of `sp-north-nightly`, the service principal that writes the accepted table and holds no page permission at all, because the identity that writes the data is not the identity that shows it; everyone else gets nothing on either door. The page is published with individual data permissions, so these grants, not the publisher's, protect the rows.\n\nHow to review it: list the page's access control entries through the permissions API or the share dialog, run `SHOW GRANTS ON TABLE accepted.daily_line_rate`, then open the page as a test analyst identity and as an outsider identity and record what each sees. The plan guide's matrix is a design until this review executes it. What fails: granting Can Manage to fix a data error, or granting SELECT on a raw schema because a filter \"needs it\".",
+    "markdown": "The documentation for the permissions API lists four levels on an AI/BI dashboard: CAN_READ (shown as Can View) views it; CAN_RUN also runs it; CAN_EDIT also edits the draft; CAN_MANAGE also changes its permissions. Legacy dashboards are a different object with their own permission model, so an access review names which kind it is reading. Editors work on the draft, viewers see the published version, and publishing decides whose data permissions apply, which the next beat takes up.\n\nThe second door is Unity Catalog, whose full model the governance track owns; three privileges are enough here. Reading a table needs `USE CATALOG` on its catalog, `USE SCHEMA` on its schema and `SELECT` on the table: `SELECT` alone opens nothing while either parent is closed.\n\n```sql\nGRANT USE CATALOG ON CATALOG quality_pilot TO `north-reporting-analysts`;\nGRANT USE SCHEMA ON SCHEMA quality_pilot.accepted TO `north-reporting-analysts`;\nGRANT SELECT ON TABLE quality_pilot.accepted.daily_line_rate TO `north-reporting-analysts`;\nGRANT SELECT ON TABLE quality_pilot.accepted.publish_status TO `north-reporting-analysts`;\n```\n\nWhether a tile returns rows is decided by these privileges for whichever principal the query runs as. A page permission never grants a table privilege, and a table privilege never grants page access. The page reads these two objects, so Cinderline's matrix has two columns per principal: `north-reporting-analysts` gets Can View and the grants above, and must not reach raw or quarantine rows through any filter; `quality-stewards` get the same plus `USE SCHEMA` and `SELECT` on the quarantine table; the data team gets Can Edit and works with its own grants, never those of `sp-north-nightly`, the service principal that writes the accepted tables and holds no page permission, because the identity that writes the data is not the identity that shows it; everyone else gets nothing on either door. The page is published with individual data permissions, so these grants, not the publisher's, protect the rows.\n\nHow to review it: list the page's access control entries, run `SHOW GRANTS ON TABLE accepted.daily_line_rate` and the same for the view, then open the page as a test analyst and as an outsider and record what each sees. A viewer missing a grant should see the tile fail with a permission error rather than results (check the exact rendering in a workspace), which must never be read as the contract's \"no inspections\". What fails: granting Can Manage to fix a data error, or SELECT on a raw schema because a filter \"needs it\".",
     "sourceSectionIds": [
      "dbxfe-bi-l01-access"
     ]
@@ -2915,7 +2918,7 @@
    "version": "1.0.0",
    "title": "Embedded credentials make the publisher the reader",
    "outcome": "Choose between embedded and individual data permissions for a page and name what each choice exposes and requires.",
-   "explanation": "When a dashboard is published, the publisher chooses whose data permissions run its queries. With [[dbxfe-bi-credentials-concept|embedded credentials]], the documented shared data permissions option, every viewer's query runs as the publisher, so the catalog checks the publisher's grants and a viewer needs only Can View. With [[dbxfe-bi-viewer-credentials-concept|individual data permissions]], each viewer's own grants are checked and a viewer without SELECT sees no data. Follow the request in the diagram: the privilege check moves from the publisher to the viewer. Notice that under embedded credentials a filter is not a wall; whatever the publisher's queries can return, a viewer can reach.",
+   "explanation": "When a dashboard is published, the publisher chooses whose data permissions run its queries. With [[dbxfe-bi-credentials-concept|embedded credentials]], the documented shared data permissions option, every viewer's query runs as the publisher, so the catalog checks the publisher's grants and a viewer needs only Can View. With [[dbxfe-bi-viewer-credentials-concept|individual data permissions]], each viewer's own grants are checked and a viewer without SELECT gets no results. Follow the request in the diagram: the privilege check moves from the publisher to the viewer. Notice that under embedded credentials a filter is not a wall; whatever the publisher's queries can return, a viewer can reach.",
    "lessonId": "dbxfe-bi-l01",
    "sectionId": "dbxfe-bi-l01-access",
    "conceptIds": [
@@ -2952,7 +2955,7 @@
    "version": "1.0.0",
    "title": "Freshness is a sentence the reader can act on",
    "outcome": "Write the freshness statement for a page in its normal and not-updated states and say what data it reads.",
-   "explanation": "A timestamp in a corner tells a supervisor nothing about whether yesterday is in the numbers. A [[dbxfe-bi-freshness-concept|freshness statement]] says, in words where the eye lands, which business day the page covers, when it was published, that restated days are marked, and what the page says when it was not updated. The timeline runs from the plant's day through the nightly job at 02:10 and the scheduled refresh at 06:30 to the 7:45 meeting. In the second state the job finishes late, and the page must say not updated, showing Monday, rather than showing Monday's rows under Tuesday's heading.",
+   "explanation": "A timestamp in a corner tells a supervisor nothing about whether yesterday is in the numbers. A [[dbxfe-bi-freshness-concept|freshness statement]] says, in words where the eye lands, which business day the page covers, when it was published, that restated days are marked, and what the page says when it was not updated. The timeline runs from the plant's day through the 02:10 nightly job and the 06:30 refresh to the supervisors' 07:45 read before the 8 a.m. meeting. In the second state the job finishes after the meeting, and the page must say not updated, showing Monday, not Monday's rows under Tuesday's heading.",
    "lessonId": "dbxfe-bi-l01",
    "sectionId": "dbxfe-bi-l01-freshness",
    "conceptIds": [
@@ -2968,7 +2971,7 @@
     "dbxfe-bi-freshness-self"
    ],
    "handbook": {
-    "markdown": "Freshness has two clocks that readers confuse: the period the numbers cover and the moment they were published. The plan guide puts both in words at the top of the page: \"Covers Tuesday (the previous business day). Published 06:32. Restated days are marked.\" When the nightly run has not published by 7:30, the same position reads \"Not updated: showing Monday. See the operator note,\" and the note appears beneath it. A report held while a conflicting inspection is adjudicated uses the same position with its own reason, \"Held: conflict under adjudication\", and the owner's note. A refresh timestamp alone would have said 06:30 on both mornings and been true both times, which is the problem.\n\nThe statement is a tile like any other, and it needs a dataset. The nightly job writes one row per run to `ops.publish_run` with the business day it published, the completion time and a status. The freshness dataset reads the latest successful row and compares its business day with the expected one:\n\n```sql\nSELECT business_day, completed_at,\n       CASE WHEN business_day = :expected_day THEN 'current'\n            ELSE 'not updated' END AS state\nFROM ops.publish_run\nWHERE status = 'published'\nORDER BY completed_at DESC LIMIT 1\n```\n\nThe restatement mark reads the `restated` flag and previous value that the contract requires the published table to carry, so a day changed since it was first shown is marked with what it replaced. What fails: a page whose header is typed text rather than a dataset, which says Tuesday forever; a freshness line in a tooltip; and a late job that nobody is told about, which the plan's ownership row fixes by notifying the operator and the analyst before 7:30. What to inspect on a doubtful morning: the latest `publish_run` row, the published table's maximum business day, and the schedule's last run time, in that order.",
+    "markdown": "Freshness has two clocks that readers confuse: the period the numbers cover and the moment they were published. The plan guide puts both in words at the top of the page: \"Covers Tuesday (the previous business day). Published 06:32. Restated days are marked.\" When the nightly run has not published by 7:30, the same position reads \"Not updated: showing Monday. See the operator note,\" and the note appears beneath it. A report held while a conflicting inspection is adjudicated uses the same position with its own reason, \"Held: conflict under adjudication\", and the owner's note. A refresh timestamp alone would have said 06:30 on both mornings and been true both times, which is the problem.\n\nThe statement is a tile like any other, and it needs a dataset. The nightly job writes one row per run to `ops.publish_run` with the business day it published, the completion time and a status. The page reads it through `accepted.publish_status`, a view over that table published beside the rate table, so a reader's grants stay inside the accepted schema. The freshness dataset reads the latest successful row and compares its business day with the expected one:\n\n```sql\nSELECT business_day, completed_at,\n       CASE WHEN business_day = :expected_day THEN 'current'\n            ELSE 'not updated' END AS state\nFROM accepted.publish_status\nWHERE status = 'published'\nORDER BY completed_at DESC LIMIT 1\n```\n\nThe restatement mark reads the `restated` flag and previous value that the contract requires the published table to carry, so a day changed since it was first shown is marked with what it replaced. What fails: a page whose header is typed text rather than a dataset, which says Tuesday forever; a freshness line in a tooltip; and a late job that nobody is told about, which the plan's ownership row fixes by notifying the operator and the analyst before 7:30. What to inspect on a doubtful morning: the latest `publish_run` row, the published table's maximum business day, and the schedule's last run time, in that order.",
     "sourceSectionIds": [
      "dbxfe-bi-l01-freshness"
     ]
@@ -3006,7 +3009,7 @@
     "dbxfe-bi-refresh-question"
    ],
    "handbook": {
-    "markdown": "The schedule documentation describes a periodic cadence: at each scheduled update all the SQL that defines the datasets runs, and for a page published with shared data permissions the shared cache is refreshed. Subscribers additionally receive a snapshot by email, Slack or Microsoft Teams, and a subscriber can choose to refresh data without receiving the email. Each run executes the page's dataset queries on the dashboard's warehouse, so it costs compute and returns whatever the tables hold at that moment.\n\nThat last clause is the design constraint. Cinderline's nightly job normally completes at 02:10; the page's schedule runs at 06:30 and posts a snapshot to the supervisors' Teams channel at 06:35. On a slow night the job finishes at 08:20. The schedule does not wait, does not fail and does not know the job was late: it snapshots Monday's rows and posts them on Tuesday morning with no operator note. Supervisors who open the page at 07:45 run their own queries under individual data permissions and see what the table holds, which is still Monday.\n\nTwo mitigations belong together. First, make the freshness line read the publish-run table, so lateness is visible in words on the page and inside every snapshot. Second, trigger the refresh from the job rather than the clock: the documented dashboard task, added to the nightly job after the publishing task, refreshes the dashboard and can send a snapshot to its own subscriber list, and it needs a serverless or pro SQL warehouse. Where that is not available, the schedule sits after the job's expected completion plus a buffer that the operator reviews when the job's duration drifts.\n\nWhat to inspect on a doubtful morning: the schedule's or task's last run time and warehouse, the published table's maximum business day, and the snapshot's send time relative to the job. A per-user cache under individual data permissions is a cost and permission question, not a freshness one.",
+    "markdown": "The schedule documentation describes a periodic cadence: at each scheduled update all the SQL that defines the datasets runs, and for a page published with shared data permissions the shared cache is refreshed. Subscribers additionally receive a snapshot by email, Slack or Microsoft Teams, and a subscriber can choose to refresh data without receiving the email. Each run executes the page's dataset queries on the dashboard's warehouse, so it costs compute and returns whatever the tables hold at that moment.\n\nThat last clause is the design constraint. Cinderline's nightly job normally completes at 02:10; the page's schedule runs at 06:30 and posts a snapshot to the supervisors' Teams channel at 06:35. On a slow night the job finishes at 08:20. The schedule does not wait, does not fail and does not know the job was late: it snapshots Monday's rows and posts them on Wednesday morning with no operator note. Supervisors who open the page at 07:45 run their own queries under individual data permissions and see what the table holds, which is still Monday.\n\nTwo mitigations belong together. First, make the freshness line read the publish-run table, so lateness is visible in words on the page and inside every snapshot. Second, trigger the refresh from the job rather than the clock: the documented dashboard task, added to the nightly job after the publishing task, refreshes the dashboard and can send a snapshot to its own subscriber list, and it needs a serverless or pro SQL warehouse. Where that is not available, the schedule sits after the job's expected completion plus a buffer that the operator reviews when the job's duration drifts.\n\nWhat to inspect on a doubtful morning: the schedule's or task's last run time and warehouse, the published table's maximum business day, and the snapshot's send time relative to the job. A per-user cache under individual data permissions is a cost and permission question, not a freshness one.",
     "sourceSectionIds": [
      "dbxfe-bi-l01-freshness"
     ]
@@ -3038,7 +3041,7 @@
     "dbxfe-bi-metricview-question"
    ],
    "handbook": {
-    "markdown": "The documentation describes metric views as the core of Unity Catalog semantics: measure definitions are separated from the dimensions used to group, filter and aggregate them, the definition is written in YAML and registered in Unity Catalog through SQL or Catalog Explorer, and a query can group by any available dimension while the engine generates the correct computation. A standard view locks its aggregation at creation time; a metric view defers it to the query. Schematically, the definition names a source, dimensions with expressions, and measures with aggregate expressions:\n\n```yaml\n# schematic shape; the YAML reference owns the exact keys, including the version key it requires first\nsource: cinderline.accepted.inspections\ndimensions:\n  - name: line_id\n    expr: line_id\n  - name: business_day\n    expr: business_day\nmeasures:\n  - name: unit_defect_rate\n    expr: try_divide(SUM(defective_units), SUM(inspected_units))\n```\n\nA query then asks for the measure at a grain: grouped by `line_id` it returns 4.8% for line 3; with no dimension it returns 47 over 1,040, which is 4.5%, because the ratio is recomputed over sums at each grouping. That is exactly the contract's plant rule, now enforced by the object rather than by every dashboard author remembering it. The documentation names a `MEASURE` function for selecting a measure in a query; check the current syntax page before writing one.\n\nAn AI/BI dataset can be based on a metric view directly, so the page's tiles read the governed definition instead of copying its SQL. What a metric view does not do: it does not decide the empty rule by itself (`try_divide` keeps a zero denominator as NULL, and the tile still has to show it in the contract's words, \"no inspections\" or \"no inspected units\"), it does not carry the restatement mark, and it helps only a client that sends SQL to the warehouse; a BI tool with its own semantic model re-expresses the definition and must be reconciled by the acceptance script. What to inspect: `DESCRIBE` the view, compare each measure's expression to the contract text, and run the two-grain query above against the reconciliation sheet.",
+    "markdown": "The documentation describes metric views as the core of Unity Catalog semantics: measure definitions are separated from the dimensions used to group, filter and aggregate them, the definition is written in YAML and registered in Unity Catalog through SQL or Catalog Explorer, and a query can group by any available dimension while the engine generates the correct computation. A standard view locks its aggregation at creation time; a metric view defers it to the query. Schematically, the definition names a source, dimensions with expressions, and measures with aggregate expressions:\n\n```yaml\n# schematic shape; the YAML reference owns the exact keys, including the version key it requires first\nsource: quality_pilot.accepted.daily_line_rate\ndimensions:\n  - name: line_id\n    expr: line_id\n  - name: business_day\n    expr: business_day\nmeasures:\n  - name: unit_defect_rate\n    expr: try_divide(SUM(defective_units), SUM(inspected_units))\n```\n\nA query then asks for the measure at a grain: grouped by `line_id` it returns 4.8% for line 3; with no dimension it returns 47 over 1,040, which is 4.5%, because the ratio is recomputed over sums at each grouping. That is exactly the contract's plant rule, now enforced by the object rather than by every dashboard author remembering it. The documentation names a `MEASURE` function for selecting a measure in a query; check the current syntax page before writing one.\n\nAn AI/BI dataset can be based on a metric view directly, so the page's tiles read the governed definition instead of copying its SQL. What a metric view does not do: it does not decide the empty rule by itself (`try_divide` keeps a zero denominator as NULL, and the tile still has to show it in the contract's words, \"no inspections\" or \"no inspected units\"), it does not carry the restatement mark, and it helps only a client that sends SQL to the warehouse; a BI tool with its own semantic model re-expresses the definition and must be reconciled by the acceptance script. What to inspect: `DESCRIBE` the view, compare each measure's expression to the contract text, and run the two-grain query above against the reconciliation sheet.",
     "sourceSectionIds": [
      "dbxfe-bi-l01-semantic"
     ]

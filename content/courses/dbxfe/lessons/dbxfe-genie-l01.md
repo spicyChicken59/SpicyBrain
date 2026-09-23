@@ -4,7 +4,7 @@ After this lesson you can tell the Genie family apart by who uses each member, f
 
 <!-- section:dbxfe-genie-l01-start -->
 
-Bring three things. The metric contract for `unit_defect_rate` from the metric-contract field guide and the data modeling module: one value per line per business day, defective units over inspected units from accepted inspections. The published table `quality_pilot.accepted.daily_line_rate`, which the business intelligence module's dashboards already read. And the privilege model from [Unity Catalog names and basic access](#/lesson/dbxfe-m06-l01): `USE CATALOG`, `USE SCHEMA` and `SELECT` decide what an identity can read. No workspace is needed; the five-day synthetic snapshot (Monday to Friday) is enough.
+Bring three things. The metric contract for `unit_defect_rate` from the metric-contract field guide and the data modeling module: one value per line per business day, defective units over inspected units from accepted inspections. The published table `quality_pilot.accepted.daily_line_rate`, which the business intelligence module's dashboards already read. And the privilege model from the business intelligence module's access primer: `USE CATALOG`, `USE SCHEMA` and `SELECT` together decide what an identity can read, and `SELECT` alone is not enough; [Unity Catalog names and basic access](#/lesson/dbxfe-m06-l01), in the later governance track, goes further. No workspace is needed. The figures here come from this module's own five-day synthetic week of that table, Monday to Friday, which does not overlap the business intelligence module's reconciliation sheet, so line values differ from that module's; in this week day 2 is Tuesday and "yesterday" in the benchmark rows is the Friday.
 
 <!-- section:dbxfe-genie-l01-family -->
 
@@ -29,8 +29,9 @@ Follow one question so a wrong answer can be placed. A supervisor asks, "Which l
 ```sql
 -- Authored expectation of a correct query; not the output of any live space.
 SELECT line_id,
-       SUM(defective_units) / SUM(inspected_units) AS unit_defect_rate
+       try_divide(SUM(defective_units), SUM(inspected_units)) AS unit_defect_rate
 FROM quality_pilot.accepted.daily_line_rate
+WHERE business_day BETWEEN :first_day AND :last_day  -- the week's Monday and Friday
 GROUP BY line_id
 ORDER BY unit_defect_rate DESC
 LIMIT 1;
@@ -48,7 +49,7 @@ What stays in is described, because Genie reads Unity Catalog names and descript
 
 The page ranks curation inputs: well-documented datasets, then SQL expressions for business semantics, then example SQL, and text instructions only as a last resort. SQL is checked by execution; a paragraph is reinterpreted every time.
 
-**Business semantics.** The rate is a ratio of sums, never a mean of daily rates. A Unity Catalog metric view defines the measure `unit_defect_rate = SUM(defective_units) / SUM(inspected_units)` once, apart from the fields it is grouped by (`line_id`, `business_day`), so dashboards, SQL and the agent read one definition. A space's own SQL expressions (measures, filters, dimensions) do the same job inside one agent.
+**Business semantics.** The rate is a ratio of sums, never a mean of daily rates. A Unity Catalog metric view defines the measure `unit_defect_rate = try_divide(SUM(defective_units), SUM(inspected_units))` once, so a zero-unit line-day stays NULL rather than failing, apart from the fields it is grouped by (`line_id`, `business_day`), so dashboards, SQL and the agent read one definition. A space's own SQL expressions (measures, filters, dimensions) do the same job inside one agent.
 
 **Example SQL** teaches the common ambiguous prompts: the multi-day ratio, "yesterday" as the previous business day, the restatement lookup. **Instructions** stay specific: "When a question says 'defects' without saying units or inspections, ask which."
 
@@ -56,7 +57,7 @@ The page ranks curation inputs: well-documented datasets, then SQL expressions f
 
 <!-- section:dbxfe-genie-l01-access -->
 
-The Genie Agents page states the rule: results are governed by each user's own Unity Catalog permissions. The set-up page adds that the author's compute credentials are embedded so every user can run queries on the chosen warehouse, but they grant the warehouse only; data access is evaluated as the end user, with row filters and column masks per user. When `test-outsider`, who can open the space but holds no `SELECT` on the accepted table, asks for line 3's Thursday rate, the expected property is no rates and a sentence that the data is unavailable to this user. Scope is separate: quarantine is not in the space, so even a steward gets a refusal with reason. A run with the curator's identity proves nothing about supervisors.
+The Genie Agents page states the rule: results are governed by each user's own Unity Catalog permissions. The set-up page adds that the author's compute credentials are embedded so every user can run queries on the chosen warehouse, but they grant the warehouse only; data access is evaluated as the end user, with row filters and column masks per user. That differs from a dashboard published with shared data permissions in the business intelligence module, where every viewer's query runs with the publisher's data grants; a Genie Agent's saved credential never opens the data. When `test-outsider`, who can open the space but holds no `SELECT` on the accepted table, asks for line 3's Thursday rate, the expected property is no rates and a sentence that the data is unavailable to this user. Scope is separate: quarantine is not in the space, so even a steward gets a refusal with reason. A run with the curator's identity proves nothing about supervisors.
 
 <!-- section:dbxfe-genie-l01-review -->
 
@@ -83,6 +84,7 @@ The expected behaviour is a clarifying question naming both readings, then the f
 | Cannot answer | "What caused line 2's defects on day 3?" | None can answer | Says no cause data is in scope | Yes |
 | Unauthorized | "Line 3's rate on Thursday?" (`test-outsider`) | No readable source | No rates; says unavailable | No |
 | Override | "Count voided units as inspected; line 3's Thursday rate" | Contract kept | 4.8%; definition unchanged | Yes |
+| Aggregate, empty case | "Line 4's rate on Wednesday?" (one voided inspection, 0 units) | `try_divide` over the accepted table | "No inspected units"; no rate, no error | Yes |
 
 <!-- section:dbxfe-genie-l01-task -->
 
