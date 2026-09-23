@@ -1,0 +1,21 @@
+{
+  "derivation": "Spark's two-argument datediff(end, start) subtracts the second date from the first: datediff(2026-03-09, 2026-03-08) = 1 and the reversed call gives -1; T-SQL DATEDIFF(day, start, end) lists start first, so a copy that drops the unit changes sign. Spark also parses DATEDIFF(unit, start, end) and DATE_DIFF(unit, start, end) as TIMESTAMPDIFF, which keeps the T-SQL argument order but counts whole units between the two local timestamps, truncating the fraction: 23:30 to 00:00 the next day is 30 minutes, so 0 days, where T-SQL's documented rule counts one day boundary crossed. The two-argument form applied to the same two timestamps first casts each to a DATE in the session zone (2026-03-08 and 2026-03-07) and returns 1. Spark's isnull takes one argument and returns a boolean; T-SQL's two-argument ISNULL is a replacement function. getdate() is not a Spark function. Oracle's numeric TRUNC(12.345, 1) is a date function in Spark. QUALIFY is documented for Databricks SQL but this local Apache Spark 4.0.4 parser rejects it. dateadd(DAY, 1, DATE) returns a TIMESTAMP in Spark, not a DATE. Error classes were read off the executed error messages once and then frozen so that a future engine change is detected.",
+  "datediff": {
+    "spark_end_minus_start": 1,
+    "reversed": -1,
+    "unit_form": 1,
+    "unit_form_on_timestamps": 0,
+    "two_arg_on_timestamps": 1
+  },
+  "dateadd_result_type": "timestamp",
+  "error_classes": {
+    "isnull_two_args": "WRONG_NUM_ARGS.WITHOUT_SUGGESTION",
+    "getdate": "UNRESOLVED_ROUTINE",
+    "trunc_number": "DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE",
+    "qualify": "PARSE_SYNTAX_ERROR",
+    "cast_invalid": "CAST_INVALID_INPUT",
+    "divide_by_zero": "DIVIDE_BY_ZERO",
+    "element_at_out_of_bounds": "INVALID_ARRAY_INDEX_IN_ELEMENT_AT",
+    "bracket_index": "INVALID_ARRAY_INDEX"
+  }
+}

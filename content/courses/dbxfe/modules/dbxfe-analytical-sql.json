@@ -1,0 +1,415 @@
+{
+  "module": {
+    "id": "dbxfe-analytical-sql",
+    "title": "Advanced analytical SQL",
+    "summary": "Predict window frames, ties, deduplication, islands, membership joins, set operators, nested fields, safe casts and time-zone results from executed local Spark SQL.",
+    "objectives": [
+      "Predict window, ranking and deduplication results row by row, including at ties and around NULL.",
+      "Use semi and anti joins and set operators for membership questions without multiplying or misaligning rows.",
+      "State the session time zone and calendar rule every date, hour, duration and period total depends on, and verify source-dialect expressions by execution."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-transformations"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-analytical-sql-l01.json"
+    ],
+    "scenarioId": "dbxfe-analytical-sql-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-analytical-sql-scenario",
+      "title": "Review a migrated downtime report before it is trusted",
+      "context": "Fictional Cinderline Components has moved its plant reporting from SQL Server to Databricks SQL. A contractor translated the T-SQL 'daily downtime and top machines' report line by line into Spark SQL. The operations lead wants to switch dashboards next week; the data lead has noticed that March totals changed but cannot say why. Stop/start events are stored as UTC instants; the plant runs on New York time; the warehouse's session time zone has never been set explicitly.",
+      "task": "Write the review that decides whether the migrated query set can replace the report, naming what must be executed before the switch.",
+      "requirements": [
+        "Identify every expression whose meaning may have changed in translation and say how each will be verified by execution against a case with a known answer.",
+        "State the time-zone assumption the report must make explicit and show one March 2026 case where the two zones give different days or durations.",
+        "Define how the report handles ties, duplicates and incomplete periods so that the same input always produces the same numbers.",
+        "Name the evidence that would justify the switch and the evidence that would postpone it."
+      ],
+      "model": "### Review of the migrated downtime report\n\nI would not switch dashboards on the contractor's word that the SQL 'runs'. Three groups of expressions need executed proof.\n\n**Dialect.** `DATEDIFF(day, stop, start)` became `DATEDIFF(stop, start)`; Spark's two-argument form subtracts the second argument from the first, so every duration changed sign. Keeping the unit would not have been enough: Spark reads `DATEDIFF(DAY, start, end)` as whole elapsed days (0 for 23:30 to midnight) where T-SQL counts day boundaries crossed (1). `ISNULL(units, 0)` must become `COALESCE`, because Spark's `isnull` takes one argument. The `TOP 3 … ORDER BY total DESC` became `ROW_NUMBER() OVER (ORDER BY total DESC)` with no tie-breaker, so two machines tied at 225 can swap places between runs; add `machine_id`. Each fix is verified with a one-row case whose answer is known, not by eyeballing the dashboard.\n\n**Time.** The report must set its zone explicitly (`SET TIME ZONE 'America/New_York'`) and say so in its header. On 8 March 2026 the plant clock skipped 02:00–03:00: a stoppage from 01:00 to 04:00 local is 120 elapsed minutes, and a wall-clock `TIMESTAMPDIFF` reports 180. On 1 November 2026 the repeated hour makes a 45-minute stoppage read −15 on the wall clock. Durations come from instant differences; the calendar day of a stop comes from the local zone, which moves a 04:30Z event to 7 March. Month totals are attributed by local month, so 1 April 03:30Z belongs to March.\n\n**Determinism and completeness.** Exact replays are removed with `DISTINCT`; a revision claimed by two different rows is flagged, not silently resolved. The current month is labelled incomplete until the data reaches its last day, with days observed shown beside the total.\n\n**Decision.** Switch when the migrated queries reproduce a hand-derived answer set covering a tie, a NULL count, the DST day and a month boundary, and when the old and new reports agree on February, a complete month with no clock change. Postpone if any duration is negative, if the top-machine list differs between two runs, or if the session zone is still unset. The March discrepancy the data lead saw is expected until the zone and the `DATEDIFF` order are fixed; it is not evidence that either system is wrong.",
+      "reasoning": "The review treats each translated expression as a hypothesis with an executable test, makes the time-zone assumption explicit with a dated counterexample, and separates deterministic rules from the switch decision so that agreement on an easy month is not mistaken for correctness on a hard one.",
+      "rubric": [
+        {
+          "id": "dbxfe-analytical-sql-scenario-rubric-1",
+          "criterion": "Dialect verification",
+          "weak": "Assumes translated SQL that runs is correct.",
+          "partial": "Names some risky expressions but proposes no executed check.",
+          "strong": "Names DATEDIFF order, ISNULL and the missing tie-breaker and gives a known-answer test for each."
+        },
+        {
+          "id": "dbxfe-analytical-sql-scenario-rubric-2",
+          "criterion": "Time-zone explicitness",
+          "weak": "Ignores the session zone or treats UTC as harmless.",
+          "partial": "Sets a zone but shows no case where zones disagree.",
+          "strong": "Sets the zone explicitly and shows the 8 March 2026 duration and the local-day cases with numbers."
+        },
+        {
+          "id": "dbxfe-analytical-sql-scenario-rubric-3",
+          "criterion": "Determinism and completeness",
+          "weak": "Lets ties, duplicates and partial months resolve themselves.",
+          "partial": "Handles one of the three.",
+          "strong": "States tie-breaker, replay removal with flagged conflicts and an incomplete-period label."
+        },
+        {
+          "id": "dbxfe-analytical-sql-scenario-rubric-4",
+          "criterion": "Switch decision",
+          "weak": "Recommends switching because the dashboard looks similar.",
+          "partial": "Lists checks without a stop condition.",
+          "strong": "Gives both the evidence that justifies the switch and the evidence that postpones it."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Operations lead: the old and new reports agree for February, so why not switch now?",
+          "response": "February has no clock change, no month-boundary event and no tie, so agreement there tests none of the expressions that changed meaning. March is where the risks live; I need the March cases to reproduce hand-derived answers first."
+        },
+        {
+          "question": "Data lead: can we just set the warehouse to UTC and avoid the daylight-saving question?",
+          "response": "A UTC session makes elapsed and wall-clock durations agree, but it moves stops that happen after 8 PM New York to the next calendar day and the last evening of March into April. The report must state which zone it means; UTC is a choice, not an escape."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-analytical-sql-l01"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-functions",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-analytical-sql-course-claim-tsql",
+        "dbxfe-analytical-sql-course-claim-ansi",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-analytical-sql-course-source-window",
+      "title": "Spark 4.0.4 SQL reference: Window functions",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-syntax-qry-select-window.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4 SQL reference; search-level review, page body not fetched in this build.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Frame defaults and function semantics are stated for Spark SQL; a Databricks Runtime bundles its own Spark version."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-null",
+      "title": "Spark 4.0.4 SQL reference: NULL semantics",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-null-semantics.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4 SQL reference; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Null-safe equality expresses a different business rule from equality; choosing it needs a stated meaning for missing values."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-join",
+      "title": "Spark 4.0.4 SQL reference: JOIN",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-syntax-qry-select-join.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4 SQL reference; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Join type does not establish key uniqueness or business grain."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-functions",
+      "title": "Spark 4.0.4 SQL reference: Built-in functions",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-functions-builtin.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4 SQL reference; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Function availability and ANSI behaviour differ across Spark versions and Databricks Runtime releases."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-datetime",
+      "title": "Spark 4.0.4 SQL reference: Datetime patterns",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-datetime-pattern.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4 SQL reference; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Pattern letters are Spark's own; a source system's format strings are not assumed equivalent."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-setops",
+      "title": "Spark 4.0.4 SQL reference: Set operators",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-syntax-qry-select-setops.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4 SQL reference; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Column matching is positional; result types follow coercion rules that ANSI mode can turn into runtime errors."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-timezone",
+      "title": "Databricks SQL: TIMEZONE configuration parameter",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/parameters/timezone",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS, SQL language manual; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The documented default is UTC; a workspace or warehouse can set another zone, so a query should state the zone it assumes."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-timestamp",
+      "title": "Databricks SQL: TIMESTAMP type",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/data-types/timestamp-type",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS, SQL language manual; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Describes the zone-normalised TIMESTAMP; TIMESTAMP_NTZ has separate rules."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-qualify",
+      "title": "Databricks SQL: QUALIFY clause",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-qualify",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks SQL and Databricks Runtime; the page carries an Applies-to label with the minimum runtime version; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Rejected by the local Apache Spark 4.0.4 parser used in Lab L12; verify on the target engine."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-manual",
+      "title": "Databricks SQL language reference",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS landing page for the SQL language manual; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Feature pages carry an Applies-to label per product and runtime; this course does not claim any workspace execution."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-dst",
+      "title": "Databricks: Dates and timestamps (Spark 3.x migration archive)",
+      "url": "https://docs.databricks.com/aws/en/archive/spark-3.x-migration/dates-timestamps",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Archived Databricks page describing Spark 3.x date/timestamp semantics; search-level review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "An archive page for Spark 3.x; the gap-shift behaviour it describes was re-observed on local Spark 4.0.4 in Lab L12 and is recorded as observed, not promised."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-ansi",
+      "title": "ANSI compliance (Spark SQL)",
+      "url": "https://spark.apache.org/docs/latest/sql-ref-ansi-compliance.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark SQL reference, 4.2.0 at review (the lab ran 4.0.4); search also listed the 4.0.1 and 4.0.2 copies of the page.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Describes open-source Spark defaults; a Databricks warehouse or runtime documents its own ANSI setting. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-tsql-datediff",
+      "title": "DATEDIFF (Transact-SQL)",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/functions/datediff-transact-sql?view=sql-server-ver17",
+      "publisher": "Microsoft",
+      "type": "official documentation",
+      "context": "SQL Server Transact-SQL reference; the source dialect of the module's migration example.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Describes T-SQL, not Spark; used only to state what a copied expression meant in its source. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-tsql-isnull",
+      "title": "ISNULL (Transact-SQL)",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/functions/isnull-transact-sql?view=sql-server-ver17",
+      "publisher": "Microsoft",
+      "type": "official documentation",
+      "context": "SQL Server Transact-SQL reference.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "T-SQL's two-argument replacement function; Spark's isnull is a one-argument predicate. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-tsql-dateadd",
+      "title": "DATEADD (Transact-SQL)",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/functions/dateadd-transact-sql?view=sql-server-ver17",
+      "publisher": "Microsoft",
+      "type": "official documentation",
+      "context": "SQL Server Transact-SQL reference.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "States T-SQL's return type rule only; Spark's DATEADD was executed separately and returned a TIMESTAMP. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-source-oracle-trunc",
+      "title": "TRUNC (number)",
+      "url": "https://docs.oracle.com/en/database/oracle/oracle-database/26/sqlrf/TRUNC-number.html",
+      "publisher": "Oracle",
+      "type": "official documentation",
+      "context": "Oracle Database SQL Language Reference.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Oracle's numeric TRUNC; Spark's trunc truncates dates and rejected a number in Lab L12. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-analytical-sql-course-claim-window",
+      "description": "Window functions compute a value per row over a partition ordered by ORDER BY; with ORDER BY and no frame the default frame is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, which includes peer rows; ROWS and RANGE frames and the ranking functions RANK, DENSE_RANK and ROW_NUMBER are documented.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-analytical-sql-course-source-window"
+      ],
+      "context": "Apache Spark 4.0.4 SQL reference."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-claim-null",
+      "description": "Comparisons with NULL yield unknown; NOT IN with a NULL in the list is never true; aggregates other than COUNT(*) skip NULL; GROUP BY, DISTINCT and set operators group NULLs together; <=> is null-safe equality.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-analytical-sql-course-source-null"
+      ],
+      "context": "Apache Spark 4.0.4 SQL reference."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-claim-join",
+      "description": "LEFT SEMI JOIN returns left rows that have a match and LEFT ANTI JOIN returns left rows with no match; neither adds right-side columns.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-analytical-sql-course-source-join"
+      ],
+      "context": "Apache Spark 4.0.4 SQL reference."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-claim-functions",
+      "description": "try_cast, try_divide and try_element_at return NULL where their strict counterparts raise under ANSI mode; element_at indexes are 1-based; add_months, last_day, date_add, datediff(end, start), timestampdiff and timestampadd have the documented signatures, and timestampdiff counts whole units.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-analytical-sql-course-source-functions"
+      ],
+      "context": "Apache Spark 4.0.4 SQL reference; ANSI mode is on by default in Spark 4."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-claim-datetime",
+      "description": "A TIMESTAMP is an instant rendered in the session time zone; the session zone is a configuration parameter that defaults to UTC on Databricks and can be set with SET TIME ZONE; date_format pattern letters and offsets are documented; a local time inside a daylight-saving gap is moved to the next valid time, and an ambiguous local time in a repeated hour takes the earlier offset.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-analytical-sql-course-source-datetime",
+        "dbxfe-analytical-sql-course-source-timezone",
+        "dbxfe-analytical-sql-course-source-timestamp",
+        "dbxfe-analytical-sql-course-source-dst"
+      ],
+      "context": "Apache Spark 4.0.4 datetime patterns; Databricks SQL TIMEZONE parameter and TIMESTAMP type; Databricks archive page on Spark 3.x dates and timestamps."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-claim-setops",
+      "description": "UNION, INTERSECT and EXCEPT match columns by position, default to DISTINCT and coerce column types to a common type; ALL keeps duplicates.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-analytical-sql-course-source-setops"
+      ],
+      "context": "Apache Spark 4.0.4 SQL reference; behaviour re-executed locally in Lab L12."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-claim-qualify",
+      "description": "The QUALIFY clause filters window-function results in Databricks SQL and Databricks Runtime; the page's Applies-to label gives the minimum runtime version, which must be checked for the target.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-analytical-sql-course-source-qualify",
+        "dbxfe-analytical-sql-course-source-manual"
+      ],
+      "context": "Databricks SQL language manual; the same clause is a parse error on local Apache Spark 4.0.4."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-claim-lab",
+      "description": "Every quoted Cinderline output was executed in Lab L12 on local Apache Spark 4.0.4 (PySpark 4.0.4, Python 3.12.3, Java 21.0.10, local[2]) with session time zone America/New_York; 51 tests, 0 failures, 0 skips, including a UTC session and an ANSI-off transfer. These are mechanism illustrations on synthetic data, not Databricks executions or benchmarks.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Independent SpicyBrain curriculum; local execution only."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-claim-ansi",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-analytical-sql-course-source-ansi"
+      ],
+      "description": "In Spark 4, spark.sql.ansi.enabled is true by default: invalid input to a SQL operator or function raises an error instead of returning NULL, and try_cast tolerates malformed input by returning NULL.",
+      "context": "Apache Spark SQL reference; the lab also executed the same statements with ANSI mode off."
+    },
+    {
+      "id": "dbxfe-analytical-sql-course-claim-tsql",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-analytical-sql-course-source-tsql-datediff",
+        "dbxfe-analytical-sql-course-source-tsql-isnull",
+        "dbxfe-analytical-sql-course-source-tsql-dateadd",
+        "dbxfe-analytical-sql-course-source-oracle-trunc"
+      ],
+      "description": "T-SQL DATEDIFF(datepart, startdate, enddate) returns the count of datepart boundaries crossed between start and end; T-SQL ISNULL replaces NULL with a replacement value; T-SQL DATEADD returns the data type of its date argument; Oracle TRUNC(n1, n2) truncates a number to n2 decimal places.",
+      "context": "Source-dialect documentation, used to state what a copied expression meant before it was executed on Spark."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-analytical-sql-l01-frame-concept",
+      "term": "window frame",
+      "aliases": [
+        "frame clause",
+        "ROWS BETWEEN",
+        "RANGE BETWEEN"
+      ],
+      "definition": "The subset of a partition's ordered rows that a window function evaluates for the current row.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-frames"
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-membership-concept",
+      "term": "semi join",
+      "aliases": [
+        "anti join",
+        "LEFT SEMI JOIN",
+        "LEFT ANTI JOIN",
+        "NOT EXISTS"
+      ],
+      "definition": "A join form that keeps or excludes left rows by whether a match exists, without adding right columns or multiplying rows.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-membership"
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-cast-concept",
+      "term": "try_cast",
+      "aliases": [
+        "safe cast",
+        "TRY_DIVIDE",
+        "TRY_ELEMENT_AT"
+      ],
+      "definition": "A conversion that returns NULL for an unrepresentable input where the strict CAST raises an ANSI error.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-nested"
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-session-concept",
+      "term": "session time zone",
+      "aliases": [
+        "spark.sql.session.timeZone",
+        "TIMEZONE parameter",
+        "daylight saving"
+      ],
+      "definition": "The zone in which an instant is rendered and from which its day, hour and month are extracted.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-time"
+    }
+  ]
+}
