@@ -1,0 +1,33 @@
+# Service knowledge and controlled actions — capstone guide
+
+This page is how to work the second capstone, *Service knowledge and controlled actions*, in stages. The scenario itself — the brief, the stakeholder disclosures, the nine requirements, the model submission, its reasoning and the six-dimension rubric — is at [#/practice/dbxfe-capstone-service-knowledge](#/practice/dbxfe-capstone-service-knowledge). Everything in it is fictional: Harrowgate Field Services, its regions, technicians, equipment, documents, policies, incident and money are synthetic teaching material. No Databricks workspace, endpoint or language model is executed by the capstone, and nothing you write here is a credential or a readiness judgement; the rubric is for your own reflection.
+
+## What the capstone asks
+
+A fictional service organisation wants an assistant that finds the right maintenance procedure for a technician and, eventually, files parts orders. Its library holds superseded versions beside current ones, a bulletin that overrides one section of a manual for some units, a region-restricted supplement, a level-restricted section, a draft, an unofficial wiki tip and administrative noise. Its parts policy forbids an assistant to submit an order. Your job is to choose between plain search, retrieval-assisted answers and tool use, design the authority, retrieval, evaluation and authorization boundaries, and recommend a next step on evidence — including saying plainly that ordering is not justified yet and what would justify it.
+
+## Work it in stages
+
+**Stage 1 — Discovery.** Read the brief, notice what it leaves out, then open the disclosures one at a time and record what each one changes. [Discovery and qualification](#/module/dbxfe-m02) teaches the synthesis; [Role and customer journey](#/module/dbxfe-m01) the responsibility map. Field guides: discovery brief (fg01), stakeholder map (fg02), requirements contract (fg03). Output: `templates/discovery-synthesis.md`.
+
+**Stage 2 — Source authority and freshness.** Read every document header in `documents/` and `stale-content.md` before any body, and write the rule that decides which document is eligible for which asker and which wins when two current ones disagree. [Document processing and retrieval engineering](#/module/dbxfe-retrieval) and Lab L20 (retrieval quality) show why the wrong chunk wins and how metadata changes that; the RAG evaluation guide (fg17) gives the shape.
+
+**Stage 3 — Pattern choice.** Decide between plain search, retrieval-assisted answers and tool use as two defensible paths with tradeoffs and a switching condition. [GenAI, retrieval and agents](#/module/dbxfe-genai) separates finding information from taking action; [Managed AI building blocks](#/module/dbxfe-ai-platform) covers when simple retrieval beats autonomous tool selection; [Architecture and migration](#/module/dbxfe-m08) and the architecture decision guide (fg04) give the decision-record form.
+
+**Stage 4 — Retrieval and evaluation design.** Work `questions.json` by hand first: for each question decide eligibility, winner and outcome, then compare with the expected property. Define metrics with numerators and denominators and the blocking failures. [GenAI evaluation, traces and failure analysis](#/module/dbxfe-genai-eval) and Lab L21 (evaluation traces) separate retrieval failure from reasoning failure from a denied tool. Output: `templates/evaluation-plan.md`.
+
+**Stage 5 — Authorization and state boundary.** Use `authorization-matrix.csv` and `injection-fixture.md`. [Tools, MCP and action authorization](#/module/dbxfe-tools) and Lab L22 (tool authorization) show a system prompt is not access control and how untrusted content requesting an action is rejected under policy; the untrusted-content threat review (fg18) and tool-action review (fg19) guides structure it. [Unity Catalog and governance](#/module/dbxfe-m06) with Lab L14 and the access review guide (fg06), and [Identity, authorization and audit](#/module/dbxfe-identity), cover delegated permissions and negative tests. [Databricks Apps and application architecture](#/module/dbxfe-apps) and the application state guide (fg20) settle where each fact lives. Output: `templates/authorization-boundary.md`.
+
+**Stage 6 — Operational ownership.** Name an owner or write "unassigned" for the library, operation, the evaluation set, access rules and the parts policy, with the incident path. [Production operations, observability and recovery](#/module/dbxfe-operations) and the escalation packet guide (fg31).
+
+**Stage 7 — Demo sequence and technical appendix.** Ten minutes at most: a provenance-bearing answer, a version conflict, a denied action, the injection refusal, an explain-back question and a transparent fallback. [Demos that teach and prove](#/module/dbxfe-m09) with the demo script (fg24) and demo failure plan (fg25) guides.
+
+**Stage 8 — Pilot charter, evidence and recommendation.** Write the charter with stop conditions, then the one-page recommendation with its negative-outcome section. [Proofs of value](#/module/dbxfe-m10) with the PoV charter (fg26) and evidence ledger (fg27) guides; [Competition and business value](#/module/dbxfe-m11) for the alternatives memo (fg29); [Field execution and capstone](#/module/dbxfe-m12) for the executive readout (fg30) and handoff plan (fg32). Output: `templates/recommendation.md` plus the appendix.
+
+## How the data pack is used
+
+The pack lives at `content/exercises/capstone-service-knowledge/`; its `README.md` is the dictionary. `documents/` is the corpus and carries the planted trouble; `stale-content.md` is the superseded procedure behind the incident; `injection-fixture.md` is the benign planted instruction with its answer key; `questions.json` is the labelled set with authorized and unauthorized askers, must-not-cite sources and blocking failures; `authorization-matrix.csv` is the starting matrix that nothing enforces; `templates/` are the four submission templates. Only Markdown, JSON and CSV; nothing to install. If you run a local retrieval experiment over the files, label it as your own local execution. The pack creates nothing on your machine; delete only your working copies and keep your written answers.
+
+## When you are done
+
+Reveal the model submission only after your own is complete, then read the rubric's six dimensions — discovery, technical correctness, tradeoffs, communication, measurable evidence, decision quality — as reflection prompts. Several designs are defensible when their assumptions, evidence and refusals are explicit; a refusal that names the missing approval is a correct outcome here. The third capstone, enterprise coexistence and modernization, follows this one.
