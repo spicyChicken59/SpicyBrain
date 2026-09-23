@@ -24,6 +24,7 @@ Each chunk is a record, not just text:
 | `family`, `version`, `effective_date`, `status` | supersession, effective-date and authority rules |
 | `region`, `audience` | permission |
 | `title`, `heading` | the contextual header and citation label |
+| `citable` | the citation check; false for a context-only source (a design addition: the lab's record has no such column) |
 
 A contextual header (`M7 press service manual. Hydraulic unit.`) is text the index scores; a column is a value a rule filters on. Keep that distinction: headers change rankings, columns change admission.
 
@@ -39,7 +40,7 @@ TF-IDF weights each token by its count in a chunk times its rarity, `idf(t) = ln
 
 <!-- section:dbxfe-retrieval-l01-context -->
 
-Context assembly spends a budget: take hits in rank order, skip repeated text, stop when the next chunk would exceed the budget, and label every entry with document, section, version and effective date. The labels let a reader tell the M7 manual's 200 hours from the M8 manual's 300 hours when both enter. Carry `chunk_id` into citations and reject any citation that is not in the context: a deterministic check that catches invented and out-of-context citations. Whether a cited passage supports its sentence is a separate question.
+Context assembly spends a budget: take hits in rank order, skip repeated text, stop when the next chunk would exceed the budget, and label every entry with document, section, version and effective date. The labels let a reader tell the M7 manual's 200 hours from the M8 manual's 300 hours when both enter. Carry `chunk_id` into citations and reject any citation that is not in the context: a deterministic check that catches invented and out-of-context citations. It tests presence only, so a context-only source needs the `citable` column for the check to reject a citation to it; marking a source context-only changes no rank and no budget. Whether a cited passage supports its sentence is a separate question.
 
 <!-- section:dbxfe-retrieval-l01-evaluation -->
 

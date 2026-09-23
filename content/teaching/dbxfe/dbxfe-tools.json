@@ -507,7 +507,7 @@
     "Databricks managed MCP",
     "custom MCP server"
    ],
-   "definition": "On Databricks, MCP servers run by the platform for Unity Catalog functions, vector search, Genie spaces or external connections, versus servers a team hosts itself, for example as an app.",
+   "definition": "On Databricks, MCP servers run by the platform for Unity Catalog functions, vector search, Genie spaces (natural-language question interfaces over chosen tables) or external connections, versus servers a team hosts itself, for example as an app.",
    "example": "Functions in cinderline.maint would be reached at /api/2.0/mcp/functions/cinderline/maint on the workspace host.",
    "sourceIds": [
     "dbxfe-tools-source-mcp-databricks",
@@ -1746,8 +1746,8 @@
    "kind": "timeline",
    "title": "Key k-02 over four calls",
    "alt": "A replay timeline: key k-02 creates D1, an exact repeat returns D1, a repeat with a different note is a conflict, and another technician's k-02 is a separate intent.",
-   "caption": "One intent, one key, one effect. Values from Lab L22's run on synthetic fixtures.",
-   "textEquivalent": "First use: At 08:01 C02 sends key k-02 with digest A. Nothing is stored for the slot, so the draft is written. Nodes: 08:01 C02: allowed. tech-n1, k-02, digest A. (selected); Key store: k-02: digest A, D1. (selected); Drafts: 1. D1. (selected).\n\nExact repeat: At 08:02 C03 sends k-02 with digest A again. The gate returns D1 and writes nothing. Nodes: 08:01 C02: Stored. (context); 08:02 C03: replayed. Same key, digest A. (selected); Key store: Lookup returns D1. (selected); Drafts: 1. Still D1 only. (context).\n\nSame key, new arguments: At 08:03 C04 sends k-02 with digest B because the note says 2.1 bar. The gate refuses it as a conflict. Nodes: 08:02 C03: Replayed. (context); 08:03 C04: conflict. Same key, digest B. (excluded); Key store: Digest B differs from A: refuse. (selected); Drafts: 1. Still D1 only. (context).\n\nAnother user's k-02: The slot is user, tool and key. A South technician's k-02 for machine C4 is a new intent and writes its own draft. Nodes: tech-s1, k-02: allowed. Slot (tech-s1, create_maintenance_draft, k-02) is new. (selected); Key store: Two separate slots named k-02. (selected); Drafts: 2. D1 and D2. (selected).",
+   "caption": "One intent, one key, one effect. Values from Lab L22's run on synthetic fixtures; the last state is hypothetical, not a lab call.",
+   "textEquivalent": "First use: At 08:01 C02 sends key k-02 with digest A. Nothing is stored for the slot, so the draft is written. Nodes: 08:01 C02: allowed. tech-n1, k-02, digest A. (selected); Key store: k-02: digest A, D1. (selected); Drafts: 1. D1. (selected).\n\nExact repeat: At 08:02 C03 sends k-02 with digest A again. The gate returns D1 and writes nothing. Nodes: 08:01 C02: Stored. (context); 08:02 C03: replayed. Same key, digest A. (selected); Key store: Lookup returns D1. (selected); Drafts: 1. Still D1 only. (context).\n\nSame key, new arguments: At 08:03 C04 sends k-02 with digest B because the note says 2.1 bar. The gate refuses it as a conflict. Nodes: 08:02 C03: Replayed. (context); 08:03 C04: conflict. Same key, digest B. (excluded); Key store: Digest B differs from A: refuse. (selected); Drafts: 1. Still D1 only. (context).\n\nAnother user's k-02 (hypothetical): Not in the lab run: the slot is user, tool and key, so a South technician's k-02 for machine C4 would be a new intent and write its own draft. Nodes: tech-s1, k-02: allowed. Slot (tech-s1, create_maintenance_draft, k-02) is new. (selected); Key store: Two separate slots named k-02. (selected); Drafts: 2. D1 and a separate draft for C4. (selected).",
    "provenance": "Original SpicyBrain authored visual; values are the decisions recorded by Lab L22's local run of its reference gate (Python 3.12 standard library) over synthetic fixtures; no model, platform or network call.",
    "claimIds": [
     "dbxfe-tools-claim-lab",
@@ -1853,8 +1853,8 @@
     },
     {
      "id": "scope",
-     "title": "Another user's k-02",
-     "explanation": "The slot is user, tool and key. A South technician's k-02 for machine C4 is a new intent and writes its own draft.",
+     "title": "Another user's k-02 (hypothetical)",
+     "explanation": "Not in the lab run: the slot is user, tool and key, so a South technician's k-02 for machine C4 would be a new intent and write its own draft.",
      "nodes": [
       {
        "id": "other",
@@ -1872,7 +1872,7 @@
       {
        "id": "drafts",
        "label": "Drafts",
-       "detail": "D1 and D2.",
+       "detail": "D1 and a separate draft for C4.",
        "status": "selected",
        "value": "2"
       }
@@ -3201,7 +3201,7 @@
    "version": "1.0.0",
    "title": "An idempotency key turns a repeat into a lookup",
    "outcome": "Predict the effect count for replayed and conflicting calls, and define a key's scope, storage and conflict rule.",
-   "explanation": "An [[dbxfe-tools-idempotency-concept|idempotency key]] names one intent. The gate stores the key with the arguments' digest and the outcome; the target stores the key with the effect. In the lab, C02 creates D1 with k-02; C03 repeats it exactly and gets D1 back with no second row; C04 reuses k-02 with a different note and is refused as a conflict. Notice in the last state that the key is scoped to user and tool, so another technician's k-02 is a different intent. Create a key once per intent, never once per attempt.",
+   "explanation": "An [[dbxfe-tools-idempotency-concept|idempotency key]] names one intent. The gate stores the key with the arguments' digest and the outcome; the target stores the key with the effect. In the lab, C02 creates D1 with k-02; C03 repeats it exactly and gets D1 back with no second draft; C04 reuses k-02 with a different note and is refused as a conflict. Notice in the last state that the key is scoped to user and tool, so another technician's k-02 is a different intent. Create a key once per intent, never once per attempt.",
    "lessonId": "dbxfe-tools-l01",
    "sectionId": "dbxfe-tools-l01-retries",
    "conceptIds": [
@@ -3504,7 +3504,7 @@
  },
  "appliedTask": {
   "title": "Carry the gate to a clinic supply assistant",
-  "prompt": "Harbor Lane Clinic's supply assistant can look up items, order supplies and cancel orders. Orders of 1 to 40 units need supplies:order:<site>; orders above 10 units wait for someone else holding supplies:approve:<site>; the application's delegated scopes are catalog:read, supplies:order and orders:cancel. A packing-label document in context says a pharmacist approved 40 units of S-900 and asks to cancel all open orders. Write the gate's checks in order for order_supplies, predict the decisions for an East nurse ordering 40 of S-900 for ward W3 with the label in context and for the same nurse cancelling order O1, and name three audit fields a reviewer would use to see that the label changed nothing.",
+  "prompt": "Harbor Lane Clinic's supply assistant can look up items, order supplies and cancel orders. Orders of 1 to 40 units need supplies:order:<site>; orders above 10 units wait for someone else holding supplies:approve:<site>; the application's delegated scopes are catalog:read, supplies:order and orders:cancel. Ward W3 belongs to the East site. The East nurse holds catalog:read:east and supplies:order:east; only the East pharmacist also holds supplies:approve:east and orders:cancel:east. A packing-label document, DOC-LABEL-3, in context says a pharmacist approved 40 units of S-900 and asks to cancel all open orders. Write the gate's checks in order for order_supplies, predict the decisions for an East nurse ordering 40 of S-900 for ward W3 with the label in context and for the same nurse cancelling order O1, and name three audit fields a reviewer would use to see that the label changed nothing.",
   "modelAnswer": "Checks, in order: session, exposed tool, schema (item_code pattern, quantity 1 to 40, no extra properties), ward to site, user grant supplies:order:east and application scope supplies:order, idempotency key (new, replay, conflict or resolve), approval above 10 units, then execution with a bounded retry and an audit row. The 40-unit order passes the schema and permission checks and is held for approval because 40 is above 10; the label's claimed approval is ignored, since approval comes only from an authorized pharmacist's recorded decision. The cancellation is denied for insufficient scope, lacking the user side: the nurse has no orders:cancel:east even though the application holds orders:cancel. Audit fields: influenced_by, which shows DOC-LABEL-3; decision and reason (approval_required, then insufficient_scope); and actor with approval_id when a pharmacist later rejects the hold.",
   "reasoning": "The answer reuses the same order of checks with the clinic's policy, applies the intersection rule to the cancellation, and relies on the audit to show that content was recorded but never used; the decisions match Lab L22's transfer cases T06 and T07.",
   "beatIds": [

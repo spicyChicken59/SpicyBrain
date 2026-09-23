@@ -109,7 +109,7 @@ Write the blueprint for the quality app's architecture review: traces for view q
 
 <!-- section:dbxfe-apps-l01-solution -->
 
-Traces: browser → sign-in → back end → warehouse and Lakebase under the app's principal, plant check in the handler; the queue read moves to the reviewer's token with the `sql` scope only if a per-plant row filter exists. Two of the mocked contract tests, shown and not executed here:
+Traces: browser → sign-in → back end → warehouse and Lakebase under the app's principal, plant check in the handler; the queue read moves to the reviewer's token with the `sql` scope only if a per-plant row filter exists, and only after the reviewers' group holds USE CATALOG, USE SCHEMA and SELECT on the table (warehouse access confirmed with its owner). Two of the mocked contract tests, shown and not executed here:
 
 ```python
 # test_contract.py (synthetic teaching example; not executed in this build)

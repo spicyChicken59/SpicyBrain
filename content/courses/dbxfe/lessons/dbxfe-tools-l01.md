@@ -77,7 +77,7 @@ Selected rows from the executed lab run (synthetic fixtures, local stubs):
 | Event | Proposal | Decision | Effect |
 |---|---|---|---|
 | C02 | tech-n1 drafts for M7, key k-02 | allowed | D1 |
-| C03 | the same call again | replayed | D1, no new row |
+| C03 | the same call again | replayed | D1, no new draft |
 | C06 | adds `priority: urgent` | malformed | none |
 | C11 | 20 × P-9001 from the supplier page | approval_required | A2 held |
 | C12 | `delete_work_order` | denied: not exposed | none |
@@ -89,7 +89,7 @@ Final state: three drafts, one purchase request, 26 audit rows, and no decision 
 
 <!-- section:dbxfe-tools-l01-exercise -->
 
-Harbor Lane Clinic's supply assistant uses the same gate. `order_supplies(item_code, quantity, ward_id)` allows 1 to 40 units, needs `supplies:order:<site>`, and holds orders above 10 units for someone else with `supplies:approve:<site>`. The application's scopes are `catalog:read`, `supplies:order` and `orders:cancel`. Predict the decision for: (a) an East nurse ordering 6 of S-101 for ward W3; (b) the same call with the same key; (c) 12 units with a new key; (d) a West nurse ordering for W3; (e) 45 units; (f) an East nurse cancelling order O1 while a packing label in context claims a pharmacist approved "cancel all open orders".
+Harbor Lane Clinic's supply assistant uses the same gate. `order_supplies(item_code, quantity, ward_id)` allows 1 to 40 units, needs `supplies:order:<site>`, and holds orders above 10 units for someone else with `supplies:approve:<site>`. The application's scopes are `catalog:read`, `supplies:order` and `orders:cancel`. Ward W3 belongs to the East site. The East nurse holds `catalog:read:east` and `supplies:order:east`; the West nurse holds `catalog:read:west` and `supplies:order:west`; only the East pharmacist holds `supplies:approve:east` and `orders:cancel:east`. Predict the decision for: (a) an East nurse ordering 6 of S-101 for ward W3; (b) the same call with the same key; (c) 12 units with a new key; (d) a West nurse ordering for W3; (e) 45 units; (f) an East nurse cancelling order O1 while a packing label in context claims a pharmacist approved "cancel all open orders".
 
 <!-- section:dbxfe-tools-l01-solution -->
 

@@ -98,6 +98,17 @@
    "context": "Databricks on AWS; Unity Catalog row filters and column masks as query-time controls.",
    "caveat": "Supported access paths and compute have explicit limits; a filter is a visibility control evaluated for the principal that runs the query, not an encryption or universal protection.",
    "reviewedEvidence": "Reviewed for the Unity Catalog module on 2026-09-20 and recorded in that module's source record; not re-searched or re-read for this record because the session's search budget was exhausted and the documentation host is blocked by the sandbox egress proxy. Passage relied on, as recorded there: row filters restrict the rows a query returns and column masks return original or masked column values at query time; supported access paths and runtimes have explicit limits."
+  },
+  {
+   "id": "dbxfe-apps-source-cli-changelog",
+   "title": "Databricks CLI v1.17.0: CHANGELOG.md",
+   "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/CHANGELOG.md",
+   "publisher": "Databricks (databricks/cli repository)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": "2026-09-16",
+   "context": "Release notes of the open databricks/cli repository at tag v1.17.0; the bundle rename applies to every cloud.",
+   "caveat": "Release notes summarize changes; check bundle keys and commands against the documentation for the CLI version in use.",
+   "reviewedEvidence": "Fetched in this editorial pass on 2026-09-23 from the tagged raw URL; its SHA-256 f3f705c0a6b3291bd81600552bafaa85c342a2b9d2490ba023b73dcf230b8956 equals the value recorded for the same file in the delivery module. Passage relied on, under 'Release v0.295.0 (2026-03-18)': 'Databricks Asset Bundles have been renamed to Declarative Automation Bundles (DABs). This is a non-breaking change; no code or configuration modifications are required.'"
   }
  ],
  "claims": [
@@ -170,9 +181,10 @@
    "description": "Declarative Automation Bundles (formerly Databricks Asset Bundles) are a documented way to define an app and its resources as configuration and deploy it per target.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-apps-source-deploy"
+    "dbxfe-apps-source-deploy",
+    "dbxfe-apps-source-cli-changelog"
    ],
-   "context": "As previously read; bundle keys and commands must be checked against the current bundle reference before use."
+   "context": "Rename from the CLI v1.17.0 changelog (release v0.295.0); deployment use as previously read; bundle keys and commands must be checked against the current bundle reference before use."
   },
   {
    "id": "dbxfe-apps-claim-masks",
@@ -823,7 +835,7 @@
    "title": "Identity chosen per request",
    "alt": "Identity chosen per request. Today the quarantine table has no per-plant row filter, so every data hop runs as the app and the handler narrows to the reviewer's plants.",
    "caption": "The identity at the data hop is chosen for each request, and changes only where the data carries per-user rules. Synthetic teaching example.",
-   "textEquivalent": "Row filters absent: Today the quarantine table has no per-plant row filter, so every data hop runs as the app and the handler narrows to the reviewer's plants. Table columns: Request | Data hop | Identity there | Who narrows to the plant. Rows: View queue | Warehouse and Lakebase | App service principal | Handler / Claim item | Lakebase | App service principal | Handler / Record disposition | Lakebase | App service principal | Handler and claimant check / Manual text | Manuals service | Bound secret token | Not user-specific / Suggestion (later) | Serving endpoint | App service principal | Handler.\n\nRow filters on quality.raw.quarantine: Once the data lead adds a per-plant row filter, only the queue read moves to Imani's token with the sql scope; writes stay with the app because reviewers hold no Lakebase grants. Table columns: Request | Data hop | Identity there | Who narrows to the plant. Rows: View queue | Warehouse | Imani, sql scope | Unity Catalog row filter / View queue | Lakebase claims | App service principal | Handler / Claim item | Lakebase | App service principal | Handler / Record disposition | Lakebase | App service principal | Handler and claimant check / Manual text | Manuals service | Bound secret token | Not user-specific.",
+   "textEquivalent": "Row filters absent: Today the quarantine table has no per-plant row filter, so every data hop runs as the app and the handler narrows to the reviewer's plants. Table columns: Request | Data hop | Identity there | Who narrows to the plant. Rows: View queue | Warehouse and Lakebase | App service principal | Handler / Claim item | Lakebase | App service principal | Handler / Record disposition | Lakebase | App service principal | Handler and claimant check / Manual text | Manuals service | Bound secret token | Not user-specific / Suggestion (later) | Serving endpoint | App service principal | Handler.\n\nRow filters on quality.raw.quarantine: Once the data lead adds a per-plant row filter, only the queue read moves to Imani's token with the sql scope, and the reviewers' group then needs USE CATALOG, USE SCHEMA and SELECT on the table or the read fails; writes stay with the app because reviewers hold no Lakebase grants. Table columns: Request | Data hop | Identity there | Who narrows to the plant. Rows: View queue | Warehouse | Imani, sql scope | Unity Catalog row filter / View queue | Lakebase claims | App service principal | Handler / Claim item | Lakebase | App service principal | Handler / Record disposition | Lakebase | App service principal | Handler and claimant check / Manual text | Manuals service | Bound secret token | Not user-specific.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-apps-claim-user",
@@ -882,7 +894,7 @@
     {
      "id": "filters",
      "title": "Row filters on quality.raw.quarantine",
-     "explanation": "Once the data lead adds a per-plant row filter, only the queue read moves to Imani's token with the sql scope; writes stay with the app because reviewers hold no Lakebase grants.",
+     "explanation": "Once the data lead adds a per-plant row filter, only the queue read moves to Imani's token with the sql scope, and the reviewers' group then needs USE CATALOG, USE SCHEMA and SELECT on the table or the read fails; writes stay with the app because reviewers hold no Lakebase grants.",
      "nodes": [],
      "connections": [],
      "table": {
@@ -1154,7 +1166,7 @@
    "title": "A secret from scope to request",
    "alt": "A secret from scope to request. The token sits in a secret scope, reaches the process as MANUALS_TOKEN at 09:00 and is sent only in the outbound call's header.",
    "caption": "The process reads a bound secret when it starts, so a rotation reaches it only through a restart or redeploy. Synthetic teaching example.",
-   "textEquivalent": "Bound and read at start: The token sits in a secret scope, reaches the process as MANUALS_TOKEN at 09:00 and is sent only in the outbound call's header. Nodes: Secret scope: 08:30. quality-app/manuals-token stored. (selected); Resource manuals-token: 08:40. App's principal granted Can read. (selected); Process start: 09:00. Environment receives MANUALS_TOKEN. (selected); Manuals call: 09:12. Token sent in the outbound header; 200. (selected); App log: 09:12. Writes 'manual fetched A-2031', not the token. (selected). Relationships: Secret scope → Resource manuals-token: bound; Resource manuals-token → Process start: injected; Process start → Manuals call: used; Manuals call → App log: recorded.\n\nRotated while running: At 10:00 the owner stores a new token. The running process still holds the 09:00 value, so the 10:05 call fails; the 10:20 redeploy starts a process that reads the new one. Nodes: Secret scope: 10:00. New value stored. (selected); Resource manuals-token: Unchanged; still Can read. (selected); Process start: 09:00. Still holds the 09:00 value. (warning); Manuals call: 10:05. 401 from the manuals service. (warning); App log: 10:05. Records the 401 and the key name only. (selected); Redeploy: 10:20. New process reads the new value; 200. (pending). Relationships: Secret scope → Resource manuals-token: bound; Resource manuals-token → Process start: not re-read; Process start → Manuals call: old value; Manuals call → App log: recorded; Redeploy → Manuals call: new value.",
+   "textEquivalent": "Bound and read at start: The token sits in a secret scope, reaches the process as MANUALS_TOKEN at 09:00 and is sent only in the outbound call's header. Nodes: Secret scope: 08:30. quality-app/manuals-token stored. (selected); Resource manuals-token: 08:40. App's principal granted Can read. (selected); Process start: 09:00. Environment receives MANUALS_TOKEN. (selected); Manuals call: 09:12. Token sent in the outbound header; 200. (selected); App log: 09:12. Writes 'manual fetched A-2031', not the token. (selected). Relationships: Secret scope → Resource manuals-token: bound; Resource manuals-token → Process start: injected; Process start → Manuals call: used; Manuals call → App log: recorded.\n\nRotated while running: At 10:00 the owner stores a new token and revokes the old one at the manuals service. The running process still holds the 09:00 value, so the 10:05 call fails; the 10:20 redeploy starts a process that reads the new one. Nodes: Secret scope: 10:00. New value stored; old token revoked at the manuals service. (selected); Resource manuals-token: Unchanged; still Can read. (selected); Process start: 09:00. Still holds the 09:00 value. (warning); Manuals call: 10:05. 401 from the manuals service. (warning); App log: 10:05. Records the 401 and the key name only. (selected); Redeploy: 10:20. New process reads the new value; 200. (pending). Relationships: Secret scope → Resource manuals-token: bound; Resource manuals-token → Process start: not re-read; Process start → Manuals call: old value; Manuals call → App log: recorded; Redeploy → Manuals call: new value.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-apps-claim-resources",
@@ -1230,12 +1242,12 @@
     {
      "id": "rotated",
      "title": "Rotated while running",
-     "explanation": "At 10:00 the owner stores a new token. The running process still holds the 09:00 value, so the 10:05 call fails; the 10:20 redeploy starts a process that reads the new one.",
+     "explanation": "At 10:00 the owner stores a new token and revokes the old one at the manuals service. The running process still holds the 09:00 value, so the 10:05 call fails; the 10:20 redeploy starts a process that reads the new one.",
      "nodes": [
       {
        "id": "scope",
        "label": "Secret scope",
-       "detail": "New value stored.",
+       "detail": "New value stored; old token revoked at the manuals service.",
        "status": "selected",
        "value": "10:00"
       },
@@ -2580,8 +2592,8 @@
   },
   {
    "id": "dbxfe-apps-secrets-question",
-   "revision": "1",
-   "prompt": "Five minutes after the manuals token was rotated, manual text fails with 401 while claims and the queue still work. What is the most likely cause and the next step?",
+   "revision": "2",
+   "prompt": "Five minutes after the manuals token was rotated (the new value stored in the secret scope and the old token revoked at the manuals service), manual text fails with 401 while claims and the queue still work. What is the most likely cause and the next step?",
    "options": [
     {
      "id": "dbxfe-apps-secrets-question-a",
@@ -2797,9 +2809,9 @@
  "selfQuestions": [
   {
    "id": "dbxfe-apps-scopes-self",
-   "revision": "1",
+   "revision": "2",
    "prompt": "The data lead confirms that a per-plant row filter now exists on quality.raw.quarantine. Rewrite the view-queue trace, say what the handler no longer has to do, what it still must do, and what you would test before release.",
-   "modelAnswer": "The queue read now calls the warehouse with Imani's forwarded token and only the sql scope, so Unity Catalog's row filter limits the quarantine rows to her plants and the handler no longer filters those rows. The handler still reads claims from Lakebase as the app and must narrow them to her plants, still checks plant membership before a claim, and must never cache query results across reviewers. Test with two reviewers from different plants and one with no grant, read the principal in query history, and confirm a missing token is refused rather than silently falling back to the app.",
+   "modelAnswer": "The queue read now calls the warehouse with Imani's forwarded token and only the sql scope, so Unity Catalog's row filter limits the quarantine rows to her plants and the handler no longer filters those rows. Before the switch the reviewers' group is granted USE CATALOG, USE SCHEMA and SELECT on quality.raw.quarantine, and the warehouse owner confirms whether reviewers also need Can use on the warehouse; without those grants a reviewer such as Leo gets a permission error. The handler still reads claims from Lakebase as the app and must narrow them to her plants, still checks plant membership before a claim, and must never cache query results across reviewers. Test with two reviewers from different plants, one newly added reviewer who must see rows rather than an error, and one person outside the reviewers' group with no grant, read the principal in query history, and confirm a missing token is refused rather than silently falling back to the app.",
    "reasoning": "The trace changes only at the hop whose data carries per-user rules; writes keep the app's identity because reviewers hold no Lakebase grants. Checking the principal in query history catches a silent fallback, which the agent authentication page warns about; keeping handler filtering as defence in depth is an acceptable alternative.",
    "conceptIds": [
     "dbxfe-apps-scope-concept",
@@ -2955,7 +2967,7 @@
     "dbxfe-apps-scopes-self"
    ],
    "handbook": {
-    "markdown": "**Status first.** The agent authentication page reviewed for this course marked user authorization Public Preview, and the authorization page describes it as something the app declares with scopes. Before designing on it, confirm its current status and whether it must be enabled for the workspace; if it is unavailable, the app-identity design with handler filtering is the fallback, not an afterthought.\n\n**Scopes bound the app, not the person.** A scope such as `sql` lets the app run warehouse queries as the user. Adding a feature that needs another API means declaring another scope, which widens what the app can do on everyone's behalf; review it as a permission change, not a code change.\n\n**Token handling rules** (original guidance):\n\n- Read `X-Forwarded-Access-Token` from the current request and pass it straight to the call that needs it.\n- Never write it to a log, a database, a cache key or a module-level variable; one global holding \"the current token\" serves one reviewer's rights to another reviewer's concurrent request.\n- If the header is missing on a request that must run as the user, refuse with 401. The agent authentication page warns that a missing token can fall back to app identity; a silent fallback turns a per-user read into the app's wider read.\n- Never cache user-authorized results under a key that ignores the user.\n\n**Mixing is normal.** One app can read with the user's token where the data carries per-user rules and write with its own identity where reviewers hold no grants. Write the choice per request in the design note, as the table does, with the enforcement point beside it.\n\n**What to inspect:** the app's declared scopes, the principal in query history for one request per reviewer, and a test with a reviewer who holds no grant: she must see an error, not the app's rows.",
+    "markdown": "**Status first.** The agent authentication page reviewed for this course marked user authorization Public Preview, and the authorization page describes it as something the app declares with scopes. Before designing on it, confirm its current status and whether it must be enabled for the workspace; if it is unavailable, the app-identity design with handler filtering is the fallback, not an afterthought.\n\n**Scopes bound the app, not the person.** A scope such as `sql` lets the app run warehouse queries as the user. Adding a feature that needs another API means declaring another scope, which widens what the app can do on everyone's behalf; review it as a permission change, not a code change.\n\n**Token handling rules** (original guidance):\n\n- Read `X-Forwarded-Access-Token` from the current request and pass it straight to the call that needs it.\n- Never write it to a log, a database, a cache key or a module-level variable; one global holding \"the current token\" serves one reviewer's rights to another reviewer's concurrent request.\n- If the header is missing on a request that must run as the user, refuse with 401. The agent authentication page warns that a missing token can fall back to app identity; a silent fallback turns a per-user read into the app's wider read.\n- Never cache user-authorized results under a key that ignores the user.\n\n**Moving a read to the user moves its grants too.** Under app authorization Leo needs no grant on `quality.raw.quarantine`; once the queue read runs on his token, the warehouse evaluates Leo, so the reviewers' group needs USE CATALOG, USE SCHEMA and SELECT on the table, and the warehouse owner confirms whether reviewers also need Can use on `wh-quality`. Grant before the switch, and test that a newly added reviewer sees rows, not an error.\n\n**Mixing is normal.** One app can read with the user's token where the data carries per-user rules and write with its own identity where reviewers hold no grants. Write the choice per request in the design note, as the table does, with the enforcement point beside it.\n\n**What to inspect:** the app's declared scopes, the principal in query history for one request per reviewer, and a test with a reviewer who holds no grant: she must see an error, not the app's rows.",
     "sourceSectionIds": [
      "dbxfe-apps-l01-identity"
     ]
@@ -3032,7 +3044,7 @@
    "version": "1.0.0",
    "title": "A secret is bound, read at start and never printed",
    "outcome": "Keep a credential out of source, app.yaml and logs, and predict what a rotation does to a running app.",
-   "explanation": "The manuals service needs a token. It lives in a secret scope and reaches the app as a [[dbxfe-apps-secret-concept|secret resource]]: the app's principal gets read permission and app.yaml maps MANUALS_TOKEN to the resource key. The process reads it from its environment when it starts. Notice in the second state what that implies: after the 10:00 rotation the running process still sends the old value and the call fails until a restart or redeploy starts a process that reads the new one.",
+   "explanation": "The manuals service needs a token. It lives in a secret scope and reaches the app as a [[dbxfe-apps-secret-concept|secret resource]]: the app's principal gets read permission and app.yaml maps MANUALS_TOKEN to the resource key. The process reads it from its environment when it starts. Notice in the second state what that implies: after the 10:00 rotation, which also revoked the old token at the service, the running process still sends the old value and the call fails until a restart or redeploy starts a process that reads the new one.",
    "lessonId": "dbxfe-apps-l01",
    "sectionId": "dbxfe-apps-l01-resources",
    "conceptIds": [
@@ -3468,7 +3480,7 @@
  "appliedTask": {
   "title": "Add suggestions and a second plant without moving state or trust",
   "prompt": "Cinderline adds East Yard (P3) reviewers and wants the disposition-suggest serving endpoint to propose a disposition beside each queue item. The data lead has now added a per-plant row filter to quality.raw.quarantine, and the platform team says the app may run on more than one process. Update the blueprint: the identity at each hop for view queue, suggestion and record disposition; the new resource row; how a suggestion is validated and where it is kept, if anywhere; two new mocked contract tests shown as Python and labelled not executed here; and the changes to the deployment guide, labelled not deployed. Nothing is added to SpicyBrain's own runtime.",
-  "modelAnswer": "View queue: the warehouse read moves to the reviewer's forwarded token with the sql scope, so the new row filter decides which quarantine rows each reviewer sees, P3 reviewers included; claims still come from Lakebase as the app, narrowed by the handler, and a missing token is refused rather than falling back to the app. Suggestion: the back end calls disposition-suggest as the app's principal, bound with Can query and read through SUGGEST_ENDPOINT; the reply is data, checked against the allowed dispositions and shown labelled as a suggestion, never written as a disposition. Record disposition: unchanged, written by the app's role after the claimant check, with the reviewer taken from the header. Suggestions are a cache keyed by inspection key and revision with an expiry, so another process simply recomputes. Tests, shown and not executed here: a fake endpoint replying 'scrapped' is refused as outside the allowed values and nothing is shown; a P3 reviewer's claim on a P3 item succeeds while Tomas from P1 still receives 403. Guide changes, not deployed: bind the endpoint, confirm user authorization status and the row filter with their owners, deploy, and verify one P3 reviewer's queue by reading the principal in query history.",
+  "modelAnswer": "View queue: the warehouse read moves to the reviewer's forwarded token with the sql scope, so the new row filter decides which quarantine rows each reviewer sees, P3 reviewers included; before the switch the reviewers' group, P3 included, is granted USE CATALOG, USE SCHEMA and SELECT on quality.raw.quarantine, and warehouse access is confirmed with its owner, or every reviewer's queue fails with a permission error; claims still come from Lakebase as the app, narrowed by the handler, and a missing token is refused rather than falling back to the app. Suggestion: the back end calls disposition-suggest as the app's principal, bound with Can query and read through SUGGEST_ENDPOINT; the reply is data, checked against the allowed dispositions and shown labelled as a suggestion, never written as a disposition. Record disposition: unchanged, written by the app's role after the claimant check, with the reviewer taken from the header. Suggestions are a cache keyed by inspection key and revision with an expiry, so another process simply recomputes. Tests, shown and not executed here: a fake endpoint replying 'scrapped' is refused as outside the allowed values and nothing is shown; a P3 reviewer's claim on a P3 item succeeds while Tomas from P1 still receives 403. Guide changes, not deployed: bind the endpoint, confirm user authorization status, the row filter and the reviewers' grants with their owners, deploy, and verify that one newly added P3 reviewer sees P3 rows, not an error, by reading the principal in query history.",
   "reasoning": "The answer changes identity only at the hop whose data now carries per-user rules, treats model output as untrusted data behind the same validation as a request, keeps every shared fact out of process memory so more processes change capacity rather than correctness, and labels tests and deployment honestly.",
   "beatIds": [
    "dbxfe-apps-scopes",
