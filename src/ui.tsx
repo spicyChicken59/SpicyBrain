@@ -8,7 +8,8 @@ import {
 } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { Asset, Course } from "./content-schema";
+import type { Asset } from "./content-schema";
+import type { CatalogCourse } from "./catalog-types";
 import { lessonHref, paths } from "./catalog";
 import { pathForLesson } from "./paths";
 import { StudyStore, exportText } from "./study";
@@ -278,7 +279,7 @@ export function Sources({
   course,
   claimIds,
 }: {
-  course: Course;
+  course: CatalogCourse;
   claimIds: string[];
 }) {
   const claims = course.claims.filter((c) => claimIds.includes(c.id));

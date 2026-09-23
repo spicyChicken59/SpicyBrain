@@ -140,13 +140,11 @@ test("Native IndexedDB2 schema3 migrates every original family, then teaching ed
     await ready(fresh, new URL("/#/settings", page.url()).href);
     const blank = await stored(fresh);
     expect(Object.keys(blank?.notes ?? {})).toHaveLength(0);
-    await fresh
-      .getByLabel("Study data file")
-      .setInputFiles({
-        name: "synthetic-schema4-after-migration.json",
-        mimeType: "application/json",
-        buffer: Buffer.from(backup),
-      });
+    await fresh.getByLabel("Study data file").setInputFiles({
+      name: "synthetic-schema4-after-migration.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(backup),
+    });
     await expect(
       fresh.getByRole("heading", { name: "Import preview", exact: true }),
     ).toBeVisible();

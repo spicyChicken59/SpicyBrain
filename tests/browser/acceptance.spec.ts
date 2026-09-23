@@ -3,6 +3,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { readFile, readdir } from "node:fs/promises";
 import { emptyState, exportText } from "../../src/study";
 import { ready, nav, stored, noOverflow, shot } from "./helpers";
+const moduleCount = (
+  JSON.parse(await readFile("src/generated/catalog.json", "utf8")) as {
+    modules: unknown[];
+  }[]
+)[0].modules.length;
 const lesson = "dbxfe-m01-l01",
   section = `${lesson}-understand`;
 const marker = "SYNTHETIC-ONLY-COPPER-KITE-48291";
@@ -20,16 +25,20 @@ for (const base of ["/", "/SpicyBrain/"])
     );
     await ready(page, base);
     await expect(
-      page.getByRole("heading", { name:"One idea. A little clearer." }),
+      page.getByRole("heading", { name: "One idea. A little clearer." }),
     ).toBeVisible();
     await shot(page, base === "/" ? "01-start-desktop" : "01-start-nested");
     await page
       .getByRole("navigation", { name: "Main navigation" })
       .getByRole("link", { name: "Courses", exact: true })
       .click();
-    await expect(page.getByText("16 modules",{exact:true})).toBeVisible();
+    await expect(
+      page.getByText(`${moduleCount} modules`, { exact: true }),
+    ).toBeVisible();
     await page.locator(".teacher-course-card").click();
-    await expect(page.locator(".teacher-module-map>li")).toHaveCount(16);
+    await expect(page.locator(".teacher-module-map>li")).toHaveCount(
+      moduleCount,
+    );
     await shot(page, "02-course-map");
     await nav(page, `#/lesson/${lesson}/${section}`);
     await expect(page.locator(`#${section}`)).toBeVisible();
@@ -247,6 +256,9 @@ test("E scenario and complete capstone draft/model/rubric journey", async ({
   await expect(page.locator(".practice-row")).toHaveCount(13);
   for (const id of ["dbxfe-m02-scenario", "dbxfe-capstone"]) {
     await nav(page, `#/practice/${id}`);
+    await expect(
+      page.getByRole("heading", { name: "The situation", exact: true }),
+    ).toBeVisible();
     await page
       .getByRole("textbox", { name: "Your response", exact: true })
       .fill(

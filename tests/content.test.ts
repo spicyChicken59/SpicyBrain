@@ -33,11 +33,23 @@ test("launch inventory and stable IDs are preserved while additional lessons are
   // Teaching modules may split an original module. Preserve every original
   // diagram identity rather than requiring each new partition to reuse an image.
   assert.ok(c.assets.length >= 18);
-  assert.equal(c.modules.length,16);
-  const current=validatePreservation(JSON.parse(await readFile("content/preservation/dbxfe-study-hub.json","utf8")),original);
-  assert.equal(current.lessons.length,43);
-  assert.equal(current.lessons.flatMap(l=>l.cardIds).length,144);
-  assert.equal(current.lessons.flatMap(l=>l.questions).length,96);
+  // The academy grows the module list; the retained sixteen must remain.
+  assert.ok(c.modules.length >= 16);
+  for (const id of [
+    "dbxfe-m01","dbxfe-m02","dbxfe-m03","dbxfe-delta","dbxfe-transformations","dbxfe-m04",
+    "dbxfe-orchestration","dbxfe-m05","dbxfe-m06","dbxfe-m07","dbxfe-genai","dbxfe-m08",
+    "dbxfe-m09","dbxfe-m10","dbxfe-m11","dbxfe-m12",
+  ])
+    assert.ok(c.modules.some((m) => m.id === id), `retained module ${id}`);
+  const current = validatePreservation(
+    JSON.parse(
+      await readFile("content/preservation/dbxfe-study-hub.json", "utf8"),
+    ),
+    original,
+  );
+  assert.equal(current.lessons.length, 43);
+  assert.equal(current.lessons.flatMap((l) => l.cardIds).length, 144);
+  assert.equal(current.lessons.flatMap((l) => l.questions).length, 96);
   for (const m of c.modules) {
     for (const l of m.lessons) {
       assert.ok(l.cards.length >= 3);

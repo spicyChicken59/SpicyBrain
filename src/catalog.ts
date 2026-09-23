@@ -8,8 +8,19 @@ import type {
 } from "./teaching-schema";
 import { validateTeaching, mediaSchema } from "./teaching-schema";
 import rawPaths from "./generated/paths.json";
-import type { Course, LearningPath } from "./content-schema";
-export const courses = raw as Course[];
+import type { Card, LearningPath } from "./content-schema";
+import type {
+  CardRef,
+  CatalogCourse,
+  ContentBody,
+  LessonBody,
+  ScenarioBody,
+} from "./catalog-types";
+import { bodyErrors, bodyExpectations, createBodyLoader } from "./bodies";
+export type { CatalogCourse, CatalogLesson } from "./catalog-types";
+export type ExtensionCard = TeachingModule["extensionCards"][number];
+/** The catalog tier: identities, titles, mappings and counts, never lesson prose or card text. */
+export const courses = raw as CatalogCourse[];
 export const paths = rawPaths as LearningPath[];
 export const defaultPath = paths.find((path) => path.defaultStart);
 export const playbooks = paths.flatMap((path) =>
@@ -89,6 +100,18 @@ export function loadTeachingModule(moduleId: string) {
             ) !==
               JSON.stringify(
                 entry.beats.map((b) => ({ id: b.id, version: b.version })),
+              ) ||
+            JSON.stringify(
+              module.extensionCards.map((c) => ({
+                id: c.id,
+                revision: c.revision,
+              })),
+            ) !==
+              JSON.stringify(
+                entry.extensionCards.map((c) => ({
+                  id: c.id,
+                  revision: c.revision,
+                })),
               )
           )
             throw Error(
@@ -202,10 +225,17 @@ export const lessons = lessonEntries.map((x) => x.lesson);
 export const extensionCardIds = new Set(
   teachingIndex.flatMap((m) => m.extensionCards.map((c) => c.id)),
 );
-export const cards = [
+/** Every reviewable card's identity, core lessons first, then extension cards. Text is loaded through `loadCards`. */
+export const cardIndex: CardRef[] = [
   ...lessons.flatMap((l) => l.cards),
   ...teachingIndex.flatMap((m) => m.extensionCards),
 ];
+const cardOwner = new Map(
+  lessons.flatMap((l) => l.cards.map((c) => [c.id, l.id] as const)),
+);
+const questionOwner = new Map(
+  lessons.flatMap((l) => l.questions.map((q) => [q.id, l.id] as const)),
+);
 export const scenarios = courses.flatMap((course) =>
   course.scenarios.map((scenario) => ({ course, scenario })),
 );
@@ -234,3 +264,65 @@ export const lessonHref = (id: string, section?: string, pathId?: string) =>
   `#/lesson/${id}${section ? `/${section}` : ""}${pathId ? `?path=${encodeURIComponent(pathId)}` : ""}`;
 export const findLesson = (id: string) =>
   lessonEntries.find((e) => e.lesson.id === id);
+
+/**
+ * The body tier. Each lesson, scenario, lab, guide and case has one
+ * same-origin JSON file, validated and identity-checked against the catalog
+ * before it is cached; a failed load is evicted so Retry fetches again.
+ */
+const expectations = bodyExpectations(courses);
+const bodyLoader = createBodyLoader({
+  url: (id) => `${import.meta.env.BASE_URL}teaching/bodies/${id}.json`,
+  expected: (id) => expectations.get(id),
+});
+export const loadBody = (id: string): Promise<ContentBody> =>
+  bodyLoader.load(id);
+export const loadLessonBody = (id: string): Promise<LessonBody> =>
+  bodyLoader.lesson(id);
+export async function loadScenarioBody(id: string): Promise<ScenarioBody> {
+  const body = await loadBody(id);
+  if (body.kind !== "scenario") throw Error(bodyErrors.mismatch);
+  return body;
+}
+/** Lessons a module workspace needs: the owned lessons plus any lesson whose check a beat reuses. */
+export function moduleLessonIds(entry: TeachingIndexEntry) {
+  return [
+    ...new Set([
+      ...entry.lessonIds,
+      ...entry.beats.flatMap((b) =>
+        b.questionIds.flatMap((q) => {
+          const owner = questionOwner.get(q);
+          return owner ? [owner] : [];
+        }),
+      ),
+    ]),
+  ];
+}
+/** Resolves card text: core cards through their lesson bodies, extension cards through their module. */
+export async function loadCards(
+  ids: string[],
+): Promise<Map<string, Card | ExtensionCard>> {
+  const wanted = new Set(ids),
+    lessonIds = new Set<string>(),
+    moduleIds = new Set<string>();
+  for (const id of wanted) {
+    const owner = cardOwner.get(id);
+    if (owner) lessonIds.add(owner);
+    else if (extensionCardIds.has(id)) {
+      const teaching = cardTeaching(id);
+      if (teaching) moduleIds.add(teaching.module.moduleId);
+    }
+  }
+  const result = new Map<string, Card | ExtensionCard>();
+  await Promise.all([
+    ...[...lessonIds].map(async (lessonId) => {
+      for (const card of (await loadLessonBody(lessonId)).cards)
+        if (wanted.has(card.id)) result.set(card.id, card);
+    }),
+    ...[...moduleIds].map(async (moduleId) => {
+      for (const card of (await loadTeachingModule(moduleId)).extensionCards)
+        if (wanted.has(card.id)) result.set(card.id, card);
+    }),
+  ]);
+  return result;
+}

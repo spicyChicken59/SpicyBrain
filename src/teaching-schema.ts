@@ -1,10 +1,6 @@
 import { z } from "zod";
-import {
-  idSchema,
-  questionSchema,
-  cardSchema,
-  type Course,
-} from "./content-schema";
+import { idSchema, questionSchema, cardSchema } from "./content-schema";
+import type { CatalogCourse, ExtensionCardRef } from "./catalog-types";
 const text = z.string().trim().min(1).max(100000);
 const ids = z.array(idSchema);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -231,14 +227,14 @@ export type TeachingIndexEntry = Pick<
   | "moduleId"
   | "title"
   | "summary"
-  | "outcomes"
-  | "startingAssumptions"
   | "lessonIds"
   | "optionalBridgeLessonIds"
   | "cardLinks"
-  | "extensionCards"
 > & {
+  /** Identity and mapping only; the full text stays inside the module JSON. */
+  extensionCards: ExtensionCardRef[];
   url: string;
+  /** Check identities (questions and self-questions): the module-level ids study records can reference. */
   referenceIds: string[];
   visualIds: string[];
   conceptIds: string[];
@@ -334,7 +330,7 @@ export type TeachingMedia = z.infer<typeof mediaSchema>;
 
 export function validateTeaching(
   raw: unknown[],
-  courses: Course[],
+  courses: CatalogCourse[],
   mediaRaw: unknown[] = [],
   validateMediaReferences = true,
 ) {
@@ -355,7 +351,13 @@ export function validateTeaching(
           l.id,
           ...l.sections.map((s) => s.id),
           ...l.cards.map((c) => c.id),
-          ...l.questions.flatMap((q) => [q.id, ...q.options.map((o) => o.id)]),
+          // The runtime catalog carries question references without options.
+          ...l.questions.flatMap((q) => [
+            q.id,
+            ...((q as { options?: { id: string }[] }).options?.map(
+              (o) => o.id,
+            ) ?? []),
+          ]),
         ]),
       ),
     ]),

@@ -9,7 +9,7 @@ import {
 import Markdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { Course } from "./content-schema";
+import type { CatalogCourse } from "./catalog-types";
 import type {
   TeachingModule,
   TeachingConcept,
@@ -245,7 +245,7 @@ export function TeachingText({
 }: {
   children: string;
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
 }) {
   const concepts = useMemo(
     () => [
@@ -495,7 +495,7 @@ export function TeachingSources({
   claimIds,
 }: {
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
   claimIds: string[];
 }) {
   const claims = [...module.claims, ...course.claims].filter((c) =>

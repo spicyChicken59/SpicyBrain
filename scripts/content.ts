@@ -18,9 +18,15 @@ import {
   validateCourses,
   safePath,
   type Course,
+  type Lesson,
   validatePaths,
   validatePreservation,
 } from "../src/content-schema.ts";
+import type {
+  CatalogCourse,
+  CatalogLesson,
+  ContentBody,
+} from "../src/catalog-types.ts";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 type RawLesson = {
@@ -387,6 +393,95 @@ export function counts(courses: Course[]) {
     cases: c.cases?.length ?? 0,
   }));
 }
+/** The catalog tier: every identity, mapping and number, no prose or assessment text. */
+export function stripLesson(lesson: Lesson): CatalogLesson {
+  return {
+    ...lesson,
+    sections: lesson.sections.map(
+      ({ markdown: _markdown, ...section }) => section,
+    ),
+    cards: lesson.cards.map(({ id, revision, lessonId, sectionId }) => ({
+      id,
+      revision,
+      lessonId,
+      sectionId,
+    })),
+    questions: lesson.questions.map(({ id, revision, conceptIds }) => ({
+      id,
+      revision,
+      conceptIds,
+    })),
+  };
+}
+export function stripCourse(course: Course): CatalogCourse {
+  const withoutBody = <T extends { body: unknown }>({
+    body: _body,
+    ...rest
+  }: T) => rest;
+  return {
+    ...course,
+    modules: course.modules.map((module) => ({
+      ...module,
+      lessons: module.lessons.map(stripLesson),
+    })),
+    scenarios: course.scenarios.map(
+      ({
+        context: _context,
+        task: _task,
+        model: _model,
+        reasoning: _reasoning,
+        disclosures: _disclosures,
+        ...scenario
+      }) => scenario,
+    ),
+    ...(course.labs ? { labs: course.labs.map(withoutBody) } : {}),
+    ...(course.guides ? { guides: course.guides.map(withoutBody) } : {}),
+    ...(course.cases ? { cases: course.cases.map(withoutBody) } : {}),
+  };
+}
+/** The body tier: one same-origin JSON file per lesson, scenario, lab, guide and case. */
+export function contentBodies(course: Course): ContentBody[] {
+  return [
+    ...course.modules.flatMap((module) =>
+      module.lessons.map((lesson): ContentBody => ({
+        kind: "lesson",
+        id: lesson.id,
+        contentVersion: lesson.contentVersion,
+        sections: Object.fromEntries(
+          lesson.sections.map((section) => [section.id, section.markdown]),
+        ),
+        questions: lesson.questions,
+        cards: lesson.cards,
+      })),
+    ),
+    ...course.scenarios.map(
+      ({ id, context, task, model, reasoning, disclosures }): ContentBody => ({
+        kind: "scenario",
+        id,
+        context,
+        task,
+        model,
+        reasoning,
+        disclosures,
+      }),
+    ),
+    ...(course.labs ?? []).map(({ id, body }): ContentBody => ({
+      kind: "lab",
+      id,
+      body,
+    })),
+    ...(course.guides ?? []).map(({ id, body }): ContentBody => ({
+      kind: "guide",
+      id,
+      body,
+    })),
+    ...(course.cases ?? []).map(({ id, body }): ContentBody => ({
+      kind: "case",
+      id,
+      body,
+    })),
+  ];
+}
 export async function buildContent(
   contentRoot = join(root, "content"),
   destination = root,
@@ -406,7 +501,7 @@ export async function buildContent(
   );
   await writeFile(
     join(destination, "src/generated/catalog.json"),
-    JSON.stringify(courses),
+    JSON.stringify(courses.map(stripCourse)),
   );
   await writeFile(
     join(destination, "src/generated/paths.json"),
@@ -445,15 +540,18 @@ export async function buildContent(
   const teachingIndex: TeachingIndexEntry[] = [];
   const teachingDirectory = join(destination, "public/teaching");
   await rm(teachingDirectory, { recursive: true, force: true });
-  await mkdir(teachingDirectory, { recursive: true });
+  await mkdir(join(teachingDirectory, "bodies"), { recursive: true });
+  for (const body of courses.flatMap(contentBodies))
+    await writeFile(
+      join(teachingDirectory, "bodies", `${body.id}.json`),
+      JSON.stringify(body),
+    );
   for (const module of teaching.modules) {
     const {
       courseId,
       moduleId,
       title,
       summary,
-      outcomes,
-      startingAssumptions,
       lessonIds,
       optionalBridgeLessonIds,
       cardLinks,
@@ -469,21 +567,23 @@ export async function buildContent(
       moduleId,
       title,
       summary,
-      outcomes,
-      startingAssumptions,
       lessonIds,
       optionalBridgeLessonIds,
       cardLinks,
-      extensionCards,
+      extensionCards: extensionCards.map(
+        ({ id, revision, lessonId, sectionId, beatId }) => ({
+          id,
+          revision,
+          lessonId,
+          sectionId,
+          beatId,
+        }),
+      ),
       visualIds: module.visuals.map((v) => v.id),
       conceptIds: module.concepts.map((c) => c.id),
-      referenceIds: [
-        ...module.concepts,
-        ...module.questions,
-        ...module.selfQuestions,
-        ...module.visuals,
-        ...module.visuals.flatMap((v) => v.states),
-      ].map((x) => x.id),
+      referenceIds: [...module.questions, ...module.selfQuestions].map(
+        (x) => x.id,
+      ),
       url: `teaching/${filename}`,
       beats: module.beats.map(
         ({ id, title, version, lessonId, sectionId, recap, questionIds }) => ({

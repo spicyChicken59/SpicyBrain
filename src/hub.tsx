@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  cards,
+  cardIndex,
   courses,
   defaultPath,
   findLesson,
@@ -8,12 +8,12 @@ import {
   paths,
 } from "./catalog";
 import { pathLessonHref, pathForLesson } from "./paths";
-import type { Lesson } from "./content-schema";
+import type { CatalogLesson } from "./catalog-types";
 import type { StudyState } from "./study";
 import { reviewQueue } from "./study";
 import { PageTitle, useStudy } from "./ui";
 
-export function completionLabel(lesson: Lesson, data: StudyState) {
+export function completionLabel(lesson: CatalogLesson, data: StudyState) {
   const record = data.completions[`complete-${lesson.id}`];
   if (!record?.completed) return "Ready to explore";
   return record.contentVersion === lesson.contentVersion
@@ -25,7 +25,7 @@ export function Today() {
   const resume = data.resume,
     entry = resume && findLesson(resume.lessonId);
   const path = paths.find((p) => p.id === resume?.pathId);
-  const due = reviewQueue(cards, data, new Date().toISOString(), 100000);
+  const due = reviewQueue(cardIndex, data, new Date().toISOString(), 100000);
   return (
     <>
       <div className="start-hero">

@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import type { Card, Course, Question } from "../../src/content-schema";
+import type { Card, Question } from "../../src/content-schema";
+import type { CatalogCourse } from "../../src/catalog-types";
 import { applyReview, emptyState, stateSchema } from "../../src/study";
 import { ready, nav, stored, noOverflow, shot } from "./helpers";
 
@@ -16,7 +17,7 @@ const prior = JSON.parse(
 };
 const courses = JSON.parse(
   await readFile("src/generated/catalog.json", "utf8"),
-) as Course[];
+) as CatalogCourse[];
 const course = courses.find((c) => c.id === "dbxfe")!;
 const lesson = course.modules
   .flatMap((m) => m.lessons)

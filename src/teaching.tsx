@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import {
   beatHref,
-  cards,
+  cardIndex,
   courses,
   findBeat,
   findLesson,
   lessonHref,
+  loadLessonBody,
   loadTeachingMedia,
   loadTeachingModule,
+  moduleLessonIds,
   paths,
   plainTeaching,
   teachingIndex,
 } from "./catalog";
-import type { Course } from "./content-schema";
+import type { CatalogCourse, LessonBody } from "./catalog-types";
 import type { Beat, TeachingMedia, TeachingModule } from "./teaching-schema";
 import { nowISO, reviewQueue, type BeatPosition } from "./study";
 import { MD, SaveStatus, useStudy, uuid } from "./ui";
@@ -24,7 +26,7 @@ export function TeacherToday() {
   const { data } = useStudy(),
     resume = data.beatResume,
     entry = resume ? findBeat(resume.beatId) : undefined;
-  const due = reviewQueue(cards, data, nowISO(), 100000).length;
+  const due = reviewQueue(cardIndex, data, nowISO(), 100000).length;
   return (
     <div className="teacher-home">
       <p className="sc-eyebrow">Your learning space</p>
@@ -320,18 +322,27 @@ function BeatCheck({
   course,
   beat,
   questionId,
+  lessons,
 }: {
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
   beat: Beat;
   questionId: string;
+  lessons: LessonBody[];
 }) {
   const { data, store } = useStudy(),
     q = [
       ...module.questions,
       ...module.selfQuestions,
-      ...course.modules.flatMap((m) => m.lessons.flatMap((l) => l.questions)),
-    ].find((q) => q.id === questionId)!;
+      ...lessons.flatMap((l) => l.questions),
+    ].find((q) => q.id === questionId);
+  if (!q)
+    return (
+      <p className="sc-hint">
+        This check is unavailable in the current course files. Your earlier
+        answers are retained.
+      </p>
+    );
   const id = `check-${q.id}`,
     raw = data.beatChecks[id],
     saved = raw?.questionRevision === q.revision ? raw : undefined,
@@ -507,7 +518,7 @@ function MediaReference({
 }: {
   item: TeachingMedia;
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
 }) {
   const [loaded, setLoaded] = useState(false),
     [failed, setFailed] = useState(false);
@@ -631,7 +642,7 @@ function HandbookArticle({
   withVisual = true,
 }: {
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
   beat: Beat;
   withVisual?: boolean;
 }) {
@@ -710,17 +721,20 @@ function HandbookArticle({
 function ModuleCards({
   module,
   course,
+  lessons,
 }: {
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
+  lessons: LessonBody[];
 }) {
   const [scope, setScope] = useState("core"),
     [topic, setTopic] = useState("all"),
     [reviewing, setReviewing] = useState(false);
-  const core = module.cardLinks.map((l) => ({
-      ...cards.find((c) => c.id === l.cardId)!,
-      beatId: l.beatId,
-    })),
+  const lessonCards = lessons.flatMap((l) => l.cards);
+  const core = module.cardLinks.flatMap((l) => {
+      const card = lessonCards.find((c) => c.id === l.cardId);
+      return card ? [{ ...card, beatId: l.beatId }] : [];
+    }),
     all = [...core, ...module.extensionCards];
   const filtered = (
     scope === "core"
@@ -836,15 +850,24 @@ export function ModuleWorkspace({
   extensionId?: string;
   detour?: boolean;
 }) {
-  const [module, setModule] = useState<TeachingModule | null>(null),
+  const [loaded, setLoaded] = useState<{
+      module: TeachingModule;
+      lessons: LessonBody[];
+    } | null>(null),
     [error, setError] = useState(""),
     [retry, setRetry] = useState(0);
   useEffect(() => {
     let active = true;
     setError("");
-    void loadTeachingModule(id)
-      .then((m) => {
-        if (active) setModule(m);
+    // The module and the lesson bodies its beats and cards draw on load in
+    // parallel; either failure is retried through the same control.
+    const entry = teachingIndex.find((m) => m.moduleId === id);
+    void Promise.all([
+      loadTeachingModule(id),
+      Promise.all((entry ? moduleLessonIds(entry) : []).map(loadLessonBody)),
+    ])
+      .then(([module, lessons]) => {
+        if (active) setLoaded({ module, lessons });
       })
       .catch((e) => {
         if (active) setError(e.message);
@@ -867,12 +890,13 @@ export function ModuleWorkspace({
         <a href="#/courses">Browse courses</a>
       </div>
     );
-  if (!module || module.moduleId !== id)
+  if (!loaded || loaded.module.moduleId !== id)
     return <p role="status">Opening the teaching module…</p>;
   return (
     <ModuleView
       key={id}
-      module={module}
+      module={loaded.module}
+      lessons={loaded.lessons}
       beatId={beatId}
       view={view}
       extensionId={extensionId}
@@ -882,12 +906,14 @@ export function ModuleWorkspace({
 }
 function ModuleView({
   module,
+  lessons,
   beatId,
   view: requestedView,
   extensionId,
   detour,
 }: {
   module: TeachingModule;
+  lessons: LessonBody[];
   beatId?: string;
   view?: string;
   extensionId?: string;
@@ -1187,6 +1213,7 @@ function ModuleView({
                   course={course}
                   beat={beat}
                   questionId={q}
+                  lessons={lessons}
                 />
               ))}
               {mediaError && <p className="sc-hint">{mediaError}</p>}
@@ -1376,7 +1403,7 @@ function ModuleView({
           <ModuleRecap module={module} course={course} />
         </div>
       ) : (
-        <ModuleCards module={module} course={course} />
+        <ModuleCards module={module} course={course} lessons={lessons} />
       )}
       <details className="module-foundations">
         <summary>Module outcomes, starting assumptions and bridges</summary>
@@ -1409,7 +1436,7 @@ function ModuleRecap({
   course,
 }: {
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
 }) {
   return (
     <section className="module-recap">

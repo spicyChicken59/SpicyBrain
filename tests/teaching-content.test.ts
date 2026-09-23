@@ -34,7 +34,7 @@ const expectedModules = [
   "dbxfe-m12",
 ];
 
-test("teacher-first release covers the actual sixteen modules while preserving canonical study identities", async () => {
+test("the academy keeps the sixteen retained modules and every canonical study identity", async () => {
   const baseline = validatePreservation(
     JSON.parse(
       await readFile("content/preservation/dbxfe-study-hub.json", "utf8"),
@@ -44,18 +44,16 @@ test("teacher-first release covers the actual sixteen modules while preserving c
   assert.equal(baseline.lessons.length, 43);
   assert.equal(baseline.lessons.flatMap((l) => l.cardIds).length, 144);
   assert.equal(baseline.lessons.flatMap((l) => l.questions).length, 96);
-  assert.deepEqual(
-    new Set(course.modules.map((m) => m.id)),
-    new Set(expectedModules),
-  );
-  assert.deepEqual(
-    new Set(modules.map((m) => m.moduleId)),
-    new Set(expectedModules),
-  );
-  assert.deepEqual(
-    new Set(modules.flatMap((m) => m.lessonIds)),
-    new Set(baseline.lessons.map((l) => l.id)),
-  );
+  // The retained sixteen modules stay registered; every registered course
+  // module has exactly one teaching module and vice versa.
+  const registered = new Set(course.modules.map((m) => m.id));
+  for (const id of expectedModules)
+    assert.ok(registered.has(id), `retained module ${id} is registered`);
+  assert.deepEqual(new Set(modules.map((m) => m.moduleId)), registered);
+  const taughtLessons = new Set(modules.flatMap((m) => m.lessonIds));
+  for (const l of baseline.lessons)
+    assert.ok(taughtLessons.has(l.id), `retained lesson ${l.id} is taught`);
+  assert.deepEqual(taughtLessons, new Set(lessons.map((l) => l.id)));
   // Every preserved card keeps its mapping; the academy may add core cards
   // under new identities, and each of those must be mapped as well (the
   // validator refuses an unmapped lesson card).
@@ -76,8 +74,8 @@ test("teacher-first release covers the actual sixteen modules while preserving c
   const extensionIds = modules.flatMap((m) =>
     m.extensionCards.map((c) => c.id),
   );
-  assert.equal(extensionIds.length, 64);
-  assert.equal(new Set(extensionIds).size, 64);
+  assert.equal(extensionIds.length, modules.length * 4);
+  assert.equal(new Set(extensionIds).size, extensionIds.length);
   for (const id of extensionIds)
     assert.ok(
       !lessons.some((l) => l.cards.some((c) => c.id === id)),

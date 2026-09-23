@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
-import type { Course } from "../../src/content-schema";
+import type { Question } from "../../src/content-schema";
+import type { CatalogCourse, LessonBody } from "../../src/catalog-types";
 import type { TeachingModule, TeachingMedia } from "../../src/teaching-schema";
 import { parseImport } from "../../src/study";
 import { ready, nav, stored, noOverflow, shot } from "./helpers";
@@ -9,8 +10,25 @@ const delta = JSON.parse(
   await readFile("content/teaching/dbxfe/dbxfe-delta.json", "utf8"),
 ) as TeachingModule;
 const course = (
-  JSON.parse(await readFile("src/generated/catalog.json", "utf8")) as Course[]
+  JSON.parse(
+    await readFile("src/generated/catalog.json", "utf8"),
+  ) as CatalogCourse[]
 )[0];
+// Question text lives in the lazy lesson bodies, not the initial catalog.
+const lessonQuestions: Question[] = (
+  await Promise.all(
+    course.modules
+      .flatMap((m) => m.lessons)
+      .map(
+        async (l) =>
+          (
+            JSON.parse(
+              await readFile(`public/teaching/bodies/${l.id}.json`, "utf8"),
+            ) as LessonBody
+          ).questions,
+      ),
+  )
+).flat();
 const media = JSON.parse(
   await readFile("content/teaching/dbxfe/media.json", "utf8"),
 ) as TeachingMedia[];
@@ -33,7 +51,9 @@ for (const base of ["/", "/SpicyBrain/"])
     await page
       .getByRole("link", { name: "Open the course", exact: false })
       .click();
-    await expect(page.locator(".teacher-module-map>li")).toHaveCount(16);
+    await expect(page.locator(".teacher-module-map>li")).toHaveCount(
+      course.modules.length,
+    );
     await page
       .getByRole("heading", { name: delta.title, exact: true })
       .getByRole("link")
@@ -209,10 +229,7 @@ test("Glossary is hoverable, keyboard dismissible and persistent; visual enlarge
 test("Objective answer produces correct immutable evidence; reveal and navigation never imply completion", async ({
   page,
 }) => {
-  const questions = [
-    ...delta.questions,
-    ...course.modules.flatMap((m) => m.lessons.flatMap((l) => l.questions)),
-  ];
+  const questions: Question[] = [...delta.questions, ...lessonQuestions];
   const b = delta.beats.find((b) =>
     b.questionIds.some((id) => questions.some((q) => q.id === id)),
   )!;
