@@ -1,0 +1,70 @@
+{
+  "metric": "unit_defect_rate",
+  "version": "1",
+  "status": "proposed",
+  "owner": "Quality lead, Cinderline Components (fictional)",
+  "grain": "One value per production line per business day. Plant-day and plant-month values are the same calculation over all of the plant's lines and days, never an average of line or day rates.",
+  "numerator": {
+    "name": "defective_pieces",
+    "source_field": "defective_qty",
+    "population": "accepted inspections in fact_inspection",
+    "unit": "piece"
+  },
+  "denominator": {
+    "name": "inspected_pieces",
+    "source_field": "inspected_qty",
+    "population": "accepted inspections in fact_inspection",
+    "unit": "piece"
+  },
+  "same_population": true,
+  "unit": {
+    "quantity": "piece",
+    "conversion": "unit_conversion.pieces_per_uom, applied to both quantities before any sum",
+    "unconvertible": "quarantined from numerator and denominator and listed"
+  },
+  "result": {
+    "type": "fraction",
+    "display": "percentage to one decimal place",
+    "stored": "unrounded"
+  },
+  "period": {
+    "day": "business day = 00:00:00 to 23:59:59 plant local time, assigned by the recorded inspection time",
+    "month": "calendar month of the business day",
+    "window": {
+      "kind": "business_days",
+      "length": 3,
+      "calendar": "dim_date.is_business_day (the plant calendar)"
+    }
+  },
+  "empty_cases": {
+    "zero_denominator_status": "no_units",
+    "no_rows_status": "no_inspections",
+    "rate_when_empty": null
+  },
+  "unknown_member": {
+    "line_sk": -1,
+    "plant_id": "UNKNOWN",
+    "rule": "an inspection whose line has no dimension row valid on its business day is reported under the unknown member and listed, never dropped"
+  },
+  "history": {
+    "attribute": "supervisor",
+    "type": 2,
+    "join": "valid_from <= business_date < valid_to (open-ended when valid_to is null)"
+  },
+  "tests": [
+    "components reconcile across line-day, plant-day and plant-month",
+    "a zero denominator gives no rate, never 0 and never an error",
+    "units are converted to pieces before summing",
+    "a missing dimension key is kept under the unknown member",
+    "history is joined on its validity window, so no fact is counted twice",
+    "the window counts business days from the plant calendar, not calendar days"
+  ],
+  "change_log": [
+    {
+      "version": "1",
+      "change": "first proposal",
+      "requested_by": "plant analyst (fictional)",
+      "approved_by": null
+    }
+  ]
+}

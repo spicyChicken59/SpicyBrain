@@ -1,0 +1,3699 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-modeling",
+ "title": "Data modeling and metric contracts",
+ "summary": "Declare the grain, build a star whose joins hold, keep history and missing keys honest, and write a metric contract that survives three grains and five classic failures.",
+ "outcomes": [
+  "Declare the grain of a fact and a metric, place measures and descriptions in facts and dimensions, and tell a medallion label from a modeled entity.",
+  "Join facts to conformed and type 2 dimensions with a known cardinality, attributing history as-was or as-is on purpose and keeping missing keys visible.",
+  "Convert units, sum additive parts and handle empty denominators so one metric reconciles at line-day, plant-day and plant-month.",
+  "Write a metric contract with numerator, denominator, unit, period, window and owner, map each clause to a test, and place it in a metric view without trusting a non-unique join."
+ ],
+ "startingAssumptions": [
+  "SQL joins, GROUP BY and CASE are familiar; the join multiplication in the retained grain and joins lesson has been seen.",
+  "The retained metric lesson has shown that a metric needs a named numerator, denominator, time basis and owner."
+ ],
+ "lessonIds": [
+  "dbxfe-modeling-l01"
+ ],
+ "optionalBridgeLessonIds": [],
+ "editorialRationale": "Modeling teaching fails when it lists star-schema vocabulary without showing what breaks, so the module moves from grain to keys to measures to the contract, and every beat carries a number from one locally executed synthetic dataset: the same 22 inspections produce each failure (a double count, an empty denominator, mixed units, a dropped key, a calendar-day window) and its repair. The metric view appears after the model because its join rule depends on unique keys, and the wide table last because it is a derived delivery shape, not a model.",
+ "sources": [
+  {
+   "id": "dbxfe-modeling-source-medallion",
+   "title": "What is the medallion lakehouse architecture?",
+   "url": "https://docs.databricks.com/aws/en/lakehouse/medallion",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; lakehouse design pattern, independent of cloud.",
+   "caveat": "Describes layers by data quality and readiness; it prescribes no table grain or key design.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: the medallion architecture describes a series of data layers that denote the quality of data stored in the lakehouse; bronze holds raw ingested data, silver validated and cleaned data, gold enriched, business-ready data."
+  },
+  {
+   "id": "dbxfe-modeling-source-warehousing",
+   "title": "Data warehousing architecture",
+   "url": "https://docs.databricks.com/aws/en/sql/get-started/data-warehousing-concepts",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks SQL; data warehousing concepts on the lakehouse.",
+   "caveat": "An architectural overview; it names modeling approaches without prescribing one for a given workload.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: the gold layer is the presentation layer and can contain one or more data marts, which are frequently dimensional models; it follows modeling approaches such as star schema, snowflake and flattened tables."
+  },
+  {
+   "id": "dbxfe-modeling-source-metricviews",
+   "title": "Unity Catalog metric views",
+   "url": "https://docs.databricks.com/aws/en/uc-semantics/metric-views/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Unity Catalog semantics. Release status, UI flows and runtime requirements vary; check the page.",
+   "caveat": "Search snippets on 2026-09-23 reported general availability announced in April 2026, some features such as materialization in Public Preview, and a minimum Databricks Runtime stated on the page; none of this was executed here.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: metric views separate measure definitions from the fields (dimensions) used to group, filter and aggregate them, so a metric is defined once and queried at runtime; a standard view locks in aggregations at creation time, while with a metric view users can group by any available field and the engine generates the correct computation; metric views are created with SQL DDL or Catalog Explorer and defined in YAML."
+  },
+  {
+   "id": "dbxfe-modeling-source-metricjoins",
+   "title": "Joins in metric views",
+   "url": "https://docs.databricks.com/aws/en/uc-semantics/metric-views/joins",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Unity Catalog metric views.",
+   "caveat": "Join behaviour is documented, not tested here; confirm current semantics before relying on first-match behaviour.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: by default all joins are many-to-one, so each source row matches at most one row in the joined table; in a star schema the source is the fact table and joins to dimension tables use a LEFT OUTER JOIN; in cases of many-to-many, the engine selects the first matching row from the joined dimension table; joins are specified with an on or a using clause."
+  },
+  {
+   "id": "dbxfe-modeling-source-measure",
+   "title": "measure aggregate function",
+   "url": "https://docs.databricks.com/aws/en/sql/language-manual/functions/measure",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks SQL language reference; metric views.",
+   "caveat": "Syntax only; the function exists for metric view queries and was not executed in this build.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: measure(measure_column) [FILTER (WHERE cond)] evaluates a measure of a metric view; the optional filter restricts the rows used to compute the measure; the function cannot be invoked as a window function with OVER; queries list individual columns rather than SELECT * because measures need MEASURE() to evaluate."
+  },
+  {
+   "id": "dbxfe-modeling-source-yaml",
+   "title": "Metric view YAML syntax reference",
+   "url": "https://docs.databricks.com/aws/en/uc-semantics/metric-views/yaml-reference",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; metric view definition language, YAML version 1.1 in the examples.",
+   "caveat": "Keys and versions change between releases; the course's YAML sketch is unexecuted and must be checked against the current reference.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: a definition declares its version, source, joins, dimensions and measures; dimensions are named expressions returning scalar values used for grouping and filtering; measures are aggregate expressions with no predetermined level of aggregation and may reference earlier measures."
+  },
+  {
+   "id": "dbxfe-modeling-source-constraints",
+   "title": "Constraints on Databricks",
+   "url": "https://docs.databricks.com/aws/en/tables/constraints",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Unity Catalog and Delta Lake tables.",
+   "caveat": "Availability of each constraint type depends on runtime version and was not tested here.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: primary key, foreign key and unique constraints are informational only and are not enforced; with RELY Databricks may use a constraint to rewrite and optimize queries, and it is the user's responsibility to ensure the constraint is satisfied; the default is NORELY."
+  },
+  {
+   "id": "dbxfe-modeling-source-autocdc",
+   "title": "The AUTO CDC APIs: Simplify change data capture with pipelines",
+   "url": "https://docs.databricks.com/aws/en/ldp/cdc",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakeflow pipelines (formerly Delta Live Tables), AUTO CDC (formerly APPLY CHANGES).",
+   "caveat": "API names and column conventions follow the current product naming; nothing was run against a pipeline here.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: AUTO CDC and AUTO CDC FROM SNAPSHOT compute SCD type 1 and type 2 targets from a change feed or snapshots; for SCD type 2 the target includes __START_AT and __END_AT columns with the same data type as the sequence_by field, filled from the sequencing values."
+  },
+  {
+   "id": "dbxfe-modeling-source-groupby",
+   "title": "GROUP BY Clause (Spark 4.0.4 SQL reference)",
+   "url": "https://spark.apache.org/docs/4.0.4/sql-ref-syntax-qry-select-groupby.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Apache Spark 4.0.4 SQL reference; search confirmed the page for 4.0.2 and the latest release.",
+   "caveat": "Describes grouping syntax; it does not say which measures may be summed at a coarser grain.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: GROUP BY groups rows by grouping expressions and computes aggregates per group; GROUPING SETS is equivalent to a union of GROUP BY results; ROLLUP(a, b) equals GROUPING SETS((a, b), (a), ()) and CUBE adds every combination."
+  },
+  {
+   "id": "dbxfe-modeling-source-join",
+   "title": "JOIN (Spark 4.0.4 SQL reference)",
+   "url": "https://spark.apache.org/docs/4.0.4/sql-ref-syntax-qry-select-join.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Apache Spark 4.0.4 SQL reference; search confirmed the page for 4.0.1 and the latest release.",
+   "caveat": "Join type does not establish key uniqueness or business grain.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: an inner join returns rows that have matching values in both relations; a left join returns all rows of the left relation with matches or NULL; semi and anti joins return left rows with or without a match."
+  },
+  {
+   "id": "dbxfe-modeling-source-ansi",
+   "title": "ANSI Compliance (Spark 4.0.4 SQL reference)",
+   "url": "https://spark.apache.org/docs/4.0.4/sql-ref-ansi-compliance.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Apache Spark 4.0.4; search confirmed the page for 4.0.1, 4.0.2 and the latest release.",
+   "caveat": "Engine defaults differ across products and versions; check the setting in force before relying on either behaviour.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: spark.sql.ansi.enabled is true by default and invalid operations such as division by zero throw exceptions; try_divide is identical to the division operator except that it returns NULL instead of failing when the divisor is 0."
+  },
+  {
+   "id": "dbxfe-modeling-source-grain",
+   "title": "Grain (Kimball Dimensional Modeling Techniques)",
+   "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/grain/",
+   "publisher": "Kimball Group",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Dimensional modeling technique reference; product-independent.",
+   "caveat": "A methodology source, not a platform rule; teams adapt it to their own processes.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: declaring the grain is the pivotal step in a dimensional design; the grain establishes exactly what a single fact table row represents and is declared before choosing dimensions or facts; atomic grain is the lowest level captured by a process and is recommended because it withstands unpredictable queries."
+  },
+  {
+   "id": "dbxfe-modeling-source-additive",
+   "title": "Additive, Semi-Additive, and Non-Additive Facts (Kimball)",
+   "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/",
+   "publisher": "Kimball Group",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Dimensional modeling technique reference; product-independent.",
+   "caveat": "Classifies measures; the right components to store still depend on the metric's contract.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: additive measures sum across all dimensions of the fact table; semi-additive measures such as balances sum across some dimensions but not time; ratios are non-additive, and a good approach is to store the fully additive components and sum them before computing the final ratio."
+  },
+  {
+   "id": "dbxfe-modeling-source-conformed",
+   "title": "Conformed Dimensions (Kimball)",
+   "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/conformed-dimension/",
+   "publisher": "Kimball Group",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Dimensional modeling technique reference; product-independent.",
+   "caveat": "Conformance is an agreement between teams; no engine enforces it.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: dimension tables conform when attributes in separate dimension tables have the same column names and domain contents; information from separate fact tables can then be combined in a single report through the conformed attributes associated with each fact table."
+  },
+  {
+   "id": "dbxfe-modeling-source-type2",
+   "title": "Type 2: Add New Row (Kimball)",
+   "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/type-2/",
+   "publisher": "Kimball Group",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Dimensional modeling technique reference; product-independent.",
+   "caveat": "The technique does not fix boundary semantics; inclusive or exclusive end dates are a design decision.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: a type 2 change adds a new row in the dimension with the updated attribute values; a new primary surrogate key is assigned and used as the foreign key in fact tables from the moment of the update until a later change creates another row."
+  },
+  {
+   "id": "dbxfe-modeling-source-nulls",
+   "title": "Nulls in Fact Tables (Kimball)",
+   "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/fact-table-null/",
+   "publisher": "Kimball Group",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Dimensional modeling technique reference; product-independent.",
+   "caveat": "How many default rows a dimension needs is a design decision for each team.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: nulls must be avoided in fact table foreign keys; rather than a null foreign key, the associated dimension table has a default row, with its own surrogate key, representing the unknown or not applicable condition."
+  },
+  {
+   "id": "dbxfe-modeling-source-star",
+   "title": "Star Schemas and OLAP Cubes (Kimball)",
+   "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/star-schema-olap-cube/",
+   "publisher": "Kimball Group",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Dimensional modeling technique reference; product-independent.",
+   "caveat": "Describes the pattern; physical layout on a lakehouse is a separate performance decision.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: star schemas consist of fact tables linked to associated dimension tables through primary and foreign key relationships; dimension tables are usually wide, flat and denormalized, with fixed-depth hierarchies collapsed into the dimension."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-modeling-claim-medallion",
+   "description": "Medallion layers denote data quality and readiness (bronze raw, silver validated, gold business-ready); the gold layer is a presentation layer that can hold data marts, frequently dimensional models such as a star schema or flattened tables.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-medallion",
+    "dbxfe-modeling-source-warehousing"
+   ],
+   "context": "Databricks lakehouse design guidance; layer names carry no grain."
+  },
+  {
+   "id": "dbxfe-modeling-claim-grain",
+   "description": "Declaring the grain establishes what one fact row represents and precedes the choice of dimensions and facts; the atomic grain is recommended.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-grain"
+   ],
+   "context": "Kimball dimensional modeling technique."
+  },
+  {
+   "id": "dbxfe-modeling-claim-star",
+   "description": "A star schema links fact tables to denormalized dimension tables through primary and foreign keys.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-star"
+   ],
+   "context": "Kimball dimensional modeling technique."
+  },
+  {
+   "id": "dbxfe-modeling-claim-conformed",
+   "description": "Conformed dimensions share column names and domain contents, so separate fact tables can be combined in one report.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-conformed"
+   ],
+   "context": "Kimball dimensional modeling technique."
+  },
+  {
+   "id": "dbxfe-modeling-claim-type2",
+   "description": "A type 2 change adds a new dimension row with a new surrogate key that facts use from the change onward.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-type2"
+   ],
+   "context": "Kimball dimensional modeling technique; boundary semantics are a design choice."
+  },
+  {
+   "id": "dbxfe-modeling-claim-nulls",
+   "description": "Fact tables avoid null foreign keys; the dimension carries a default row for the unknown or not applicable condition.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-nulls"
+   ],
+   "context": "Kimball dimensional modeling technique."
+  },
+  {
+   "id": "dbxfe-modeling-claim-additive",
+   "description": "Ratios are non-additive; store the additive components and sum them before computing the ratio. Semi-additive measures do not sum across time.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-additive"
+   ],
+   "context": "Kimball dimensional modeling technique."
+  },
+  {
+   "id": "dbxfe-modeling-claim-join",
+   "description": "A Spark SQL inner join returns matching row combinations and a left join keeps unmatched left rows with NULLs; neither checks key uniqueness.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-join"
+   ],
+   "context": "Apache Spark 4.0.4 SQL reference."
+  },
+  {
+   "id": "dbxfe-modeling-claim-groupby",
+   "description": "Spark SQL GROUPING SETS equal a union of GROUP BY results, and ROLLUP(a, b) equals GROUPING SETS((a, b), (a), ()).",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-groupby"
+   ],
+   "context": "Apache Spark 4.0.4 SQL reference."
+  },
+  {
+   "id": "dbxfe-modeling-claim-ansi",
+   "description": "Spark 4 enables ANSI mode by default, so division by zero raises an error; try_divide returns NULL instead.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-ansi"
+   ],
+   "context": "Apache Spark 4.0.4; observed as DIVIDE_BY_ZERO in the local Lab L11 run."
+  },
+  {
+   "id": "dbxfe-modeling-claim-metricviews",
+   "description": "A Unity Catalog metric view defines measures once, separately from the fields used to group them; measures are aggregate expressions evaluated with MEASURE() at the grain a query selects, and a measure may reference earlier measures.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-metricviews",
+    "dbxfe-modeling-source-yaml",
+    "dbxfe-modeling-source-measure"
+   ],
+   "context": "Databricks Unity Catalog; release status and runtime requirements must be checked on the current page."
+  },
+  {
+   "id": "dbxfe-modeling-claim-metricjoins",
+   "description": "Metric view joins are many-to-one by default (left outer to dimensions in a star); when a join finds several rows, the first matching row is selected.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-metricjoins"
+   ],
+   "context": "Databricks Unity Catalog metric views."
+  },
+  {
+   "id": "dbxfe-modeling-claim-measurefilter",
+   "description": "MEASURE accepts an optional FILTER (WHERE cond) clause that restricts the rows used to compute the measure, and it cannot be used as a window function.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-measure"
+   ],
+   "context": "Databricks SQL language reference."
+  },
+  {
+   "id": "dbxfe-modeling-claim-constraints",
+   "description": "Primary key, foreign key and unique constraints on Databricks are informational and not enforced; with RELY the optimizer may use them and their truth is the user's responsibility.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-constraints"
+   ],
+   "context": "Databricks on AWS; availability varies by runtime."
+  },
+  {
+   "id": "dbxfe-modeling-claim-autocdc",
+   "description": "AUTO CDC computes SCD type 1 and type 2 targets; type 2 targets carry __START_AT and __END_AT columns typed like the sequence_by field and filled from sequencing values.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-modeling-source-autocdc"
+   ],
+   "context": "Lakeflow pipelines on Databricks."
+  },
+  {
+   "id": "dbxfe-modeling-guidance",
+   "description": "Original SpicyBrain modeling reasoning, contract structure, diagnostic order and test design for Cinderline's inspection metric; not a Databricks or Kimball Group procedure.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "Independent curriculum; adapt to the real process, owner and review."
+  },
+  {
+   "id": "dbxfe-modeling-fiction",
+   "description": "Cinderline Components, its plants, lines, supervisors, inspections, downtime events, targets and every number shown are synthetic teaching records; the figures match the local Lab L11 run on Apache Spark 4.0.4.",
+   "kind": "fictional",
+   "sourceIds": [],
+   "context": "No Databricks workspace, Unity Catalog object or metric view was created, read or tested."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-modeling-medallion-concept",
+   "term": "medallion architecture",
+   "aliases": [
+    "bronze, silver and gold layers",
+    "medallion label"
+   ],
+   "definition": "A lakehouse layering that names tables by data quality and readiness, not by what a row represents.",
+   "example": "gold_quality sits in the gold layer yet does not say whether a row is an inspection or a line-day.",
+   "sourceIds": [
+    "dbxfe-modeling-source-medallion",
+    "dbxfe-modeling-source-warehousing"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-grain-concept",
+   "term": "grain",
+   "aliases": [
+    "declared grain",
+    "granularity",
+    "business grain"
+   ],
+   "definition": "The one-sentence statement of what a single row of a table or metric represents.",
+   "example": "fact_inspection: one row per accepted inspection; unit_defect_rate: one value per line per business day.",
+   "sourceIds": [
+    "dbxfe-modeling-source-grain"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-fact-concept",
+   "term": "fact table",
+   "aliases": [
+    "fact",
+    "measurements table"
+   ],
+   "definition": "A table of measured business events at a declared grain, carrying keys to dimensions and additive measures.",
+   "example": "fact_inspection holds pieces inspected and defective for each accepted inspection.",
+   "sourceIds": [
+    "dbxfe-modeling-source-star",
+    "dbxfe-modeling-source-grain"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-dimension-concept",
+   "term": "dimension table",
+   "aliases": [
+    "dimension",
+    "descriptive attributes"
+   ],
+   "definition": "A table of descriptive attributes, keyed uniquely, that facts join to many-to-one for filtering and grouping.",
+   "example": "dim_line gives each line version its plant and supervisor.",
+   "sourceIds": [
+    "dbxfe-modeling-source-star"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-star-concept",
+   "term": "star schema",
+   "aliases": [
+    "star model",
+    "dimensional model"
+   ],
+   "definition": "One fact table joined to its dimension tables by keys, each join many-to-one.",
+   "example": "fact_inspection joined to dim_line, dim_shift and dim_date, with dim_line pointing to dim_plant.",
+   "sourceIds": [
+    "dbxfe-modeling-source-star"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-conformed-concept",
+   "term": "conformed dimension",
+   "aliases": [
+    "conformed key",
+    "drill across"
+   ],
+   "definition": "A dimension whose keys and attribute values mean the same in every fact that uses it.",
+   "example": "Inspections and downtime both use dim_line's N1 so they can be reported per line-day.",
+   "sourceIds": [
+    "dbxfe-modeling-source-conformed"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-scd-concept",
+   "term": "slowly changing dimension",
+   "aliases": [
+    "SCD type 1",
+    "SCD type 2",
+    "as-was",
+    "as-is"
+   ],
+   "definition": "A dimension attribute that changes over time, handled by overwriting (type 1) or by adding a versioned row (type 2).",
+   "example": "N1's supervisor changes on 30 March: version 101 closes, version 102 opens.",
+   "sourceIds": [
+    "dbxfe-modeling-source-type2"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-surrogate-concept",
+   "term": "surrogate key",
+   "aliases": [
+    "line_sk",
+    "dimension key"
+   ],
+   "definition": "A meaningless key assigned by the warehouse to each dimension row, unique even when the natural key repeats.",
+   "example": "N1 has line_sk 101 before 30 March and 102 from 30 March.",
+   "sourceIds": [
+    "dbxfe-modeling-source-type2",
+    "dbxfe-modeling-source-star"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-cardinality-concept",
+   "term": "join cardinality",
+   "aliases": [
+    "many-to-one",
+    "many-to-many",
+    "fan-out",
+    "double-count"
+   ],
+   "definition": "How many rows on each side of a join can match one another, which decides whether rows are preserved or multiplied.",
+   "example": "Joining on line_id alone turns 22 inspections into 29 rows.",
+   "sourceIds": [
+    "dbxfe-modeling-source-join"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-unknown-concept",
+   "term": "unknown member",
+   "aliases": [
+    "default dimension row",
+    "line_sk -1"
+   ],
+   "definition": "A default dimension row that receives facts whose key has no valid dimension row, so they stay visible and countable.",
+   "example": "Inspection I-21 on line N3 maps to line_sk -1, plant UNKNOWN.",
+   "sourceIds": [
+    "dbxfe-modeling-source-nulls"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-unit-concept",
+   "term": "unit of measure",
+   "aliases": [
+    "uom",
+    "unit conversion",
+    "pieces per case"
+   ],
+   "definition": "The unit a quantity is recorded in, which must be converted to the contract's unit before any sum.",
+   "example": "S2 records cases of 12, converted to pieces before South is summed.",
+   "sourceIds": [
+    "dbxfe-modeling-source-additive"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-additivity-concept",
+   "term": "additivity",
+   "aliases": [
+    "additive fact",
+    "semi-additive fact",
+    "non-additive fact"
+   ],
+   "definition": "Whether a measure can be summed across a dimension; ratios cannot, so their parts are summed and divided once.",
+   "example": "North on 27 March: (4 + 5) / (200 + 100) = 3.0%, not the 3.5% average of line rates.",
+   "sourceIds": [
+    "dbxfe-modeling-source-additive"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-denominator-concept",
+   "term": "denominator population",
+   "aliases": [
+    "zero denominator",
+    "empty denominator"
+   ],
+   "definition": "The set of records a rate divides by, which must match the numerator's population and may be empty or zero.",
+   "example": "N2 on 31 March has one inspection of 0 pieces, so its rate is shown as no_units.",
+   "sourceIds": [
+    "dbxfe-modeling-source-ansi",
+    "dbxfe-modeling-source-additive"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-window-concept",
+   "term": "business-day window",
+   "aliases": [
+    "plant calendar",
+    "trailing business days"
+   ],
+   "definition": "A reporting window counted in the plant calendar's business days rather than in calendar days.",
+   "example": "As of Monday 30 March, the last three business days are 26, 27 and 30 March.",
+   "sourceIds": [
+    "dbxfe-modeling-source-grain"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-contract-concept",
+   "term": "metric contract",
+   "aliases": [
+    "metric definition",
+    "semantic metric definition"
+   ],
+   "definition": "A versioned, owned statement of a metric's grain, numerator, denominator, unit, period, window and empty cases, each implying a test.",
+   "example": "unit_defect_rate v1: defective pieces over inspected pieces, per line per business day, owned by the quality lead.",
+   "sourceIds": [
+    "dbxfe-modeling-source-grain",
+    "dbxfe-modeling-source-additive"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-semantic-concept",
+   "term": "metric view",
+   "aliases": [
+    "Unity Catalog metric views",
+    "Unity Catalog business semantics",
+    "semantic layer"
+   ],
+   "definition": "A Unity Catalog object that stores measure definitions separately from grouping fields and evaluates them at the grain of each query.",
+   "example": "unit_defect_rate defined as MEASURE(defective_pieces) divided by MEASURE(inspected_pieces).",
+   "sourceIds": [
+    "dbxfe-modeling-source-metricviews",
+    "dbxfe-modeling-source-measure",
+    "dbxfe-modeling-source-metricjoins"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-wide-concept",
+   "term": "wide table",
+   "aliases": [
+    "one big table",
+    "flattened table",
+    "denormalized table"
+   ],
+   "definition": "A table that copies dimension attributes onto every fact row so readers need no joins.",
+   "example": "wide_inspection repeats each inspection's plant, supervisor and shift name.",
+   "sourceIds": [
+    "dbxfe-modeling-source-warehousing"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-extension-constraints-concept",
+   "term": "informational constraint",
+   "aliases": [
+    "PRIMARY KEY",
+    "FOREIGN KEY",
+    "RELY"
+   ],
+   "definition": "A declared key constraint that Databricks records but does not enforce, optionally trusted by the optimizer.",
+   "example": "Declaring dim_line.line_sk as a primary key does not reject a duplicated 101.",
+   "sourceIds": [
+    "dbxfe-modeling-source-constraints"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-extension-measurefilter-concept",
+   "term": "MEASURE with FILTER",
+   "aliases": [
+    "measure aggregate function",
+    "filtered measure"
+   ],
+   "definition": "A metric view query form that evaluates a measure over only the rows matching a condition.",
+   "example": "The defect rate evaluated with FILTER (WHERE shift = 'C') for the night shift.",
+   "sourceIds": [
+    "dbxfe-modeling-source-measure"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-extension-autocdc-concept",
+   "term": "__START_AT and __END_AT",
+   "aliases": [
+    "AUTO CDC",
+    "APPLY CHANGES",
+    "Lakeflow Declarative Pipelines",
+    "Delta Live Tables"
+   ],
+   "definition": "The validity columns an AUTO CDC SCD type 2 target carries, filled from the change feed's sequencing values.",
+   "example": "A supervisor change sequenced at 30 March closes one version and opens the next.",
+   "sourceIds": [
+    "dbxfe-modeling-source-autocdc"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-extension-rollup-concept",
+   "term": "ROLLUP and GROUPING SETS",
+   "aliases": [
+    "subtotals",
+    "multiple grouping levels"
+   ],
+   "definition": "GROUP BY forms that compute several grouping levels in one query, each summing the same parts.",
+   "example": "ROLLUP(plant, line) returns line totals, plant subtotals and an overall total.",
+   "sourceIds": [
+    "dbxfe-modeling-source-groupby"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-modeling-medallion-visual",
+   "kind": "nodes",
+   "title": "A layer name versus a modeled entity",
+   "alt": "Two diagrams of the same gold layer: first a table named only by its layer, then tables named by entity with stated grains.",
+   "caption": "The layer stays gold in both states; only the entities and their grains become explicit. Synthetic teaching example.",
+   "textEquivalent": "Named by layer: Data moves bronze to silver to gold, and the gold table is named after its layer. Nobody can say what one of its rows is. Nodes: bronze_inspections: Payloads as received, one row per message. (context); silver_inspections: Validated, one row per accepted inspection. (context); gold_quality: Layer name only: grain, keys and measures unstated. (warning); Dashboard: Cannot tell an inspection row from a line-day row. (pending). Relationships: bronze_inspections → silver_inspections: validate; silver_inspections → gold_quality: reshape; gold_quality → Dashboard: reads.\n\nNamed by entity and grain: The same gold layer now holds a fact, a dimension and a metric, each with a one-sentence grain. Nodes: silver_inspections: Validated, one row per accepted inspection. (context); fact_inspection: Grain: one accepted inspection. (selected); dim_line: Grain: one line version (type 2). (selected); unit_defect_rate: Grain: one line per business day. (selected); Dashboard: Reads a named metric at a stated grain. (selected). Relationships: silver_inspections → fact_inspection: load; dim_line → fact_inspection: line_sk; fact_inspection → unit_defect_rate: sum parts; unit_defect_rate → Dashboard: reads.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-medallion",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "layers",
+     "title": "Named by layer",
+     "explanation": "Data moves bronze to silver to gold, and the gold table is named after its layer. Nobody can say what one of its rows is.",
+     "nodes": [
+      {
+       "id": "bronze",
+       "label": "bronze_inspections",
+       "detail": "Payloads as received, one row per message.",
+       "status": "context"
+      },
+      {
+       "id": "silver",
+       "label": "silver_inspections",
+       "detail": "Validated, one row per accepted inspection.",
+       "status": "context"
+      },
+      {
+       "id": "goldq",
+       "label": "gold_quality",
+       "detail": "Layer name only: grain, keys and measures unstated.",
+       "status": "warning"
+      },
+      {
+       "id": "dash",
+       "label": "Dashboard",
+       "detail": "Cannot tell an inspection row from a line-day row.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "bronze",
+       "to": "silver",
+       "label": "validate"
+      },
+      {
+       "from": "silver",
+       "to": "goldq",
+       "label": "reshape"
+      },
+      {
+       "from": "goldq",
+       "to": "dash",
+       "label": "reads"
+      }
+     ]
+    },
+    {
+     "id": "entities",
+     "title": "Named by entity and grain",
+     "explanation": "The same gold layer now holds a fact, a dimension and a metric, each with a one-sentence grain.",
+     "nodes": [
+      {
+       "id": "silver",
+       "label": "silver_inspections",
+       "detail": "Validated, one row per accepted inspection.",
+       "status": "context"
+      },
+      {
+       "id": "fact",
+       "label": "fact_inspection",
+       "detail": "Grain: one accepted inspection.",
+       "status": "selected"
+      },
+      {
+       "id": "dline",
+       "label": "dim_line",
+       "detail": "Grain: one line version (type 2).",
+       "status": "selected"
+      },
+      {
+       "id": "metric",
+       "label": "unit_defect_rate",
+       "detail": "Grain: one line per business day.",
+       "status": "selected"
+      },
+      {
+       "id": "dash",
+       "label": "Dashboard",
+       "detail": "Reads a named metric at a stated grain.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "silver",
+       "to": "fact",
+       "label": "load"
+      },
+      {
+       "from": "dline",
+       "to": "fact",
+       "label": "line_sk"
+      },
+      {
+       "from": "fact",
+       "to": "metric",
+       "label": "sum parts"
+      },
+      {
+       "from": "metric",
+       "to": "dash",
+       "label": "reads"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-grain-visual",
+   "kind": "table",
+   "title": "One table, two grains",
+   "alt": "Three small tables for line N1 on 27 March: a mixed-grain table whose sum doubles, the declared inspection grain, and the derived line-day metric.",
+   "caption": "A subtotal row stored beside the inspections it summarizes doubles every sum. Synthetic teaching example.",
+   "textEquivalent": "Mixed grain: Two inspection rows and a daily subtotal row share one table; SUM adds all three. Table columns: row, line, day, inspected, defective. Rows: row I-06; line N1; day 27 Mar; inspected 120; defective 3 | row I-09; line N1; day 27 Mar; inspected 80; defective 1 | row subtotal; line N1; day 27 Mar; inspected 200; defective 4 | row SUM; line N1; day 27 Mar; inspected 400; defective 8.\n\nOne grain declared: One row per accepted inspection; the subtotal is not stored here and the sum is right. Table columns: row, line, day, inspected, defective. Rows: row I-06; line N1; day 27 Mar; inspected 120; defective 3 | row I-09; line N1; day 27 Mar; inspected 80; defective 1 | row SUM; line N1; day 27 Mar; inspected 200; defective 4.\n\nMetric grain derived: The line-day metric is computed from the inspection rows, never stored beside them. Table columns: line, business day, inspected, defective, rate. Rows: line N1; business day 27 Mar; inspected 200; defective 4; rate 2.0%.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "mixed",
+     "title": "Mixed grain",
+     "explanation": "Two inspection rows and a daily subtotal row share one table; SUM adds all three.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "row",
+       "line",
+       "day",
+       "inspected",
+       "defective"
+      ],
+      "rows": [
+       [
+        "I-06",
+        "N1",
+        "27 Mar",
+        "120",
+        "3"
+       ],
+       [
+        "I-09",
+        "N1",
+        "27 Mar",
+        "80",
+        "1"
+       ],
+       [
+        "subtotal",
+        "N1",
+        "27 Mar",
+        "200",
+        "4"
+       ],
+       [
+        "SUM",
+        "N1",
+        "27 Mar",
+        "400",
+        "8"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "declared",
+     "title": "One grain declared",
+     "explanation": "One row per accepted inspection; the subtotal is not stored here and the sum is right.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "row",
+       "line",
+       "day",
+       "inspected",
+       "defective"
+      ],
+      "rows": [
+       [
+        "I-06",
+        "N1",
+        "27 Mar",
+        "120",
+        "3"
+       ],
+       [
+        "I-09",
+        "N1",
+        "27 Mar",
+        "80",
+        "1"
+       ],
+       [
+        "SUM",
+        "N1",
+        "27 Mar",
+        "200",
+        "4"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "derived",
+     "title": "Metric grain derived",
+     "explanation": "The line-day metric is computed from the inspection rows, never stored beside them.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "line",
+       "business day",
+       "inspected",
+       "defective",
+       "rate"
+      ],
+      "rows": [
+       [
+        "N1",
+        "27 Mar",
+        "200",
+        "4",
+        "2.0%"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-star-visual",
+   "kind": "nodes",
+   "title": "The Cinderline inspection star",
+   "alt": "A star diagram: fact_inspection in the centre joined to line, shift and date dimensions, the line dimension pointing to the plant.",
+   "caption": "Every join from the fact is many-to-one; units are converted at load. Synthetic teaching example.",
+   "textEquivalent": "The inspection star: One fact at the inspection grain, four dimensions and a conversion table applied at load. Nodes: fact_inspection: One row per accepted inspection; pieces inspected and defective. (selected); dim_line: Type 2: line_sk per version; plant, supervisor. (context); dim_plant: One row per plant. (context); dim_shift: Shifts A, B and C; C crosses midnight. (context); dim_date: Plant calendar: business day flag, month. (context); unit_conversion: Pieces per unit, applied when the fact is loaded. (context). Relationships: fact_inspection → dim_line: line_sk; fact_inspection → dim_shift: shift_id; fact_inspection → dim_date: business_date; dim_line → dim_plant: plant_id; unit_conversion → fact_inspection: converts at load.\n\nA plant-day query: A plant-day rate touches only the fact, the line dimension (for the plant) and the date dimension. Nodes: fact_inspection: Sums pieces by plant and business day. (selected); dim_line: Supplies plant_id for each line version. (selected); dim_plant: Lists plants for days with no inspection. (selected); dim_shift: Not needed for a plant-day value. (excluded); dim_date: Lists the business days of the period. (selected); unit_conversion: Already applied; no report repeats it. (excluded). Relationships: fact_inspection → dim_line: line_sk; fact_inspection → dim_date: business_date; dim_line → dim_plant: plant_id.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-star",
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "star",
+     "title": "The inspection star",
+     "explanation": "One fact at the inspection grain, four dimensions and a conversion table applied at load.",
+     "nodes": [
+      {
+       "id": "fact",
+       "label": "fact_inspection",
+       "detail": "One row per accepted inspection; pieces inspected and defective.",
+       "status": "selected"
+      },
+      {
+       "id": "dline",
+       "label": "dim_line",
+       "detail": "Type 2: line_sk per version; plant, supervisor.",
+       "status": "context"
+      },
+      {
+       "id": "dplant",
+       "label": "dim_plant",
+       "detail": "One row per plant.",
+       "status": "context"
+      },
+      {
+       "id": "dshift",
+       "label": "dim_shift",
+       "detail": "Shifts A, B and C; C crosses midnight.",
+       "status": "context"
+      },
+      {
+       "id": "ddate",
+       "label": "dim_date",
+       "detail": "Plant calendar: business day flag, month.",
+       "status": "context"
+      },
+      {
+       "id": "units",
+       "label": "unit_conversion",
+       "detail": "Pieces per unit, applied when the fact is loaded.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "fact",
+       "to": "dline",
+       "label": "line_sk"
+      },
+      {
+       "from": "fact",
+       "to": "dshift",
+       "label": "shift_id"
+      },
+      {
+       "from": "fact",
+       "to": "ddate",
+       "label": "business_date"
+      },
+      {
+       "from": "dline",
+       "to": "dplant",
+       "label": "plant_id"
+      },
+      {
+       "from": "units",
+       "to": "fact",
+       "label": "converts at load"
+      }
+     ]
+    },
+    {
+     "id": "query",
+     "title": "A plant-day query",
+     "explanation": "A plant-day rate touches only the fact, the line dimension (for the plant) and the date dimension.",
+     "nodes": [
+      {
+       "id": "fact",
+       "label": "fact_inspection",
+       "detail": "Sums pieces by plant and business day.",
+       "status": "selected"
+      },
+      {
+       "id": "dline",
+       "label": "dim_line",
+       "detail": "Supplies plant_id for each line version.",
+       "status": "selected"
+      },
+      {
+       "id": "dplant",
+       "label": "dim_plant",
+       "detail": "Lists plants for days with no inspection.",
+       "status": "selected"
+      },
+      {
+       "id": "dshift",
+       "label": "dim_shift",
+       "detail": "Not needed for a plant-day value.",
+       "status": "excluded"
+      },
+      {
+       "id": "ddate",
+       "label": "dim_date",
+       "detail": "Lists the business days of the period.",
+       "status": "selected"
+      },
+      {
+       "id": "units",
+       "label": "unit_conversion",
+       "detail": "Already applied; no report repeats it.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "fact",
+       "to": "dline",
+       "label": "line_sk"
+      },
+      {
+       "from": "fact",
+       "to": "ddate",
+       "label": "business_date"
+      },
+      {
+       "from": "dline",
+       "to": "dplant",
+       "label": "plant_id"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-conformed-visual",
+   "kind": "nodes",
+   "title": "Two facts meeting on conformed keys",
+   "alt": "Inspections and downtime joined through shared line and date dimensions, then the same report broken by a second line code.",
+   "caption": "When both facts use the same line key they can be reported side by side; a local code silently empties the join. Synthetic teaching example.",
+   "textEquivalent": "Two facts, one line key: Inspections and downtime both use dim_line's N1 and the same business day. Nodes: fact_inspection: N1, 27 Mar: 200 pieces inspected. (selected); fact_downtime: N1, 27 Mar: 45 minutes stopped. (selected); dim_line: N1 means the same line in both facts. (selected); dim_date: The same business day in both facts. (selected); Line-day report: Inspected pieces beside stopped minutes. (selected). Relationships: fact_inspection → dim_line: N1; fact_downtime → dim_line: N1; fact_inspection → dim_date: 27 Mar; fact_downtime → dim_date: 27 Mar; dim_line → Line-day report: drill across.\n\nA second line code: Downtime arrives coded NORTH-1 from the maintenance system; the report shows no downtime for N1 and no error. Nodes: fact_inspection: N1, 27 Mar: 200 pieces inspected. (selected); fact_downtime: Coded NORTH-1, so it matches no dim_line row. (warning); dim_line: Knows N1, not NORTH-1. (selected); Line-day report: Downtime blank for N1: plausible and wrong. (warning); Code mapping: Map NORTH-1 to N1 once, when downtime is loaded. (pending). Relationships: fact_inspection → dim_line: N1; fact_downtime → Code mapping: NORTH-1; Code mapping → dim_line: not yet applied; dim_line → Line-day report: drill across.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-conformed",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "shared",
+     "title": "Two facts, one line key",
+     "explanation": "Inspections and downtime both use dim_line's N1 and the same business day.",
+     "nodes": [
+      {
+       "id": "insp",
+       "label": "fact_inspection",
+       "detail": "N1, 27 Mar: 200 pieces inspected.",
+       "status": "selected"
+      },
+      {
+       "id": "down",
+       "label": "fact_downtime",
+       "detail": "N1, 27 Mar: 45 minutes stopped.",
+       "status": "selected"
+      },
+      {
+       "id": "dline",
+       "label": "dim_line",
+       "detail": "N1 means the same line in both facts.",
+       "status": "selected"
+      },
+      {
+       "id": "ddate",
+       "label": "dim_date",
+       "detail": "The same business day in both facts.",
+       "status": "selected"
+      },
+      {
+       "id": "report",
+       "label": "Line-day report",
+       "detail": "Inspected pieces beside stopped minutes.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "insp",
+       "to": "dline",
+       "label": "N1"
+      },
+      {
+       "from": "down",
+       "to": "dline",
+       "label": "N1"
+      },
+      {
+       "from": "insp",
+       "to": "ddate",
+       "label": "27 Mar"
+      },
+      {
+       "from": "down",
+       "to": "ddate",
+       "label": "27 Mar"
+      },
+      {
+       "from": "dline",
+       "to": "report",
+       "label": "drill across"
+      }
+     ]
+    },
+    {
+     "id": "drift",
+     "title": "A second line code",
+     "explanation": "Downtime arrives coded NORTH-1 from the maintenance system; the report shows no downtime for N1 and no error.",
+     "nodes": [
+      {
+       "id": "insp",
+       "label": "fact_inspection",
+       "detail": "N1, 27 Mar: 200 pieces inspected.",
+       "status": "selected"
+      },
+      {
+       "id": "down",
+       "label": "fact_downtime",
+       "detail": "Coded NORTH-1, so it matches no dim_line row.",
+       "status": "warning"
+      },
+      {
+       "id": "dline",
+       "label": "dim_line",
+       "detail": "Knows N1, not NORTH-1.",
+       "status": "selected"
+      },
+      {
+       "id": "report",
+       "label": "Line-day report",
+       "detail": "Downtime blank for N1: plausible and wrong.",
+       "status": "warning"
+      },
+      {
+       "id": "map",
+       "label": "Code mapping",
+       "detail": "Map NORTH-1 to N1 once, when downtime is loaded.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "insp",
+       "to": "dline",
+       "label": "N1"
+      },
+      {
+       "from": "down",
+       "to": "map",
+       "label": "NORTH-1"
+      },
+      {
+       "from": "map",
+       "to": "dline",
+       "label": "not yet applied"
+      },
+      {
+       "from": "dline",
+       "to": "report",
+       "label": "drill across"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-history-visual",
+   "kind": "timeline",
+   "title": "Supervisor history for line N1",
+   "alt": "A timeline of N1's two dimension versions and two inspections, first kept as type 2 rows, then overwritten as type 1.",
+   "caption": "Type 2 attributes each inspection to the supervisor of its day; type 1 rewrites history to today's supervisor. Synthetic teaching example.",
+   "textEquivalent": "Type 2 keeps both versions: Version 101 closes on 30 March and version 102 opens; each inspection joins the version valid on its day. Nodes: Version 101: N1, D. Varga, 5 Jan to 29 Mar (valid_to 30 Mar, exclusive). (context); I-06, 27 Mar: As-was: D. Varga. (selected); 30 Mar change: Supervisor becomes P. Nair. (warning); Version 102: N1, P. Nair, from 30 Mar, still current. (selected); I-10, 30 Mar: As-was: P. Nair. (selected).\n\nType 1 overwrites: The only row is rewritten to P. Nair, so the 27 March inspection now reads P. Nair too. Nodes: Version 101: Overwritten; D. Varga no longer appears. (excluded); I-06, 27 Mar: As-is: P. Nair, whoever was on duty. (warning); 30 Mar change: Recorded nowhere. (context); Version 102: The single N1 row: P. Nair. (selected); I-10, 30 Mar: P. Nair either way. (selected).",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-type2",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "typetwo",
+     "title": "Type 2 keeps both versions",
+     "explanation": "Version 101 closes on 30 March and version 102 opens; each inspection joins the version valid on its day.",
+     "nodes": [
+      {
+       "id": "v101",
+       "label": "Version 101",
+       "detail": "N1, D. Varga, 5 Jan to 29 Mar (valid_to 30 Mar, exclusive).",
+       "status": "context"
+      },
+      {
+       "id": "i06",
+       "label": "I-06, 27 Mar",
+       "detail": "As-was: D. Varga.",
+       "status": "selected"
+      },
+      {
+       "id": "change",
+       "label": "30 Mar change",
+       "detail": "Supervisor becomes P. Nair.",
+       "status": "warning"
+      },
+      {
+       "id": "v102",
+       "label": "Version 102",
+       "detail": "N1, P. Nair, from 30 Mar, still current.",
+       "status": "selected"
+      },
+      {
+       "id": "i10",
+       "label": "I-10, 30 Mar",
+       "detail": "As-was: P. Nair.",
+       "status": "selected"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "typeone",
+     "title": "Type 1 overwrites",
+     "explanation": "The only row is rewritten to P. Nair, so the 27 March inspection now reads P. Nair too.",
+     "nodes": [
+      {
+       "id": "v101",
+       "label": "Version 101",
+       "detail": "Overwritten; D. Varga no longer appears.",
+       "status": "excluded"
+      },
+      {
+       "id": "i06",
+       "label": "I-06, 27 Mar",
+       "detail": "As-is: P. Nair, whoever was on duty.",
+       "status": "warning"
+      },
+      {
+       "id": "change",
+       "label": "30 Mar change",
+       "detail": "Recorded nowhere.",
+       "status": "context"
+      },
+      {
+       "id": "v102",
+       "label": "Version 102",
+       "detail": "The single N1 row: P. Nair.",
+       "status": "selected"
+      },
+      {
+       "id": "i10",
+       "label": "I-10, 30 Mar",
+       "detail": "P. Nair either way.",
+       "status": "selected"
+      }
+     ],
+     "connections": []
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-manytomany-visual",
+   "kind": "table",
+   "title": "A double count through history, before and after",
+   "alt": "Tables showing two inspections joined to both versions of line N1, then to the one valid version, then the whole baseline compared.",
+   "caption": "Joining on the natural key doubles every N1 row; the validity window keeps one. Synthetic teaching example.",
+   "textEquivalent": "Joined on line_id only: Each N1 inspection meets both versions: two facts become four rows and 270 pieces become 540. Table columns: inspection, day, version matched, pieces. Rows: inspection I-06; day 27 Mar; version matched 101 D. Varga; pieces 120 | inspection I-06; day 27 Mar; version matched 102 P. Nair; pieces 120 | inspection I-10; day 30 Mar; version matched 101 D. Varga; pieces 150 | inspection I-10; day 30 Mar; version matched 102 P. Nair; pieces 150 | inspection total; day 27 and 30 Mar; version matched 4 rows from 2 facts; pieces 540.\n\nJoined on the validity window: Each inspection meets only the version valid on its business day. Table columns: inspection, day, version matched, pieces. Rows: inspection I-06; day 27 Mar; version matched 101 D. Varga; pieces 120 | inspection I-10; day 30 Mar; version matched 102 P. Nair; pieces 150 | inspection total; day 27 and 30 Mar; version matched 2 rows from 2 facts; pieces 270.\n\nWhole baseline: Across 22 inspections the natural-key join adds 8 rows, drops the unmatched N3 row, and inflates North by 80% while its rate barely moves. Table columns: join, rows, North pieces, North rate. Rows: join line_id only; rows 29; North pieces 2,250; North rate 2.13% | join validity window; rows 22; North pieces 1,250; North rate 2.16%.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-join",
+    "dbxfe-modeling-claim-type2",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "naturalkey",
+     "title": "Joined on line_id only",
+     "explanation": "Each N1 inspection meets both versions: two facts become four rows and 270 pieces become 540.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "inspection",
+       "day",
+       "version matched",
+       "pieces"
+      ],
+      "rows": [
+       [
+        "I-06",
+        "27 Mar",
+        "101 D. Varga",
+        "120"
+       ],
+       [
+        "I-06",
+        "27 Mar",
+        "102 P. Nair",
+        "120"
+       ],
+       [
+        "I-10",
+        "30 Mar",
+        "101 D. Varga",
+        "150"
+       ],
+       [
+        "I-10",
+        "30 Mar",
+        "102 P. Nair",
+        "150"
+       ],
+       [
+        "total",
+        "27 and 30 Mar",
+        "4 rows from 2 facts",
+        "540"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "validwindow",
+     "title": "Joined on the validity window",
+     "explanation": "Each inspection meets only the version valid on its business day.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "inspection",
+       "day",
+       "version matched",
+       "pieces"
+      ],
+      "rows": [
+       [
+        "I-06",
+        "27 Mar",
+        "101 D. Varga",
+        "120"
+       ],
+       [
+        "I-10",
+        "30 Mar",
+        "102 P. Nair",
+        "150"
+       ],
+       [
+        "total",
+        "27 and 30 Mar",
+        "2 rows from 2 facts",
+        "270"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "baseline",
+     "title": "Whole baseline",
+     "explanation": "Across 22 inspections the natural-key join adds 8 rows, drops the unmatched N3 row, and inflates North by 80% while its rate barely moves.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "join",
+       "rows",
+       "North pieces",
+       "North rate"
+      ],
+      "rows": [
+       [
+        "line_id only",
+        "29",
+        "2,250",
+        "2.13%"
+       ],
+       [
+        "validity window",
+        "22",
+        "1,250",
+        "2.16%"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-unknown-visual",
+   "kind": "nodes",
+   "title": "Where a fact with a missing key goes",
+   "alt": "Three membership diagrams for inspection I-21 on line N3: dropped by an inner join, kept under a NULL plant, and kept under the unknown member.",
+   "caption": "Only the unknown member keeps every piece and names the gap. Synthetic teaching example.",
+   "textEquivalent": "Inner join: N3 has no dimension row, so the inner join drops I-21 and April loses 50 pieces without a message. Nodes: I-20, line N1: Joins version 102; North plant. (selected); I-21, line N3: No dim_line row: dropped. (excluded); April total: 550 pieces instead of 600. (warning); Unknown member: Row -1 exists but is never used. (pending). Relationships: I-20, line N1 → April total: counted; I-21, line N3 → April total: lost.\n\nLeft join, no default: The left join keeps I-21, but under a NULL plant that tools may hide or mislabel. Nodes: I-20, line N1: North plant. (selected); I-21, line N3: Kept; plant is NULL. (warning); April total: 600 pieces, one group unnamed. (warning); Unknown member: Still unused. (pending). Relationships: I-20, line N1 → April total: counted; I-21, line N3 → April total: NULL group.\n\nUnknown member: I-21 maps to line_sk -1, plant UNKNOWN, and appears on the orphan list. Nodes: I-20, line N1: North plant. (selected); I-21, line N3: Mapped to line_sk -1 and listed. (selected); April total: 600 pieces; the all-period total reconciles to 2,440. (selected); Unknown member: Plant UNKNOWN: 50 inspected, 2 defective. (selected). Relationships: I-20, line N1 → April total: counted; I-21, line N3 → Unknown member: line_sk -1; Unknown member → April total: counted.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-nulls",
+    "dbxfe-modeling-claim-join",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "inner",
+     "title": "Inner join",
+     "explanation": "N3 has no dimension row, so the inner join drops I-21 and April loses 50 pieces without a message.",
+     "nodes": [
+      {
+       "id": "i20",
+       "label": "I-20, line N1",
+       "detail": "Joins version 102; North plant.",
+       "status": "selected"
+      },
+      {
+       "id": "i21",
+       "label": "I-21, line N3",
+       "detail": "No dim_line row: dropped.",
+       "status": "excluded"
+      },
+      {
+       "id": "apr",
+       "label": "April total",
+       "detail": "550 pieces instead of 600.",
+       "status": "warning"
+      },
+      {
+       "id": "unk",
+       "label": "Unknown member",
+       "detail": "Row -1 exists but is never used.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "i20",
+       "to": "apr",
+       "label": "counted"
+      },
+      {
+       "from": "i21",
+       "to": "apr",
+       "label": "lost"
+      }
+     ]
+    },
+    {
+     "id": "left",
+     "title": "Left join, no default",
+     "explanation": "The left join keeps I-21, but under a NULL plant that tools may hide or mislabel.",
+     "nodes": [
+      {
+       "id": "i20",
+       "label": "I-20, line N1",
+       "detail": "North plant.",
+       "status": "selected"
+      },
+      {
+       "id": "i21",
+       "label": "I-21, line N3",
+       "detail": "Kept; plant is NULL.",
+       "status": "warning"
+      },
+      {
+       "id": "apr",
+       "label": "April total",
+       "detail": "600 pieces, one group unnamed.",
+       "status": "warning"
+      },
+      {
+       "id": "unk",
+       "label": "Unknown member",
+       "detail": "Still unused.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "i20",
+       "to": "apr",
+       "label": "counted"
+      },
+      {
+       "from": "i21",
+       "to": "apr",
+       "label": "NULL group"
+      }
+     ]
+    },
+    {
+     "id": "member",
+     "title": "Unknown member",
+     "explanation": "I-21 maps to line_sk -1, plant UNKNOWN, and appears on the orphan list.",
+     "nodes": [
+      {
+       "id": "i20",
+       "label": "I-20, line N1",
+       "detail": "North plant.",
+       "status": "selected"
+      },
+      {
+       "id": "i21",
+       "label": "I-21, line N3",
+       "detail": "Mapped to line_sk -1 and listed.",
+       "status": "selected"
+      },
+      {
+       "id": "apr",
+       "label": "April total",
+       "detail": "600 pieces; the all-period total reconciles to 2,440.",
+       "status": "selected"
+      },
+      {
+       "id": "unk",
+       "label": "Unknown member",
+       "detail": "Plant UNKNOWN: 50 inspected, 2 defective.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "i20",
+       "to": "apr",
+       "label": "counted"
+      },
+      {
+       "from": "i21",
+       "to": "unk",
+       "label": "line_sk -1"
+      },
+      {
+       "from": "unk",
+       "to": "apr",
+       "label": "counted"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-units-visual",
+   "kind": "table",
+   "title": "Cases and pieces on one plant-day",
+   "alt": "Three tables for South on 27 March: raw quantities, a sum that treats cases as pieces, and the sum after conversion.",
+   "caption": "Line S2 counts cases of 12; converting first changes South's rate from 2.1% to 5.0%. Synthetic teaching example.",
+   "textEquivalent": "Source quantities: Each line records in its own unit. Table columns: line, unit, inspected, defective, line rate. Rows: line S1; unit piece; inspected 180; defective 3; line rate 1.7% | line S2; unit case; inspected 10; defective 1; line rate 10.0%.\n\nSummed as if pieces: Adding the raw numbers mixes 180 pieces with 10 cases. Table columns: plant-day, unit, inspected, defective, rate. Rows: plant-day South, 27 Mar; unit mixed; inspected 190; defective 4; rate 2.1%.\n\nConverted first: S2's cases become 120 and 12 pieces before any sum. Table columns: line, unit, inspected, defective, rate. Rows: line S1; unit piece; inspected 180; defective 3; rate 1.7% | line S2; unit 12 per case; inspected 120; defective 12; rate 10.0% | line South, 27 Mar; unit piece; inspected 300; defective 15; rate 5.0%.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "raw",
+     "title": "Source quantities",
+     "explanation": "Each line records in its own unit.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "line",
+       "unit",
+       "inspected",
+       "defective",
+       "line rate"
+      ],
+      "rows": [
+       [
+        "S1",
+        "piece",
+        "180",
+        "3",
+        "1.7%"
+       ],
+       [
+        "S2",
+        "case",
+        "10",
+        "1",
+        "10.0%"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "naive",
+     "title": "Summed as if pieces",
+     "explanation": "Adding the raw numbers mixes 180 pieces with 10 cases.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "plant-day",
+       "unit",
+       "inspected",
+       "defective",
+       "rate"
+      ],
+      "rows": [
+       [
+        "South, 27 Mar",
+        "mixed",
+        "190",
+        "4",
+        "2.1%"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "converted",
+     "title": "Converted first",
+     "explanation": "S2's cases become 120 and 12 pieces before any sum.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "line",
+       "unit",
+       "inspected",
+       "defective",
+       "rate"
+      ],
+      "rows": [
+       [
+        "S1",
+        "piece",
+        "180",
+        "3",
+        "1.7%"
+       ],
+       [
+        "S2",
+        "12 per case",
+        "120",
+        "12",
+        "10.0%"
+       ],
+       [
+        "South, 27 Mar",
+        "piece",
+        "300",
+        "15",
+        "5.0%"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-additivity-visual",
+   "kind": "comparison",
+   "title": "Averaging rates versus summing parts",
+   "alt": "Two tables and an equation for North on 27 March: the average of line rates, the summed parts, and the division done once.",
+   "caption": "Averaging weights a 100-piece line like a 200-piece line; summing the parts does not. Synthetic teaching example.",
+   "textEquivalent": "Average of line rates: Each line's rate is computed, then the two rates are averaged. Table columns: line, inspected, defective, rate. Rows: line N1; inspected 200; defective 4; rate 2.0% | line N2; inspected 100; defective 5; rate 5.0% | line average of rates; inspected not summed; defective not summed; rate 3.5%.\n\nSum the parts: The additive parts are summed across lines first. Table columns: level, inspected, defective, rate. Rows: level N1; inspected 200; defective 4; rate 2.0% | level N2; inspected 100; defective 5; rate 5.0% | level North; inspected 300; defective 9; rate 3.0%.\n\nDivide once: The plant rate is one division of summed parts. Equation: North rate = (4 + 5) / (200 + 100) = 9 / 300 = 3.0%, not (2.0% + 5.0%) / 2 = 3.5%.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "average",
+     "title": "Average of line rates",
+     "explanation": "Each line's rate is computed, then the two rates are averaged.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "line",
+       "inspected",
+       "defective",
+       "rate"
+      ],
+      "rows": [
+       [
+        "N1",
+        "200",
+        "4",
+        "2.0%"
+       ],
+       [
+        "N2",
+        "100",
+        "5",
+        "5.0%"
+       ],
+       [
+        "average of rates",
+        "not summed",
+        "not summed",
+        "3.5%"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "parts",
+     "title": "Sum the parts",
+     "explanation": "The additive parts are summed across lines first.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "level",
+       "inspected",
+       "defective",
+       "rate"
+      ],
+      "rows": [
+       [
+        "N1",
+        "200",
+        "4",
+        "2.0%"
+       ],
+       [
+        "N2",
+        "100",
+        "5",
+        "5.0%"
+       ],
+       [
+        "North",
+        "300",
+        "9",
+        "3.0%"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "equation",
+     "title": "Divide once",
+     "explanation": "The plant rate is one division of summed parts.",
+     "nodes": [],
+     "connections": [],
+     "equation": "North rate = (4 + 5) / (200 + 100) = 9 / 300 = 3.0%, not (2.0% + 5.0%) / 2 = 3.5%"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-grains-visual",
+   "kind": "table",
+   "title": "One metric at three grains, and one incompatible join",
+   "alt": "Tables for North in March at line-day, plant-day and plant-month, then a monthly target repeated on daily rows.",
+   "caption": "The grains reconcile through summed parts; the monthly target does not belong on daily rows. Synthetic teaching example.",
+   "textEquivalent": "Line-day: North's eight line-days in March, each with its own rate. Table columns: day, N1, N2. Rows: day 26 Mar; N1 150 / 3; N2 50 / 0 | day 27 Mar; N1 200 / 4; N2 100 / 5 | day 30 Mar; N1 200 / 5; N2 100 / 1 | day 31 Mar; N1 200 / 4; N2 0 / 0 (no units).\n\nPlant-day: Each plant-day is its lines' parts summed and divided once. Table columns: day, inspected, defective, rate. Rows: day 26 Mar; inspected 200; defective 3; rate 1.5% | day 27 Mar; inspected 300; defective 9; rate 3.0% | day 30 Mar; inspected 300; defective 6; rate 2.0% | day 31 Mar; inspected 200; defective 4; rate 2.0%.\n\nPlant-month: The month sums the same parts: 1,000 inspected and 22 defective. Table columns: month, inspected, defective, rate. Rows: month March; inspected 1,000; defective 22; rate 2.2%.\n\nA monthly target on daily rows: Joined on plant and month, the 2.0% target repeats on all four days and its sum reads 8.0%. Table columns: day, rate, monthly target. Rows: day 26 Mar; rate 1.5%; monthly target 2.0% | day 27 Mar; rate 3.0%; monthly target 2.0% | day 30 Mar; rate 2.0%; monthly target 2.0% | day 31 Mar; rate 2.0%; monthly target 2.0% | day sum of target; rate not comparable; monthly target 8.0%.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "lineday",
+     "title": "Line-day",
+     "explanation": "North's eight line-days in March, each with its own rate.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "day",
+       "N1",
+       "N2"
+      ],
+      "rows": [
+       [
+        "26 Mar",
+        "150 / 3",
+        "50 / 0"
+       ],
+       [
+        "27 Mar",
+        "200 / 4",
+        "100 / 5"
+       ],
+       [
+        "30 Mar",
+        "200 / 5",
+        "100 / 1"
+       ],
+       [
+        "31 Mar",
+        "200 / 4",
+        "0 / 0 (no units)"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "plantday",
+     "title": "Plant-day",
+     "explanation": "Each plant-day is its lines' parts summed and divided once.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "day",
+       "inspected",
+       "defective",
+       "rate"
+      ],
+      "rows": [
+       [
+        "26 Mar",
+        "200",
+        "3",
+        "1.5%"
+       ],
+       [
+        "27 Mar",
+        "300",
+        "9",
+        "3.0%"
+       ],
+       [
+        "30 Mar",
+        "300",
+        "6",
+        "2.0%"
+       ],
+       [
+        "31 Mar",
+        "200",
+        "4",
+        "2.0%"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "plantmonth",
+     "title": "Plant-month",
+     "explanation": "The month sums the same parts: 1,000 inspected and 22 defective.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "month",
+       "inspected",
+       "defective",
+       "rate"
+      ],
+      "rows": [
+       [
+        "March",
+        "1,000",
+        "22",
+        "2.2%"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "mismatch",
+     "title": "A monthly target on daily rows",
+     "explanation": "Joined on plant and month, the 2.0% target repeats on all four days and its sum reads 8.0%.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "day",
+       "rate",
+       "monthly target"
+      ],
+      "rows": [
+       [
+        "26 Mar",
+        "1.5%",
+        "2.0%"
+       ],
+       [
+        "27 Mar",
+        "3.0%",
+        "2.0%"
+       ],
+       [
+        "30 Mar",
+        "2.0%",
+        "2.0%"
+       ],
+       [
+        "31 Mar",
+        "2.0%",
+        "2.0%"
+       ],
+       [
+        "sum of target",
+        "not comparable",
+        "8.0%"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-denominator-visual",
+   "kind": "table",
+   "title": "A zero denominator, three ways",
+   "alt": "Tables for line-days with zero or missing inspected pieces: plain division failing, try_divide returning NULL, and the contract's statuses.",
+   "caption": "Zero out of zero is no rate; zero out of 50 is a real 0%. Synthetic teaching example.",
+   "textEquivalent": "Plain division: Spark 4's default ANSI mode stops the whole query at N2's 0 / 0. Table columns: line-day, inspected, defective, result. Rows: line-day N1, 31 Mar; inspected 200; defective 4; result 2.0% | line-day N2, 31 Mar; inspected 0; defective 0; result DIVIDE_BY_ZERO.\n\nGuarded division: try_divide returns NULL for the zero divisor and the query completes. Table columns: line-day, inspected, defective, result. Rows: line-day N1, 31 Mar; inspected 200; defective 4; result 2.0% | line-day N2, 31 Mar; inspected 0; defective 0; result NULL.\n\nContract statuses: The report names why a rate is missing and keeps a genuine zero as a value. Table columns: line-day, inspections, pieces, status, rate. Rows: line-day S2, 30 Mar; inspections 0; pieces 0 / 0; status no_inspections; rate none | line-day N2, 31 Mar; inspections 1; pieces 0 / 0; status no_units; rate none | line-day N2, 26 Mar; inspections 1; pieces 50 / 0; status ok; rate 0.0%.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-ansi",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "plain",
+     "title": "Plain division",
+     "explanation": "Spark 4's default ANSI mode stops the whole query at N2's 0 / 0.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "line-day",
+       "inspected",
+       "defective",
+       "result"
+      ],
+      "rows": [
+       [
+        "N1, 31 Mar",
+        "200",
+        "4",
+        "2.0%"
+       ],
+       [
+        "N2, 31 Mar",
+        "0",
+        "0",
+        "DIVIDE_BY_ZERO"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "guarded",
+     "title": "Guarded division",
+     "explanation": "try_divide returns NULL for the zero divisor and the query completes.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "line-day",
+       "inspected",
+       "defective",
+       "result"
+      ],
+      "rows": [
+       [
+        "N1, 31 Mar",
+        "200",
+        "4",
+        "2.0%"
+       ],
+       [
+        "N2, 31 Mar",
+        "0",
+        "0",
+        "NULL"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "statuses",
+     "title": "Contract statuses",
+     "explanation": "The report names why a rate is missing and keeps a genuine zero as a value.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "line-day",
+       "inspections",
+       "pieces",
+       "status",
+       "rate"
+      ],
+      "rows": [
+       [
+        "S2, 30 Mar",
+        "0",
+        "0 / 0",
+        "no_inspections",
+        "none"
+       ],
+       [
+        "N2, 31 Mar",
+        "1",
+        "0 / 0",
+        "no_units",
+        "none"
+       ],
+       [
+        "N2, 26 Mar",
+        "1",
+        "50 / 0",
+        "ok",
+        "0.0%"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-window-visual",
+   "kind": "timeline",
+   "title": "Three business days against three calendar days",
+   "alt": "A timeline from Thursday 26 to Monday 30 March, first selecting three business days, then three calendar days.",
+   "caption": "On a Monday the calendar window holds one working day. Synthetic teaching example.",
+   "textEquivalent": "Three business days: The plant calendar selects Thursday, Friday and Monday: North 800 pieces, 18 defective, 2.25%. Nodes: Thu 26 Mar: Business day: North 200 / 3. (selected); Fri 27 Mar: Business day: North 300 / 9. (selected); Sat 28 Mar: Not a business day. (excluded); Sun 29 Mar: Not a business day. (excluded); Mon 30 Mar: Business day: North 300 / 6. (selected).\n\nThree calendar days: Counting calendar days selects Saturday, Sunday and Monday: one working day, North 300 / 6 = 2.0%. Nodes: Thu 26 Mar: Outside the window. (excluded); Fri 27 Mar: Outside the window. (excluded); Sat 28 Mar: Counted, but no production. (warning); Sun 29 Mar: Counted, but no production. (warning); Mon 30 Mar: The only working day in the window. (selected).",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "business",
+     "title": "Three business days",
+     "explanation": "The plant calendar selects Thursday, Friday and Monday: North 800 pieces, 18 defective, 2.25%.",
+     "nodes": [
+      {
+       "id": "d26",
+       "label": "Thu 26 Mar",
+       "detail": "Business day: North 200 / 3.",
+       "status": "selected"
+      },
+      {
+       "id": "d27",
+       "label": "Fri 27 Mar",
+       "detail": "Business day: North 300 / 9.",
+       "status": "selected"
+      },
+      {
+       "id": "d28",
+       "label": "Sat 28 Mar",
+       "detail": "Not a business day.",
+       "status": "excluded"
+      },
+      {
+       "id": "d29",
+       "label": "Sun 29 Mar",
+       "detail": "Not a business day.",
+       "status": "excluded"
+      },
+      {
+       "id": "d30",
+       "label": "Mon 30 Mar",
+       "detail": "Business day: North 300 / 6.",
+       "status": "selected"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "calendar",
+     "title": "Three calendar days",
+     "explanation": "Counting calendar days selects Saturday, Sunday and Monday: one working day, North 300 / 6 = 2.0%.",
+     "nodes": [
+      {
+       "id": "d26",
+       "label": "Thu 26 Mar",
+       "detail": "Outside the window.",
+       "status": "excluded"
+      },
+      {
+       "id": "d27",
+       "label": "Fri 27 Mar",
+       "detail": "Outside the window.",
+       "status": "excluded"
+      },
+      {
+       "id": "d28",
+       "label": "Sat 28 Mar",
+       "detail": "Counted, but no production.",
+       "status": "warning"
+      },
+      {
+       "id": "d29",
+       "label": "Sun 29 Mar",
+       "detail": "Counted, but no production.",
+       "status": "warning"
+      },
+      {
+       "id": "d30",
+       "label": "Mon 30 Mar",
+       "detail": "The only working day in the window.",
+       "status": "selected"
+      }
+     ],
+     "connections": []
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-contract-visual",
+   "kind": "table",
+   "title": "The unit defect rate contract and its tests",
+   "alt": "Two tables: the clauses of the unit_defect_rate contract, then each clause mapped to the test that catches its violation.",
+   "caption": "Every clause names a decision and every decision implies a test. Synthetic teaching example.",
+   "textEquivalent": "The metric contract: Version 1 of unit_defect_rate, proposed to its owner. Table columns: clause, unit_defect_rate v1. Rows: clause grain; unit_defect_rate v1 one line per business day; plant and month from summed parts | clause numerator; unit_defect_rate v1 defective pieces of accepted inspections | clause denominator; unit_defect_rate v1 inspected pieces of the same inspections | clause unit; unit_defect_rate v1 pieces; cases converted; no conversion means quarantine | clause period; unit_defect_rate v1 business day 00:00 to 23:59:59 local; calendar month | clause window; unit_defect_rate v1 last 3 business days of the plant calendar | clause empty cases; unit_defect_rate v1 no_inspections or no_units; no rate | clause unknown member; unit_defect_rate v1 line_sk -1, plant UNKNOWN, listed | clause owner; unit_defect_rate v1 quality lead; version 1, proposed.\n\nThe tests it implies: Each clause maps to a test the lab runs on the baseline and the transfer set. Table columns: clause, test, catches. Rows: clause grain; test line-days sum to plant-days and months; catches averaged rates, lost rows | clause denominator; test zero pieces give no rate; catches 0% or a failed query | clause unit; test sums compared in pieces; catches cases added to pieces | clause unknown member; test fact totals equal report totals; catches an inner join dropping N3 | clause history; test 22 facts stay 22 rows; catches a join on line_id only | clause window; test window dates from the calendar; catches three calendar days.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-claim-nulls",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "clauses",
+     "title": "The metric contract",
+     "explanation": "Version 1 of unit_defect_rate, proposed to its owner.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "clause",
+       "unit_defect_rate v1"
+      ],
+      "rows": [
+       [
+        "grain",
+        "one line per business day; plant and month from summed parts"
+       ],
+       [
+        "numerator",
+        "defective pieces of accepted inspections"
+       ],
+       [
+        "denominator",
+        "inspected pieces of the same inspections"
+       ],
+       [
+        "unit",
+        "pieces; cases converted; no conversion means quarantine"
+       ],
+       [
+        "period",
+        "business day 00:00 to 23:59:59 local; calendar month"
+       ],
+       [
+        "window",
+        "last 3 business days of the plant calendar"
+       ],
+       [
+        "empty cases",
+        "no_inspections or no_units; no rate"
+       ],
+       [
+        "unknown member",
+        "line_sk -1, plant UNKNOWN, listed"
+       ],
+       [
+        "owner",
+        "quality lead; version 1, proposed"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "tests",
+     "title": "The tests it implies",
+     "explanation": "Each clause maps to a test the lab runs on the baseline and the transfer set.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "clause",
+       "test",
+       "catches"
+      ],
+      "rows": [
+       [
+        "grain",
+        "line-days sum to plant-days and months",
+        "averaged rates, lost rows"
+       ],
+       [
+        "denominator",
+        "zero pieces give no rate",
+        "0% or a failed query"
+       ],
+       [
+        "unit",
+        "sums compared in pieces",
+        "cases added to pieces"
+       ],
+       [
+        "unknown member",
+        "fact totals equal report totals",
+        "an inner join dropping N3"
+       ],
+       [
+        "history",
+        "22 facts stay 22 rows",
+        "a join on line_id only"
+       ],
+       [
+        "window",
+        "window dates from the calendar",
+        "three calendar days"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-semantic-visual",
+   "kind": "nodes",
+   "title": "A metric view: defined once, evaluated per query",
+   "alt": "Diagrams of a metric view definition, two queries at different grains, and a join on a non-unique key.",
+   "caption": "The ratio is rebuilt from summed parts at each query's grain; a non-unique join key makes attribution arbitrary. Schematic, not a product screenshot; synthetic teaching example.",
+   "textEquivalent": "Defined once: The YAML names the source fact, a join on the surrogate key and three measures. Nodes: fact_inspection: Source of the metric view. (context); Join: dim_line: On line_sk, many-to-one. (context); defective_pieces: SUM(defective_pieces). (selected); inspected_pieces: SUM(inspected_pieces). (selected); unit_defect_rate: Defective measure divided by inspected measure. (selected). Relationships: fact_inspection → Join: dim_line: line_sk; fact_inspection → defective_pieces: aggregates; fact_inspection → inspected_pieces: aggregates; defective_pieces → unit_defect_rate: MEASURE(); inspected_pieces → unit_defect_rate: MEASURE().\n\nQueried at two grains: Grouped by line and day, then by plant and month; each value is rebuilt from its parts. Nodes: unit_defect_rate: One definition. (selected); By line, day: N1, 27 Mar: 4 / 200 = 2.0%. (selected); By plant, month: North, March: 22 / 1,000 = 2.2%. (selected); Stored rate column: None exists, so nothing can be averaged. (excluded). Relationships: unit_defect_rate → By line, day: MEASURE at line-day; unit_defect_rate → By plant, month: MEASURE at plant-month.\n\nA non-unique join key: Joined on line_id, N1 matches two rows; the documentation says the first matching row is selected. Nodes: fact_inspection: N1 inspections from both months. (context); Join on line_id: Two dim_line rows match N1. (warning); First matching row: One version chosen per inspection. (warning); Supervisor attribution: Totals hold; the supervisor can be wrong. (warning). Relationships: fact_inspection → Join on line_id: line_id; Join on line_id → First matching row: several rows; First matching row → Supervisor attribution: arbitrary version.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values taken from the local Lab L11 run (Apache Spark 4.0.4 on one machine); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-metricviews",
+    "dbxfe-modeling-claim-metricjoins",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "definition",
+     "title": "Defined once",
+     "explanation": "The YAML names the source fact, a join on the surrogate key and three measures.",
+     "nodes": [
+      {
+       "id": "src",
+       "label": "fact_inspection",
+       "detail": "Source of the metric view.",
+       "status": "context"
+      },
+      {
+       "id": "jline",
+       "label": "Join: dim_line",
+       "detail": "On line_sk, many-to-one.",
+       "status": "context"
+      },
+      {
+       "id": "mdef",
+       "label": "defective_pieces",
+       "detail": "SUM(defective_pieces).",
+       "status": "selected"
+      },
+      {
+       "id": "mins",
+       "label": "inspected_pieces",
+       "detail": "SUM(inspected_pieces).",
+       "status": "selected"
+      },
+      {
+       "id": "rate",
+       "label": "unit_defect_rate",
+       "detail": "Defective measure divided by inspected measure.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "src",
+       "to": "jline",
+       "label": "line_sk"
+      },
+      {
+       "from": "src",
+       "to": "mdef",
+       "label": "aggregates"
+      },
+      {
+       "from": "src",
+       "to": "mins",
+       "label": "aggregates"
+      },
+      {
+       "from": "mdef",
+       "to": "rate",
+       "label": "MEASURE()"
+      },
+      {
+       "from": "mins",
+       "to": "rate",
+       "label": "MEASURE()"
+      }
+     ]
+    },
+    {
+     "id": "queries",
+     "title": "Queried at two grains",
+     "explanation": "Grouped by line and day, then by plant and month; each value is rebuilt from its parts.",
+     "nodes": [
+      {
+       "id": "rate",
+       "label": "unit_defect_rate",
+       "detail": "One definition.",
+       "status": "selected"
+      },
+      {
+       "id": "qline",
+       "label": "By line, day",
+       "detail": "N1, 27 Mar: 4 / 200 = 2.0%.",
+       "status": "selected"
+      },
+      {
+       "id": "qmonth",
+       "label": "By plant, month",
+       "detail": "North, March: 22 / 1,000 = 2.2%.",
+       "status": "selected"
+      },
+      {
+       "id": "stored",
+       "label": "Stored rate column",
+       "detail": "None exists, so nothing can be averaged.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "rate",
+       "to": "qline",
+       "label": "MEASURE at line-day"
+      },
+      {
+       "from": "rate",
+       "to": "qmonth",
+       "label": "MEASURE at plant-month"
+      }
+     ]
+    },
+    {
+     "id": "firstmatch",
+     "title": "A non-unique join key",
+     "explanation": "Joined on line_id, N1 matches two rows; the documentation says the first matching row is selected.",
+     "nodes": [
+      {
+       "id": "src",
+       "label": "fact_inspection",
+       "detail": "N1 inspections from both months.",
+       "status": "context"
+      },
+      {
+       "id": "jline",
+       "label": "Join on line_id",
+       "detail": "Two dim_line rows match N1.",
+       "status": "warning"
+      },
+      {
+       "id": "pick",
+       "label": "First matching row",
+       "detail": "One version chosen per inspection.",
+       "status": "warning"
+      },
+      {
+       "id": "attr",
+       "label": "Supervisor attribution",
+       "detail": "Totals hold; the supervisor can be wrong.",
+       "status": "warning"
+      }
+     ],
+     "connections": [
+      {
+       "from": "src",
+       "to": "jline",
+       "label": "line_id"
+      },
+      {
+       "from": "jline",
+       "to": "pick",
+       "label": "several rows"
+      },
+      {
+       "from": "pick",
+       "to": "attr",
+       "label": "arbitrary version"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-wide-visual",
+   "kind": "comparison",
+   "title": "A wide table beside the star",
+   "alt": "Two tables: the star and a wide table compared on five questions, then a late supervisor correction reaching one and not the other.",
+   "caption": "The wide table is a derived snapshot; corrections land in the star and reach it only by a rebuild. Synthetic teaching example.",
+   "textEquivalent": "Star versus wide table: Five questions a model owner asks of each shape. Table columns: question, star, wide table. Rows: question one row means; star stated per table; wide table the fact's grain, if built with care | question supervisor correction; star one dimension row; wide table every affected fact row | question new attribute; star one column in one dimension; wide table a rebuild | question as-was or as-is; star chosen per query; wide table frozen at build | question subtotal rows; star kept in their own table; wide table nothing stops them.\n\nA late correction: Version 101's supervisor was mistyped; the star fixes one row, the wide table keeps the old name until rebuilt. Table columns: inspection, day, star (as-was, now), wide table (built 1 Apr). Rows: inspection I-01; day 26 Mar; star (as-was, now) D. Varga; wide table (built 1 Apr) D. Vargas | inspection I-06; day 27 Mar; star (as-was, now) D. Varga; wide table (built 1 Apr) D. Vargas | inspection I-09; day 27 Mar; star (as-was, now) D. Varga; wide table (built 1 Apr) D. Vargas | inspection I-10; day 30 Mar; star (as-was, now) P. Nair; wide table (built 1 Apr) P. Nair.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-modeling-claim-star",
+    "dbxfe-modeling-claim-medallion",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "states": [
+    {
+     "id": "compare",
+     "title": "Star versus wide table",
+     "explanation": "Five questions a model owner asks of each shape.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "question",
+       "star",
+       "wide table"
+      ],
+      "rows": [
+       [
+        "one row means",
+        "stated per table",
+        "the fact's grain, if built with care"
+       ],
+       [
+        "supervisor correction",
+        "one dimension row",
+        "every affected fact row"
+       ],
+       [
+        "new attribute",
+        "one column in one dimension",
+        "a rebuild"
+       ],
+       [
+        "as-was or as-is",
+        "chosen per query",
+        "frozen at build"
+       ],
+       [
+        "subtotal rows",
+        "kept in their own table",
+        "nothing stops them"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "correction",
+     "title": "A late correction",
+     "explanation": "Version 101's supervisor was mistyped; the star fixes one row, the wide table keeps the old name until rebuilt.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "inspection",
+       "day",
+       "star (as-was, now)",
+       "wide table (built 1 Apr)"
+      ],
+      "rows": [
+       [
+        "I-01",
+        "26 Mar",
+        "D. Varga",
+        "D. Vargas"
+       ],
+       [
+        "I-06",
+        "27 Mar",
+        "D. Varga",
+        "D. Vargas"
+       ],
+       [
+        "I-09",
+        "27 Mar",
+        "D. Varga",
+        "D. Vargas"
+       ],
+       [
+        "I-10",
+        "30 Mar",
+        "P. Nair",
+        "P. Nair"
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-modeling-medallion-question",
+   "revision": "1",
+   "prompt": "Four tables sit in Cinderline's gold schema. Which one lets a dashboard author know what a single row represents without opening the pipeline code?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-medallion-question-a",
+     "text": "gold_quality",
+     "rationale": "A layer name says the data reached business-ready quality; it says nothing about grain, keys or measures."
+    },
+    {
+     "id": "dbxfe-modeling-medallion-question-b",
+     "text": "fact_inspection, commented 'one row per accepted inspection'",
+     "rationale": "Correct: an entity name plus a declared grain is exactly what a consumer needs, whatever the layer."
+    },
+    {
+     "id": "dbxfe-modeling-medallion-question-c",
+     "text": "silver_to_gold_quality_v2",
+     "rationale": "It names a pipeline step and a version, which describe how the table was made, not what a row is."
+    },
+    {
+     "id": "dbxfe-modeling-medallion-question-d",
+     "text": "quality_final",
+     "rationale": "'Final' is a status claim about readiness; a reader still cannot tell an inspection row from a daily row."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-medallion-question-b",
+   "conceptIds": [
+    "dbxfe-modeling-medallion-concept",
+    "dbxfe-modeling-grain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-medallion",
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-grain-question",
+   "revision": "1",
+   "prompt": "A table holds N1's two inspections for 27 March (120 and 80 pieces inspected) and, in the same table, a daily subtotal row for N1 on 27 March (200 pieces). What does SUM(inspected) return for N1 on that day?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-grain-question-a",
+     "text": "200",
+     "rationale": "That is the answer to the business question, but the stored subtotal row is summed along with the inspections."
+    },
+    {
+     "id": "dbxfe-modeling-grain-question-b",
+     "text": "400",
+     "rationale": "Correct: SQL adds rows, not meanings, so 120 + 80 + 200 = 400; the table mixes two grains."
+    },
+    {
+     "id": "dbxfe-modeling-grain-question-c",
+     "text": "280",
+     "rationale": "280 would need one inspection to be skipped; SUM skips no row of the group."
+    },
+    {
+     "id": "dbxfe-modeling-grain-question-d",
+     "text": "An error, because the rows have different grains",
+     "rationale": "SQL has no notion of grain; mixed rows sum silently, which is why the grain must be declared and tested."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-grain-question-b",
+   "conceptIds": [
+    "dbxfe-modeling-grain-concept",
+    "dbxfe-modeling-fact-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-conformed-question",
+   "revision": "1",
+   "prompt": "Inspections use line code N1 from dim_line; the maintenance downtime fact arrives with its own code NORTH-1 for the same line. A line-day report aggregates both facts and joins them on line and business day. What does the report show for N1?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-conformed-question-a",
+     "text": "N1's inspections with blank downtime on every day",
+     "rationale": "Correct: the codes never match, so the join finds no downtime for N1 and raises no error."
+    },
+    {
+     "id": "dbxfe-modeling-conformed-question-b",
+     "text": "The downtime matched to N1 by the similarity of the two codes",
+     "rationale": "Joins compare values exactly; no engine infers that NORTH-1 and N1 are the same line."
+    },
+    {
+     "id": "dbxfe-modeling-conformed-question-c",
+     "text": "N1's defect rate doubled",
+     "rationale": "The facts were aggregated to line-day first, so nothing multiplies; the downtime side is simply missing."
+    },
+    {
+     "id": "dbxfe-modeling-conformed-question-d",
+     "text": "A type error, because the codes differ in format",
+     "rationale": "Both codes are strings, so the comparison is valid and just returns no match."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-conformed-question-a",
+   "conceptIds": [
+    "dbxfe-modeling-conformed-concept",
+    "dbxfe-modeling-dimension-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-conformed",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-history-question",
+   "revision": "1",
+   "prompt": "N1's supervisor changed from D. Varga to P. Nair on 30 March; the line dimension keeps both versions as type 2 rows with valid_to exclusive. Inspection I-06 happened on 27 March. Which reading attributes I-06 to D. Varga?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-history-question-a",
+     "text": "As-was: join the fact's line_sk, the version valid on 27 March",
+     "rationale": "Correct: the surrogate key resolved at load points to version 101, D. Varga's."
+    },
+    {
+     "id": "dbxfe-modeling-history-question-b",
+     "text": "As-is: join the current row of each line",
+     "rationale": "The current row is version 102, so this reading shows P. Nair for every N1 inspection."
+    },
+    {
+     "id": "dbxfe-modeling-history-question-c",
+     "text": "Both readings, because the inspection itself never changed",
+     "rationale": "The fact is unchanged, but the two readings join different dimension rows and so name different supervisors."
+    },
+    {
+     "id": "dbxfe-modeling-history-question-d",
+     "text": "Neither, because type 2 loses the old supervisor",
+     "rationale": "Type 2 keeps the old version as its own row; it is type 1 that overwrites it."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-history-question-a",
+   "conceptIds": [
+    "dbxfe-modeling-scd-concept",
+    "dbxfe-modeling-surrogate-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-type2",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-manytomany-question",
+   "revision": "1",
+   "prompt": "The baseline has 22 inspections. Line N1 has 8 of them and two versions in dim_line; lines N2, S1 and S2 have one version each and 4, 5 and 4 inspections; line N3 (1 inspection) is missing from the dimension. How many rows does an inner join on line_id alone return?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-manytomany-question-a",
+     "text": "22",
+     "rationale": "This assumes one match per inspection, but each N1 inspection meets two versions and N3 meets none."
+    },
+    {
+     "id": "dbxfe-modeling-manytomany-question-b",
+     "text": "29",
+     "rationale": "Correct: 8 × 2 + 4 + 5 + 4 = 29; N1 is doubled and the N3 inspection is dropped by the inner join."
+    },
+    {
+     "id": "dbxfe-modeling-manytomany-question-c",
+     "text": "30",
+     "rationale": "30 is 22 + 8, forgetting that the inner join also drops the unmatched N3 inspection."
+    },
+    {
+     "id": "dbxfe-modeling-manytomany-question-d",
+     "text": "44",
+     "rationale": "Only N1 has two versions; the other lines each match exactly once."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-manytomany-question-b",
+   "conceptIds": [
+    "dbxfe-modeling-cardinality-concept",
+    "dbxfe-modeling-scd-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-join",
+    "dbxfe-modeling-claim-type2",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-unknown-question",
+   "revision": "1",
+   "prompt": "Inspection I-21 is on line N3, which is not yet in dim_line. Which approach keeps the period total at 2,440 pieces and still tells readers something is wrong?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-unknown-question-a",
+     "text": "Inner join facts to dim_line",
+     "rationale": "The inner join drops I-21, so the total falls to 2,390 and nothing says why."
+    },
+    {
+     "id": "dbxfe-modeling-unknown-question-b",
+     "text": "Left join and group by plant_id",
+     "rationale": "The total is kept, but under a NULL plant that many tools hide or show without a name."
+    },
+    {
+     "id": "dbxfe-modeling-unknown-question-c",
+     "text": "Map unmatched facts to the unknown member (line_sk -1, plant UNKNOWN) and list them",
+     "rationale": "Correct: every piece is counted and the orphan list names the missing line for follow-up."
+    },
+    {
+     "id": "dbxfe-modeling-unknown-question-d",
+     "text": "Drop facts whose line is unknown before loading",
+     "rationale": "Filtering hides the defect upstream; the report is consistent but silently incomplete."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-unknown-question-c",
+   "conceptIds": [
+    "dbxfe-modeling-unknown-concept",
+    "dbxfe-modeling-cardinality-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-nulls",
+    "dbxfe-modeling-claim-join",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-units-question",
+   "revision": "1",
+   "prompt": "South on 27 March: S1 inspected 180 pieces with 3 defective; S2 inspected 10 cases with 1 defective case, at 12 pieces per case. What is South's plant-day unit defect rate under the contract?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-units-question-a",
+     "text": "2.1% (4 / 190)",
+     "rationale": "This adds cases to pieces; the contract converts both quantities to pieces before any sum."
+    },
+    {
+     "id": "dbxfe-modeling-units-question-b",
+     "text": "5.0% (15 / 300)",
+     "rationale": "Correct: S2 becomes 120 inspected and 12 defective pieces, so South is (3 + 12) / (180 + 120)."
+    },
+    {
+     "id": "dbxfe-modeling-units-question-c",
+     "text": "5.8% (the average of 1.7% and 10%)",
+     "rationale": "Averaging line rates weights the two lines equally; the contract sums parts and divides once."
+    },
+    {
+     "id": "dbxfe-modeling-units-question-d",
+     "text": "10% (S2's rate)",
+     "rationale": "S2's rate is right for S2 alone; the plant value includes S1's pieces too."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-units-question-b",
+   "conceptIds": [
+    "dbxfe-modeling-unit-concept",
+    "dbxfe-modeling-additivity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-additivity-question",
+   "revision": "1",
+   "prompt": "North on 27 March: N1 inspected 200 pieces with 4 defective (2.0%) and N2 inspected 100 with 5 defective (5.0%). A dashboard tile shows North at 3.5%. What went wrong, and what value does the contract give?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-additivity-question-a",
+     "text": "It averaged the line rates; the contract gives 9 / 300 = 3.0%",
+     "rationale": "Correct: rates are non-additive, so the plant value sums the parts and divides once."
+    },
+    {
+     "id": "dbxfe-modeling-additivity-question-b",
+     "text": "Nothing: 3.5% is North's plant rate",
+     "rationale": "3.5% weights N2's 100 pieces as heavily as N1's 200, which no pieces-based rate does."
+    },
+    {
+     "id": "dbxfe-modeling-additivity-question-c",
+     "text": "It double counted N2; the value should be 2.0%",
+     "rationale": "No row was duplicated; 2.0% is N1's rate alone and ignores N2's defects."
+    },
+    {
+     "id": "dbxfe-modeling-additivity-question-d",
+     "text": "It should show the worse line, 5.0%",
+     "rationale": "The worst line is a different question; the contract defines the plant rate over all of its pieces."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-additivity-question-a",
+   "conceptIds": [
+    "dbxfe-modeling-additivity-concept",
+    "dbxfe-modeling-denominator-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-grains-question",
+   "revision": "1",
+   "prompt": "A targets table holds one row per plant per month (North, March: 2.0%). An analyst joins it to North's four March plant-day rows on plant and month, then sums the target column. What does the sum show, and why?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-grains-question-a",
+     "text": "8.0%: the monthly target repeats on each daily row, so the sum means nothing",
+     "rationale": "Correct: the coarser side repeats at the finer grain; compare the target with the plant-month rate instead."
+    },
+    {
+     "id": "dbxfe-modeling-grains-question-b",
+     "text": "2.0%: a join keeps each table's own grain",
+     "rationale": "A join produces one row per matching pair, so the monthly row is copied to four days."
+    },
+    {
+     "id": "dbxfe-modeling-grains-question-c",
+     "text": "An error, because the two tables have different grains",
+     "rationale": "SQL cannot see grains; the join succeeds and the arithmetic is silently meaningless."
+    },
+    {
+     "id": "dbxfe-modeling-grains-question-d",
+     "text": "0.5% per day, because the join spreads the target",
+     "rationale": "Spreading a monthly quantity is an allocation rule someone must define; a join only copies."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-grains-question-a",
+   "conceptIds": [
+    "dbxfe-modeling-grain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-claim-join",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-denominator-question",
+   "revision": "1",
+   "prompt": "Line N2 on 31 March has one inspection with 0 pieces inspected. Spark 4, at its default settings, runs SUM(defective_pieces) / SUM(inspected_pieces) grouped by line and day. What happens?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-denominator-question-a",
+     "text": "The query fails with DIVIDE_BY_ZERO because ANSI mode is on by default",
+     "rationale": "Correct: Spark 4 enables ANSI mode, and the local lab run raised exactly this condition."
+    },
+    {
+     "id": "dbxfe-modeling-denominator-question-b",
+     "text": "N2's rate is returned as 0",
+     "rationale": "Zero would claim a perfect day; nothing was inspected, so there is no rate at all."
+    },
+    {
+     "id": "dbxfe-modeling-denominator-question-c",
+     "text": "N2's rate is returned as NULL",
+     "rationale": "That is what try_divide does; the plain division operator fails under ANSI mode."
+    },
+    {
+     "id": "dbxfe-modeling-denominator-question-d",
+     "text": "N2's rate is returned as Infinity",
+     "rationale": "Spark does not return an infinite rate here; with ANSI off it returns NULL, with ANSI on it fails."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-denominator-question-a",
+   "conceptIds": [
+    "dbxfe-modeling-denominator-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-ansi",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-window-question",
+   "revision": "1",
+   "prompt": "The contract's huddle tile shows the defect rate over the last three business days of the plant calendar, where weekends are not business days. On Monday 30 March, which days does the tile cover?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-window-question-a",
+     "text": "Saturday 28, Sunday 29 and Monday 30 March",
+     "rationale": "Those are three calendar days, holding only one working day, which the contract rules out."
+    },
+    {
+     "id": "dbxfe-modeling-window-question-b",
+     "text": "Thursday 26, Friday 27 and Monday 30 March",
+     "rationale": "Correct: counting back only business days from Monday skips the weekend."
+    },
+    {
+     "id": "dbxfe-modeling-window-question-c",
+     "text": "Friday 27, Monday 30 and Tuesday 31 March",
+     "rationale": "Tuesday is after the as-of date; a trailing window ends on the day it is shown."
+    },
+    {
+     "id": "dbxfe-modeling-window-question-d",
+     "text": "Only Monday 30 March, because the weekend breaks the window",
+     "rationale": "A business-day window skips non-business days rather than stopping at them."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-window-question-b",
+   "conceptIds": [
+    "dbxfe-modeling-window-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-semantic-question",
+   "revision": "1",
+   "prompt": "A metric view's YAML joins dim_line on line_id, and line N1 has two type 2 rows. Going by the metric view documentation, what happens to N1's inspections when the rate is queried by supervisor?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-semantic-question-a",
+     "text": "Each inspection is counted once per version, doubling N1",
+     "rationale": "Metric view joins are many-to-one; the documented behaviour for several matches is to take one row."
+    },
+    {
+     "id": "dbxfe-modeling-semantic-question-b",
+     "text": "Each inspection takes the first matching row, so totals hold but the supervisor can be the wrong version",
+     "rationale": "Correct: the joins page says the first matching row is selected, so attribution becomes arbitrary."
+    },
+    {
+     "id": "dbxfe-modeling-semantic-question-c",
+     "text": "The engine picks the version valid on each inspection's date",
+     "rationale": "The join condition is line_id only; nothing tells the engine about validity dates."
+    },
+    {
+     "id": "dbxfe-modeling-semantic-question-d",
+     "text": "The metric view rejects the join because the key is not unique",
+     "rationale": "The documentation describes what happens when several rows match, so do not rely on a refusal to protect you."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-semantic-question-b",
+   "conceptIds": [
+    "dbxfe-modeling-semantic-concept",
+    "dbxfe-modeling-cardinality-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-metricjoins",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-modeling-star-self",
+   "revision": "1",
+   "prompt": "Cinderline adds machine downtime events (line, start and end time, reason code). Sketch the fact's grain, the dimensions it should share with the inspection star, and the key that makes each of its joins many-to-one.",
+   "modelAnswer": "Grain: one downtime segment per line per business day, splitting an event that crosses midnight so each segment belongs to one day. Shared dimensions: dim_line (join on line_sk resolved at load to the version valid on the segment's day), dim_date (business_date), dim_shift (shift_id). New dimension: dim_reason keyed by reason_code. Measure: stopped minutes, additive. Each key is unique in its dimension, so each join is many-to-one; unmatched codes go to unknown members.",
+   "reasoning": "It declares the grain first, reuses conformed dimensions so downtime can sit beside inspections, and names a unique key for every join; keeping whole events as the grain is acceptable if the day rule is stated.",
+   "conceptIds": [
+    "dbxfe-modeling-star-concept",
+    "dbxfe-modeling-fact-concept",
+    "dbxfe-modeling-dimension-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-star",
+    "dbxfe-modeling-claim-conformed",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-contract-self",
+   "revision": "1",
+   "prompt": "Draft a contract for first-pass yield at line-day grain: units that pass inspection without rework divided by units inspected. Name each clause and the test that would catch its violation.",
+   "modelAnswer": "Grain: one line per business day; plant and month from summed parts. Numerator: pieces passing without rework in accepted inspections. Denominator: inspected pieces of the same inspections, so a quarantined inspection leaves both. Unit: pieces, cases converted. Period: business day 00:00 to 23:59:59 local, calendar month, a three-business-day window. Empty cases: no_inspections and no_units give no rate. Unknown member for missing lines. Owner: quality lead, version 1. Tests: parts reconcile across grains, zero pieces give no rate, cases converted, orphans kept, history joined on its validity window, window from the plant calendar.",
+   "reasoning": "Each clause mirrors the unit defect rate contract and names its test; the open item is how rework recorded on a later day is treated, which belongs to the owner, not the analyst.",
+   "conceptIds": [
+    "dbxfe-modeling-contract-concept",
+    "dbxfe-modeling-denominator-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-wide-self",
+   "revision": "1",
+   "prompt": "The BI team asks for one wide table instead of the star. When would you publish it, and what would you require of it before anyone reads it?",
+   "modelAnswer": "Publish it as a derived view or table of the star when readers need a single table, never as the place where data is corrected. Require: its grain stated (one row per accepted inspection), a row count equal to the fact's, point-in-time keys so attribution is as-was (or a stated as-is choice), unknown members instead of dropped rows, a rebuild on every dimension change, and a note that rates must still be recomputed from summed parts, not averaged across its rows.",
+   "reasoning": "The star stays the source of truth and the wide table a reproducible snapshot; refusing a wide table outright is also defensible when attributes change often or both history readings are needed.",
+   "conceptIds": [
+    "dbxfe-modeling-wide-concept",
+    "dbxfe-modeling-star-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-star",
+    "dbxfe-modeling-claim-medallion",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-modeling-medallion",
+   "version": "1.0.0",
+   "title": "A gold label does not say what a row is",
+   "outcome": "Tell a medallion layer name from a modeled entity, and name tables by entity and declared grain.",
+   "explanation": "The [[dbxfe-modeling-medallion-concept|medallion]] layers describe refinement: bronze keeps what arrived, silver is validated, gold is shaped for business use. A layer is not a model. In the first state `gold_quality` sits in gold, yet nobody can say whether one of its rows is an inspection, a line-day or both. In the second state the same layer holds `fact_inspection`, `dim_line` and a line-day metric, each with a stated [[dbxfe-modeling-grain-concept|grain]]. Notice that nothing moved between layers; only the entities became explicit.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-grain",
+   "conceptIds": [
+    "dbxfe-modeling-medallion-concept",
+    "dbxfe-modeling-grain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-medallion",
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-medallion-visual",
+   "questionIds": [
+    "dbxfe-modeling-medallion-question"
+   ],
+   "hint": "Ask what a single row of gold_quality represents; the layer name cannot answer.",
+   "handbook": {
+    "markdown": "Databricks describes the medallion architecture as a series of layers that denote the quality of data in the lakehouse: bronze for raw ingested data, silver for validated and cleaned data, gold for enriched, business-ready data. Its data warehousing page adds that the gold layer is a presentation layer that can hold data marts, frequently dimensional models such as a star schema, a snowflake or flattened tables. Both statements are about readiness. Neither tells a reader what a row means.\n\nA consumer of `gold_quality` still has three questions the label cannot answer: what does one row represent, which key identifies it, and which columns may be summed? Answer them in the name and the table comment, and keep the layer as the schema or catalog it lives in. This ran on local Spark 4.0.4 in the lab environment:\n\n```sql\nCREATE TABLE quality.fact_inspection (\n  inspection_id STRING NOT NULL, line_sk INT NOT NULL, shift_id STRING,\n  business_date DATE, inspected_pieces BIGINT, defective_pieces BIGINT)\nCOMMENT 'One row per accepted inspection; line_sk is the line version valid on business_date';\n```\n\nWhat fails without it: two teams read `gold_quality` as two grains and both reports look plausible. What to inspect: whether every gold table states a grain in one sentence and whether the key that grain implies is unique (a `GROUP BY key HAVING COUNT(*) > 1` query returning no rows). When not to rename anything: a catalog convention of bronze, silver and gold schemas is fine as a namespace. How to explain it to a stakeholder: the layer says how clean the data is; the model says what it means.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-grain"
+    ]
+   },
+   "recap": "A medallion layer says how refined data is; the entity name and the declared grain say what a row means.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-grain",
+   "version": "1.0.0",
+   "title": "Declare the grain before any column",
+   "outcome": "Write a table's grain in one sentence and predict what a mixed-grain table does to a sum.",
+   "explanation": "The [[dbxfe-modeling-grain-concept|grain]] says what one row represents, and it is decided before any column. In the first state a table holds N1's two inspections for 27 March and a daily subtotal row, so `SUM(inspected)` returns 400: SQL adds rows, not meanings. The second state declares one row per accepted inspection and the sum is 200. The third derives the metric's own grain, one line per business day. Notice that the subtotal was not bad data; it was a second grain in the same table.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-grain",
+   "conceptIds": [
+    "dbxfe-modeling-grain-concept",
+    "dbxfe-modeling-fact-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-grain-visual",
+   "samajh": {
+    "text": "Socho sabzi mandi ka bill: har line pe ek item hai, tamatar ek kilo, pyaaz do kilo. Agar kisi ne usi list mein neeche ek aur line bana di, 'aaj ka total teen kilo', toh jo bhi saari lines jodega use chhe kilo milega. Bill mein koi galat number nahi likha; bas do alag cheezein ek hi list mein aa gayi, item ki line aur din ka total.",
+    "mapping": "Each bill line is a fact row at the declared grain of one item, and the written total is a row at a coarser grain mixed into the same table.",
+    "boundary": "A person can see which bill line is a total; a SQL SUM cannot, so the grain must be declared and tested rather than inferred from the values."
+   },
+   "questionIds": [
+    "dbxfe-modeling-grain-question"
+   ],
+   "handbook": {
+    "markdown": "Kimball's technique pages call declaring the grain the pivotal step in a dimensional design: it establishes exactly what a single fact row represents, and it comes before dimensions or facts because every candidate column must be true at that grain. They recommend the atomic grain, the lowest level a business process captures, because it withstands questions nobody predicted.\n\nCinderline's inspection station records one event per inspection, so the atomic grain of `fact_inspection` is one accepted inspection. The metric has a coarser grain, one line per business day, and it is derived from the atomic rows, never stored beside them.\n\nA declared grain implies a key, and the key can be tested:\n\n```sql\nSELECT inspection_id, COUNT(*) AS copies\nFROM fact_inspection\nGROUP BY inspection_id\nHAVING COUNT(*) > 1;          -- Lab L11 expects no rows\n```\n\nA mixed-grain table fails quietly. With I-06 (120 pieces, 3 defective), I-09 (80, 1) and a stored subtotal (200, 4) for N1 on 27 March, the sums are 400 and 8. The rate built on them is still 2.0%, because both parts doubled, so a rate check alone would pass while every total is wrong. Compare parts, not only ratios.\n\nWhen not to split: a published rollup may carry several grains if a column states the grain of each row and every consumer filters on it; that is a report table, not a fact. What to inspect: row counts per candidate key, and whether any row describes a group of events rather than one event.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-grain"
+    ]
+   },
+   "recap": "Say what one row means before choosing columns, and test that the grain's key is unique.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-star",
+   "version": "1.0.0",
+   "title": "Facts record events; dimensions describe them",
+   "outcome": "Place measures in a fact table and descriptive attributes in dimensions joined many-to-one.",
+   "explanation": "A [[dbxfe-modeling-fact-concept|fact table]] holds measured events at its grain: one accepted inspection with pieces inspected and pieces defective. [[dbxfe-modeling-dimension-concept|Dimensions]] hold the words people filter by: line, plant, shift and the plant calendar. Joined by keys, they form a [[dbxfe-modeling-star-concept|star]]. The first state shows Cinderline's whole star; the second shows a plant-day query touching only the line, plant and date dimensions. Notice that units are converted when the fact is loaded, so no report can forget them.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-grain",
+   "conceptIds": [
+    "dbxfe-modeling-fact-concept",
+    "dbxfe-modeling-dimension-concept",
+    "dbxfe-modeling-star-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-star",
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-star-visual",
+   "questionIds": [
+    "dbxfe-modeling-star-self"
+   ],
+   "handbook": {
+    "markdown": "Kimball's pages describe a star schema as fact tables linked to dimension tables through primary and foreign keys. Dimensions are usually wide, flat and denormalized, carrying many descriptive attributes, and fixed-depth hierarchies such as line to plant are collapsed into them. The lab keeps plant as its own small dimension because the plant-day report needs the list of plants even on days without inspections; each line row still carries its `plant_id`.\n\n| Table | Grain | Key | Holds |\n|---|---|---|---|\n| fact_inspection | one accepted inspection | inspection_id | line_sk, shift_id, business_date, pieces inspected and defective |\n| dim_line | one line version | line_sk | line_id, plant_id, supervisor, valid_from, valid_to |\n| dim_plant | one plant | plant_id | name |\n| dim_shift | one shift | shift_id | A, B, C (C crosses midnight) |\n| dim_date | one calendar date | date | is_business_day, month |\n\nEvery fact-to-dimension join must be many-to-one: each fact row finds at most one dimension row. Count before and after to prove it (both are 22 in the lab):\n\n```sql\nSELECT (SELECT COUNT(*) FROM fact_inspection) AS facts,\n       (SELECT COUNT(*) FROM fact_inspection f\n          JOIN dim_line l ON l.line_sk = f.line_sk) AS joined;\n```\n\nWhy use a star: every analyst reads the same plant for a line, the same business day for a timestamp and the same unit for a quantity. When not to: a one-off extract or a single lookup does not need dimensions. What fails without one: each report re-derives those rules, slightly differently. How to explain it: the fact says what happened and how much; the dimensions say where, when and under whom.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-grain"
+    ]
+   },
+   "recap": "Facts hold the measured events at one grain; dimensions hold the descriptions, reached through many-to-one keys.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-conformed",
+   "version": "1.0.0",
+   "title": "Conformed keys let two facts meet",
+   "outcome": "Explain how a conformed dimension lets two facts be reported side by side, and what a local code breaks.",
+   "explanation": "A [[dbxfe-modeling-conformed-concept|conformed dimension]] carries the same keys and attribute values for every fact that uses it. In the first state inspections and machine downtime both use dim_line's N1 and the same business day, so a report can set 200 inspected pieces beside 45 stopped minutes. In the second state downtime arrives coded NORTH-1 from the maintenance system. Notice that nothing errors: the report simply shows no downtime for N1, an answer that is plausible and wrong.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-conformed-concept",
+    "dbxfe-modeling-dimension-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-conformed",
+    "dbxfe-modeling-claim-join",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-conformed-visual",
+   "questionIds": [
+    "dbxfe-modeling-conformed-question"
+   ],
+   "handbook": {
+    "markdown": "Kimball's conformed dimension page says dimension tables conform when attributes in separate tables share column names and domain contents, so information from separate fact tables can be combined in one report through those shared attributes. That combination is called drilling across. The downtime fact here is a synthetic extension of the lab's star.\n\nThe safe pattern aggregates each fact to the shared grain first and then joins on the conformed keys:\n\n```sql\nWITH q AS (SELECT line_sk, business_date, SUM(inspected_pieces) AS inspected\n           FROM fact_inspection GROUP BY line_sk, business_date),\n     d AS (SELECT line_sk, business_date, SUM(stopped_minutes) AS stopped\n           FROM fact_downtime GROUP BY line_sk, business_date)\nSELECT COALESCE(q.line_sk, d.line_sk) AS line_sk,\n       COALESCE(q.business_date, d.business_date) AS business_date,\n       q.inspected, d.stopped\nFROM q FULL OUTER JOIN d\n  ON q.line_sk = d.line_sk AND q.business_date = d.business_date;\n```\n\nJoining the two facts row to row instead pairs every inspection with every downtime event of that line-day and multiplies both sums: a many-to-many join between facts.\n\nConform once, in the dimension: map NORTH-1 to N1 when maintenance rows are loaded and keep the mapping as governed reference rows. Conforming in each report is how two dashboards reach two answers. What to inspect: the orphan count per fact per dimension on every load (the lab's `orphans_line` statement), and whether the key domains of two facts overlap as expected. When not to share a dimension: one used by a single fact need not be conformed, though it should still use the enterprise code where one exists.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-keys"
+    ]
+   },
+   "recap": "Conformed dimensions give two facts the same keys and values, so they can be aggregated separately and reported side by side.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-history",
+   "version": "1.0.0",
+   "title": "A new supervisor is a new dimension row",
+   "outcome": "Choose type 1 or type 2 for a changing attribute and predict the as-was and as-is attribution.",
+   "explanation": "A [[dbxfe-modeling-scd-concept|slowly changing]] attribute needs a decision. On 30 March line N1's supervisor changes from D. Varga to P. Nair. Type 2, in the first state, closes version 101 and opens version 102 with a new [[dbxfe-modeling-surrogate-concept|surrogate key]], so the 27 March inspection stays with D. Varga: the as-was reading. Type 1, in the second state, overwrites the only row, and the same inspection now reads P. Nair: as-is. Notice that each answers a different question; the contract says which one a report uses.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-scd-concept",
+    "dbxfe-modeling-surrogate-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-type2",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-history-visual",
+   "samajh": {
+    "text": "Ghar badla toh ration card pe naya pata aa gaya. Ab purane bijli ke bill, jo purane ghar ke the, kis pate pe dikhne chahiye? Agar purana pata mita ke naya likh diya, toh purane bill bhi naye ghar ke lagenge. Agar naya card bana aur purane pe 'yahan tak valid' likh ke rakh liya, toh har bill apne waqt ke ghar se judta hai.",
+    "mapping": "The address is the supervisor attribute, the old and new cards are type 2 versions with validity dates, and each bill is a fact joined to the version valid on its date.",
+    "boundary": "A card change concerns one household; a type 2 dimension must also fix whether the end date is inclusive or exclusive, which the analogy leaves open."
+   },
+   "questionIds": [
+    "dbxfe-modeling-history-question"
+   ],
+   "handbook": {
+    "markdown": "Kimball's type 2 technique adds a new dimension row with the updated attribute values and a new surrogate key, which facts use from the change onward. Type 1 overwrites the attribute in place, so all history reads as the current value.\n\nThe lab's line dimension is type 2 on supervisor:\n\n| line_sk | line_id | supervisor | valid_from | valid_to |\n|---|---|---|---|---|\n| 101 | N1 | D. Varga | 2026-01-05 | 2026-03-30 |\n| 102 | N1 | P. Nair | 2026-03-30 | NULL |\n\nThe boundary rule is part of the model: `valid_from` inclusive, `valid_to` exclusive, NULL meaning still valid. Written with `<=` on `valid_to`, an inspection on 30 March matches both versions. The transfer set pins the rule down: S2's new version starts on 30 April, the day of inspection T-09, and T-09 belongs to the new supervisor.\n\nBoth readings are legitimate and both keep every fact once:\n\n```sql\n-- as-was: the version valid on the inspection's business day\nSELECT l.supervisor, SUM(f.inspected_pieces) AS inspected\nFROM fact_inspection f JOIN dim_line l ON l.line_sk = f.line_sk\nGROUP BY l.supervisor;\n-- as-is: today's supervisor for every inspection of the line\nSELECT c.supervisor, SUM(f.inspected_pieces) AS inspected\nFROM fact_inspection f JOIN dim_line l ON l.line_sk = f.line_sk\nJOIN dim_line c ON c.line_id = l.line_id AND c.is_current\nGROUP BY c.supervisor;\n```\n\nIn the lab, as-was gives D. Varga 350 pieces and P. Nair 650; as-is gives P. Nair all 1,000. A performance review needs as-was; a staffing view may want as-is. What to inspect before trusting either: overlapping versions, and lines without exactly one current row, both checked by the lab before any report runs.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-keys"
+    ]
+   },
+   "recap": "Type 2 keeps each version with its own surrogate key and dates; as-was and as-is are two readings the contract must choose between.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-manytomany",
+   "version": "1.0.0",
+   "title": "History joined on its natural key counts twice",
+   "outcome": "Predict the fan-out of a join on a non-unique key and repair it with a point-in-time join.",
+   "explanation": "A type 2 dimension repeats its natural key, so joining facts on `line_id` alone is a many-to-many join: each N1 inspection meets both versions. The first state shows two inspections becoming four rows and 270 pieces becoming 540. The second joins on the validity window, one version per fact. The third shows the whole baseline: 29 rows instead of 22, North at 2,250 pieces instead of 1,250. Notice that North's rate barely moves, 2.13% against 2.16%: a [[dbxfe-modeling-cardinality-concept|double-count]] can hide behind a plausible rate.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-cardinality-concept",
+    "dbxfe-modeling-scd-concept",
+    "dbxfe-modeling-surrogate-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-join",
+    "dbxfe-modeling-claim-type2",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-manytomany-visual",
+   "samajh": {
+    "text": "Society mein flat 101 ke do malik rahe: pehle Sharma ji, phir Mehta ji. Secretary ne maintenance ki payments ko flat number se malikon ki list ke saath joda, toh flat 101 ki har payment do baar aa gayi, ek Sharma ji ke naam aur ek Mehta ji ke. Total collection double dikha, jabki paisa utna hi aaya tha.",
+    "mapping": "The flat number is the natural key line_id, the two owners are type 2 versions, and each payment is a fact that should join only the owner valid on its date.",
+    "boundary": "A secretary can spot a doubled payment by eye in a short list; thousands of joined rows cannot be checked that way, so the row count before and after the join is tested."
+   },
+   "questionIds": [
+    "dbxfe-modeling-manytomany-question"
+   ],
+   "handbook": {
+    "markdown": "Spark's JOIN reference describes an inner join as returning the rows with matching values in both relations; it checks nothing about uniqueness. On a type 2 dimension `line_id` is unique per version, not per line, so a join on it is many-to-many. Measured on the lab's 22 baseline inspections:\n\n| Join | Rows | North pieces | North rate |\n|---|---|---|---|\n| on line_id only | 29 | 2,250 | 2.13% |\n| on the validity window | 22 | 1,250 | 2.16% |\n\nThe repair used in the lab resolves the version once, at load, and stores the surrogate key on the fact, so every report joins on a unique key:\n\n```sql\nSELECT s.inspection_id, COALESCE(l.line_sk, -1) AS line_sk\nFROM silver_dated s\nLEFT JOIN dim_line l\n  ON l.line_id = s.line_id\n AND s.business_date >= l.valid_from\n AND (l.valid_to IS NULL OR s.business_date < l.valid_to);\n```\n\nThat join is many-to-one only if versions never overlap, so check first:\n\n```sql\nSELECT DISTINCT a.line_id FROM dim_line a JOIN dim_line b\n  ON a.line_id = b.line_id AND a.line_sk < b.line_sk\n AND a.valid_from < COALESCE(b.valid_to, DATE'9999-12-31')\n AND b.valid_from < COALESCE(a.valid_to, DATE'9999-12-31');\n```\n\nThe lab's negative case moves one `valid_to` a day later: this check names N1, and without it the fact would hold 24 rows. Taking only the latest version also stops the fan-out, but it answers the as-is question and gives March to the wrong supervisor. Adding DISTINCT does not repair anything either, because the doubled rows differ in their version columns. The retained grain and joins lesson shows the same multiplication with tags; there the repair is an existence test, here a validity window.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-keys"
+    ]
+   },
+   "recap": "A join on a non-unique key multiplies rows; resolve history on its validity window, store the surrogate key and count rows before and after.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-unknown",
+   "version": "1.0.0",
+   "title": "A missing key needs a row, not a disappearance",
+   "outcome": "Keep facts with missing dimension keys visible through an unknown member and reconcile the totals.",
+   "explanation": "Inspection I-21 is on line N3, commissioned before anyone added it to dim_line. In the first state an inner join drops it and April loses 50 pieces without a message. In the second a left join keeps it, but under a NULL plant that many tools hide or mislabel. In the third it maps to the [[dbxfe-modeling-unknown-concept|unknown member]], line_sk -1 and plant UNKNOWN, and appears on an orphan list. Notice that only the third state keeps every piece and names the problem.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-unknown-concept",
+    "dbxfe-modeling-cardinality-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-nulls",
+    "dbxfe-modeling-claim-join",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-unknown-visual",
+   "questionIds": [
+    "dbxfe-modeling-unknown-question"
+   ],
+   "handbook": {
+    "markdown": "Kimball's page on nulls in fact tables says null foreign keys should be avoided: the dimension instead carries a default row, with its own surrogate key, for the unknown or not-applicable condition. The lab's line dimension has one such row:\n\n| line_sk | line_id | plant_id | supervisor |\n|---|---|---|---|\n| -1 | UNKNOWN | UNKNOWN | Unknown |\n\nThe fact build maps any inspection without a valid version to it with `COALESCE(l.line_sk, :unknown_line_sk)`, reading -1 from the metric contract. Reports then show an UNKNOWN row (April: 50 inspected, 2 defective) and the orphan list names I-21.\n\nThe three joins on the baseline:\n\n| Approach | Rows | Pieces | What the reader sees |\n|---|---|---|---|\n| inner join | 21 | 2,390 | nothing wrong |\n| left join | 22 | 2,440 | a NULL plant group |\n| unknown member | 22 | 2,440 | UNKNOWN, with an orphan list |\n\nThe unknown member only works because the fact keeps its natural key (`source_line_id`): once N3 is added to the dimension, a rebuild can resolve I-21 to its real line. When one default row is not enough: if the reasons differ and someone acts on them (not yet loaded, not applicable, rejected), use one default row per reason so the reader can tell them apart. What to inspect on every run: the orphan list per dimension and its size over time; a growing UNKNOWN row is a pipeline defect, not a plant. How to explain it: nothing disappears from the totals, and anything we could not place is listed by name.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-keys"
+    ]
+   },
+   "recap": "Map a fact whose key has no dimension row to an unknown member and list it, so totals reconcile and the gap stays visible.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-units",
+   "version": "1.0.0",
+   "title": "Convert to one unit before any sum",
+   "outcome": "Convert quantities to the contract's unit before aggregation and explain why the error surfaces only at coarser grains.",
+   "explanation": "South's packing line S2 counts cases of 12 pieces; S1 counts pieces. In the first state the raw quantities sit side by side. The second sums them as if all were pieces: 190 inspected, 4 defective, 2.1%. The third converts first through the [[dbxfe-modeling-unit-concept|unit]] table: 300 and 15, 5.0%. Notice that S2's own rate is 10% either way, because a ratio within one unit is unit-free; the mix only appears when lines are added together.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-unit-concept",
+    "dbxfe-modeling-additivity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-units-visual",
+   "samajh": {
+    "text": "Dukaan pe ande ginte waqt ek ladka darjan mein likhta hai, doosra piece mein. Ek line pe '10 darjan', doosri pe '180 piece'. Agar munshi dono ko seedha jod de toh 190 likh dega, jabki asal mein 300 ande hain. Har ladke ka apna hisaab sahi tha; galti us munshi ki thi jisne jodne se pehle unit nahi badli.",
+    "mapping": "Each boy's tally is one line's count in its own unit, the munshi's total is the plant-day sum, and converting dozens to pieces first is the unit conversion applied at load.",
+    "boundary": "Eggs have one fixed conversion; a real factor can differ by product or change over time, so it belongs in a governed table with its own history, not in a constant."
+   },
+   "questionIds": [
+    "dbxfe-modeling-units-question"
+   ],
+   "hint": "Convert S2's cases to pieces before adding South's two lines.",
+   "handbook": {
+    "markdown": "The contract fixes one quantity unit (pieces) and one conversion (`unit_conversion.pieces_per_uom`), applied to both quantities when the fact is loaded:\n\n```sql\nSELECT r.inspection_id,\n       r.inspected_qty * u.pieces_per_uom AS inspected_pieces,\n       r.defective_qty * u.pieces_per_uom AS defective_pieces\nFROM resolved r\nJOIN unit_conversion u ON u.uom = r.uom;   -- no conversion: not in the fact\n```\n\nThe inner join is deliberate here and paired with a quarantine list: an inspection in a unit with no conversion (the transfer set's 20 trays) cannot be expressed in pieces, so it leaves both numerator and denominator and is reported by name, never summed.\n\nThe error hides at fine grains. Baseline South, naive against contract:\n\n| Day | Naive, source units | Contract, pieces |\n|---|---|---|\n| 26 Mar | 130 / 0 | 240 / 0 |\n| 27 Mar | 190 / 4 = 2.1% | 300 / 15 = 5.0% |\n| 31 Mar | 65 / 3 = 4.6% | 120 / 3 = 2.5% |\n| 1 Apr | 80 / 4 = 5.0% | 300 / 15 = 5.0% |\n\nOn 26 March and 1 April the rates agree while the sums do not, so a test must compare the parts, not only the rate; the lab's unit test does exactly that. What to inspect: the distinct units per line and per source, the conversion table's coverage, and whether any factor depends on product or date (the transfer set's case pack changes from 12 to 24 pieces). When a factor is uncertain, report the quantity in its source unit separately rather than guess. Weight and batch fields measure different things; the contract names which fields count.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-measures"
+    ]
+   },
+   "recap": "Convert every quantity to the contract's unit at load; within one line the ratio hides a mix that plant totals expose.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-additivity",
+   "version": "1.0.0",
+   "title": "Sum the parts, then divide once",
+   "outcome": "Classify measures as additive or not and compute a ratio at a coarser grain from summed parts.",
+   "explanation": "Pieces inspected and pieces defective are additive: they sum across lines, days and plants. A rate is not. In the first state North's line rates, 2.0% and 5.0%, average to 3.5%. The second state sums the parts instead, 9 defective out of 300, and the third writes the equation: 3.0%. Notice that the average weights N2's 100 pieces as heavily as N1's 200; that is the [[dbxfe-modeling-additivity-concept|additivity]] rule at work, not a rounding difference.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-additivity-concept",
+    "dbxfe-modeling-denominator-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-additivity-visual",
+   "questionIds": [
+    "dbxfe-modeling-additivity-question"
+   ],
+   "handbook": {
+    "markdown": "Kimball's page on additive, semi-additive and non-additive facts places ratios among the non-additive measures and recommends storing the fully additive components and summing them before computing the ratio. Semi-additive measures, such as a balance or an inventory level, add across some dimensions but not across time.\n\nFor the unit defect rate the components are pieces defective and pieces inspected:\n\n```sql\nSELECT l.plant_id, f.business_date,\n       SUM(f.defective_pieces) AS defective,\n       SUM(f.inspected_pieces) AS inspected,\n       try_divide(CAST(SUM(f.defective_pieces) AS DOUBLE),\n                  SUM(f.inspected_pieces)) AS rate\nFROM fact_inspection f JOIN dim_line l ON l.line_sk = f.line_sk\nGROUP BY l.plant_id, f.business_date;\n```\n\nThe lab measures both readings side by side:\n\n| Level | Average of rates | Rate of summed parts |\n|---|---|---|\n| North, 27 March (from its lines) | 3.5% | 3.0% |\n| North, March (from its days) | 2.125% | 2.2% |\n\nAn average of rates is a different metric. It answers 'how does a typical line do?' with every line weighted equally, which can be a fair question, but it needs its own name and contract. It also drifts when values are missing, because `AVG` skips NULL, so a line-day with no units silently changes how many lines are averaged.\n\nWhat to inspect: any stored rate column feeding a coarser report, and any `AVG(rate)` in a query. How to demonstrate it honestly: show both numbers with their definitions, as the lab's additivity test does, rather than calling one of them 'the real rate'.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-measures"
+    ]
+   },
+   "recap": "Store and sum the additive parts at every grain, then divide once; an average of rates is a different, separately named metric.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-grains",
+   "version": "1.0.0",
+   "title": "The same name at another grain is another number",
+   "outcome": "Reconcile one metric across line-day, plant-day and plant-month, and reject joins between incompatible grains.",
+   "explanation": "One metric exists at several grains: North's line-days, its plant-days and its plant-month each have their own values, and each coarser value is rebuilt from summed parts. The first three states show them reconciling to 1,000 pieces and 22 defective in March. The fourth joins a monthly target to daily rows: the 2.0% target repeats on four days and its sum reads 8.0%. Notice that no number was wrong; the [[dbxfe-modeling-grain-concept|grains]] were incompatible.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-grain-concept",
+    "dbxfe-modeling-additivity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-claim-groupby",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-grains-visual",
+   "questionIds": [
+    "dbxfe-modeling-grains-question"
+   ],
+   "handbook": {
+    "markdown": "Reconciliation is the test that values at several grains are one metric. North in March, from the lab's baseline:\n\n| Grain | Rows | Inspected | Defective | Rate |\n|---|---|---|---|---|\n| line-day | 8 | 150 + 50 + 200 + 100 + 200 + 100 + 200 + 0 | 3 + 0 + 4 + 5 + 5 + 1 + 4 + 0 | per row |\n| plant-day | 4 | 200 + 300 + 300 + 200 | 3 + 9 + 6 + 4 | 1.5%, 3.0%, 2.0%, 2.0% |\n| plant-month | 1 | 1,000 | 22 | 2.2% |\n\nThe lab reconciles the collected rows rather than trusting the SQL: each plant-day equals the sum of its line-days, each plant-month the sum of its plant-days, and the months equal the fact totals of 2,440 and 65 pieces.\n\nIncompatible grains appear when tables of different grains are joined. A monthly target joined to daily rows repeats on every day; its sum reads 8.0%, its average hides the repetition, and a 1.5% day is compared with a 2.0% month. Bring both sides to one grain first:\n\n```sql\nSELECT m.plant_id, m.month, m.rate, t.target_rate\nFROM plant_month m\nJOIN targets t ON t.plant_id = m.plant_id AND t.month = m.month;\n```\n\nAllocation, spreading a monthly quantity over days, is sometimes wanted, but it is a business rule with its own weights, not something a join does. Spark's GROUP BY page describes GROUPING SETS and ROLLUP for computing several grains in one query; run on the lab's baseline data, `ROLLUP(plant_id, business_date)` over March returned North's four days, its month at 1,000 / 22 and the all-plant total, each level summing the same parts. What to inspect: the grain of both sides of every join, written as 'one row per ...'; if they differ, the coarser side repeats.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-measures"
+    ]
+   },
+   "recap": "A metric at another grain is rebuilt from the same parts; join tables only at a shared grain, never a monthly row onto daily rows.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-denominator",
+   "version": "1.0.0",
+   "title": "An empty denominator means no rate, not zero",
+   "outcome": "Handle zero and missing denominators so a report shows no rate with a reason instead of 0% or an error.",
+   "explanation": "Line N2 on 31 March has one inspection of 0 pieces. In the first state plain division fails: Spark 4 runs in ANSI mode by default, so the whole query stops with DIVIDE_BY_ZERO. The second uses `try_divide` and gets NULL. The third adds the contract's statuses: `no_units` for that row, `no_inspections` for S2 on 30 March, and a genuine 0.0% for N2 on 26 March. Notice that zero defective out of 50 is a value; zero out of zero is not a [[dbxfe-modeling-denominator-concept|denominator]].",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-denominator-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-ansi",
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-denominator-visual",
+   "samajh": {
+    "text": "Cricket mein batsman ne ek bhi ball nahi kheli, toh scorecard pe uska strike rate zero nahi likhte, 'did not bat' likhte hain. Zero strike rate ka matlab hai ki balls kheli par run nahi bane. Dono alag baatein hain. Agar dono ko '0' likh doge, toh selector galat khiladi ko team se bahar kar dega.",
+    "mapping": "Balls faced is the denominator of inspected pieces, runs are the numerator, 'did not bat' is the no_units status and a zero strike rate is a real 0% defect rate.",
+    "boundary": "A scorecard has one reason for an empty denominator; a plant has several, such as no inspection, a faulty station or a quarantined unit, and the contract names each status."
+   },
+   "questionIds": [
+    "dbxfe-modeling-denominator-question"
+   ],
+   "handbook": {
+    "markdown": "Spark's ANSI compliance page states that ANSI mode is on by default and that invalid operations throw exceptions; `try_divide` behaves like `/` but returns NULL when the divisor is 0. The lab's naive statement raised `DIVIDE_BY_ZERO` on the baseline; with ANSI mode switched off the same division returns NULL, so check the setting in force on any engine rather than assuming either behaviour.\n\nThe lab's line-day statement separates three cases:\n\n```sql\nCASE WHEN f.inspections IS NULL THEN 'no_inspections'\n     WHEN f.inspected_pieces = 0 THEN 'no_units'\n     ELSE 'ok' END AS status,\ntry_divide(CAST(COALESCE(f.defective_pieces, 0) AS DOUBLE),\n           COALESCE(f.inspected_pieces, 0)) AS rate\n```\n\n`no_inspections` needs a scaffold. A fact table has no row for a day without events, so the grid comes from the dimensions (every line version valid on every business day of the period) left-joined to the aggregated facts. Without it, S2's silent 30 March is simply absent from the report.\n\nA second denominator failure is drift: different populations in the numerator and the denominator. If quarantined tray inspections were excluded from defective pieces but their quantities stayed in inspected pieces, the rate would fall for no reason. The contract states one population for both, and the lab's validator refuses a contract whose populations differ.\n\nWhat to inspect: the count of rows per status on every run, and whether any report formats NULL as 0%. How to explain it: no inspected pieces means no rate; it is shown with its reason and never averaged in as zero.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-measures"
+    ]
+   },
+   "recap": "A zero or missing denominator gives no rate with a named status; a real zero is a value, and plain division under ANSI mode fails.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-window",
+   "version": "1.0.0",
+   "title": "Three business days are not three calendar days",
+   "outcome": "Define reporting days and windows from the contract and the plant calendar instead of counting calendar days.",
+   "explanation": "The contract's business day runs 00:00:00 to 23:59:59 plant local time, and its huddle tile covers the last three business days. On Monday 30 March the [[dbxfe-modeling-window-concept|business-day window]] in the first state holds Thursday, Friday and Monday: North 800 pieces, 18 defective, 2.25%. The second state counts three calendar days, Saturday to Monday, which hold one working day and give 2.0%. Notice that the plant calendar in the date dimension, not the weekday, decides what counts.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-window-concept",
+    "dbxfe-modeling-grain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-window-visual",
+   "samajh": {
+    "text": "Bank kehta hai cheque teen working days mein clear hoga. Shukravaar ko jama kiya, toh paisa Budhvaar tak aayega, Somvaar tak nahi, kyunki Shanivaar aur Ravivaar bank band rehta hai. Beech mein bank holiday pad gaya toh ek din aur. 'Teen din' sunke Somvaar ko intezaar karne waala galti karta hai.",
+    "mapping": "The bank's working days are the plant calendar's business days, a bank holiday is a plant shutdown, and 'three days' in the contract means three business days.",
+    "boundary": "A bank publishes its holidays in advance; a plant shutdown can be decided late, so the date dimension's business-day flag needs an owner and a change log."
+   },
+   "questionIds": [
+    "dbxfe-modeling-window-question"
+   ],
+   "handbook": {
+    "markdown": "Two period rules live in the contract. The day: 00:00:00 to 23:59:59 plant local time, assigned by the recorded inspection time, so the night shift is split at midnight (the lab's I-18 at 23:59:59 falls on 31 March, I-19 at 00:00:00 on 1 April and into April). The window: the last three business days of the plant calendar.\n\nThe calendar is a conformed date dimension with a business-day flag, not a weekday rule:\n\n```sql\nSELECT date FROM (\n  SELECT date, ROW_NUMBER() OVER (ORDER BY date DESC) AS position\n  FROM dim_date\n  WHERE is_business_day AND date <= DATE'2026-03-30')\nWHERE position <= 3;          -- 2026-03-26, 2026-03-27, 2026-03-30\n```\n\nMeasured in the lab:\n\n| Window as of Monday 30 March | Days | North | South |\n|---|---|---|---|\n| 3 business days | 26, 27, 30 Mar | 800 / 18 = 2.25% | 720 / 18 = 2.5% |\n| 3 calendar days | 28, 29, 30 Mar | 300 / 6 = 2.0% | 180 / 3 = 1.67% |\n\nThe transfer set adds a shutdown on Friday 1 May. As of Monday 4 May the business window is 29 April, 30 April and 4 May, while a Monday-to-Friday rule picks 30 April, 1 May and 4 May and drops 29 April; North's window total falls from 550 to 450 pieces.\n\nWhat this beat does not cover: time zones and daylight-saving days; here timestamps are already plant wall-clock time, and the advanced analytical SQL module treats conversions in depth. What to inspect: who owns the plant calendar, when shutdown days are entered, and whether a window crosses a month boundary that a monthly report treats differently.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-measures"
+    ]
+   },
+   "recap": "Assign each event to its business day by the contract's rule and count windows in the plant calendar's business days.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-contract",
+   "version": "1.0.0",
+   "title": "Write the contract before the query",
+   "outcome": "Write a metric contract whose clauses each imply a test and a named owner.",
+   "explanation": "A [[dbxfe-modeling-contract-concept|metric contract]] turns 'defect rate' into something a machine can check. The first state is the contract for `unit_defect_rate`: grain, numerator and denominator over one population, unit, day, month and window, empty cases, unknown member, owner and version. The second maps each clause to the test that would catch its violation. Notice that every earlier beat is one row here: the contract is the model's promise written down, and an incomplete one is refused before anyone builds.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-contract",
+   "conceptIds": [
+    "dbxfe-modeling-contract-concept",
+    "dbxfe-modeling-denominator-concept",
+    "dbxfe-modeling-window-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-grain",
+    "dbxfe-modeling-claim-additive",
+    "dbxfe-modeling-claim-nulls",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-contract-visual",
+   "questionIds": [
+    "dbxfe-modeling-contract-self"
+   ],
+   "handbook": {
+    "markdown": "The metric contract field guide gives the one-page template: name, grain and owner; numerator; denominator; units and precision; reporting period; restatement; tests; change log. The lab stores the same contract as JSON so code can read it (abridged):\n\n```json\n{\"metric\": \"unit_defect_rate\", \"version\": \"1\", \"owner\": \"Quality lead\",\n \"numerator\":   {\"source_field\": \"defective_qty\", \"population\": \"accepted inspections\", \"unit\": \"piece\"},\n \"denominator\": {\"source_field\": \"inspected_qty\", \"population\": \"accepted inspections\", \"unit\": \"piece\"},\n \"period\": {\"day\": \"00:00:00-23:59:59 plant local time\",\n            \"window\": {\"kind\": \"business_days\", \"length\": 3}},\n \"empty_cases\": {\"zero_denominator_status\": \"no_units\",\n                 \"no_rows_status\": \"no_inspections\", \"rate_when_empty\": null}}\n```\n\nA validator refuses it when a clause is missing or contradictory: no denominator, different numerator and denominator populations, mismatched units, a zero rate for empty cases, or a window counted in calendar days. The query parameters (window length, unknown member, status words) are read from the contract, so a change to the definition is one reviewed file, not a search through queries.\n\nThe tests the clauses imply, all run in Lab L11 on two datasets: parts reconcile across grains; a zero denominator gives no rate; units are converted before summing; a missing key is kept under the unknown member; history is joined on its validity window; the window comes from the plant calendar.\n\nWhat a contract cannot do: make a source field mean what its name suggests, or settle open business questions such as rework or the as-was versus as-is supervisor view; those stay open items with the owner. Restatement, whether a late correction changes a reported day, belongs in the contract too, and the field guide's example shows one way to mark it.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-contract"
+    ]
+   },
+   "recap": "A metric contract names grain, parts, unit, period, window, empty cases, unknown member and owner, and every clause implies a test.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-semantic",
+   "version": "1.0.0",
+   "title": "Define the measure once and let the query pick the grain",
+   "outcome": "Explain how a Unity Catalog metric view keeps a ratio correct at every grain and what its join rule demands of the model.",
+   "explanation": "A [[dbxfe-modeling-semantic-concept|metric view]] in Unity Catalog stores the definition, not the numbers. In the first state the YAML names a source fact, a join to dim_line on its surrogate key, and measures for defective and inspected pieces; the rate divides one `MEASURE()` by the other. The second queries it by line-day and by plant-month and gets 2.0% and 2.2%, rebuilt from parts each time. The third joins on `line_id`; the documentation says the first matching row is selected, so attribution becomes arbitrary.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-contract",
+   "conceptIds": [
+    "dbxfe-modeling-semantic-concept",
+    "dbxfe-modeling-contract-concept",
+    "dbxfe-modeling-cardinality-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-metricviews",
+    "dbxfe-modeling-claim-metricjoins",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-semantic-visual",
+   "questionIds": [
+    "dbxfe-modeling-semantic-question"
+   ],
+   "handbook": {
+    "markdown": "Databricks documents metric views as the core of Unity Catalog semantics: they separate measure definitions from the fields (dimensions) used to group and filter them, so a metric is defined once and queried at runtime. Measures are aggregate expressions with no predetermined level of aggregation; a query evaluates each with the `MEASURE()` aggregate function at the grain of the fields it selects, and names columns explicitly instead of `SELECT *`. A measure may reference earlier measures through `MEASURE()`.\n\nA sketch of the contract as a metric view. It was written from the documentation and not executed; check the YAML version and keys against the current reference:\n\n```yaml\nversion: 1.1\nsource: cinderline.quality.fact_inspection\njoins:\n  - name: line\n    source: cinderline.quality.dim_line\n    on: source.line_sk = line.line_sk\ndimensions:\n  - name: plant\n    expr: line.plant_id\n  - name: business_day\n    expr: business_date\nmeasures:\n  - name: defective_pieces\n    expr: SUM(defective_pieces)\n  - name: inspected_pieces\n    expr: SUM(inspected_pieces)\n  - name: unit_defect_rate\n    expr: try_divide(MEASURE(defective_pieces), MEASURE(inspected_pieces))\n```\n\nThe joins page says joins are many-to-one by default, a left outer join from fact to dimension in a star, and that when a join finds several rows the first matching row is selected. That protects totals from fan-out but not attribution: joined on `line_id`, each N1 inspection would take one version arbitrarily. Model first, then define the metric view over keys that are unique.\n\nWhat a metric view does not do for you: validate sources, convert units, resolve history or define the business day; those stay in the model and the contract. Search snippets on 23 September 2026 reported general availability announced in April 2026, some features such as materialization in Public Preview, and a minimum runtime stated on the page; check the current page before relying on any of it.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-contract"
+    ]
+   },
+   "recap": "A metric view holds the measure definition and evaluates it at each query's grain; it still needs a model with unique join keys.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-modeling-wide",
+   "version": "1.0.0",
+   "title": "A wide table freezes the joins it was built with",
+   "outcome": "Compare a wide table with the star it derives from and decide when to publish one.",
+   "explanation": "A [[dbxfe-modeling-wide-concept|wide table]] copies every dimension attribute onto every fact row, so a reader needs no joins. The first state compares it with the star on five questions. The second applies a late correction: version 101's supervisor had been entered as D. Vargas. The star fixes one dimension row and every report sees it; the wide table keeps the old name on three inspections until it is rebuilt. Notice that the wide table is a snapshot derived from the star, not a replacement.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-contract",
+   "conceptIds": [
+    "dbxfe-modeling-wide-concept",
+    "dbxfe-modeling-star-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-medallion",
+    "dbxfe-modeling-claim-star",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "visualId": "dbxfe-modeling-wide-visual",
+   "questionIds": [
+    "dbxfe-modeling-wide-self"
+   ],
+   "handbook": {
+    "markdown": "Databricks' data warehousing page lists star schema, snowflake and flattened tables among the modeling approaches for the gold layer. A flattened, or wide, table is a legitimate delivery shape: BI tools and ad hoc readers find one table easier, and scans avoid joins.\n\nWhat it costs:\n\n| Question | Star | Wide table |\n|---|---|---|\n| One row means | stated per table | the fact's grain, if built carefully |\n| Supervisor correction | one dimension row | every affected fact row |\n| New attribute | one column in one dimension | a rebuild |\n| As-was or as-is | chosen per query | frozen at build |\n| Subtotal rows | kept in their own table | nothing stops them |\n\nBuild it from the star with the same point-in-time keys so the row count equals the fact's; run on the lab's baseline data, this view returned 22 rows for 22 inspections:\n\n```sql\nCREATE OR REPLACE TEMP VIEW wide_inspection AS\nSELECT f.*, l.line_id, l.plant_id, l.supervisor, s.shift_name, d.is_business_day\nFROM fact_inspection f\nJOIN dim_line l ON l.line_sk = f.line_sk\nJOIN dim_shift s ON s.shift_id = f.shift_id\nJOIN dim_date d ON d.date = f.business_date;\n```\n\nThe inner joins are safe only because every key resolves, the line through its unknown member; test the count on every rebuild.\n\nPublish it when readers need it, state its grain and its as-was or as-is choice in its comment, rebuild it from the star on every dimension change, and never make it the place where corrections are entered. A rate over it is still summed parts divided once, never an average of stored rates. When not to publish one: when attributes change often, or when readers need both readings of history.",
+    "sourceSectionIds": [
+     "dbxfe-modeling-l01-contract"
+    ]
+   },
+   "recap": "A wide table is a rebuildable snapshot of the star with its grain stated; corrections belong in the star.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-modeling-l01-card1",
+   "beatId": "dbxfe-modeling-medallion"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card2",
+   "beatId": "dbxfe-modeling-grain"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card3",
+   "beatId": "dbxfe-modeling-star"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card4",
+   "beatId": "dbxfe-modeling-conformed"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card5",
+   "beatId": "dbxfe-modeling-history"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card6",
+   "beatId": "dbxfe-modeling-manytomany"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card7",
+   "beatId": "dbxfe-modeling-unknown"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card8",
+   "beatId": "dbxfe-modeling-units"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card9",
+   "beatId": "dbxfe-modeling-additivity"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card10",
+   "beatId": "dbxfe-modeling-grains"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card11",
+   "beatId": "dbxfe-modeling-denominator"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card12",
+   "beatId": "dbxfe-modeling-window"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card13",
+   "beatId": "dbxfe-modeling-contract"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card14",
+   "beatId": "dbxfe-modeling-semantic"
+  },
+  {
+   "cardId": "dbxfe-modeling-l01-card15",
+   "beatId": "dbxfe-modeling-wide"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-modeling-extension-constraints",
+   "revision": "1",
+   "prompt": "Would declaring line_sk as a primary key in Unity Catalog stop duplicate dimension keys?",
+   "answer": "No. Databricks primary and foreign key constraints are informational and not enforced, so the duplicate-key and overlap checks still have to run.",
+   "explanation": "The constraints page says primary key, foreign key and unique constraints are informational only and are not enforced; declaring them documents the model and can help optimization. With the RELY option Databricks may use a constraint to rewrite queries, and keeping it true is the user's responsibility, so a duplicated line_sk under RELY is a correctness risk rather than untidy metadata. Keep the lab's uniqueness and overlap checks as gates on every load, and declare the keys once those checks pass.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-extension-constraints-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-constraints",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "beatId": "dbxfe-modeling-manytomany",
+   "whyItMatters": "It separates declaring a key from guaranteeing it, which decides whether a join cardinality test is still needed."
+  },
+  {
+   "id": "dbxfe-modeling-extension-measurefilter",
+   "revision": "1",
+   "prompt": "How can one metric view report the night shift's defect rate without defining a second measure?",
+   "answer": "Evaluate the existing rate with MEASURE(...) FILTER (WHERE ...) so only the night shift's rows feed the computation.",
+   "explanation": "The measure aggregate function page gives the form measure(measure_column) FILTER (WHERE cond), where the condition restricts the rows used to compute the measure, and notes that the function cannot be used as a window function with OVER. Because the rate is defined from summed parts, the filtered value is still sum-then-divide over the night shift's inspections, not an average of anything. A second, hand-written night-shift measure would be a copy of the definition that can drift; filtering the one definition keeps a single contract.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-contract",
+   "conceptIds": [
+    "dbxfe-modeling-extension-measurefilter-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-measurefilter",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "beatId": "dbxfe-modeling-semantic",
+   "whyItMatters": "It shows how a sliced value keeps the sum-then-divide definition instead of becoming a second, drifting copy of the metric."
+  },
+  {
+   "id": "dbxfe-modeling-extension-autocdc",
+   "revision": "1",
+   "prompt": "How does AUTO CDC record the period during which a type 2 row was valid?",
+   "answer": "The SCD type 2 target carries __START_AT and __END_AT columns, typed like the sequence_by field and filled from the change feed's sequencing values.",
+   "explanation": "The AUTO CDC page describes computing SCD type 1 and type 2 targets from a change feed or snapshots in Lakeflow pipelines (formerly Delta Live Tables, with AUTO CDC formerly APPLY CHANGES). For type 2, the target includes __START_AT and __END_AT with the same data type as the sequence_by field, filled from sequencing values. Those values order changes; they are not automatically business dates. Before a point-in-time join, confirm that the fact's event value and the sequence column are on the same scale, and test how an event exactly on a boundary is assigned.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-extension-autocdc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-autocdc",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "beatId": "dbxfe-modeling-history",
+   "whyItMatters": "It connects the model's validity columns to the platform mechanism that maintains them, with the boundary question the join must still answer."
+  },
+  {
+   "id": "dbxfe-modeling-extension-rollup",
+   "revision": "1",
+   "prompt": "Can a single Spark SQL query return line-day values, plant subtotals and an all-plant total together?",
+   "answer": "Yes. GROUP BY ROLLUP or GROUPING SETS computes each level in one query; compute the rate from each level's summed parts.",
+   "explanation": "Spark's GROUP BY page defines GROUPING SETS as the union of separate GROUP BY results and ROLLUP(a, b) as GROUPING SETS((a, b), (a), ()). Each level sums the additive parts, so try_divide(SUM(defective), SUM(inspected)) is right at every level; run on the lab's baseline over March, ROLLUP(plant_id, business_date) returned North's month as 22 / 1,000. In subtotal rows the rolled-up column comes back NULL, which is one more reason for the unknown member: a genuinely missing key must not look like a subtotal.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-extension-rollup-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-claim-groupby",
+    "dbxfe-modeling-guidance",
+    "dbxfe-modeling-fiction"
+   ],
+   "beatId": "dbxfe-modeling-grains",
+   "whyItMatters": "It gives a one-query reconciliation across grains while keeping sum-then-divide and the unknown member intact."
+  }
+ ],
+ "recap": {
+  "title": "Grain, keys, parts and a written contract",
+  "markdown": "**Declare the grain, make every join many-to-one, sum the parts and write the contract down.** A medallion label says how refined a table is, never what a row means. Facts record events at a stated grain; conformed dimensions describe them with keys that hold; a type 2 attribute is resolved to the version valid on each fact's business day, and a missing key goes to an unknown member instead of disappearing. Quantities are converted before any sum, rates are rebuilt from summed parts at every grain, an empty denominator is a status, and a window counts the plant calendar's business days. The metric contract names each rule and implies a test, and a metric view can hold the definition once a model with unique keys exists. **Transfer challenge:** for first-pass yield (units passing without rework over units inspected), write the grain, the shared population, the empty cases and the window, and name the one join that could double-count it.",
+  "visualId": "dbxfe-modeling-contract-visual"
+ },
+ "appliedTask": {
+  "title": "Model downtime and extend the contract to availability",
+  "prompt": "Cinderline adds machine downtime events (line, start and end time, reason code) and wants availability per line per business day: running minutes divided by planned minutes. One line's events arrive coded NORTH-1, some events cross midnight, a line changes supervisor mid-month, and planned minutes come from a monthly plan. Describe the fact's grain and keys, the dimensions it shares with the inspection star, how you treat events that cross midnight, where the monthly plan may join, and the contract clauses and tests that keep availability right at line-day, plant-day and plant-month.",
+  "modelAnswer": "Grain: one downtime segment per line per business day; an event crossing midnight is split at 00:00 so each segment belongs to one business day under the contract's day rule. Keys: NORTH-1 is mapped to N1 once, in the conformed line dimension; line_sk is resolved at load to the version valid on the segment's day; business_date comes from the conformed date dimension; shift_id from dim_shift; reason_code from a new reason dimension, with unmatched codes sent to unknown members and listed. Measure: stopped minutes, additive. Planned minutes come from a monthly plan, so they are never joined onto daily rows: either the owner approves an allocation rule (planned minutes per business day from the plant calendar) or availability is published only at plant-month. Contract: availability = (planned - stopped) / planned over the same line and period, minutes as the unit, business day 00:00 to 23:59:59 local, zero planned minutes giving no rate with a status, owner the maintenance lead. Tests: segment minutes sum back to event minutes; each segment joins exactly one line version; line-days sum to plant-days and plant-months; a zero-plan day gives no rate; a NORTH-1 event is reported, not missing.",
+  "reasoning": "The answer declares the grain first, conforms keys once in the dimension, splits events by the contract's day rule, refuses to join a monthly plan to daily rows without an owned allocation rule, and turns each clause into a test at all three grains.",
+  "beatIds": [
+   "dbxfe-modeling-grain",
+   "dbxfe-modeling-conformed",
+   "dbxfe-modeling-history",
+   "dbxfe-modeling-additivity",
+   "dbxfe-modeling-grains",
+   "dbxfe-modeling-contract"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-modeling-scenario"
+ ]
+}

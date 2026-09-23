@@ -1,0 +1,634 @@
+{
+ "id": "dbxfe-modeling-l01",
+ "title": "Data modeling and metric contracts",
+ "summary": "Declare the grain, build a star whose joins hold, keep history and missing keys honest, and write a metric contract that reconciles at three grains and catches five classic failures.",
+ "contentVersion": "1.0.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 18,
+ "objectives": [
+  "Declare the grain of a fact and a metric, separate facts from dimensions, and tell a medallion label from a modeled entity.",
+  "Join facts to conformed and type 2 dimensions with a known cardinality, keeping missing keys visible under an unknown member.",
+  "Write and test a metric contract that reconciles the unit defect rate at line-day, plant-day and plant-month and catches double counts, empty denominators, mixed units and calendar-day windows."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Analytics and semantics",
+  "Data modeling",
+  "Star schema",
+  "Slowly changing dimensions",
+  "Metric contracts",
+  "Metric views",
+  "Spark SQL",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-modeling-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-modeling-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-modeling-l01-grain-concept",
+    "dbxfe-modeling-l01-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-start",
+   "kind": "prerequisites",
+   "title": "Before you model",
+   "conceptIds": [
+    "dbxfe-modeling-l01-grain-concept",
+    "dbxfe-modeling-l01-cardinality-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-modeling-course-claim-join",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-grain",
+   "kind": "mechanism",
+   "title": "Grain first: what one row means",
+   "conceptIds": [
+    "dbxfe-modeling-l01-medallion-concept",
+    "dbxfe-modeling-l01-grain-concept",
+    "dbxfe-modeling-l01-star-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-medallion",
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-modeling-course-claim-star",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-keys",
+   "kind": "mechanism",
+   "title": "Keys that hold: conformed, historical and missing",
+   "conceptIds": [
+    "dbxfe-modeling-l01-conformed-concept",
+    "dbxfe-modeling-l01-scd-concept",
+    "dbxfe-modeling-l01-cardinality-concept",
+    "dbxfe-modeling-l01-unknown-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-conformed",
+    "dbxfe-modeling-course-claim-type2",
+    "dbxfe-modeling-course-claim-join",
+    "dbxfe-modeling-course-claim-nulls",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-measures",
+   "kind": "mechanism",
+   "title": "Measures that survive aggregation",
+   "conceptIds": [
+    "dbxfe-modeling-l01-unit-concept",
+    "dbxfe-modeling-l01-additivity-concept",
+    "dbxfe-modeling-l01-denominator-concept",
+    "dbxfe-modeling-l01-window-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-modeling-course-claim-ansi",
+    "dbxfe-modeling-course-claim-groupby",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-contract",
+   "kind": "mechanism",
+   "title": "The contract, its platform home and the wide table",
+   "conceptIds": [
+    "dbxfe-modeling-l01-contract-concept",
+    "dbxfe-modeling-l01-semantic-concept",
+    "dbxfe-modeling-l01-wide-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-metricviews",
+    "dbxfe-modeling-course-claim-metricjoins",
+    "dbxfe-modeling-course-claim-medallion",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-example",
+   "kind": "example",
+   "title": "Worked example: North and South, 26 March to 1 April",
+   "conceptIds": [
+    "dbxfe-modeling-l01-grain-concept",
+    "dbxfe-modeling-l01-additivity-concept",
+    "dbxfe-modeling-l01-unknown-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-modeling-course-claim-nulls",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-exercise",
+   "kind": "exercise",
+   "title": "Exercise: predict the transfer set",
+   "conceptIds": [
+    "dbxfe-modeling-l01-scd-concept",
+    "dbxfe-modeling-l01-unit-concept",
+    "dbxfe-modeling-l01-window-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-type2",
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-solution",
+   "kind": "solution",
+   "title": "Solution",
+   "conceptIds": [
+    "dbxfe-modeling-l01-scd-concept",
+    "dbxfe-modeling-l01-unit-concept",
+    "dbxfe-modeling-l01-window-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-type2",
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-mistakes",
+   "kind": "mistakes",
+   "title": "Mistakes to avoid",
+   "conceptIds": [
+    "dbxfe-modeling-l01-cardinality-concept",
+    "dbxfe-modeling-l01-additivity-concept",
+    "dbxfe-modeling-l01-denominator-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-join",
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-modeling-course-claim-ansi",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-sources",
+   "kind": "sources",
+   "title": "Sources and scope",
+   "conceptIds": [
+    "dbxfe-modeling-l01-medallion-concept",
+    "dbxfe-modeling-l01-semantic-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-medallion",
+    "dbxfe-modeling-course-claim-metricviews",
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-modeling-course-claim-join",
+    "dbxfe-modeling-course-claim-ansi",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-related",
+   "kind": "related",
+   "title": "Related",
+   "conceptIds": [
+    "dbxfe-modeling-l01-contract-concept",
+    "dbxfe-modeling-l01-window-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-modeling-l01-revisit",
+   "kind": "revisit",
+   "title": "Check and revisit",
+   "conceptIds": [
+    "dbxfe-modeling-l01-grain-concept",
+    "dbxfe-modeling-l01-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-modeling-l01-q1",
+   "revision": "1",
+   "prompt": "South's plant-day parts in March are 240 / 0, 300 / 15, 180 / 3 and 120 / 3 (inspected / defective pieces). What is South's March unit defect rate under the contract?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-l01-q1-a",
+     "text": "2.5% (21 / 840)",
+     "rationale": "Correct: the month sums the plant-days' parts, 21 defective of 840 inspected, and divides once."
+    },
+    {
+     "id": "dbxfe-modeling-l01-q1-b",
+     "text": "2.3%, the average of 0%, 5.0%, 1.7% and 2.5%",
+     "rationale": "Averaging day rates weights a 120-piece day like a 300-piece day; the contract sums parts."
+    },
+    {
+     "id": "dbxfe-modeling-l01-q1-c",
+     "text": "5.0%, the worst day",
+     "rationale": "The worst day answers a different question; the monthly rate covers every inspected piece."
+    },
+    {
+     "id": "dbxfe-modeling-l01-q1-d",
+     "text": "No rate, because 26 March had no defective pieces",
+     "rationale": "Zero defective out of 240 inspected is a real 0% day, not an empty denominator."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-l01-q1-a",
+   "conceptIds": [
+    "dbxfe-modeling-l01-additivity-concept",
+    "dbxfe-modeling-l01-grain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-q2",
+   "revision": "1",
+   "prompt": "In April the silver inspections hold North 250, South 300 and 50 pieces on line N3, which has no dim_line row yet. An April report inner-joins them to dim_line on line_id and the validity window. Which inspected total does it show?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-l01-q2-a",
+     "text": "550, and the 50 N3 pieces vanish without a message",
+     "rationale": "Correct: an inner join keeps only matched rows, and N3 has no dimension row to match."
+    },
+    {
+     "id": "dbxfe-modeling-l01-q2-b",
+     "text": "600, because a join keeps every fact",
+     "rationale": "An inner join is exactly the join that drops unmatched facts; a left join or unknown member keeps them."
+    },
+    {
+     "id": "dbxfe-modeling-l01-q2-c",
+     "text": "650, because N3 is counted twice",
+     "rationale": "Nothing duplicates N3; with no dimension row it matches zero times, not twice."
+    },
+    {
+     "id": "dbxfe-modeling-l01-q2-d",
+     "text": "An error naming N3",
+     "rationale": "Joins do not report unmatched keys, which is why the lab lists orphans in a separate check."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-l01-q2-a",
+   "conceptIds": [
+    "dbxfe-modeling-l01-unknown-concept",
+    "dbxfe-modeling-l01-cardinality-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-nulls",
+    "dbxfe-modeling-course-claim-join",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-q3",
+   "revision": "1",
+   "prompt": "unit_defect_rate is defined in a metric view as MEASURE(defective_pieces) divided by MEASURE(inspected_pieces). A query groups by plant and month. How is North's March value produced?",
+   "options": [
+    {
+     "id": "dbxfe-modeling-l01-q3-a",
+     "text": "From North's summed March parts, 22 / 1,000",
+     "rationale": "Correct: each measure is aggregated at the query's grain and the ratio is computed from those sums."
+    },
+    {
+     "id": "dbxfe-modeling-l01-q3-b",
+     "text": "As the average of North's stored daily rates",
+     "rationale": "A metric view stores definitions, not daily rates, so there is nothing to average."
+    },
+    {
+     "id": "dbxfe-modeling-l01-q3-c",
+     "text": "As the rate of the last day in March",
+     "rationale": "Measures aggregate every row of the group; nothing picks a single day."
+    },
+    {
+     "id": "dbxfe-modeling-l01-q3-d",
+     "text": "It cannot be produced, because the view was built at line-day grain",
+     "rationale": "Measures have no predetermined grain; the fields a query selects decide it."
+    }
+   ],
+   "correctOptionId": "dbxfe-modeling-l01-q3-a",
+   "conceptIds": [
+    "dbxfe-modeling-l01-semantic-concept",
+    "dbxfe-modeling-l01-additivity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-metricviews",
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-modeling-l01-card1",
+   "revision": "1",
+   "prompt": "What does a gold medallion label tell a dashboard author about a table's rows?",
+   "answer": "Only that the data was refined for business use; it states nothing about grain, keys or measures.",
+   "explanation": "Medallion layers describe data quality and readiness. A reader still needs the entity and a one-sentence grain, such as one row per accepted inspection, to know what a row means, which key identifies it and which columns may be summed.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-grain",
+   "conceptIds": [
+    "dbxfe-modeling-l01-medallion-concept",
+    "dbxfe-modeling-l01-grain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-medallion",
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card2",
+   "revision": "1",
+   "prompt": "Why must a table's grain be declared before its columns are chosen?",
+   "answer": "Because every dimension and measure must be true at that grain, and a mixed-grain table sums silently to wrong totals.",
+   "explanation": "SQL adds rows, not meanings. Two inspections of 120 and 80 pieces plus a stored daily subtotal of 200 sum to 400, and the rate built on them still looks right because both parts doubled, so only a declared, tested grain exposes the mistake.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-grain",
+   "conceptIds": [
+    "dbxfe-modeling-l01-grain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card3",
+   "revision": "1",
+   "prompt": "In the inspection star, which tables hold measurements and which hold descriptions?",
+   "answer": "fact_inspection holds pieces inspected and defective per inspection; the line, plant, shift and date dimensions hold the descriptions.",
+   "explanation": "Facts record events at one grain with additive measures and keys; dimensions carry the words people filter and group by. Every fact-to-dimension join must be many-to-one, which a row count before and after the join proves.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-grain",
+   "conceptIds": [
+    "dbxfe-modeling-l01-star-concept",
+    "dbxfe-modeling-l01-grain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-star",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card4",
+   "revision": "1",
+   "prompt": "What breaks when inspections use line code N1 and downtime uses NORTH-1?",
+   "answer": "The facts can no longer be drilled across: downtime for that line looks missing beside every inspection day.",
+   "explanation": "Conformed dimensions share keys and values so separate facts meet in one report. A second code for the same line produces no error, only a blank, so the mapping is made once when the downtime rows are loaded, never inside each report.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-l01-conformed-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-conformed",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card5",
+   "revision": "1",
+   "prompt": "How do type 1 and type 2 handle a supervisor change on 30 March?",
+   "answer": "Type 1 overwrites the supervisor and loses history; type 2 adds a new row with a new surrogate key and validity dates.",
+   "explanation": "With type 2, an inspection on 27 March keeps the supervisor on duty that day (as-was) because the fact carries the surrogate key of the version valid then; with type 1 every inspection reads today's supervisor (as-is). Both are legitimate; the contract says which a report uses.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-l01-scd-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-type2",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card6",
+   "revision": "1",
+   "prompt": "Predict the row count when 22 inspections are joined to a type 2 line dimension on line_id alone.",
+   "answer": "29 in the lab: each of N1's 8 inspections meets two versions, and N3's inspection matches nothing.",
+   "explanation": "line_id repeats in a type 2 dimension, so the join is many-to-many. North's pieces rise from 1,250 to 2,250 while its rate moves only from 2.16% to 2.13%, which is why row counts and parts are tested, not only the rate.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-l01-cardinality-concept",
+    "dbxfe-modeling-l01-scd-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-join",
+    "dbxfe-modeling-course-claim-type2",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card7",
+   "revision": "1",
+   "prompt": "Where should an inspection go when its line has no dimension row yet?",
+   "answer": "To an unknown member row (line_sk -1, plant UNKNOWN), listed for follow-up, never dropped by an inner join.",
+   "explanation": "An inner join loses the 50 pieces silently and a left join leaves an unnamed NULL group. The unknown member keeps totals at 2,440, names the orphan, and lets a later rebuild resolve the fact once the line is added to the dimension.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-keys",
+   "conceptIds": [
+    "dbxfe-modeling-l01-unknown-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-nulls",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card8",
+   "revision": "1",
+   "prompt": "Why can a unit mismatch look correct at line-day but wrong at plant-day?",
+   "answer": "Within one line both quantities share a unit, so the ratio is unit-free; summing across lines adds cases to pieces.",
+   "explanation": "S2's 10 cases with 1 defective case give 10% in cases or in pieces, but South's sum becomes 190 / 4 instead of 300 / 15. Converting both quantities at load, and comparing parts rather than only rates, catches it.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-l01-unit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card9",
+   "revision": "1",
+   "prompt": "Which parts of a defect rate may be summed across lines and days?",
+   "answer": "The defective and inspected piece counts; the rate is recomputed from their sums at each grain.",
+   "explanation": "Ratios are non-additive. North's line rates of 2.0% and 5.0% average to 3.5%, but its 300 pieces with 9 defective give 3.0%. An average of rates is a different metric that needs its own name and contract.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-l01-additivity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card10",
+   "revision": "1",
+   "prompt": "What happens when a monthly target table is joined to daily rows on plant and month?",
+   "answer": "The target repeats on every day of the month, so summing or averaging it answers no business question.",
+   "explanation": "A join copies the coarser row onto each finer row: four March days make a 2.0% target sum to 8.0%. Compare the target with the plant-month rate, or apply an explicit, owned allocation rule if daily targets are truly needed.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-l01-grain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-modeling-course-claim-join",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card11",
+   "revision": "1",
+   "prompt": "How should a line-day with zero inspected pieces appear in the report?",
+   "answer": "As no rate with a status such as no_units, never as 0% and never as a failed query.",
+   "explanation": "Spark 4's ANSI mode makes plain division by zero fail, and try_divide returns NULL. The contract then names the reason; a line-day with pieces inspected and none defective keeps its genuine 0% rate.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-l01-denominator-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-ansi",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card12",
+   "revision": "1",
+   "prompt": "Why does a business-day window need the plant calendar rather than a weekday rule?",
+   "answer": "Because shutdowns are weekdays too, and only the date dimension's business-day flag knows which days the plant worked.",
+   "explanation": "In the transfer set, Friday 1 May is a shutdown. The contract's window as of Monday 4 May is 29 April, 30 April and 4 May; a Monday-to-Friday rule picks 1 May instead of 29 April and changes North's total from 550 to 450 pieces.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-measures",
+   "conceptIds": [
+    "dbxfe-modeling-l01-window-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card13",
+   "revision": "1",
+   "prompt": "Name the clauses a metric contract states before anyone builds its table.",
+   "answer": "Grain, numerator and denominator over one population, unit, day, month and window, empty cases, unknown member, owner and version.",
+   "explanation": "Each clause implies a test: parts reconcile across grains, zero denominators give no rate, units are converted, orphans are kept, history joins on validity, and windows come from the calendar. A validator can refuse a contract with a missing or contradictory clause.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-contract",
+   "conceptIds": [
+    "dbxfe-modeling-l01-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-grain",
+    "dbxfe-modeling-course-claim-additive",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card14",
+   "revision": "1",
+   "prompt": "Why does a metric view measure give the right ratio at every grain?",
+   "answer": "Its measures are aggregate expressions evaluated with MEASURE() at the query's grain, so the ratio is rebuilt from summed parts.",
+   "explanation": "Grouped by line and day the rate for N1 on 27 March is 4 / 200; grouped by plant and month, North's March is 22 / 1,000. No daily rate is stored to be averaged, but the join to the line dimension must use a unique key.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-contract",
+   "conceptIds": [
+    "dbxfe-modeling-l01-semantic-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-metricviews",
+    "dbxfe-modeling-course-claim-metricjoins",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-modeling-l01-card15",
+   "revision": "1",
+   "prompt": "What does a wide table cost compared with the star it came from?",
+   "answer": "Every correction or new attribute needs a rebuild, its as-was or as-is choice is frozen, and grain drift goes unnoticed.",
+   "explanation": "A wide table suits readers who want one table, so publish it as a rebuildable view of the star with its grain stated, test that its row count equals the fact's, and make corrections in the dimensions, never in the wide copy.",
+   "lessonId": "dbxfe-modeling-l01",
+   "sectionId": "dbxfe-modeling-l01-contract",
+   "conceptIds": [
+    "dbxfe-modeling-l01-wide-concept",
+    "dbxfe-modeling-l01-star-concept"
+   ],
+   "claimIds": [
+    "dbxfe-modeling-course-claim-medallion",
+    "dbxfe-modeling-course-claim-star",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ]
+}
