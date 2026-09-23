@@ -1,0 +1,651 @@
+{
+ "id": "dbxfe-serving-l01",
+ "title": "Inference, serving and model operations",
+ "summary": "Serve one registered version as a scored table and as an endpoint, hold the endpoint to its contract and capacity, release and roll back by traffic, and read inference tables and monitors as evidence that separates drift from verified quality loss under delayed labels.",
+ "contentVersion": "1.0.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 18,
+ "objectives": [
+  "Choose batch or online scoring for a consumer and trace one online request across its identities, contract check, feature lookup and timing.",
+  "Write a local contract test, estimate provisioned concurrency from arrival rate and service time, and plan a staged release with a one-step rollback.",
+  "Read inference tables and a data profiling monitor as evidence, separate drift from verified quality loss under delayed labels, classify an incident and fill an operational scorecard."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Machine learning and production evaluation",
+  "Model Serving",
+  "Batch inference",
+  "Inference tables",
+  "Data profiling",
+  "Incident response",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-serving-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-serving-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-serving-l01-batch-concept",
+    "dbxfe-serving-l01-endpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-serving"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-start",
+   "kind": "prerequisites",
+   "title": "Before serving anything",
+   "conceptIds": [
+    "dbxfe-serving-l01-batch-concept",
+    "dbxfe-serving-l01-endpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-serving"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-paths",
+   "kind": "mechanism",
+   "title": "Batch and online: one version, two contracts",
+   "conceptIds": [
+    "dbxfe-serving-l01-batch-concept",
+    "dbxfe-serving-l01-endpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-serving",
+    "dbxfe-serving-course-claim-batch",
+    "dbxfe-serving-course-claim-score-batch"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-request",
+   "kind": "mechanism",
+   "title": "The request trace and its contract",
+   "conceptIds": [
+    "dbxfe-serving-l01-contract-concept",
+    "dbxfe-serving-l01-endpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-query",
+    "dbxfe-serving-course-claim-signatures",
+    "dbxfe-serving-course-claim-scoring-server"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-capacity",
+   "kind": "mechanism",
+   "title": "Concurrency, latency and features at inference",
+   "conceptIds": [
+    "dbxfe-serving-l01-concurrency-concept",
+    "dbxfe-serving-l01-lookup-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-endpoints",
+    "dbxfe-serving-course-claim-lookup"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-release",
+   "kind": "mechanism",
+   "title": "Release and rollback as a traffic split",
+   "conceptIds": [
+    "dbxfe-serving-l01-traffic-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-multiple",
+    "dbxfe-serving-course-claim-endpoints"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-evidence",
+   "kind": "mechanism",
+   "title": "Inference tables and the monitor",
+   "conceptIds": [
+    "dbxfe-serving-l01-inference-table-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-inference-tables",
+    "dbxfe-serving-course-claim-profiling",
+    "dbxfe-serving-course-claim-health"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-drift",
+   "kind": "mechanism",
+   "title": "Drift is a hypothesis; verified loss needs labels",
+   "conceptIds": [
+    "dbxfe-serving-l01-drift-concept",
+    "dbxfe-serving-l01-delayed-label-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-profiling",
+    "dbxfe-serving-course-claim-inference-tables"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-incident",
+   "kind": "mechanism",
+   "title": "Incidents, the scorecard and cost",
+   "conceptIds": [
+    "dbxfe-serving-l01-scorecard-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-health",
+    "dbxfe-serving-course-claim-endpoints"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-example",
+   "kind": "example",
+   "title": "Worked example: contract test, scorecard, runbook",
+   "conceptIds": [
+    "dbxfe-serving-l01-contract-concept",
+    "dbxfe-serving-l01-scorecard-concept",
+    "dbxfe-serving-l01-traffic-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-query",
+    "dbxfe-serving-course-claim-signatures",
+    "dbxfe-serving-course-claim-scoring-server",
+    "dbxfe-serving-course-claim-multiple",
+    "dbxfe-serving-course-claim-health"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-exercise",
+   "kind": "exercise",
+   "title": "Exercise: the station app changes",
+   "conceptIds": [
+    "dbxfe-serving-l01-contract-concept",
+    "dbxfe-serving-l01-lookup-concept",
+    "dbxfe-serving-l01-scorecard-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-signatures",
+    "dbxfe-serving-course-claim-scoring-server",
+    "dbxfe-serving-course-claim-lookup"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-solution",
+   "kind": "solution",
+   "title": "Solution",
+   "conceptIds": [
+    "dbxfe-serving-l01-contract-concept",
+    "dbxfe-serving-l01-lookup-concept",
+    "dbxfe-serving-l01-scorecard-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-signatures",
+    "dbxfe-serving-course-claim-scoring-server",
+    "dbxfe-serving-course-claim-lookup"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-mistakes",
+   "kind": "mistakes",
+   "title": "Common mistakes",
+   "conceptIds": [
+    "dbxfe-serving-l01-drift-concept",
+    "dbxfe-serving-l01-traffic-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-multiple",
+    "dbxfe-serving-course-claim-profiling"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-sources",
+   "kind": "sources",
+   "title": "Sources",
+   "conceptIds": [
+    "dbxfe-serving-l01-endpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-serving",
+    "dbxfe-serving-course-claim-batch",
+    "dbxfe-serving-course-claim-score-batch",
+    "dbxfe-serving-course-claim-endpoints",
+    "dbxfe-serving-course-claim-query",
+    "dbxfe-serving-course-claim-multiple",
+    "dbxfe-serving-course-claim-inference-tables",
+    "dbxfe-serving-course-claim-profiling",
+    "dbxfe-serving-course-claim-signatures",
+    "dbxfe-serving-course-claim-scoring-server",
+    "dbxfe-serving-course-claim-lookup",
+    "dbxfe-serving-course-claim-health"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-related",
+   "kind": "related",
+   "title": "Related",
+   "conceptIds": [
+    "dbxfe-serving-l01-endpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-serving"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-serving-l01-revisit",
+   "kind": "revisit",
+   "title": "Revisit",
+   "conceptIds": [
+    "dbxfe-serving-l01-scorecard-concept",
+    "dbxfe-serving-l01-drift-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-health"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-serving-l01-q1",
+   "revision": "1",
+   "prompt": "At 06:10 the endpoint's client-error rate jumps from 0.02% to 18% and diverted parts fall to zero; P99 latency is unchanged and the monitor shows no drift. What happened most likely?",
+   "options": [
+    {
+     "id": "dbxfe-serving-l01-q1-a",
+     "text": "A caller's request no longer matches the signature, so requests are refused before prediction.",
+     "rationale": "A 4xx spike with unchanged latency and no drift points at the contract: schema enforcement refuses the request before the model or lookup runs."
+    },
+    {
+     "id": "dbxfe-serving-l01-q1-b",
+     "text": "The model's quality degraded overnight.",
+     "rationale": "Quality loss cannot produce client errors; it changes predictions, not status codes, and needs labels to be seen."
+    },
+    {
+     "id": "dbxfe-serving-l01-q1-c",
+     "text": "The endpoint scaled to zero and is cold-starting.",
+     "rationale": "A cold start shows as latency and timeouts, not a sustained client-error rate at unchanged P99."
+    },
+    {
+     "id": "dbxfe-serving-l01-q1-d",
+     "text": "The online feature store is stale.",
+     "rationale": "A stale lookup returns a value and a 200 response; it changes predictions silently rather than refusing requests."
+    }
+   ],
+   "correctOptionId": "dbxfe-serving-l01-q1-a",
+   "conceptIds": [
+    "dbxfe-serving-l01-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-query",
+    "dbxfe-serving-course-claim-signatures"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-q2",
+   "revision": "1",
+   "prompt": "The monitor reports humidity drift and the flagged rate rose from 9% to 16%. Which single piece of evidence would turn the hypothesis 'the model is worse' into a verified finding?",
+   "options": [
+    {
+     "id": "dbxfe-serving-l01-q2-a",
+     "text": "Precision on diverted parts over the drifted windows, computed from labels that arrived later, compared with the baseline.",
+     "rationale": "Only labels joined to the drifted windows measure quality; a lower precision than baseline verifies loss, an unchanged one refutes it."
+    },
+    {
+     "id": "dbxfe-serving-l01-q2-b",
+     "text": "A larger drift statistic on humidity in the next window.",
+     "rationale": "More drift is more of the same evidence: inputs moved. It says nothing about whether the predictions were right."
+    },
+    {
+     "id": "dbxfe-serving-l01-q2-c",
+     "text": "The flagged rate returning to 9% after a rollback to version 7.",
+     "rationale": "Both versions see the same humid parts; a rate change after rollback would still not show which version was right without labels."
+    },
+    {
+     "id": "dbxfe-serving-l01-q2-d",
+     "text": "A rise in P99 latency during the same period.",
+     "rationale": "Latency is endpoint health; it is unrelated to whether the scores were correct."
+    }
+   ],
+   "correctOptionId": "dbxfe-serving-l01-q2-a",
+   "conceptIds": [
+    "dbxfe-serving-l01-drift-concept",
+    "dbxfe-serving-l01-delayed-label-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-profiling",
+    "dbxfe-serving-course-claim-inference-tables"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-q3",
+   "revision": "1",
+   "prompt": "Version 8 is at 50% traffic when 5xx errors begin only on its served entity. What is the first action that keeps the station running?",
+   "options": [
+    {
+     "id": "dbxfe-serving-l01-q3-a",
+     "text": "Update the endpoint configuration so version 7 receives 100% of traffic, keeping version 8 deployed at 0%.",
+     "rationale": "Rollback by traffic is one configuration change; the old entity is still deployed and the failing one stays available for diagnosis."
+    },
+    {
+     "id": "dbxfe-serving-l01-q3-b",
+     "text": "Delete version 8's served entity and the endpoint, then recreate the endpoint with version 7.",
+     "rationale": "A redeploy takes minutes and drops the station's requests; the traffic split exists to avoid it."
+    },
+    {
+     "id": "dbxfe-serving-l01-q3-c",
+     "text": "Retrain version 9 with the latest data.",
+     "rationale": "5xx errors on one entity are an endpoint-health incident, not a quality finding; retraining answers the wrong question."
+    },
+    {
+     "id": "dbxfe-serving-l01-q3-d",
+     "text": "Increase the workload size to Large.",
+     "rationale": "Capacity does not repair a failing entity, and it charges more while the errors continue."
+    }
+   ],
+   "correctOptionId": "dbxfe-serving-l01-q3-a",
+   "conceptIds": [
+    "dbxfe-serving-l01-traffic-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-multiple",
+    "dbxfe-serving-course-claim-endpoints"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-serving-l01-card1",
+   "revision": "1",
+   "prompt": "Why do the nightly planner and the end-of-line station need different inference paths for the same model version?",
+   "answer": "The planner scores a complete table with nobody waiting; the station needs one answer inside 200 ms for inputs that exist only now.",
+   "explanation": "Batch and online are two contracts on one registered version. Batch loads the version by alias, applies it as a Spark UDF and writes a table with provenance columns. Online is a managed endpoint that answers one JSON request per part. The choice follows who waits and how fresh the inputs are, not the model.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-paths",
+   "conceptIds": [
+    "dbxfe-serving-l01-batch-concept",
+    "dbxfe-serving-l01-endpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-serving",
+    "dbxfe-serving-course-claim-batch"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card2",
+   "revision": "1",
+   "prompt": "Which columns should a batch scoring job write beside the prediction, and why?",
+   "answer": "The model name and version, the scoring time and the run that produced the scores, so a rerun or a version change can be told apart from the original.",
+   "explanation": "A scored table without provenance cannot answer which version produced a row when two nightly runs overlap or when a rollback changes the champion. Writing model_version, scored_at and a run identifier beside defect_risk makes the table auditable and lets the planner filter to the version it trusts.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-paths",
+   "conceptIds": [
+    "dbxfe-serving-l01-batch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-batch"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card3",
+   "revision": "1",
+   "prompt": "In the request trace, what runs before feature lookup and prediction, and what does that order mean for a malformed request?",
+   "answer": "Authorization, routing to a served entity and signature enforcement run first, so a malformed request is refused before any feature or model work.",
+   "explanation": "The server parses the body and enforces the signature ahead of the lookup and the model. A missing, renamed or uncastable column produces a client error at that step; the online store is never queried and no prediction exists. That is why a 4xx spike at unchanged latency points at the caller, not the model.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-request",
+   "conceptIds": [
+    "dbxfe-serving-l01-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-query",
+    "dbxfe-serving-course-claim-signatures"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card4",
+   "revision": "1",
+   "prompt": "A caller adds an undeclared column and sends humidity_pct as the string \"61%\". Which layer refuses the request, and why?",
+   "answer": "The parser refuses it: \"61%\" cannot be cast to the signature's double, so the body fails before enforcement. The extra column alone would simply be ignored.",
+   "explanation": "Two layers act on a body. Open-source MLflow's server first parses the JSON with the signature's types, so 61 or \"61\" become 61.0 and an uncastable value is a bad request. Enforcement then matches names, refuses a missing required column, ignores undeclared ones and allows only lossless conversions. Adding a column is harmless; renaming one or adding a unit breaks every request.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-request",
+   "conceptIds": [
+    "dbxfe-serving-l01-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-signatures",
+    "dbxfe-serving-course-claim-scoring-server"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card5",
+   "revision": "1",
+   "prompt": "How do you estimate whether a Small endpoint can carry a caller without queueing?",
+   "answer": "Multiply the arrival rate by the service time to get requests in flight, and compare with the provisioned concurrency; beyond it, requests queue and latency grows.",
+   "explanation": "The station's 0.05 requests per second at 41 ms offers 0.002 units, far under four. At 60 per second and 80 ms the offered load is 4.8 against a capacity of 50 per second, so a backlog of about 10 requests builds every second of the burst. The formula is a planning estimate, not a benchmark, and bursts matter more than averages.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-capacity",
+   "conceptIds": [
+    "dbxfe-serving-l01-concurrency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-endpoints"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card6",
+   "revision": "1",
+   "prompt": "Why is scale to zero refused for the station's endpoint even though it would cut idle hours?",
+   "answer": "The first request after a scale-down waits for a cold start, usually ten to twenty seconds and sometimes minutes, with no SLA, and a part that waits past 200 ms passes uninspected.",
+   "explanation": "Scale to zero lowers the concurrency floor to zero after 30 minutes of inactivity, which the station's idle third shift would trigger every night. It saves provisioned hours on paths where a caller can wait, such as an internal tool. A latency budget measured in milliseconds cannot absorb a cold start, so the cost of staying provisioned is accepted and recorded as unknown until pricing is checked.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-capacity",
+   "conceptIds": [
+    "dbxfe-serving-l01-concurrency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-endpoints"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card7",
+   "revision": "1",
+   "prompt": "What does a request carry when the model uses automatic feature lookup, and what does a missing key produce?",
+   "answer": "The request carries only keys and on-belt measurements; the endpoint fetches precomputed features by key, and a missing key yields a null the model imputes, with a 200 response.",
+   "explanation": "Lookup keeps callers from recomputing features and keeps training and serving on one definition. Its failure mode is silent: no error, a plausible score, and a shifted flagged rate that the monitor sees later. Feature freshness and key coverage therefore belong on the scorecard.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-capacity",
+   "conceptIds": [
+    "dbxfe-serving-l01-lookup-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-lookup"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card8",
+   "revision": "1",
+   "prompt": "Why is a rollback a traffic change rather than a redeploy?",
+   "answer": "Because the previous served entity is still deployed on the endpoint, one configuration update can send it 100% of traffic while the new entity stays at 0% for diagnosis.",
+   "explanation": "An endpoint can hold several served entities with a traffic percentage each. Keeping the old version deployed for a retention window makes reversal a single, fast, reversible step. Deleting the old entity on promotion, or the endpoint itself, turns rollback into minutes of redeploy with dropped requests.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-release",
+   "conceptIds": [
+    "dbxfe-serving-l01-traffic-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-multiple"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card9",
+   "revision": "1",
+   "prompt": "What can you compute from an inference table that endpoint health metrics cannot give you?",
+   "answer": "Per-request predictions beside their inputs, per served entity, joinable with labels that arrive later.",
+   "explanation": "Health metrics aggregate latency, request rate and errors. The inference table keeps the bodies, so you can unpack inputs and outputs, compare two entities over the same windows during a canary, and join inspection results by key days later to measure precision on the rows that received labels.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-evidence",
+   "conceptIds": [
+    "dbxfe-serving-l01-inference-table-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-inference-tables"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card10",
+   "revision": "1",
+   "prompt": "Why did a rising flagged rate during the humid season turn out not to be a quality loss?",
+   "answer": "Labels that arrived from day 4 showed precision on diverted parts and audit recall unchanged; defects really rose with humidity and the model followed them.",
+   "explanation": "Drift in inputs and predictions is known immediately; whether the model is right is a hypothesis until delayed labels test it. Here the hypothesis was refuted. The opposite case, null features after a supplier's coding change, was verified as loss when labels on the recalled, rescored parts showed 12 defective parts had passed, and it was fixed in the feature pipeline.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-drift",
+   "conceptIds": [
+    "dbxfe-serving-l01-drift-concept",
+    "dbxfe-serving-l01-delayed-label-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-profiling"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card11",
+   "revision": "1",
+   "prompt": "Which quality numbers cannot be verified for unflagged parts, and what makes them measurable at all?",
+   "answer": "Recall on unflagged parts, because those parts get labels only from returns; a random audit sample inspected regardless of score makes an estimate possible.",
+   "explanation": "Labels arrive for diverted parts because they were inspected, so precision on diverted parts is measurable with a lag. Parts that passed uninspected have no label unless a customer returns them. Inspecting a fixed random share regardless of score gives unbiased labels, small in number, reported with their sample size.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-drift",
+   "conceptIds": [
+    "dbxfe-serving-l01-delayed-label-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-profiling"
+   ]
+  },
+  {
+   "id": "dbxfe-serving-l01-card12",
+   "revision": "1",
+   "prompt": "How should the scorecard report the endpoint's cost before anyone has checked pricing?",
+   "answer": "As unknown, with its drivers named: provisioned hours whether or not requests arrive, batch job minutes, inference-table rows retained and monitor refresh compute.",
+   "explanation": "A cost row with drivers and no number is honest; a number without a dated pricing source is a guess. The drivers already tell the operations lead what would change the bill: scale to zero, a smaller workload size, shorter inference-table retention or a less frequent monitor refresh, each with a consequence elsewhere on the scorecard.",
+   "lessonId": "dbxfe-serving-l01",
+   "sectionId": "dbxfe-serving-l01-incident",
+   "conceptIds": [
+    "dbxfe-serving-l01-scorecard-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-ml",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-serving-course-claim-endpoints",
+    "dbxfe-serving-course-claim-health"
+   ]
+  }
+ ]
+}
