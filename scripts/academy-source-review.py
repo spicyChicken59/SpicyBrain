@@ -38,19 +38,45 @@ COURSE = ROOT / "content" / "courses" / "dbxfe"
 TEACHING = ROOT / "content" / "teaching" / "dbxfe"
 ORDER = ["read-this-build", "package-source", "earlier-release", "search-level", "unconfirmed", "unstated"]
 RULES = [
-    ("unconfirmed", r"could not be confirmed|not confirmed|unconfirmed|no search (?:result|confirmation)"),
-    ("read-this-build", r"read in full|read in this build|fetched on \d{4}-\d\d-\d\d[^.]*read|fetched in this build|and read\b|read at its source|read from the tag|read locally"),
-    ("package-source", r"package source|from the wheel|wheel published|sdist|source distribution"),
-    ("earlier-release", r"reused source record|as confirmed for the retained|review of 2026-09-(?:1\d|20)|reviewed 2026-09-(?:1\d|20)"),
+    ("read-this-build", r"read in full|read in this build|fetched on \d{4}-\d\d-\d\d[^.]*read|fetched in this build|and read\b|read at its source|read from the tag|read locally|\bread on 2026-09-2[123]\b|read (?:directly )?through the"),
+    ("package-source", r"package source|from the wheel|wheel published|sdist|source distribution|page source read|source file read"),
+    ("earlier-release", r"reused source record|reuses (?:the|this|a) (?:course's existing )?record|as confirmed for the retained|review (?:of )?2026-09-(?:1\d|20)|reviewed (?:on )?2026-09-(?:1\d|20)"),
     ("search-level", r"search-result|search result|confirmed by search|web search"),
 ]
+# Checked first, on the record's own words: a record that says it could not be
+# confirmed is never promoted by a stronger word elsewhere in it.
+UNCONFIRMED = r"could not be confirmed|not confirmed|unconfirmed|no search (?:result|confirmation)"
+# Checked last: a record that says it was not checked at all, and names no
+# earlier review it relies on, is unconfirmed rather than silent.
+UNCHECKED = r"not searched or fetched|neither the title nor the body|as supplied in the build's source list"
+# Negated statements ("page body not fetched in this build", "not searched or
+# fetched again") must never count as the check they negate.
+NEGATED = re.compile(
+    r"(?:page body |body )?(?:was |were )?not (?:been )?(?:searched or |re-?)?(?:fetched|read|searched)(?: or (?:re-?)?(?:fetched|searched|read))?(?: again)?(?: in (?:this|the) build| in this (?:authoring )?session)?"
+    r"|neither [^.]*? (?:was|were) (?:re-?checked|fetched|read)"
+    r"|(?:were|was) not (?:reachable|read)(?: here)?"
+)
+
+
+# A record that says this URL's own page was not fetched can never count as
+# read in this build, even if it goes on to say something else was read (an
+# SDK README, the page's source file in a package).
+BODY_NOT_READ = r"(?:page body|url|page) (?:was )?not fetched|body (?:was )?not (?:fetched|read)|not fetched in this build"
 
 
 def classify(text: str) -> str:
-    text = text.lower()
+    raw = text.lower()
+    if re.search(UNCONFIRMED, raw):
+        return "unconfirmed"
+    text = NEGATED.sub(" ", raw)
+    body_not_read = re.search(BODY_NOT_READ, raw)
     for name, rx in RULES:
+        if name == "read-this-build" and body_not_read:
+            continue
         if re.search(rx, text):
             return name
+    if re.search(UNCHECKED, raw):
+        return "unconfirmed"
     return "unstated"
 
 
@@ -99,10 +125,20 @@ def main() -> int:
     args = parser.parse_args()
     recs = records()
     probes = {}
+    availability = None
     if args.availability:
         report = json.loads(Path(args.availability).read_text())
         for row in report["sources"]:
             probes[row["url"]] = {"probe": row.get("probeStatus"), "httpStatus": row.get("httpStatus"), "checkedAt": report.get("checkedAt")}
+        availability = {
+            "checkedAt": report.get("checkedAt"),
+            "reconstructedFrom": report.get("reconstructedFrom"),
+            "probedURLs": len(probes),
+            "reachable": sum(1 for p in probes.values() if p["probe"] == "reachable"),
+            "notReachable": sorted(
+                (u, p["httpStatus"] or p["probe"]) for u, p in probes.items() if p["probe"] != "reachable"
+            ),
+        }
     by_url: dict[str, list[dict]] = collections.defaultdict(list)
     for r in recs:
         by_url[r["url"]].append(r)
@@ -132,6 +168,7 @@ def main() -> int:
         "urls": len(urls),
         "byMethod": {m: totals.get(m, 0) for m in ORDER},
         "publishers": dict(publishers.most_common()),
+        "availability": availability,
         "unstatedRecords": [
             {k: r[k] for k in ("where", "moduleId", "id", "url")}
             for r in recs if r["method"] == "unstated" and not r["retained"]
@@ -144,6 +181,24 @@ def main() -> int:
         (ROOT / "docs" / "academy" / "SOURCE-INVENTORY.json").write_text(json.dumps(inventory, indent=1, ensure_ascii=False) + "\n")
         (ROOT / "docs" / "academy" / "SOURCE-REVIEW.md").write_text(markdown(inventory))
     return 0
+
+
+def availability_lines(a: dict | None) -> list[str]:
+    if not a:
+        return []
+    source = a.get("reconstructedFrom") or {}
+    where = f" in CI run {source['run']} at `{source['head'][:7]}`, rebuilt from that job's log" if source else ""
+    lines = [
+        "## Availability (a separate question)",
+        "",
+        f"`npm run report:sources` probed {a['probedURLs']} URLs{where} ({a['checkedAt']}): {a['reachable']} answered.",
+        "The probe covers course, module and teaching sources and video references, not the crosswalk. A reachable",
+        "page does not verify a claim, and an unreachable one does not refute it.",
+    ]
+    if a["notReachable"]:
+        lines += ["", "Did not answer:", ""]
+        lines += [f"- {status}: {url}" for url, status in a["notReachable"]]
+    return lines + [""]
 
 
 def markdown(inv: dict) -> str:
@@ -182,6 +237,7 @@ def markdown(inv: dict) -> str:
         "  and lists the ones that did not answer; a reachable page does not verify a claim and",
         "  an unreachable one does not refute it. Unknown is not unsupported.",
         "",
+        *availability_lines(inv.get("availability")),
         "## Publishers",
         "",
         "| Publisher | URLs |",
