@@ -1,6 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import type { CatalogCourse, LessonBody } from "../../src/catalog-types";
+import type {
+  CatalogCourse,
+  CourseReferences,
+  LessonBody,
+} from "../../src/catalog-types";
 import type { TeachingIndexEntry } from "../../src/teaching-schema";
 import { ready, stored } from "./helpers";
 
@@ -13,6 +17,9 @@ const body = JSON.parse(
 const index = JSON.parse(
   await readFile("src/generated/teaching-index.json", "utf8"),
 ) as TeachingIndexEntry[];
+const references = JSON.parse(
+  await readFile("public/teaching/references/dbxfe.json", "utf8"),
+) as CourseReferences;
 const rubric = (
   JSON.parse(
     await readFile("src/generated/catalog.json", "utf8"),
@@ -186,6 +193,22 @@ test("A failed reference file is retried from any Sources panel, updates every p
     page.getByRole("button", { name: "Reveal answer", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
+  // A module workspace waits for the references (its glossary popovers need
+  // their definitions): while they fail it offers Retry, then it opens.
+  const delta = index.find((m) => m.moduleId === "dbxfe-delta")!;
+  await ready(page, `/#/module/${delta.moduleId}/${delta.beats[0].id}`);
+  await expect(page.getByRole("alert")).toContainText(
+    "Sources and definitions could not load",
+  );
+  await expect(page.locator(".teaching-beat")).toHaveCount(0);
+  fail = false;
+  await page.getByRole("button", { name: "Retry module", exact: true }).click();
+  await expect(page.locator(".teaching-beat>h2")).toHaveText(
+    delta.beats[0].title,
+  );
+  fail = true;
+  // A fresh document for the lesson, so the references are not cached.
+  await page.goto("about:blank");
   await ready(page, `/#/lesson/${lesson}`);
   await expect(page.locator(".knowledge-check")).toHaveCount(
     body.questions.length,
@@ -344,10 +367,27 @@ test("Each view fetches only the teaching files it needs; request counts are rec
   ]);
   await expect(panels.first().getByRole("status")).toHaveCount(0);
   await expect(panels.first().getByRole("alert")).toHaveCount(0);
+  // The panel shows the claims its section cites (read from the body) with
+  // their text (read from the reference file).
+  const [firstSection] = Object.keys(body.sectionClaims);
+  expect(body.sectionClaims[firstSection].length).toBeGreaterThan(0);
+  for (const id of body.sectionClaims[firstSection])
+    await expect(panels.first()).toContainText(
+      references.claims.find((c) => c.id === id)!.description,
+    );
   await panels.nth(1).locator("summary").click();
   await expect(panels.nth(1).getByRole("status")).toHaveCount(0);
   await page.waitForTimeout(200);
   record("lessonSources");
+  // A practice page, in a fresh document, fetches no reference file either.
+  await page.goto("about:blank");
+  log = [];
+  await ready(page, `/#/practice/${scenario}`);
+  await expect(
+    page.getByRole("heading", { name: "The situation", exact: true }),
+  ).toBeVisible();
+  await page.waitForTimeout(400);
+  record("practiceFresh");
   expect(counts.today.teaching).toEqual([]);
   expect(counts.courseMap.teaching).toEqual([]);
   expect(counts.lesson.bodies).toBe(1);
@@ -357,7 +397,8 @@ test("Each view fetches only the teaching files it needs; request counts are rec
     "/teaching/references/dbxfe.json",
   ]);
   expect(counts.practice.bodies).toBe(1);
-  expect(counts.practice.references).toBe(0);
+  expect(counts.practiceFresh.bodies).toBe(1);
+  expect(counts.practiceFresh.references).toBe(0);
   expect(counts.moduleBeat.modules).toBe(1);
   expect(counts.moduleBeat.references).toBe(1);
   expect(counts.moduleBeat.bodies).toBeGreaterThanOrEqual(
