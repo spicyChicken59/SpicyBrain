@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -9,8 +10,8 @@ import {
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Asset } from "./content-schema";
-import type { CatalogCourse } from "./catalog-types";
-import { lessonHref, paths } from "./catalog";
+import type { CatalogCourse, CourseReferences } from "./catalog-types";
+import { cachedReferences, lessonHref, loadReferences, paths } from "./catalog";
 import { pathForLesson } from "./paths";
 import { StudyStore, exportText } from "./study";
 export const store = new StudyStore();
@@ -302,6 +303,68 @@ export function StorageNotice() {
     </>
   );
 }
+/**
+ * A course's reference tier (full sources, claims and glossary records).
+ * Returned at once when a view already loaded it; otherwise fetched when
+ * `enabled` first becomes true, so a closed Sources panel costs nothing.
+ */
+export function useReferences(courseId: string, enabled = true) {
+  const [state, setState] = useState<{
+    courseId: string;
+    references?: CourseReferences;
+    error?: string;
+  }>({ courseId });
+  const [attempt, setAttempt] = useState(0);
+  const references =
+    (state.courseId === courseId ? state.references : undefined) ??
+    cachedReferences(courseId);
+  useEffect(() => {
+    if (!enabled || references) return;
+    let live = true;
+    loadReferences(courseId).then(
+      (loaded) => live && setState({ courseId, references: loaded }),
+      (error: unknown) =>
+        live &&
+        setState({
+          courseId,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Sources could not load. Your study data is safe.",
+        }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [courseId, enabled, references, attempt]);
+  return {
+    references,
+    error: state.courseId === courseId ? state.error : undefined,
+    retry: () => {
+      setState({ courseId });
+      setAttempt((n) => n + 1);
+    },
+  };
+}
+/** What a Sources panel shows while its references load or after they fail. */
+export function ReferencesPending({
+  error,
+  retry,
+}: {
+  error?: string;
+  retry: () => void;
+}) {
+  return error ? (
+    <div className="sc-notice" role="alert">
+      <p>{error}</p>
+      <button className="sc-btn sc-btn--secondary" onClick={retry}>
+        Retry
+      </button>
+    </div>
+  ) : (
+    <p role="status">Loading sources…</p>
+  );
+}
 export function Sources({
   course,
   claimIds,
@@ -309,40 +372,52 @@ export function Sources({
   course: CatalogCourse;
   claimIds: string[];
 }) {
-  const claims = course.claims.filter((c) => claimIds.includes(c.id));
+  const [opened, setOpened] = useState(false);
+  const { references, error, retry } = useReferences(course.id, opened);
+  const claims =
+    references?.claims.filter((c) => claimIds.includes(c.id)) ?? [];
   const ids = new Set(claims.flatMap((c) => c.sourceIds));
   return (
-    <details className="sc-details section-sources">
+    <details
+      className="sc-details section-sources"
+      onToggle={(e) => e.currentTarget.open && setOpened(true)}
+    >
       <summary>Sources & context</summary>
-      {claims.map((c) => (
-        <p key={c.id}>
-          <strong>
-            {c.kind === "documented"
-              ? "Documented product fact"
-              : c.kind === "fictional"
-                ? "Fictional teaching example"
-                : "SpicyBrain educational guidance"}
-            .
-          </strong>{" "}
-          {c.description} <span className="sc-muted">{c.context}</span>
-        </p>
-      ))}
-      {course.sources
-        .filter((s) => ids.has(s.id))
-        .map((s) => (
-          <div className="source-record" key={s.id}>
-            <a href={s.url} target="_blank" rel="noopener noreferrer">
-              {s.title} ↗
-            </a>
-            <p>
-              {s.publisher} · {s.type} · checked {s.accessDate}. Reviewed{" "}
-              {s.reviewDate}.
+      {!references ? (
+        <ReferencesPending error={error} retry={retry} />
+      ) : (
+        <>
+          {claims.map((c) => (
+            <p key={c.id}>
+              <strong>
+                {c.kind === "documented"
+                  ? "Documented product fact"
+                  : c.kind === "fictional"
+                    ? "Fictional teaching example"
+                    : "SpicyBrain educational guidance"}
+                .
+              </strong>{" "}
+              {c.description} <span className="sc-muted">{c.context}</span>
             </p>
-            <p>
-              {s.context} {s.caveat}
-            </p>
-          </div>
-        ))}
+          ))}
+          {references.sources
+            .filter((s) => ids.has(s.id))
+            .map((s) => (
+              <div className="source-record" key={s.id}>
+                <a href={s.url} target="_blank" rel="noopener noreferrer">
+                  {s.title} ↗
+                </a>
+                <p>
+                  {s.publisher} · {s.type} · checked {s.accessDate}. Reviewed{" "}
+                  {s.reviewDate}.
+                </p>
+                <p>
+                  {s.context} {s.caveat}
+                </p>
+              </div>
+            ))}
+        </>
+      )}
     </details>
   );
 }

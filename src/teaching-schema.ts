@@ -373,7 +373,13 @@ export function validateTeaching(
       ...(c.guides ?? []).map((s) => s.id),
       ...(c.cases ?? []).map((s) => s.id),
       ...(c.crosswalk ?? []).map((s) => s.id),
-      ...c.scenarios.flatMap((s) => [s.id, ...s.rubric.map((r) => r.id)]),
+      // The runtime catalog carries scenarios without their rubric (it is in
+      // the scenario body); the build checks rubric ids on the full course.
+      ...c.scenarios.flatMap((s) => [
+        s.id,
+        ...((s as { rubric?: { id: string }[] }).rubric?.map((r) => r.id) ??
+          []),
+      ]),
       ...c.modules.flatMap((m) =>
         m.lessons.flatMap((l) => [
           l.id,

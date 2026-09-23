@@ -178,11 +178,13 @@ export function Practice({ id }: { id?: string }) {
               <MD>{body.task}</MD>
             </>
           )}
-          <ul>
-            {s.requirements.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
+          {body && (
+            <ul>
+              {body.requirements.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          )}
           {!!s.downloadIds?.length && (
             <section className="academy-data-pack">
               <h2>Data pack</h2>
@@ -246,7 +248,7 @@ export function Practice({ id }: { id?: string }) {
             You choose the rating. This is educational feedback, not automated
             evaluation or an employer score.
           </p>
-          {s.rubric.map((r) => (
+          {body?.rubric.map((r) => (
             <fieldset className="rubric" key={r.id}>
               <legend>{r.criterion}</legend>
               {(["weak", "partial", "strong"] as const).map((level) => (
@@ -268,7 +270,7 @@ export function Practice({ id }: { id?: string }) {
           <button
             className="sc-btn sc-btn--primary"
             onClick={() => {
-              if (s.rubric.some((r) => !ratings[r.id])) {
+              if (!body || body.rubric.some((r) => !ratings[r.id])) {
                 setMessage(
                   "Choose a rating for each dimension before recording.",
                 );
@@ -306,8 +308,8 @@ export function Practice({ id }: { id?: string }) {
                   <ul>
                     {Object.entries(a.ratings).map(([id, value]) => (
                       <li key={id}>
-                        {s.rubric.find((r) => r.id === id)?.criterion ?? id}:{" "}
-                        {value}
+                        {body?.rubric.find((r) => r.id === id)?.criterion ?? id}
+                        : {value}
                       </li>
                     ))}
                   </ul>
@@ -315,7 +317,7 @@ export function Practice({ id }: { id?: string }) {
               ))}
             </details>
           )}
-          <Sources course={course} claimIds={s.claimIds} />
+          {body && <Sources course={course} claimIds={body.claimIds} />}
         </article>
         <aside className="practice-aside">
           <p className="sc-eyebrow">Return to the ideas</p>

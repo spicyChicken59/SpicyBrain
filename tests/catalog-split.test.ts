@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import {
   buildContent,
   contentBodies,
+  courseReferences,
   root,
   stripCourse,
 } from "../scripts/content.ts";
@@ -22,11 +23,16 @@ import {
   bodyExpectations,
   bodySchema,
   checkBody,
+  checkReferences,
   createBodyLoader,
+  createReferenceLoader,
+  referenceErrors,
+  referencesSchema,
 } from "../src/bodies.ts";
 import type {
   CatalogCourse,
   ContentBody,
+  CourseReferences,
   LessonBody,
 } from "../src/catalog-types.ts";
 import type { TeachingIndexEntry } from "../src/teaching-schema.ts";
@@ -50,14 +56,30 @@ const readBody = async (id: string) =>
   bodySchema.parse(
     JSON.parse(await readFile(join(bodiesDirectory, `${id}.json`), "utf8")),
   );
+const referencesDirectory = join(out, "public/teaching/references");
+const readReferences = async (courseId: string) =>
+  referencesSchema.parse(
+    JSON.parse(
+      await readFile(join(referencesDirectory, `${courseId}.json`), "utf8"),
+    ),
+  ) as CourseReferences;
 test.after(() => rm(out, { recursive: true, force: true }));
 
 test("the initial catalog carries identities and mappings, never section markdown or card/question text", () => {
   assert.deepEqual(catalog, JSON.parse(JSON.stringify(full.map(stripCourse))));
   for (const course of catalog) {
+    // Sources, claims and glossary concepts are identities only: their text
+    // is the reference tier.
+    for (const item of [
+      ...course.sources,
+      ...course.claims,
+      ...course.concepts,
+    ])
+      assert.deepEqual(Object.keys(item), ["id"]);
     for (const lesson of course.modules.flatMap((m) => m.lessons)) {
       for (const section of lesson.sections)
-        assert.equal("markdown" in section, false, section.id);
+        for (const key of ["markdown", "claimIds", "conceptIds"])
+          assert.equal(key in section, false, `${section.id}.${key}`);
       for (const card of lesson.cards)
         assert.deepEqual(Object.keys(card).sort(), [
           "id",
@@ -79,6 +101,9 @@ test("the initial catalog carries identities and mappings, never section markdow
         "model",
         "reasoning",
         "disclosures",
+        "requirements",
+        "rubric",
+        "claimIds",
       ])
         assert.equal(key in scenario, false, `${scenario.id}.${key}`);
     for (const item of [
@@ -112,6 +137,11 @@ test("the initial catalog carries identities and mappings, never section markdow
     lesson.cards[0].explanation,
     scenario.context,
     scenario.model,
+    scenario.rubric[0].strong,
+    scenario.requirements[0],
+    full[0].sources[0].caveat,
+    full[0].claims[0].description,
+    full[0].concepts[0].definition,
   ])
     assert.equal(catalogRaw.includes(JSON.stringify(text).slice(1, -1)), false);
   assert.ok(index[0].extensionCards[0]);
@@ -140,6 +170,10 @@ test("every lesson, scenario, lab, guide and case body is emitted, validates, an
         body.sections,
         Object.fromEntries(lesson.sections.map((s) => [s.id, s.markdown])),
       );
+      assert.deepEqual(
+        body.sectionClaims,
+        Object.fromEntries(lesson.sections.map((s) => [s.id, s.claimIds])),
+      );
       assert.equal(body.contentVersion, lesson.contentVersion);
     }
     for (const scenario of course.scenarios) {
@@ -151,8 +185,25 @@ test("every lesson, scenario, lab, guide and case body is emitted, validates, an
         assert.equal(body.model, scenario.model);
         assert.equal(body.reasoning, scenario.reasoning);
         assert.deepEqual(body.disclosures, scenario.disclosures);
+        assert.deepEqual(body.requirements, scenario.requirements);
+        assert.deepEqual(body.rubric, scenario.rubric);
+        assert.deepEqual(body.claimIds, scenario.claimIds);
       }
     }
+    // The reference tier reconstructs the course's full records in order and
+    // matches the catalog's identities.
+    const references = await readReferences(course.id);
+    assert.deepEqual(references, courseReferences(course));
+    assert.deepEqual(references.sources, course.sources);
+    assert.deepEqual(references.claims, course.claims);
+    assert.deepEqual(references.concepts, course.concepts);
+    assert.equal(
+      checkReferences(
+        references,
+        catalog.find((c) => c.id === course.id)!,
+      ),
+      references,
+    );
     assert.deepEqual(
       contentBodies(course).map((b) => `${b.kind}:${b.id}`),
       [
@@ -390,6 +441,19 @@ test("the body loader rejects a wrong id, kind, contentVersion, drifted revision
     json({ ...good, sections: { ...good.sections, "extra-section": "More." } }),
     mismatch,
   );
+  const [firstSection] = Object.keys(good.sectionClaims);
+  await rejects(
+    lesson.id,
+    json({
+      ...good,
+      sectionClaims: Object.fromEntries(
+        Object.entries(good.sectionClaims).filter(
+          ([id]) => id !== firstSection,
+        ),
+      ),
+    }),
+    mismatch,
+  );
   await rejects(lesson.id, json(scenarioBody), mismatch);
   await rejects(
     lesson.id,
@@ -439,4 +503,81 @@ test("the body loader rejects a wrong id, kind, contentVersion, drifted revision
       ),
     new RegExp(bodyErrors.mismatch.slice(0, 20)),
   );
+});
+
+test("the reference loader refuses another course version, malformed or failed files, evicts failures, then caches one copy", async () => {
+  const course = catalog[0];
+  const good = await readReferences(course.id);
+  assert.equal((await readdir(referencesDirectory)).length, catalog.length);
+  let calls = 0,
+    responses: (() => Response | Promise<Response>)[] = [];
+  const json =
+    (value: unknown, status = 200) =>
+    () =>
+      new Response(JSON.stringify(value), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
+  const loader = createReferenceLoader({
+    url: (id) => `/teaching/references/${id}.json`,
+    course: (id) => catalog.find((c) => c.id === id),
+    fetch: async () => {
+      calls++;
+      const next = responses.shift();
+      if (!next) throw new TypeError("Failed to fetch");
+      return next();
+    },
+  });
+  const rejects = async (
+    response: () => Response | Promise<Response>,
+    message: RegExp,
+  ) => {
+    responses = [response];
+    const before = calls;
+    await assert.rejects(loader.load(course.id), message);
+    assert.equal(calls, before + 1);
+    assert.equal(loader.cached(course.id), undefined, "nothing is cached");
+  };
+  const mismatch = /changed or are incomplete/;
+  await rejects(json({ ...good, courseId: "other-course" }), mismatch);
+  await rejects(
+    json({ ...good, sources: [...good.sources].reverse() }),
+    mismatch,
+  );
+  await rejects(json({ ...good, claims: good.claims.slice(1) }), mismatch);
+  await rejects(
+    json({
+      ...good,
+      concepts: [
+        ...good.concepts,
+        { ...good.concepts[0], id: "extra-concept-from-elsewhere" },
+      ],
+    }),
+    mismatch,
+  );
+  await rejects(
+    () => new Response("{not json", { status: 200 }),
+    new RegExp(referenceErrors.invalid.slice(0, 30)),
+  );
+  await rejects(
+    json({ ...good, sources: [{ id: good.sources[0].id }] }),
+    new RegExp(referenceErrors.invalid.slice(0, 30)),
+  );
+  await rejects(
+    () => new Response("", { status: 503 }),
+    /could not load[\s\S]*Your study data is safe/,
+  );
+  await rejects(
+    () => Promise.reject(new TypeError("Failed to fetch")),
+    /could not load[\s\S]*Your study data is safe/,
+  );
+  const before = calls;
+  await assert.rejects(loader.load("missing-course"), /unavailable/);
+  assert.equal(calls, before, "an unknown course is refused without a request");
+  responses = [json(good)];
+  const loaded = await loader.load(course.id);
+  assert.deepEqual(loaded, good);
+  assert.equal(loader.cached(course.id), loaded);
+  assert.equal(await loader.load(course.id), loaded);
+  assert.equal(calls, before + 1, "one request serves every later view");
 });

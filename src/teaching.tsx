@@ -17,7 +17,7 @@ import {
 import type { CatalogCourse, LessonBody } from "./catalog-types";
 import type { Beat, TeachingMedia, TeachingModule } from "./teaching-schema";
 import { nowISO, reviewQueue, type BeatPosition } from "./study";
-import { MD, SaveStatus, useStudy, uuid } from "./ui";
+import { MD, SaveStatus, useReferences, useStudy, uuid } from "./ui";
 import { NoteEditor } from "./reader";
 import { Review } from "./practice-review";
 import { TeachingSources, TeachingText, Visual } from "./teaching-text";
@@ -809,6 +809,7 @@ function ModuleCards({
   const [scope, setScope] = useState("core"),
     [topic, setTopic] = useState("all"),
     [reviewing, setReviewing] = useState(false);
+  const { references } = useReferences(course.id);
   const lessonCards = lessons.flatMap((l) => l.cards);
   const core = module.cardLinks.flatMap((l) => {
       const card = lessonCards.find((c) => c.id === l.cardId);
@@ -822,8 +823,8 @@ function ModuleCards({
         ? module.extensionCards
         : all
   ).filter((c) => topic === "all" || c.conceptIds.includes(topic));
-  const concepts = [...module.concepts, ...course.concepts].filter((g) =>
-    all.some((c) => c.conceptIds.includes(g.id)),
+  const concepts = [...module.concepts, ...(references?.concepts ?? [])].filter(
+    (g) => all.some((c) => c.conceptIds.includes(g.id)),
   );
   return (
     <section className="module-cards">

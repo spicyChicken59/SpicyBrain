@@ -34,7 +34,14 @@ import {
 } from "./collections-model";
 import { NoteEditor } from "./reader";
 import { nowISO } from "./study";
-import { ContentDownload, MD, PageTitle, useStudy } from "./ui";
+import {
+  ContentDownload,
+  MD,
+  PageTitle,
+  ReferencesPending,
+  useReferences,
+  useStudy,
+} from "./ui";
 import { ScrollableTable } from "./teaching-text";
 
 /*
@@ -806,7 +813,12 @@ function CasePage({
   item: CatalogCase;
 }) {
   const { body, error, retry } = useCollectionBody("case", item.id);
-  const sources = course.sources.filter((s) => item.sourceIds.includes(s.id));
+  const references = useReferences(course.id);
+  const cited = course.sources.filter((s) => item.sourceIds.includes(s.id));
+  const sources =
+    references.references?.sources.filter((s) =>
+      item.sourceIds.includes(s.id),
+    ) ?? [];
   return (
     <div className="academy-page">
       {back(`#/course/${course.id}/cases`, "Case analyses")}
@@ -819,12 +831,18 @@ function CasePage({
         aria-labelledby="academy-case-source"
       >
         <h2 id="academy-case-source">
-          {sources.length === 1 ? "Source" : "Sources"}
+          {cited.length === 1 ? "Source" : "Sources"}
         </h2>
         <p className="sc-hint">
           Outcomes are as the source reports them. This course has not
           reproduced them.
         </p>
+        {!references.references && (
+          <ReferencesPending
+            error={references.error}
+            retry={references.retry}
+          />
+        )}
         {sources.map((s) => (
           <div className="source-record" key={s.id}>
             <External href={s.url}>{s.title}</External>

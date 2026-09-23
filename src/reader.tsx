@@ -778,7 +778,12 @@ export function Reader({
                 <TryDraft course={course} lesson={lesson} section={s} />
               )}{" "}
               {s.id === checkSection?.id && checks}
-              <Sources course={course} claimIds={s.claimIds} />
+              {body && (
+                <Sources
+                  course={course}
+                  claimIds={body.sectionClaims[s.id] ?? []}
+                />
+              )}
               <SectionTools course={course} lesson={lesson} section={s} />
             </section>
           ))}

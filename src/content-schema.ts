@@ -49,6 +49,17 @@ export const claimSchema = z
     context: text,
   })
   .strict();
+/** A course glossary concept: its term, definition and home section. */
+export const courseConceptSchema = z
+  .object({
+    id: idSchema,
+    term: text,
+    aliases: z.array(text),
+    definition: text,
+    lessonId: idSchema,
+    sectionId: idSchema,
+  })
+  .strict();
 export const sectionSchema = z
   .object({
     id: idSchema,
@@ -260,18 +271,7 @@ export const courseSchema = z
     modules: z.array(moduleSchema).min(1),
     sources: z.array(sourceSchema),
     claims: z.array(claimSchema),
-    concepts: z.array(
-      z
-        .object({
-          id: idSchema,
-          term: text,
-          aliases: z.array(text),
-          definition: text,
-          lessonId: idSchema,
-          sectionId: idSchema,
-        })
-        .strict(),
-    ),
+    concepts: z.array(courseConceptSchema),
     assets: z.array(assetSchema),
     downloads: z
       .array(
@@ -310,6 +310,10 @@ export const courseSchema = z
 export type Course = z.infer<typeof courseSchema>;
 export type Lesson = z.infer<typeof lessonSchema>;
 export type Section = z.infer<typeof sectionSchema>;
+export type Source = z.infer<typeof sourceSchema>;
+export type Claim = z.infer<typeof claimSchema>;
+export type CourseConcept = z.infer<typeof courseConceptSchema>;
+export type Rubric = z.infer<typeof rubricSchema>;
 export type Card = z.infer<typeof cardSchema>;
 export type Question = z.infer<typeof questionSchema>;
 export type Scenario = z.infer<typeof scenarioSchema>;

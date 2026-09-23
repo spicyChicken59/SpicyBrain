@@ -10,6 +10,7 @@ import Markdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { CatalogCourse } from "./catalog-types";
+import { ReferencesPending, useReferences } from "./ui";
 import type {
   TeachingModule,
   TeachingConcept,
@@ -254,16 +255,20 @@ export function TeachingText({
   module: TeachingModule;
   course: CatalogCourse;
 }) {
+  // The module loader waits for the course references, so the glossary is
+  // normally here on first render; until it is, course concepts render as
+  // plain text rather than a control without a definition.
+  const { references } = useReferences(course.id);
   const concepts = useMemo(
     () => [
       ...module.concepts,
-      ...course.concepts.map((c) => ({
+      ...(references?.concepts ?? []).map((c) => ({
         ...c,
         example: "Use the linked concept in its lesson context.",
         sourceIds: [],
       })),
     ],
-    [module, course],
+    [module, references],
   );
   const components = useMemo<Components>(
     () => ({
@@ -505,12 +510,19 @@ export function TeachingSources({
   course: CatalogCourse;
   claimIds: string[];
 }) {
-  const claims = [...module.claims, ...course.claims].filter((c) =>
+  const { references, error, retry } = useReferences(course.id);
+  const claims = [...module.claims, ...(references?.claims ?? [])].filter((c) =>
     claimIds.includes(c.id),
   );
+  const courseClaim = (id: string) =>
+    !module.claims.some((c) => c.id === id) &&
+    course.claims.some((c) => c.id === id);
   return (
     <details className="teaching-sources">
       <summary>Sources, context and limits</summary>
+      {!references && claimIds.some(courseClaim) && (
+        <ReferencesPending error={error} retry={retry} />
+      )}
       {claims.map((c) => (
         <div key={c.id}>
           <p>
@@ -520,9 +532,10 @@ export function TeachingSources({
           {"context" in c && <p>{c.context}</p>}
           <ul>
             {c.sourceIds.map((id) => {
-              const s = [...module.sources, ...course.sources].find(
-                (s) => s.id === id,
-              );
+              const s = [
+                ...module.sources,
+                ...(references?.sources ?? []),
+              ].find((s) => s.id === id);
               return s ? (
                 <li key={id}>
                   <a href={s.url} target="_blank" rel="noopener noreferrer">

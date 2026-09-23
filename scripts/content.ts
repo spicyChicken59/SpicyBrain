@@ -27,6 +27,7 @@ import type {
   CatalogCourse,
   CatalogLesson,
   ContentBody,
+  CourseReferences,
 } from "../src/catalog-types.ts";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -399,7 +400,12 @@ export function stripLesson(lesson: Lesson): CatalogLesson {
   return {
     ...lesson,
     sections: lesson.sections.map(
-      ({ markdown: _markdown, ...section }) => section,
+      ({
+        markdown: _markdown,
+        claimIds: _claimIds,
+        conceptIds: _conceptIds,
+        ...section
+      }) => section,
     ),
     cards: lesson.cards.map(({ id, revision, lessonId, sectionId }) => ({
       id,
@@ -419,8 +425,12 @@ export function stripCourse(course: Course): CatalogCourse {
     body: _body,
     ...rest
   }: T) => rest;
+  const idOnly = ({ id }: { id: string }) => ({ id });
   return {
     ...course,
+    sources: course.sources.map(idOnly),
+    claims: course.claims.map(idOnly),
+    concepts: course.concepts.map(idOnly),
     modules: course.modules.map((module) => ({
       ...module,
       lessons: module.lessons.map(stripLesson),
@@ -432,6 +442,9 @@ export function stripCourse(course: Course): CatalogCourse {
         model: _model,
         reasoning: _reasoning,
         disclosures: _disclosures,
+        requirements: _requirements,
+        rubric: _rubric,
+        claimIds: _claimIds,
         ...scenario
       }) => scenario,
     ),
@@ -451,12 +464,25 @@ export function contentBodies(course: Course): ContentBody[] {
         sections: Object.fromEntries(
           lesson.sections.map((section) => [section.id, section.markdown]),
         ),
+        sectionClaims: Object.fromEntries(
+          lesson.sections.map((section) => [section.id, section.claimIds]),
+        ),
         questions: lesson.questions,
         cards: lesson.cards,
       })),
     ),
     ...course.scenarios.map(
-      ({ id, context, task, model, reasoning, disclosures }): ContentBody => ({
+      ({
+        id,
+        context,
+        task,
+        model,
+        reasoning,
+        disclosures,
+        requirements,
+        rubric,
+        claimIds,
+      }): ContentBody => ({
         kind: "scenario",
         id,
         context,
@@ -464,6 +490,9 @@ export function contentBodies(course: Course): ContentBody[] {
         model,
         reasoning,
         disclosures,
+        requirements,
+        rubric,
+        claimIds,
       }),
     ),
     ...(course.labs ?? []).map(({ id, body }): ContentBody => ({
@@ -482,6 +511,16 @@ export function contentBodies(course: Course): ContentBody[] {
       body,
     })),
   ];
+}
+/** The reference tier: a course's full source, claim and glossary records, in catalog order. */
+export function courseReferences(course: Course): CourseReferences {
+  return {
+    kind: "references",
+    courseId: course.id,
+    sources: course.sources,
+    claims: course.claims,
+    concepts: course.concepts,
+  };
 }
 /** Search entries for a course's labs, field guides and case analyses, linking to their own routes. */
 export function collectionSearchEntries(c: Course) {
@@ -597,6 +636,12 @@ export async function buildContent(
     await writeFile(
       join(teachingDirectory, "bodies", `${body.id}.json`),
       JSON.stringify(body),
+    );
+  await mkdir(join(teachingDirectory, "references"), { recursive: true });
+  for (const course of courses)
+    await writeFile(
+      join(teachingDirectory, "references", `${course.id}.json`),
+      JSON.stringify(courseReferences(course)),
     );
   for (const module of teaching.modules) {
     const {

@@ -160,7 +160,13 @@ test("Each view fetches only the teaching files it needs; request counts are rec
   const delta = index.find((m) => m.moduleId === "dbxfe-delta")!;
   const counts: Record<
     string,
-    { total: number; teaching: string[]; bodies: number; modules: number }
+    {
+      total: number;
+      teaching: string[];
+      bodies: number;
+      modules: number;
+      references: number;
+    }
   > = {};
   let log: string[] = [];
   page.on("request", (request) => log.push(request.url()));
@@ -172,9 +178,12 @@ test("Each view fetches only the teaching files it needs; request counts are rec
       total: log.length,
       teaching,
       bodies: teaching.filter((u) => u.startsWith("/teaching/bodies/")).length,
+      references: teaching.filter((u) => u.startsWith("/teaching/references/"))
+        .length,
       modules: teaching.filter(
         (u) =>
           !u.startsWith("/teaching/bodies/") &&
+          !u.startsWith("/teaching/references/") &&
           !/\/(?:search|media)\.json$/.test(u),
       ).length,
     };
@@ -231,12 +240,39 @@ test("Each view fetches only the teaching files it needs; request counts are rec
   ).toBeVisible();
   await page.waitForTimeout(200);
   record("reviewSession");
+  // In a fresh document (the views above share one), a lesson fetches the
+  // reference tier only when a Sources panel first opens; a second panel
+  // reuses it.
+  await page.goto("about:blank");
+  await ready(page, `/#/lesson/${lesson}`);
+  await expect(page.locator(".knowledge-check")).toHaveCount(
+    body.questions.length,
+  );
+  await page.waitForTimeout(400);
+  log = [];
+  const panels = page.locator("details.section-sources");
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/teaching/references/")),
+    panels.first().locator("summary").click(),
+  ]);
+  await expect(panels.first().getByRole("status")).toHaveCount(0);
+  await expect(panels.first().getByRole("alert")).toHaveCount(0);
+  await panels.nth(1).locator("summary").click();
+  await expect(panels.nth(1).getByRole("status")).toHaveCount(0);
+  await page.waitForTimeout(200);
+  record("lessonSources");
   expect(counts.today.teaching).toEqual([]);
   expect(counts.courseMap.teaching).toEqual([]);
   expect(counts.lesson.bodies).toBe(1);
   expect(counts.lesson.modules).toBe(0);
+  expect(counts.lesson.references).toBe(0);
+  expect(counts.lessonSources.teaching).toEqual([
+    "/teaching/references/dbxfe.json",
+  ]);
   expect(counts.practice.bodies).toBe(1);
+  expect(counts.practice.references).toBe(0);
   expect(counts.moduleBeat.modules).toBe(1);
+  expect(counts.moduleBeat.references).toBe(1);
   expect(counts.moduleBeat.bodies).toBeGreaterThanOrEqual(
     delta.lessonIds.length,
   );

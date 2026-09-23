@@ -1,9 +1,18 @@
 import { z } from "zod";
-import { cardSchema, idSchema, questionSchema } from "./content-schema";
+import {
+  cardSchema,
+  claimSchema,
+  courseConceptSchema,
+  idSchema,
+  questionSchema,
+  rubricSchema,
+  sourceSchema,
+} from "./content-schema";
 import type {
   BodyKind,
   CatalogCourse,
   ContentBody,
+  CourseReferences,
   LessonBody,
 } from "./catalog-types";
 
@@ -15,6 +24,7 @@ export const bodySchema = z.discriminatedUnion("kind", [
       id: idSchema,
       contentVersion: text,
       sections: z.record(idSchema, text),
+      sectionClaims: z.record(idSchema, z.array(idSchema)),
       questions: z.array(questionSchema),
       cards: z.array(cardSchema),
     })
@@ -30,6 +40,9 @@ export const bodySchema = z.discriminatedUnion("kind", [
       disclosures: z.array(
         z.object({ question: text, response: text }).strict(),
       ),
+      requirements: z.array(text).min(1),
+      rubric: z.array(rubricSchema).min(1),
+      claimIds: z.array(idSchema),
     })
     .strict(),
   z.object({ kind: z.literal("lab"), id: idSchema, body: text }).strict(),
@@ -110,11 +123,14 @@ export function checkBody(
   if (body.kind !== expected.kind || body.id !== expected.id)
     throw Error(bodyErrors.mismatch);
   if (body.kind === "lesson" && expected.kind === "lesson") {
-    const sections = Object.keys(body.sections);
+    const sections = Object.keys(body.sections),
+      claimed = Object.keys(body.sectionClaims);
     if (
       body.contentVersion !== expected.contentVersion ||
       sections.length !== expected.sectionIds.length ||
       expected.sectionIds.some((id) => !(id in body.sections)) ||
+      claimed.length !== expected.sectionIds.length ||
+      expected.sectionIds.some((id) => !(id in body.sectionClaims)) ||
       !same(
         body.cards.map(({ id, revision }) => ({ id, revision })),
         expected.cards,
@@ -183,4 +199,83 @@ export function createBodyLoader(options: {
     },
     has: (id) => cache.has(id),
   };
+}
+
+export const referencesSchema = z
+  .object({
+    kind: z.literal("references"),
+    courseId: idSchema,
+    sources: z.array(sourceSchema),
+    claims: z.array(claimSchema),
+    concepts: z.array(courseConceptSchema),
+  })
+  .strict();
+const referenceLabel = "Sources and definitions";
+export const referenceErrors = {
+  network: `${referenceLabel} could not load. Check your connection and retry. Your study data is safe.`,
+  invalid: `${referenceLabel} are incomplete or invalid. Retry, or reload to get the current course. Your study data is safe.`,
+};
+/**
+ * The reference file must carry exactly the catalog's source, claim and
+ * concept identities, in the catalog's order: a file from another version of
+ * the course is refused rather than shown against this catalog.
+ */
+export function checkReferences(
+  references: CourseReferences,
+  course: CatalogCourse,
+): CourseReferences {
+  const ids = (items: { id: string }[]) => items.map((item) => item.id);
+  if (
+    references.courseId !== course.id ||
+    !same(ids(references.sources), ids(course.sources)) ||
+    !same(ids(references.claims), ids(course.claims)) ||
+    !same(ids(references.concepts), ids(course.concepts))
+  )
+    throw Error(bodyErrors.mismatch);
+  return references;
+}
+export type ReferenceLoader = {
+  load: (courseId: string) => Promise<CourseReferences>;
+  /** The references once loaded, so a view that preloaded them renders them at once. */
+  cached: (courseId: string) => CourseReferences | undefined;
+};
+/** Promise-cached per course; a failed or mismatched load is evicted so Retry fetches again. */
+export function createReferenceLoader(options: {
+  url: (courseId: string) => string;
+  course: (courseId: string) => CatalogCourse | undefined;
+  fetch?: typeof fetch;
+}): ReferenceLoader {
+  const cache = new Map<string, Promise<CourseReferences>>(),
+    resolved = new Map<string, CourseReferences>();
+  const request = options.fetch ?? ((input) => fetch(input));
+  const load = (courseId: string) => {
+    const course = options.course(courseId);
+    if (!course) return Promise.reject(Error(bodyErrors.unavailable));
+    if (!cache.has(courseId))
+      cache.set(
+        courseId,
+        request(options.url(courseId))
+          .catch(() => {
+            throw Error(referenceErrors.network);
+          })
+          .then(async (response) => {
+            if (!response.ok) throw Error(referenceErrors.network);
+            let references: CourseReferences;
+            try {
+              references = referencesSchema.parse(await response.json());
+            } catch {
+              throw Error(referenceErrors.invalid);
+            }
+            checkReferences(references, course);
+            resolved.set(courseId, references);
+            return references;
+          })
+          .catch((error: unknown) => {
+            cache.delete(courseId);
+            throw error;
+          }),
+      );
+    return cache.get(courseId)!;
+  };
+  return { load, cached: (courseId) => resolved.get(courseId) };
 }
