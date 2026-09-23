@@ -105,7 +105,8 @@ intentionally incomplete. `workload-segmentation.md` is the worksheet you
 complete. `three-cloud-questions.md` is a template whose cells you either
 source or leave marked. The `reconciliation/` folder is a fixture with a
 worked answer to read only after your attempt. `cost-sensitivity.md` gives
-hypothetical inputs and a formula; change one input at a time. The
+hypothetical inputs and a formula; change one input at a time, then
+combinations, and read its worked answer only after your attempt. The
 `templates/` folder gives the structures for the three written outputs. The
 pack creates nothing to clean up.
 

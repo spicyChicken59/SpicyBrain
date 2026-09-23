@@ -15,7 +15,7 @@ here is a savings promise.
 | Recurring annual cost | $12,000 | sponsor statement | hypothetical, incomplete |
 | One-time implementation | $15,000 | sponsor statement | hypothetical |
 | Hours/week released: low / base / high | 5 / 10 / 15 | sponsor statement | scenarios |
-| Measured reconciliation effort today | about 13 hours/week | plant controller | hypothetical baseline |
+| Reconciliation effort today (hypothetical, to be measured) | about 13 hours/week | plant controller | hypothetical planning figure; measured in the baseline |
 | Engineer-hours per misdirected investigation | 4 | plant controller | hypothetical |
 | Expediting cost per held unit | $250 | plant controller | hypothetical |
 | Misdirected decisions per year | unknown | no log exists | must be measured |
@@ -30,7 +30,7 @@ Gross annual value = hours/week × weeks × rate. Year-one net = gross −
 | Low | 5 | | | |
 | Base | 10 | | | |
 | High | 15 | | | |
-| High, capped at the measured baseline | 13 | | | |
+| High, capped at the stated baseline | 13 | | | |
 
 Break-even hours/week = (recurring + implementation) / (weeks × rate) = [ ].
 

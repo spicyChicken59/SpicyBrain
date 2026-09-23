@@ -29,7 +29,10 @@ test("launch inventory and stable IDs are preserved while additional lessons are
   assert.equal(baseline.scenarioIds.length, 13);
   assert.equal(baseline.assetIds.length, 12);
   const c = original.find((course) => course.id === baseline.courseId)!;
-  assert.equal(c.scenarios.filter((s) => s.isCapstone).length, 1);
+  // The original capstone keeps its identity and its capstone role; the
+  // academy contract adds exactly two more capstones beside it.
+  assert.ok(c.scenarios.some((s) => s.id === "dbxfe-capstone" && s.isCapstone));
+  assert.equal(c.scenarios.filter((s) => s.isCapstone).length, 3);
   // Teaching modules may split an original module. Preserve every original
   // diagram identity rather than requiring each new partition to reuse an image.
   assert.ok(c.assets.length >= 18);

@@ -1,11 +1,13 @@
 # Stakeholder statements (fictional)
 
 Every person, role and quotation here is invented for the SpicyBrain
-Cinderline capstone. The first six statements are the ones the practice page
-discloses; the further remarks extend them for this data pack. Three
-additional voices (the DBA, the analyst and the plant controller) support the
-new disclosures. No statement is a requirement until the submission records
-who accepted it.
+Cinderline capstone. The first six statements were the practice page's
+original disclosures. The revised page also discloses Leo's remark on
+operational capacity, the three new voices below (the DBA, the analyst and the
+plant controller) and Leo's account of the failure night, whose full
+sequence is in `failure-timeline.md`; the other further remarks extend the
+statements for this data pack only. No statement is a requirement until
+the submission records who accepted it.
 
 ## Mara, operations director
 
@@ -90,12 +92,13 @@ Source inventory: “The ERP is SQL Server; I will confirm the exact version and
 whether it is a single instance or an availability group. Inspections live in
 `dbo.Inspection` and `dbo.InspectionResult`, updated in place. A nightly
 package copies the day's rows into a reporting database at 22:10; if it fails
-and retries, it re-exports the whole day, so the reporting database can hold
-the same inspection twice. Corrections do not touch the ERP: they arrive as a
-CSV on a file share with the same inspection ID and a higher source revision,
-and the package appends them as new rows. The plant sheet is pasted from the
-reporting database and edited afterwards. Change data capture is not enabled
-and needs a change request; my windows are Tuesday and Thursday evenings.”
+and retries, it re-sends rows it had already delivered, so the reporting
+database can hold the same inspection twice. Corrections do not touch the
+ERP: they arrive as a CSV on a file share with the same inspection ID and a
+higher source revision, and the package appends them as new rows. The plant
+sheet is pasted from the reporting database and edited afterwards. Change
+data capture is not enabled and needs a change request; my windows are
+Tuesday and Thursday evenings.”
 
 ## Sam, analyst (new voice)
 

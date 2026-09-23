@@ -14,20 +14,20 @@ needed, and no file here provisions one.
 | File | What it is | Use it for |
 |---|---|---|
 | `source-inventory.csv` | Nine fictional sources: systems of record, derived copies, the corrections channel, out-of-scope systems | Discovery synthesis, source semantics, the admission rule |
-| `stakeholder-statements.md` | The six disclosed statements plus further remarks and three new voices (DBA, analyst, plant controller) | Stakeholder map, acceptance roles, capacity limits, baseline figures |
+| `stakeholder-statements.md` | The six original disclosed statements, further remarks, and three new voices (DBA, analyst, plant controller) | Stakeholder map, acceptance roles, capacity limits, baseline figures |
 | `flawed-metric.md` | The two defect-rate definitions in use today, worked figures, and why they mislead | The metric contract and the "three numbers for one day" explanation |
 | `failure-timeline.md` | The night of 2–3 March: facts, hypotheses and what the contract path would have shown | Stale-versus-current evidence, incident review, operational fit |
-| `quality-events.csv` | Twenty synthetic inspection events across two plants and two business days, with delivery identity and a what-if branch | Walking the publication policy, reconciliation, demo steps |
+| `quality-events.csv` | Twenty delivered rows (16 distinct events) across two plants and two business days, with delivery identity and one what-if row | Walking the publication policy, reconciliation, demo steps |
 | `templates/` | Seven Markdown templates for the written deliverables | Structure your submission before revealing the model |
 
 ## Data dictionary: `quality-events.csv`
 
 | Column | Meaning |
 |---|---|
-| `delivery_id` | The delivery a row arrived in (`D1`…`D8`, or `X1` for the what-if branch). Delivery identity is what lets a replay be recognized. |
-| `received_at` | When the delivery reached the landing location (plant-local, fictional). Arrival order is not revision order. |
-| `source_id` | The source from `source-inventory.csv` (`S03` nightly extract or manual rerun, `S04` corrections file). |
-| `channel` | `erp_nightly_extract`, `erp_manual_rerun` or `qc_corrections_csv`. Only approved channels enter revision comparison. |
+| `delivery_id` | The delivery a row arrived in (`D1`…`D8`, or `X1` for the what-if branch). The ids are not in time order and `D7` is unused; read `received_at` for order. Delivery identity is what lets a replay be recognized. |
+| `received_at` | When the delivery was closed at the landing location (plant-local, fictional). The nightly extract's deliveries (D1, D8) close with the 01:10 load, whatever time their rows were extracted; the failure timeline gives the extraction times. Arrival order is not revision order. |
+| `source_id` | The source from `source-inventory.csv`: `S03` is the package's extract step, the delivery channel that carries ERP records from S01 and S02 (nightly or by manual rerun); `S04` is the corrections file. |
+| `channel` | `erp_nightly_extract`, `erp_manual_rerun` or `qc_corrections_csv`: the pilot's approved channels. The first two deliver ERP records; the third delivers approved revisions. The plant sheet (S05) and the workbook (S06) are refused at admission. Only admitted rows enter revision comparison, and an admitted row can still be quarantined. |
 | `event_id` | Immutable identity of one delivered observation. The same `event_id` with an equal payload is one event delivered again. |
 | `inspection_id` | The business key that persists through corrections. |
 | `version` | The approved source revision; a higher version supersedes a lower one for the same key. Equal versions with different quantities conflict. |
@@ -49,7 +49,23 @@ plant, line, business day and delivery columns; it changes no value.
 `revision_signal` (what, if anything, orders corrections); `duplicate_behaviour`
 (how duplicates arise); `approved_for_pilot` (yes, no, pending, out of scope);
 `classification_status`; `known_issues`. "Derived copy" means the object is
-downstream of a system of record and must not be treated as a source.
+downstream of a system of record and must not be treated as a system of
+record. S03's reporting table is such a copy and is the read path the pilot
+replaces; its extract step is admitted only as the delivery channel for S01
+and S02 records, never as a source of revisions of its own. B's negative
+quantity arrived through that extract: it is admitted as delivered and then
+quarantined by validation.
+
+## Delivery completeness (the rule this pack follows)
+
+A nightly delivery is complete only when the package run that carries it
+finishes with a completion marker; until then its rows are retained raw and
+nothing from that run is published. A corrections file is a complete delivery
+on its own. On 2–3 March the nightly run never completed, so North's rows in
+D1 were held even though they were all present; the 11:15 manual rerun (D3)
+is what completes the run. A per-plant completion marker would have let North
+publish at 06:40; that is a design option to raise with the DBA, not the rule
+the pack's walk uses.
 
 ## Derived states you should be able to reproduce
 
@@ -59,12 +75,12 @@ model's technical appendix carries the same walk.
 
 | Plant / day | After deliveries | Accepted inspections | Quarantined | Totals | Rate | Publication |
 |---|---|---|---|---|---|---|
-| North / 2 Mar | D1, D2 | A v2 12/1, C v1 8/0 | B (negative inspected) | 20 / 1 | 5.0% | published, snapshot 1 |
-| North / 2 Mar | + D3 (ev-late, A v1 again) | unchanged | B | 20 / 1 | 5.0% | unchanged; older revision cannot replace v2 |
+| North / 2 Mar | D1, D2 | A v2 12/1, C v1 8/0 | B (negative inspected) | 20 / 1 | 5.0% | prepared, not published: D1's run did not complete; the last verified snapshot is shown, stale, reason "incomplete delivery" |
+| North / 2 Mar | + D3 (completes the run; ev-late, A v1 again) | unchanged | B | 20 / 1 | 5.0% | published, snapshot 1, `evidence_as_of` 11:15; the older revision cannot replace v2 |
 | North / 2 Mar | + D4 (A v3 14/1) | A v3 14/1, C v1 8/0 | B | 22 / 1 | 4.5% | published once, snapshot 2, one effect |
 | North / 2 Mar | + D5 (exact re-send of D4) | unchanged | B | 22 / 1 | 4.5% | unchanged; raw count grows; no second effect |
 | North / 2 Mar, what-if | verified 20/1 baseline + X1 (ev-other, A v2 13/1) | A unresolved; only C 8/0 prepared, which is not a report | B | — | — | blocked; last verified 20/1 snapshot stays published and explicitly stale |
-| East / 2 Mar | D3, D6 | E v1 20/2, F v1 15/0, G v1 9/3 | none | 44 / 5 | 11.4% | published; G's second delivery changes nothing |
+| East / 2 Mar | D3, D6 | E v1 20/2, F v1 15/0, G v1 9/3 | none | 44 / 5 | 11.4% | published at 11:15 (D3 completes the run); G's second delivery changes nothing |
 | East / 2 Mar | + D4, D5 (F v2 15/1) | E v1 20/2, F v2 15/1, G v1 9/3 | none | 44 / 6 | 13.6% | restated once |
 | North / 3 Mar | D8 | J 11/0, K 9/1, L 10/0 | none | 30 / 1 | 3.3% | published |
 | East / 3 Mar | D8 | N 12/1 | M (defective exceeds inspected) | 12 / 1 | 8.3% | published with M disclosed |
@@ -85,7 +101,8 @@ totals; an older revision cannot replace a newer one; a valid A v3 14/1 gives
 keeps the last verified 20/1 snapshot explicitly stale. The policy is
 fictional teaching policy, not a product guarantee. Where this pack adds a
 source-admission step (only approved channels enter revision comparison), it
-sits in front of that policy and leaves it unchanged.
+sits in front of that policy and leaves it unchanged, and so does the
+delivery-completeness rule above.
 
 ## How to use the pack with the capstone
 

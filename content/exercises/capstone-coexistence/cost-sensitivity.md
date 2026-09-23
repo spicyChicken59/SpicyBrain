@@ -29,19 +29,14 @@ pricing" and name the source you would use.
 
 Formula: **Total = P + S + M + D + L + O**.
 
-## Scenario 1 — Path B wave 1 plus governed coexistence (the model's provisional recommendation)
+## What to compute
 
-| | Low | Base | High |
-|---|---:|---:|---:|
-| Total | 282,500 | 375,000 | 513,000 |
-| Against the 450,000 ceiling | 167,500 under | 75,000 under | 63,000 over |
-
-Check the base case: 95,000 + 3,000 + 6,000 + 120,000 + 126,000 + 25,000 = 375,000.
-
-The input that moves the high case past the ceiling is **L** (partner days).
-The control is therefore the scope of wave 1, not the platform.
-
-## Scenario 2 — "Everything on one platform in Q3" (the memo's assumption, base only)
+1. **A first wave plus governed coexistence.** Low, base and high totals from
+   the inputs above, each against the 450,000 ceiling, and which inputs, in
+   what combination, move the total past it. Change one input at a time first,
+   then combinations.
+2. **"Everything on one platform in Q3"** (the memo's assumption, base only),
+   from these inputs:
 
 | Line | Base | Note |
 |---|---:|---|
@@ -49,17 +44,12 @@ The control is therefore the scope of wave 1, not the platform.
 | S | 12,000 | ~30 TB during transition |
 | M | 46,000 | Bulk moves in both directions |
 | D | 120,000 | Unchanged |
-| L | 380 days = 532,000 | Not schedulable through the 8 December – 2 January blackout in any case |
+| L | 380 partner-days × 1,400 USD/day | Check the days against the calendar and the blackout in the brief |
 | O | 110,000 | |
-| **Total** | **1,120,000** | A number for a plan the calendar does not allow; shown so the comparison is explicit |
 
-## Scenario 3 — "Do not migrate this workload yet" (Line Pulse, finance workloads, Tessaly)
-
-| Item | Q3 incremental cost | Note |
-|---|---:|---|
-| Keeping Line Pulse and the finance workloads on Granite through Q3 | 0 | Line D is already paid for the quarter under every scenario |
-| Keeping Tessaly's restricted data in the hall | 0 | The regulator process is outside this worksheet (excluded) |
-| Real cost of "not yet" | the renewal term chosen on 31 December | Give notice (hard 31 March exit) or renew; term options unknown — ask procurement |
+3. **"Do not migrate this workload yet"** for Line Pulse, the finance
+   workloads and Tessaly's restricted data: what each costs or saves in Q3,
+   and where the real cost of waiting sits.
 
 ## Exclusions (stated, not estimated)
 
@@ -75,3 +65,41 @@ Change one input at a time and recompute the total by the formula. Record
 which input you changed, why, and what evidence would replace the guess.
 Present the result as a range against the ceiling, never as a point estimate,
 and never as a savings claim.
+
+## Worked answer (read after your attempt)
+
+### 1. A first wave plus governed coexistence (the path the capstone's model provisionally recommends)
+
+| | Low | Base | High |
+|---|---:|---:|---:|
+| Total | 282,500 | 375,000 | 513,000 |
+| Against the 450,000 ceiling | 167,500 under | 75,000 under | 63,000 over |
+
+Check the base case: 95,000 + 3,000 + 6,000 + 120,000 + 126,000 + 25,000 = 375,000.
+
+No single input moves the total past the ceiling. From the base case, **L**
+alone at its high value gives 431,000 and **P** alone at its high value gives
+430,000, both under. It takes the two of them high together (486,000), or
+either of them high with **M** and **O** also high (454,000 with P, 455,000
+with L). L (+56,000) and P (+55,000) are the two large swings, and both scale
+with the scope of wave 1, so the control is that scope, not the platform.
+
+Only this path is priced. A path that extends Vale's estate has no scenario
+here; its cost is unknown until its federation work and cross-cloud reads are
+sized, which is not the same as lower.
+
+### 2. "Everything on one platform in Q3"
+
+L is 380 × 1,400 = 532,000, and the total is 300,000 + 12,000 + 46,000 +
+120,000 + 532,000 + 110,000 = **1,120,000**. The partner-days cannot be
+scheduled through the 8 December – 2 January blackout in any case: it is a
+number for a plan the calendar does not allow, shown so that the comparison
+is explicit.
+
+### 3. "Do not migrate this workload yet" (Line Pulse, finance workloads, Tessaly)
+
+| Item | Q3 incremental cost | Note |
+|---|---:|---|
+| Keeping Line Pulse and the finance workloads on Granite through Q3 | 0 | Line D is already paid for the quarter under every scenario |
+| Keeping Tessaly's restricted data in the hall | 0 | The regulator process is outside this worksheet (excluded) |
+| Real cost of "not yet" | the renewal term chosen on 31 December | Give notice (hard 31 March exit) or renew; term options unknown — ask procurement |

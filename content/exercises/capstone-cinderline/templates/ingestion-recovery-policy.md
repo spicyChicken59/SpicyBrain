@@ -12,7 +12,7 @@ reliable-data publication policy; it may add stages in front of it. Walk
 | 1 Retain raw | [every row, with delivery identity, never deleted] | | |
 | 2 Validate / quarantine | [negative or null quantities; defective above inspected; missing key; unusable version] | | |
 | 3 Resolve identity and revision | [same event id + equal payload = one delivery; higher revision supersedes; equal revision + different quantities = conflict; arrival order is not authority] | | |
-| 4 Publication gate | [all conflict counts zero and no blocked key; read the gate's own decision, not an empty list] | | |
+| 4 Publication gate | [delivery complete under the README's rule; all conflict counts zero and no blocked key; read the gate's own decision, not an empty list] | | |
 | 5 Publish snapshot | [snapshot id, evidence-as-of, per-plant freshness, stale label with reason] | | |
 | 6 External effects | [once per snapshot identity; pending effect recorded separately from publication] | | |
 

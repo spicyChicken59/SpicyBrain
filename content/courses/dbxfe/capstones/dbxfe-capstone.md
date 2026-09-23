@@ -8,9 +8,9 @@ handoff a customer could act on. Open it at `#/practice/dbxfe-capstone`.
 **The original capstone identity is retained.** The scenario keeps its ID,
 title, lesson links, claim links, its six original disclosure questions and
 its six original rubric dimensions. The 2026-09-23 revision added five staged
-disclosures, twelve requirements, a longer model with two architectural paths
-and a mixed-outcome readout, four further rubric dimensions and this data
-pack. Drafts and self-assessments you made against the earlier version remain
+disclosures and six requirements (twelve in total), a longer model with two
+architectural paths and a mixed-outcome readout, four further rubric
+dimensions and this data pack. Drafts and self-assessments you made against the earlier version remain
 valid evidence of that version; nothing is reset, and the practice page shows
 an earlier-version notice rather than hiding your work.
 

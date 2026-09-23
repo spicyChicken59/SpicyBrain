@@ -22,7 +22,7 @@ A fictional service organisation wants an assistant that finds the right mainten
 
 **Stage 7 — Demo sequence and technical appendix.** Ten minutes at most: a provenance-bearing answer, a version conflict, a denied action, the injection refusal, an explain-back question and a transparent fallback. [Demos that teach and prove](#/module/dbxfe-m09) with the demo script (fg24) and demo failure plan (fg25) guides.
 
-**Stage 8 — Pilot charter, evidence and recommendation.** Write the charter with stop conditions, then the one-page recommendation with its negative-outcome section. [Proofs of value](#/module/dbxfe-m10) with the PoV charter (fg26) and evidence ledger (fg27) guides; [Competition and business value](#/module/dbxfe-m11) for the alternatives memo (fg29); [Field execution and capstone](#/module/dbxfe-m12) for the executive readout (fg30) and handoff plan (fg32). Output: `templates/recommendation.md` plus the appendix.
+**Stage 8 — Pilot charter, evidence and recommendation.** Write the charter with stop conditions, then the one-page recommendation with its negative-outcome section. [Proofs of value](#/module/dbxfe-m10) with the PoV charter (fg26) and evidence ledger (fg27) guides; [Competition and business value](#/module/dbxfe-m11) for the alternatives memo (fg29); [Field execution and capstone](#/module/dbxfe-m12) for the executive readout (fg30) and handoff plan (fg32). Output: `templates/recommendation.md` for the recommendation, a pilot charter in your own structure (the pack has no charter template; the PoV charter guide gives the shape), plus the appendix.
 
 ## How the data pack is used
 

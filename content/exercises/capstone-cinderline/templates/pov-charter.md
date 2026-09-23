@@ -33,7 +33,7 @@ within the disclosed hours.]
 |---|---|---|---|---|
 | Exact reconciliation except named exceptions | | | | |
 | Valid business days for the whole population | | | | |
-| Publication within 60 minutes of arrival | ≥ 95% of deliveries | | | |
+| Publication within 60 minutes of arrival | every delivery; a miss fails unless its cause was waived before the test | | | |
 | Truthful freshness label every morning | 100% of boards | | | |
 | Replay leaves accepted totals unchanged | | | | |
 | Conflict blocks and labels | | | | |

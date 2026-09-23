@@ -16,11 +16,11 @@ The pack contains only Markdown, JSON and CSV. Nothing needs to be installed, an
 | `templates/discovery-synthesis.md` | Stakeholders, facts/unknowns/assumptions, follow-ups | Requirement 1 of the scenario |
 | `templates/evaluation-plan.md` | Corpus metadata, authority rules, metrics on the labelled set, review method | Requirements 2 and 4 |
 | `templates/authorization-boundary.md` | Identities, where each fact lives, actions with approval steps, denied-action wording, untrusted content, negative tests | Requirement 5 |
-| `templates/recommendation.md` | One-page recommendation with a mixed/negative outcome section and ownership table | Requirements 6 and 8 |
+| `templates/recommendation.md` | One-page recommendation with a mixed/negative outcome section and ownership table | Requirements 3, 6 and 9; requirement 8, the pilot charter, has no template in this pack |
 
 ## Document header lines
 
-Every document begins with the same header lines so that a submission can reason about metadata rather than prose. `status` is one of `current`, `superseded`, `draft`, `unofficial` or `untrusted content`. `region` is `all`, `north`, `south` or `coastal`. `audience` names the fictional roles defined in `questions.json`. Where a document overrides part of another (the bulletin), `supersedes` says which section and under which condition.
+Every document begins with the same header lines so that a submission can reason about metadata rather than prose. `status` is one of `current`, `superseded`, `draft`, `unofficial` or `untrusted content`. `region` is `all`, `north`, `south` or `coastal`. `audience` names the fictional roles defined in `questions.json`, or a group of them: `all technicians` means technician-l1, technician-l2 and technician-coastal; `all staff` and `finance` are wider groups outside the labelled set; an unofficial page's audience is `unknown`. Membership is cumulative: a technician-coastal is also a level-2 technician, and a service supervisor reads what their technicians can read, restricted supplements only with the matching endorsement. Where sections of one document have different audiences (HFS-SM-AP7-2.0), the header names each. Where a document overrides part of another (the bulletin), `supersedes` says which section and under which condition.
 
 ## How to use the pack
 

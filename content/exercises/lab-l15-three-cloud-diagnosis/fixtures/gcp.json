@@ -1,0 +1,416 @@
+{
+  "cloud": "gcp",
+  "title": "Google Cloud: a refusal that names the wrong person, and a relay name that answers publicly",
+  "synthetic": "Fictional teaching case for Cinderline Components. Names, addresses, account and project identifiers and every error text are invented; nothing was deployed or observed. The region us-east4 and the relay name follow the module's worked example.",
+  "deployment": [
+    {
+      "item": "Workspace",
+      "value": "Classic workspace in project cl-dbx-prod (us-east4) with back-end Private Service Connect; classic job clusters"
+    },
+    {
+      "item": "Network",
+      "value": "Customer-managed VPC cl-vpc-dbx in host project cl-net-host; node subnet dbx-nodes-use4 (10.20.0.0/22); endpoint subnet dbx-psc-use4 (10.20.8.0/28) with relay-pe (10.20.8.2) and workspace-pe (10.20.8.3); users' transit network cl-vpc-transit. The Cloud NAT was removed when PSC was enabled"
+    },
+    {
+      "item": "Storage",
+      "value": "Buckets cl-quality-raw and cl-quality-curated"
+    },
+    {
+      "item": "Unity Catalog",
+      "value": "external location loc_quality_raw on gs://cl-quality-raw/inspections/ through storage credential cred_quality; table quality.raw.inspections"
+    }
+  ],
+  "identities": [
+    {
+      "id": "ana@cinderline.example",
+      "kind": "Databricks user",
+      "memberOf": [
+        "quality-analysts"
+      ],
+      "acts": "In her own notebooks; she created job quality_nightly"
+    },
+    {
+      "id": "sp-quality-nightly",
+      "kind": "Databricks service principal",
+      "memberOf": [
+        "quality-jobs"
+      ],
+      "acts": "As the run-as principal the design names for quality_nightly"
+    },
+    {
+      "id": "uc-cred-quality@example-dbx-project.iam.gserviceaccount.com",
+      "kind": "Databricks-managed service account of storage credential cred_quality",
+      "memberOf": [],
+      "acts": "On the storage path of Unity Catalog reads; Cloud Storage authorizes it by its bucket roles"
+    },
+    {
+      "id": "classic nodes",
+      "kind": "Compute Engine VMs in dbx-nodes-use4",
+      "memberOf": [],
+      "acts": "Open the secure tunnel to the relay; their own service account is not examined here"
+    }
+  ],
+  "requestPath": [
+    {
+      "path": "Author",
+      "hop": "Ana's browser to the workspace URL",
+      "identity": "ana@cinderline.example; her identity does not travel with a job",
+      "segment": null
+    },
+    {
+      "path": "Control",
+      "hop": "Classic node in dbx-nodes-use4 to the secure cluster connectivity relay through relay-pe",
+      "identity": "None that this case examines: a timeout here names no principal",
+      "segment": "control-classic"
+    },
+    {
+      "path": "Execution",
+      "hop": "Job quality_nightly on a classic job cluster asks Unity Catalog",
+      "identity": "The job's run-as principal",
+      "segment": "execution"
+    },
+    {
+      "path": "Storage",
+      "hop": "Compute to gs://cl-quality-raw/inspections/",
+      "identity": "The storage credential's service account",
+      "segment": "storage"
+    }
+  ],
+  "paths": {
+    "execution": [
+      "run-as",
+      "uc-grants"
+    ],
+    "storage": [
+      "credential-service-account",
+      "bucket-iam-binding"
+    ],
+    "control-classic": [
+      "cloud-dns-private-zone",
+      "psc-relay-endpoint",
+      "vpc-firewall-egress"
+    ]
+  },
+  "controls": [
+    {
+      "id": "run-as",
+      "name": "Run-as principal in the job settings",
+      "layer": "identity",
+      "side": "databricks",
+      "type": "run-as",
+      "owner": "The job's owner",
+      "object": "Job settings",
+      "config": {
+        "jobs": {
+          "quality_nightly": "ana@cinderline.example"
+        },
+        "note": "Ana created the job; its run-as setting was never changed from her"
+      }
+    },
+    {
+      "id": "uc-grants",
+      "name": "Unity Catalog privileges of the acting principal",
+      "layer": "authorization",
+      "side": "databricks",
+      "type": "uc-grants",
+      "owner": "The owners of the catalog, schema and table",
+      "object": "Unity Catalog grants on catalog, schema and table",
+      "config": {
+        "groups": {
+          "quality-analysts": [
+            "ana@cinderline.example"
+          ],
+          "quality-jobs": [
+            "sp-quality-nightly"
+          ]
+        },
+        "grants": [
+          {
+            "principal": "quality-jobs",
+            "privilege": "USE CATALOG",
+            "securable": "quality"
+          },
+          {
+            "principal": "quality-jobs",
+            "privilege": "USE SCHEMA",
+            "securable": "quality.raw"
+          },
+          {
+            "principal": "quality-jobs",
+            "privilege": "SELECT",
+            "securable": "quality.raw.inspections"
+          },
+          {
+            "principal": "quality-analysts",
+            "privilege": "USE CATALOG",
+            "securable": "quality"
+          },
+          {
+            "principal": "quality-analysts",
+            "privilege": "USE SCHEMA",
+            "securable": "quality.accepted"
+          },
+          {
+            "principal": "quality-analysts",
+            "privilege": "SELECT",
+            "securable": "quality.accepted.inspections"
+          }
+        ]
+      }
+    },
+    {
+      "id": "credential-service-account",
+      "name": "Storage credential cred_quality and its Databricks-managed service account",
+      "layer": "identity",
+      "side": "gcp",
+      "type": "credential",
+      "owner": "Metastore admin",
+      "object": "Storage credential cred_quality",
+      "config": {
+        "credential": "cred_quality",
+        "externalLocation": "loc_quality_raw on gs://cl-quality-raw/inspections/",
+        "identity": "uc-cred-quality@example-dbx-project.iam.gserviceaccount.com"
+      }
+    },
+    {
+      "id": "bucket-iam-binding",
+      "name": "IAM bindings on Cloud Storage buckets for the credential's service account",
+      "layer": "authorization",
+      "side": "gcp",
+      "type": "allow-list",
+      "owner": "The buckets' administrator",
+      "object": "Bucket IAM policies of cl-quality-raw and cl-quality-curated",
+      "config": {
+        "requires": {
+          "resource": "cl-quality-raw",
+          "anyOf": [
+            "roles/storage.objectViewer",
+            "roles/storage.objectAdmin"
+          ]
+        },
+        "entries": [
+          {
+            "principal": "serviceAccount:uc-cred-quality@example-dbx-project.iam.gserviceaccount.com",
+            "resource": "cl-quality-curated",
+            "grants": [
+              "roles/storage.objectAdmin",
+              "roles/storage.legacyBucketReader"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "cloud-dns-private-zone",
+      "name": "Cloud DNS private zone dbx-psc-zone (gcp.databricks.com.) and the networks it is visible to",
+      "layer": "name-resolution",
+      "side": "gcp",
+      "type": "dns",
+      "owner": "Cinderline network team",
+      "object": "Managed zone dbx-psc-zone in cl-net-host",
+      "config": {
+        "networks": [
+          "cl-vpc-transit"
+        ],
+        "records": {
+          "tunnel.us-east4.gcp.databricks.com": {
+            "ip": "10.20.8.2",
+            "via": "relay-pe"
+          }
+        },
+        "note": "A private zone answers only networks listed in its visibility; any other network gets the public answer"
+      }
+    },
+    {
+      "id": "psc-relay-endpoint",
+      "name": "PSC endpoint relay-pe, registered as the network configuration's dataplane_relay",
+      "layer": "reachability",
+      "side": "gcp",
+      "type": "endpoint-state",
+      "owner": "Cinderline network team and the Databricks account admin",
+      "object": "Forwarding rule relay-pe in cl-net-host",
+      "config": {
+        "state": "ACCEPTED",
+        "healthy": [
+          "ACCEPTED"
+        ]
+      }
+    },
+    {
+      "id": "vpc-firewall-egress",
+      "name": "Egress firewall rules of cl-vpc-dbx",
+      "layer": "reachability",
+      "side": "gcp",
+      "type": "filter",
+      "owner": "Cinderline network team",
+      "object": "VPC firewall rules of cl-vpc-dbx",
+      "config": {
+        "semantics": "priority",
+        "direction": "egress",
+        "rules": [
+          {
+            "name": "allow-psc-endpoints",
+            "priority": 1000,
+            "action": "allow",
+            "cidr": "10.20.8.0/28",
+            "ports": [
+              443
+            ]
+          },
+          {
+            "name": "block-internet",
+            "priority": 900,
+            "action": "deny",
+            "cidr": "0.0.0.0/0",
+            "ports": "all",
+            "note": "Added by a colleague to stop internet traffic"
+          },
+          {
+            "name": "deny-all-egress",
+            "priority": 65000,
+            "action": "deny",
+            "cidr": "0.0.0.0/0",
+            "ports": "all"
+          },
+          {
+            "name": "implied allow egress",
+            "priority": 65535,
+            "action": "allow",
+            "cidr": "0.0.0.0/0",
+            "ports": "all"
+          }
+        ],
+        "note": "Firewall policies attached above the VPC are not part of this case"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "error-record",
+      "control": null,
+      "capture": "The exact error or symptom text, its time, the run or cluster ID, and which service answered (or that none did)",
+      "where": "The job run or cluster event log",
+      "doesNotProve": "Which layer is at fault until the service that answered, if any, has been named"
+    },
+    {
+      "id": "job-run-as-setting",
+      "control": "run-as",
+      "capture": "The job's run-as principal as its settings show it",
+      "where": "Job settings",
+      "doesNotProve": "That the principal holds any privilege, or anything about the network"
+    },
+    {
+      "id": "show-grants-output",
+      "control": "uc-grants",
+      "capture": "SHOW GRANTS on the catalog, the schema and the table, read for the acting principal and its groups",
+      "where": "Unity Catalog",
+      "doesNotProve": "Anything about storage permissions or reachability"
+    },
+    {
+      "id": "credential-sa-email",
+      "control": "credential-service-account",
+      "capture": "DESCRIBE STORAGE CREDENTIAL cred_quality: the service account email",
+      "where": "Unity Catalog",
+      "doesNotProve": "Which bucket roles that email holds"
+    },
+    {
+      "id": "bucket-iam-policy",
+      "control": "bucket-iam-binding",
+      "capture": "The bucket's IAM policy, read for that email",
+      "where": "Bucket cl-quality-raw",
+      "doesNotProve": "Policies inherited from the project, folder or organization"
+    },
+    {
+      "id": "policy-troubleshooter-result",
+      "control": "bucket-iam-binding",
+      "capture": "Policy Troubleshooter for that email, storage.objects.get and the bucket, with the inherited policies it consulted",
+      "where": "Policy Troubleshooter",
+      "doesNotProve": "Anything about reachability"
+    },
+    {
+      "id": "relay-name-answer",
+      "control": "cloud-dns-private-zone",
+      "capture": "The relay name's answer from a VM in dbx-nodes-use4, with time",
+      "where": "A VM or running cluster in the node subnet",
+      "doesNotProve": "That the endpoint is accepted or that a firewall rule admits the flow"
+    },
+    {
+      "id": "zone-visibility",
+      "control": "cloud-dns-private-zone",
+      "capture": "The managed zone's private visibility networks and its A records",
+      "where": "Managed zone dbx-psc-zone",
+      "doesNotProve": "What a node actually received"
+    },
+    {
+      "id": "psc-connection-status",
+      "control": "psc-relay-endpoint",
+      "capture": "The forwarding rule's pscConnectionStatus",
+      "where": "Forwarding rule relay-pe",
+      "doesNotProve": "That the name resolves to it"
+    },
+    {
+      "id": "firewall-rules-by-priority",
+      "control": "vpc-firewall-egress",
+      "capture": "Egress firewall rules for the node network sorted by priority, and any firewall policies attached above the VPC",
+      "where": "VPC cl-vpc-dbx",
+      "doesNotProve": "Anything about permissions"
+    }
+  ],
+  "symptoms": [
+    {
+      "id": "GCP-D",
+      "kind": "denied",
+      "title": "The nightly job is refused in someone else's name",
+      "observed": "PERMISSION_DENIED: User ana@cinderline.example does not have SELECT on table quality.raw.inspections",
+      "observedIsFictional": true,
+      "context": "Ana created quality_nightly. The design says the job acts as sp-quality-nightly, which holds its grants through the quality-jobs group.",
+      "request": {
+        "segments": [
+          "execution",
+          "storage"
+        ],
+        "job": "quality_nightly",
+        "designPrincipal": "sp-quality-nightly",
+        "compute": "classic job cluster",
+        "table": "quality.raw.inspections"
+      }
+    },
+    {
+      "id": "GCP-U",
+      "kind": "unreachable",
+      "title": "Cluster starts stall after back-end PSC was enabled",
+      "observed": "Cluster start stalled and failed; the node never opened its secure tunnel; no principal, permission or constraint appears in any error",
+      "observedIsFictional": true,
+      "context": "This week back-end Private Service Connect was enabled and the Cloud NAT removed. Zone dbx-psc-zone was created at the same time.",
+      "request": {
+        "segments": [
+          "control-classic"
+        ],
+        "compute": "classic job cluster",
+        "sourceNetwork": "cl-vpc-dbx",
+        "sourceSubnet": "dbx-nodes-use4",
+        "sourceIp": "10.20.1.9",
+        "name": "tunnel.us-east4.gcp.databricks.com",
+        "expect": "private",
+        "port": 443
+      }
+    }
+  ],
+  "unknowns": [
+    {
+      "id": "gcp-serverless-private-connectivity",
+      "question": "Whether serverless compute can reach private resources in Cinderline's VPC on Google Cloud",
+      "whyUnknown": "The sources read for the module conflict: provider documentation lists the NCC binding for AWS and Azure only, while an SDK models a Google Cloud field; a field in a schema is not availability"
+    },
+    {
+      "id": "gcp-default-vm-service-account",
+      "question": "Which service account Databricks attaches to classic VMs by default, and what it may read",
+      "whyUnknown": "Not settled by the sources the module read"
+    },
+    {
+      "id": "gcp-required-firewall-rules",
+      "question": "The firewall rules, ports and address lists Databricks requires for a customer-managed VPC",
+      "whyUnknown": "They are on the customer-managed VPC page, which was not read for this case"
+    }
+  ]
+}

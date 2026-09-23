@@ -26,7 +26,7 @@ benchmark, discount or superiority is asserted anywhere in the pack.
 | `three-cloud-questions.md` | The questions matrix with every cell marked until you source it |
 | `reconciliation/source-totals.csv`, `reconciliation/target-totals.csv` | Six-row totals that disagree by a specific, explainable amount |
 | `reconciliation/reconciliation.md` | The task, then the worked answer (read after your attempt) |
-| `cost-sensitivity.md` | Hypothetical low/base/high worksheet with currency, period, units and exclusions |
+| `cost-sensitivity.md` | Hypothetical low/base/high worksheet with currency, period, units and exclusions; its worked answer comes last (read after your attempt) |
 | `templates/executive-readout.md` | One-page structure for the steering group |
 | `templates/technical-readout.md` | Structure for the technical readout and appendix |
 | `templates/decision-record.md` | Structure for the decision record |
@@ -78,6 +78,13 @@ benchmark, discount or superiority is asserted anywhere in the pack.
 | `as_of_utc` | Extract time; totals with different as-of times are not directly comparable |
 | `source_system` / `target_system` | Where the total came from |
 | `note` | Revisions, conversions, basis |
+
+## Calendar facts the pack relies on
+
+From the capstone brief: the fiscal quarter runs 1 October to 31 December,
+and a group-wide change blackout runs 8 December to 2 January, covering peak
+shipping and the year-end close. Contract dates are in the stakeholder
+disclosures.
 
 ## What is intentionally missing
 

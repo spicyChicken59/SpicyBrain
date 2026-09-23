@@ -1,0 +1,336 @@
+{
+  "scenarios": [
+    {
+      "id": "T-AWS-1",
+      "cloud": "aws",
+      "symptom": "AWS-U",
+      "story": "The network team adds the two new compute ranges to the endpoints' security group.",
+      "changes": [
+        {
+          "control": "endpoint-security-group",
+          "set": {
+            "rules": [
+              {
+                "cidr": "10.0.16.0/20",
+                "ports": [
+                  443
+                ]
+              },
+              {
+                "cidr": "10.0.32.0/20",
+                "ports": [
+                  443
+                ]
+              },
+              {
+                "cidr": "10.0.48.0/20",
+                "ports": [
+                  443
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-AWS-2",
+      "cloud": "aws",
+      "symptom": "AWS-U",
+      "story": "Before anyone touches the security group, a zone cleanup removes the association between phz-dbx-relay and vpc-cinderline-dbx.",
+      "changes": [
+        {
+          "control": "route53-private-hosted-zone",
+          "set": {
+            "networks": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-AWS-3",
+      "cloud": "aws",
+      "symptom": "AWS-D",
+      "story": "The key's owner adds a statement letting cinderline-lake-cred-role use the key.",
+      "changes": [
+        {
+          "control": "kms-key-policy",
+          "set": {
+            "entries": [
+              {
+                "principal": "arn:aws:iam::111122223333:role/cinderline-key-admins",
+                "resource": "alias/cinderline-lake",
+                "grants": [
+                  "kms:DescribeKey",
+                  "kms:EnableKeyRotation",
+                  "kms:ScheduleKeyDeletion"
+                ]
+              },
+              {
+                "principal": "arn:aws:iam::111122223333:role/cinderline-cluster-profile",
+                "resource": "alias/cinderline-lake",
+                "grants": [
+                  "kms:Decrypt",
+                  "kms:GenerateDataKey"
+                ]
+              },
+              {
+                "principal": "arn:aws:iam::111122223333:role/cinderline-lake-cred-role",
+                "resource": "alias/cinderline-lake",
+                "grants": [
+                  "kms:Decrypt",
+                  "kms:GenerateDataKey"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-AZ-1",
+      "cloud": "azure",
+      "symptom": "AZ-U",
+      "story": "The network team links privatelink.dfs.core.windows.net to vnet-cinderline-data.",
+      "changes": [
+        {
+          "control": "private-dns-zone-link",
+          "set": {
+            "networks": [
+              "vnet-cinderline-hub",
+              "vnet-cinderline-data"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-AZ-2",
+      "cloud": "azure",
+      "symptom": "AZ-U",
+      "story": "As T-AZ-1, and the storage owner approves pe-lake-dfs.",
+      "changes": [
+        {
+          "control": "private-dns-zone-link",
+          "set": {
+            "networks": [
+              "vnet-cinderline-hub",
+              "vnet-cinderline-data"
+            ]
+          }
+        },
+        {
+          "control": "private-endpoint-connection",
+          "set": {
+            "state": "Approved"
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-AZ-3",
+      "cloud": "azure",
+      "symptom": "AZ-U",
+      "story": "As T-AZ-2, and the connector's managed identity gets Storage Blob Data Contributor on the account back.",
+      "changes": [
+        {
+          "control": "private-dns-zone-link",
+          "set": {
+            "networks": [
+              "vnet-cinderline-hub",
+              "vnet-cinderline-data"
+            ]
+          }
+        },
+        {
+          "control": "private-endpoint-connection",
+          "set": {
+            "state": "Approved"
+          }
+        },
+        {
+          "control": "storage-role-assignment",
+          "set": {
+            "entries": [
+              {
+                "principal": "grp-platform-admins",
+                "resource": "stcinderlinelake",
+                "grants": [
+                  "Owner"
+                ]
+              },
+              {
+                "principal": "sp-job-nightly",
+                "resource": "stcinderlinelake",
+                "grants": [
+                  "Storage Blob Data Reader"
+                ]
+              },
+              {
+                "principal": "mi-ac-cinderline-uc",
+                "resource": "stcinderlinelake",
+                "grants": [
+                  "Storage Blob Data Contributor"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-AZ-4",
+      "cloud": "azure",
+      "symptom": "AZ-D",
+      "story": "The managed identity's role is restored and the attempted fix for sp-job-nightly is removed.",
+      "changes": [
+        {
+          "control": "storage-role-assignment",
+          "set": {
+            "entries": [
+              {
+                "principal": "grp-platform-admins",
+                "resource": "stcinderlinelake",
+                "grants": [
+                  "Owner"
+                ]
+              },
+              {
+                "principal": "mi-ac-cinderline-uc",
+                "resource": "stcinderlinelake",
+                "grants": [
+                  "Storage Blob Data Contributor"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-GCP-1",
+      "cloud": "gcp",
+      "symptom": "GCP-U",
+      "story": "The network team makes dbx-psc-zone visible to cl-vpc-dbx as well.",
+      "changes": [
+        {
+          "control": "cloud-dns-private-zone",
+          "set": {
+            "networks": [
+              "cl-vpc-transit",
+              "cl-vpc-dbx"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-GCP-2",
+      "cloud": "gcp",
+      "symptom": "GCP-U",
+      "story": "As T-GCP-1, and allow-psc-endpoints is renumbered to priority 800.",
+      "changes": [
+        {
+          "control": "cloud-dns-private-zone",
+          "set": {
+            "networks": [
+              "cl-vpc-transit",
+              "cl-vpc-dbx"
+            ]
+          }
+        },
+        {
+          "control": "vpc-firewall-egress",
+          "set": {
+            "rules": [
+              {
+                "name": "allow-psc-endpoints",
+                "priority": 800,
+                "action": "allow",
+                "cidr": "10.20.8.0/28",
+                "ports": [
+                  443
+                ]
+              },
+              {
+                "name": "block-internet",
+                "priority": 900,
+                "action": "deny",
+                "cidr": "0.0.0.0/0",
+                "ports": "all"
+              },
+              {
+                "name": "deny-all-egress",
+                "priority": 65000,
+                "action": "deny",
+                "cidr": "0.0.0.0/0",
+                "ports": "all"
+              },
+              {
+                "name": "implied allow egress",
+                "priority": 65535,
+                "action": "allow",
+                "cidr": "0.0.0.0/0",
+                "ports": "all"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-GCP-3",
+      "cloud": "gcp",
+      "symptom": "GCP-D",
+      "story": "The job's owner sets its run-as principal to sp-quality-nightly.",
+      "changes": [
+        {
+          "control": "run-as",
+          "set": {
+            "jobs": {
+              "quality_nightly": "sp-quality-nightly"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "T-GCP-4",
+      "cloud": "gcp",
+      "symptom": "GCP-D",
+      "story": "As T-GCP-3, and the bucket's administrator binds the credential's service account to roles/storage.objectViewer on cl-quality-raw.",
+      "changes": [
+        {
+          "control": "run-as",
+          "set": {
+            "jobs": {
+              "quality_nightly": "sp-quality-nightly"
+            }
+          }
+        },
+        {
+          "control": "bucket-iam-binding",
+          "set": {
+            "entries": [
+              {
+                "principal": "serviceAccount:uc-cred-quality@example-dbx-project.iam.gserviceaccount.com",
+                "resource": "cl-quality-curated",
+                "grants": [
+                  "roles/storage.objectAdmin",
+                  "roles/storage.legacyBucketReader"
+                ]
+              },
+              {
+                "principal": "serviceAccount:uc-cred-quality@example-dbx-project.iam.gserviceaccount.com",
+                "resource": "cl-quality-raw",
+                "grants": [
+                  "roles/storage.objectViewer"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

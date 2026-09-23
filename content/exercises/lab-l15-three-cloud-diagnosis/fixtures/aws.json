@@ -1,0 +1,572 @@
+{
+  "cloud": "aws",
+  "title": "AWS: a nightly read refused at the key, and classic clusters that stopped starting",
+  "synthetic": "Fictional teaching case for Cinderline Components. Names, addresses, account and project identifiers and every error text are invented; nothing was deployed or observed. Hostnames ending in .example stand in for the regional names on the current AWS pages; 111122223333 is a placeholder account ID.",
+  "deployment": [
+    {
+      "item": "Workspace",
+      "value": "cinderline-prod, on a customer-managed VPC with back-end PrivateLink; one serverless SQL warehouse and classic job clusters"
+    },
+    {
+      "item": "Network",
+      "value": "vpc-cinderline-dbx (10.0.0.0/16); compute subnets subnet-compute-a (10.0.32.0/20) and subnet-compute-b (10.0.48.0/20); interface endpoints in subnet-endpoints (10.0.8.0/24): vpce-relay 10.0.8.21 and vpce-rest 10.0.8.22"
+    },
+    {
+      "item": "Storage",
+      "value": "S3 bucket cinderline-inspections, objects encrypted with SSE-KMS under alias/cinderline-lake"
+    },
+    {
+      "item": "Unity Catalog",
+      "value": "external location s3://cinderline-inspections/accepted/ through storage credential cinderline-lake-cred; table quality.accepted.inspections"
+    }
+  ],
+  "identities": [
+    {
+      "id": "ana@cinderline.example",
+      "kind": "Databricks user from the identity provider",
+      "memberOf": [
+        "quality-analysts"
+      ],
+      "acts": "In her own notebooks; never as a scheduled job"
+    },
+    {
+      "id": "job-nightly",
+      "kind": "Databricks service principal",
+      "memberOf": [],
+      "acts": "As the run-as principal of job quality_nightly"
+    },
+    {
+      "id": "arn:aws:iam::111122223333:role/cinderline-lake-cred-role",
+      "kind": "IAM role wrapped by storage credential cinderline-lake-cred",
+      "memberOf": [],
+      "acts": "On the storage path of Unity Catalog reads; Databricks assumes it"
+    },
+    {
+      "id": "arn:aws:iam::111122223333:role/cinderline-cluster-profile",
+      "kind": "IAM role of instance profile cinderline-cluster-profile",
+      "memberOf": [],
+      "acts": "On the older classic interactive cluster legacy-interactive, which has no Unity Catalog"
+    }
+  ],
+  "requestPath": [
+    {
+      "path": "Author",
+      "hop": "Ana's browser to the workspace web application",
+      "identity": "ana@cinderline.example after single sign-on",
+      "segment": null
+    },
+    {
+      "path": "Control",
+      "hop": "Classic node in subnet-compute-a to the secure cluster connectivity relay, through interface endpoint vpce-relay",
+      "identity": "None that this case examines: a timeout here names no principal",
+      "segment": "control-classic"
+    },
+    {
+      "path": "Execution",
+      "hop": "Job quality_nightly on the serverless SQL warehouse asks Unity Catalog",
+      "identity": "The job's run-as principal",
+      "segment": "execution"
+    },
+    {
+      "path": "Storage",
+      "hop": "Serverless compute to s3://cinderline-inspections/accepted/",
+      "identity": "The storage credential's IAM role",
+      "segment": "storage-serverless"
+    },
+    {
+      "path": "Storage (legacy)",
+      "hop": "Classic cluster legacy-interactive to the same prefix, outside Unity Catalog",
+      "identity": "The instance profile's IAM role",
+      "segment": "storage-classic-legacy"
+    }
+  ],
+  "paths": {
+    "control-classic": [
+      "route53-private-hosted-zone",
+      "vpc-route-table",
+      "compute-security-group",
+      "endpoint-security-group",
+      "relay-interface-endpoint"
+    ],
+    "execution": [
+      "run-as",
+      "uc-grants"
+    ],
+    "storage-serverless": [
+      "storage-credential-iam-role",
+      "credential-role-policy",
+      "s3-bucket-policy",
+      "kms-key-policy"
+    ],
+    "storage-classic-legacy": [
+      "instance-profile",
+      "s3-bucket-policy",
+      "kms-key-policy"
+    ]
+  },
+  "controls": [
+    {
+      "id": "route53-private-hosted-zone",
+      "name": "Route 53 private hosted zone phz-dbx-relay and the VPCs associated with it",
+      "layer": "name-resolution",
+      "side": "aws",
+      "type": "dns",
+      "owner": "Cinderline network team",
+      "object": "Private hosted zone phz-dbx-relay",
+      "config": {
+        "networks": [
+          "vpc-cinderline-dbx"
+        ],
+        "records": {
+          "relay-endpoint.example": {
+            "ip": "10.0.8.21",
+            "via": "vpce-relay"
+          },
+          "rest-endpoint.example": {
+            "ip": "10.0.8.22",
+            "via": "vpce-rest"
+          }
+        },
+        "note": "A VPC that is not associated with the zone gets the public answer for these names"
+      }
+    },
+    {
+      "id": "vpc-route-table",
+      "name": "Route table rtb-compute on the compute subnets",
+      "layer": "reachability",
+      "side": "aws",
+      "type": "route",
+      "owner": "Cinderline network team",
+      "object": "Route table rtb-compute",
+      "config": {
+        "subnets": [
+          "subnet-compute-a",
+          "subnet-compute-b"
+        ],
+        "routes": [
+          {
+            "destination": "10.0.0.0/16",
+            "target": "local"
+          }
+        ],
+        "note": "No route to the internet: control traffic is meant to use the interface endpoints"
+      }
+    },
+    {
+      "id": "compute-security-group",
+      "name": "Security group sg-dbx-compute on the cluster nodes (outbound rules)",
+      "layer": "reachability",
+      "side": "aws",
+      "type": "filter",
+      "owner": "Cinderline network team",
+      "object": "Security group sg-dbx-compute",
+      "config": {
+        "semantics": "allow-only",
+        "direction": "egress",
+        "rules": [
+          {
+            "cidr": "0.0.0.0/0",
+            "ports": "all"
+          }
+        ]
+      }
+    },
+    {
+      "id": "endpoint-security-group",
+      "name": "Security group sg-dbx-endpoints on vpce-relay and vpce-rest (inbound rules)",
+      "layer": "reachability",
+      "side": "aws",
+      "type": "filter",
+      "owner": "Cinderline network team",
+      "object": "Security group sg-dbx-endpoints",
+      "config": {
+        "semantics": "allow-only",
+        "direction": "ingress",
+        "rules": [
+          {
+            "cidr": "10.0.16.0/20",
+            "ports": [
+              443
+            ],
+            "note": "written for the compute range used before Monday"
+          }
+        ],
+        "note": "Port 443 alone is a simplification; the ports an endpoint needs are listed on the current page"
+      }
+    },
+    {
+      "id": "relay-interface-endpoint",
+      "name": "Interface endpoint vpce-relay, registered in the workspace's network configuration",
+      "layer": "reachability",
+      "side": "aws",
+      "type": "endpoint-state",
+      "owner": "Cinderline network team and the Databricks account admin",
+      "object": "VPC endpoint vpce-relay and its registration",
+      "config": {
+        "state": "available",
+        "healthy": [
+          "available"
+        ],
+        "registeredInNetworkConfiguration": true
+      }
+    },
+    {
+      "id": "run-as",
+      "name": "Run-as principal in the job settings",
+      "layer": "identity",
+      "side": "databricks",
+      "type": "run-as",
+      "owner": "The job's owner",
+      "object": "Job settings",
+      "config": {
+        "jobs": {
+          "quality_nightly": "job-nightly"
+        },
+        "note": "Set to the service principal when the job was scheduled"
+      }
+    },
+    {
+      "id": "uc-grants",
+      "name": "Unity Catalog privileges of the acting principal",
+      "layer": "authorization",
+      "side": "databricks",
+      "type": "uc-grants",
+      "owner": "The owners of the catalog, schema and table",
+      "object": "Unity Catalog grants on catalog, schema and table",
+      "config": {
+        "groups": {
+          "quality-analysts": [
+            "ana@cinderline.example"
+          ]
+        },
+        "grants": [
+          {
+            "principal": "job-nightly",
+            "privilege": "USE CATALOG",
+            "securable": "quality"
+          },
+          {
+            "principal": "job-nightly",
+            "privilege": "USE SCHEMA",
+            "securable": "quality.accepted"
+          },
+          {
+            "principal": "job-nightly",
+            "privilege": "SELECT",
+            "securable": "quality.accepted.inspections"
+          },
+          {
+            "principal": "quality-analysts",
+            "privilege": "USE CATALOG",
+            "securable": "quality"
+          },
+          {
+            "principal": "quality-analysts",
+            "privilege": "USE SCHEMA",
+            "securable": "quality.accepted"
+          },
+          {
+            "principal": "quality-analysts",
+            "privilege": "SELECT",
+            "securable": "quality.accepted.inspections"
+          }
+        ]
+      }
+    },
+    {
+      "id": "storage-credential-iam-role",
+      "name": "Storage credential cinderline-lake-cred and the IAM role it wraps",
+      "layer": "identity",
+      "side": "aws",
+      "type": "credential",
+      "owner": "Metastore admin (credential) and Cinderline cloud team (role)",
+      "object": "Storage credential cinderline-lake-cred",
+      "config": {
+        "credential": "cinderline-lake-cred",
+        "externalLocation": "s3://cinderline-inspections/accepted/",
+        "identity": "arn:aws:iam::111122223333:role/cinderline-lake-cred-role"
+      }
+    },
+    {
+      "id": "credential-role-policy",
+      "name": "Permissions policy of cinderline-lake-cred-role",
+      "layer": "authorization",
+      "side": "aws",
+      "type": "allow-list",
+      "owner": "Cinderline cloud team",
+      "object": "IAM role cinderline-lake-cred-role",
+      "config": {
+        "requires": {
+          "resource": "arn:aws:s3:::cinderline-inspections/accepted/*",
+          "anyOf": [
+            "s3:GetObject"
+          ]
+        },
+        "entries": [
+          {
+            "principal": "arn:aws:iam::111122223333:role/cinderline-lake-cred-role",
+            "resource": "arn:aws:s3:::cinderline-inspections/accepted/*",
+            "grants": [
+              "s3:GetObject",
+              "s3:PutObject",
+              "s3:DeleteObject"
+            ]
+          },
+          {
+            "principal": "arn:aws:iam::111122223333:role/cinderline-lake-cred-role",
+            "resource": "arn:aws:s3:::cinderline-inspections",
+            "grants": [
+              "s3:ListBucket"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "s3-bucket-policy",
+      "name": "Bucket policy of cinderline-inspections",
+      "layer": "authorization",
+      "side": "aws",
+      "type": "allow-list",
+      "owner": "Cinderline cloud team",
+      "object": "Bucket cinderline-inspections",
+      "config": {
+        "style": "Denies every principal that is not listed below",
+        "requires": {
+          "resource": "arn:aws:s3:::cinderline-inspections/accepted/*",
+          "anyOf": [
+            "s3:GetObject"
+          ]
+        },
+        "entries": [
+          {
+            "principal": "arn:aws:iam::111122223333:role/cinderline-lake-cred-role",
+            "resource": "arn:aws:s3:::cinderline-inspections/accepted/*",
+            "grants": [
+              "s3:GetObject",
+              "s3:PutObject",
+              "s3:DeleteObject"
+            ]
+          },
+          {
+            "principal": "arn:aws:iam::111122223333:role/cinderline-cluster-profile",
+            "resource": "arn:aws:s3:::cinderline-inspections/accepted/*",
+            "grants": [
+              "s3:GetObject"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "kms-key-policy",
+      "name": "Key policy of alias/cinderline-lake",
+      "layer": "authorization",
+      "side": "aws",
+      "type": "allow-list",
+      "owner": "Cinderline security team (key owner)",
+      "object": "KMS key alias/cinderline-lake",
+      "config": {
+        "style": "No statement delegates to IAM policies, so only the roles listed may use the key",
+        "requires": {
+          "resource": "alias/cinderline-lake",
+          "anyOf": [
+            "kms:Decrypt"
+          ]
+        },
+        "entries": [
+          {
+            "principal": "arn:aws:iam::111122223333:role/cinderline-key-admins",
+            "resource": "alias/cinderline-lake",
+            "grants": [
+              "kms:DescribeKey",
+              "kms:EnableKeyRotation",
+              "kms:ScheduleKeyDeletion"
+            ]
+          },
+          {
+            "principal": "arn:aws:iam::111122223333:role/cinderline-cluster-profile",
+            "resource": "alias/cinderline-lake",
+            "grants": [
+              "kms:Decrypt",
+              "kms:GenerateDataKey"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "instance-profile",
+      "name": "Instance profile cinderline-cluster-profile on legacy-interactive",
+      "layer": "identity",
+      "side": "aws",
+      "type": "credential",
+      "owner": "Workspace admin (registration) and Cinderline cloud team (role)",
+      "object": "Instance profile cinderline-cluster-profile",
+      "config": {
+        "instanceProfile": "cinderline-cluster-profile",
+        "attachedTo": "Classic interactive cluster legacy-interactive, without Unity Catalog",
+        "identity": "arn:aws:iam::111122223333:role/cinderline-cluster-profile"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "error-record",
+      "control": null,
+      "capture": "The exact error or symptom text, its time, the run or cluster ID, and which service answered (or that none did)",
+      "where": "The job run or cluster event log",
+      "doesNotProve": "Which layer is at fault until the service that answered, if any, has been named"
+    },
+    {
+      "id": "job-run-as-setting",
+      "control": "run-as",
+      "capture": "The job's run-as principal as its settings show it",
+      "where": "Job settings",
+      "doesNotProve": "That the principal holds any privilege, or anything about the network"
+    },
+    {
+      "id": "show-grants-output",
+      "control": "uc-grants",
+      "capture": "SHOW GRANTS on the catalog, the schema and the table, read for the acting principal and its groups",
+      "where": "Unity Catalog",
+      "doesNotProve": "Anything about storage permissions or reachability"
+    },
+    {
+      "id": "credential-role-arn",
+      "control": "storage-credential-iam-role",
+      "capture": "The storage credential's IAM role ARN and account, and the external location that resolved for the path",
+      "where": "Unity Catalog storage credential and external location",
+      "doesNotProve": "That any policy admits the role on the prefix"
+    },
+    {
+      "id": "role-permissions-policy",
+      "control": "credential-role-policy",
+      "capture": "The role's permissions policy statements for the bucket and prefix",
+      "where": "IAM role cinderline-lake-cred-role",
+      "doesNotProve": "What the bucket policy or the key policy say"
+    },
+    {
+      "id": "bucket-policy-statements",
+      "control": "s3-bucket-policy",
+      "capture": "The bucket policy's statements for the exact role ARN",
+      "where": "Bucket cinderline-inspections",
+      "doesNotProve": "Whether the key policy lets the role decrypt"
+    },
+    {
+      "id": "kms-key-policy-statements",
+      "control": "kms-key-policy",
+      "capture": "The key policy statements and grants naming the exact role ARN, and the key's region and state",
+      "where": "KMS key alias/cinderline-lake",
+      "doesNotProve": "Whether the network path to the key or the bucket exists"
+    },
+    {
+      "id": "instance-profile-role",
+      "control": "instance-profile",
+      "capture": "Which instance profile the cluster launched with, and its role ARN",
+      "where": "Cluster configuration of legacy-interactive",
+      "doesNotProve": "Anything about reads that go through Unity Catalog"
+    },
+    {
+      "id": "relay-dns-answer",
+      "control": "route53-private-hosted-zone",
+      "capture": "The relay hostname's answer resolved from an instance in subnet-compute-a, with time",
+      "where": "An instance in the compute subnet",
+      "doesNotProve": "That a route or security group admits the traffic"
+    },
+    {
+      "id": "hosted-zone-associations",
+      "control": "route53-private-hosted-zone",
+      "capture": "The private hosted zone's records and its associated VPCs",
+      "where": "Private hosted zone phz-dbx-relay",
+      "doesNotProve": "What an instance actually received"
+    },
+    {
+      "id": "route-table-export",
+      "control": "vpc-route-table",
+      "capture": "The route table associated with the compute subnet",
+      "where": "Route table rtb-compute",
+      "doesNotProve": "That a security group admits the flow"
+    },
+    {
+      "id": "compute-sg-outbound",
+      "control": "compute-security-group",
+      "capture": "Outbound rules of the nodes' security group",
+      "where": "Security group sg-dbx-compute",
+      "doesNotProve": "What the endpoint's own security group admits"
+    },
+    {
+      "id": "endpoint-sg-inbound",
+      "control": "endpoint-security-group",
+      "capture": "Inbound rules of the endpoints' security group against the current compute ranges",
+      "where": "Security group sg-dbx-endpoints",
+      "doesNotProve": "Endpoint registration or anything about permissions"
+    },
+    {
+      "id": "vpc-flow-log-rejects",
+      "control": "endpoint-security-group",
+      "capture": "VPC flow log REJECT records at the endpoint's network interface for the failure time",
+      "where": "VPC flow logs",
+      "doesNotProve": "Which rule to change; only that packets were refused there"
+    },
+    {
+      "id": "endpoint-state-registration",
+      "control": "relay-interface-endpoint",
+      "capture": "The endpoint's state and its registration in the workspace's network configuration",
+      "where": "VPC endpoint vpce-relay and the account console",
+      "doesNotProve": "That packets reach it"
+    }
+  ],
+  "symptoms": [
+    {
+      "id": "AWS-D",
+      "kind": "denied",
+      "title": "The nightly job is refused after the catalog agreed",
+      "observed": "AccessDenied (KMS): the assumed role cinderline-lake-cred-role is not authorized to perform kms:Decrypt on alias/cinderline-lake",
+      "observedIsFictional": true,
+      "context": "The bucket's objects moved to SSE-KMS under alias/cinderline-lake last week. Ana still reads the same prefix from legacy-interactive without trouble. Unity Catalog raised no PERMISSION_DENIED.",
+      "request": {
+        "segments": [
+          "execution",
+          "storage-serverless"
+        ],
+        "job": "quality_nightly",
+        "designPrincipal": "job-nightly",
+        "compute": "serverless SQL warehouse",
+        "table": "quality.accepted.inspections"
+      }
+    },
+    {
+      "id": "AWS-U",
+      "kind": "unreachable",
+      "title": "Classic clusters stopped starting",
+      "observed": "Cluster start failed after a bootstrap timeout reaching the secure cluster connectivity relay; no service returned an error",
+      "observedIsFictional": true,
+      "context": "On Monday the compute subnets moved from 10.0.16.0/20 to 10.0.32.0/20 and 10.0.48.0/20. No job, grant or credential changed.",
+      "request": {
+        "segments": [
+          "control-classic"
+        ],
+        "compute": "classic job cluster",
+        "sourceNetwork": "vpc-cinderline-dbx",
+        "sourceSubnet": "subnet-compute-a",
+        "sourceIp": "10.0.33.17",
+        "name": "relay-endpoint.example",
+        "expect": "private",
+        "port": 443
+      }
+    }
+  ],
+  "unknowns": [
+    {
+      "id": "aws-relay-endpoint-service",
+      "question": "The relay and REST API endpoint service names, and the ports each endpoint needs, for Cinderline's region",
+      "whyUnknown": "They are listed per region on the current PrivateLink page, which this lab does not reproduce"
+    },
+    {
+      "id": "aws-cmk-tier",
+      "question": "Whether Cinderline's tier and region permit customer-managed keys for managed services and workspace storage",
+      "whyUnknown": "The feature is gated by tier and its regional availability changes"
+    }
+  ]
+}

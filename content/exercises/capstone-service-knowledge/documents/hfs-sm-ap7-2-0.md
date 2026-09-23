@@ -6,7 +6,7 @@ supersedes: HFS-SM-AP7-1.3
 superseded-by: none
 status: current
 region: all
-audience: technician-l2
+audience: technician-l2 for §6.2 (mechanical seal replacement); technician-l1, technician-l2 for the rest of the manual, including the §3 external inspection
 fictional: true — synthetic SpicyBrain teaching fixture; not real equipment guidance
 
 ## Access note
