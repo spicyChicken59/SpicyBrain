@@ -20,6 +20,8 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,6 +39,8 @@ def main() -> int:
                         help="interpreter for labs whose evidence runtime is 'ml'")
     parser.add_argument("--evidence-dir", default=str(ROOT / "test-results" / "labs"))
     parser.add_argument("--only", nargs="*", default=None)
+    parser.add_argument("--from-zip", action="store_true",
+                        help="extract each lab's committed download to a clean temp dir and run it there")
     args = parser.parse_args()
     out = Path(args.evidence_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -57,12 +61,25 @@ def main() -> int:
             "spark": args.spark_python,
             "ml": args.ml_python,
         }.get(runtime) or args.python
+        workdir = EXERCISES / lab
+        extracted = None
+        if args.from_zip:
+            archive = ROOT / "content" / "downloads" / f"{lab}.zip"
+            if not archive.exists():
+                failures.append(f"{lab}: no committed download at {archive}")
+                continue
+            extracted = tempfile.TemporaryDirectory(prefix=f"{lab}-")
+            with zipfile.ZipFile(archive) as bundle:
+                bundle.extractall(extracted.name)
+            workdir = Path(extracted.name)
         result = subprocess.run(
             [interpreter, "run_tests.py", "--evidence", str(evidence)],
-            cwd=EXERCISES / lab,
+            cwd=workdir,
             capture_output=True,
             text=True,
         )
+        if extracted:
+            extracted.cleanup()
         tail = (result.stdout + result.stderr)[-2000:]
         if result.returncode != 0 or not evidence.exists():
             failures.append(f"{lab}: exit {result.returncode}\n{tail}")

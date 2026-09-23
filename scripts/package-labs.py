@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Package lab exercise directories into deterministic ZIP downloads.
 
-Usage: python scripts/package-labs.py [lab-id ...]
+Usage: python scripts/package-labs.py [--check] [package-id ...]
 
-Each content/exercises/<lab-id>/ directory (excluding the original
-reliable-data package, which has its own packager) is written to
+Each content/exercises/<lab-id>/ or capstone-<id>/ data-pack directory
+(excluding the original reliable-data package, which has its own packager)
+is written to
 content/downloads/<lab-id>.zip with sorted members, fixed timestamps and
 deflate compression, so a rebuild from unchanged sources produces identical
 bytes. Only the member types the application accepts are packaged; caches
 and virtual environments are refused rather than skipped silently. The
-script prints the SHA-256 and member count for course.json.
+script prints the SHA-256 and member count for course.json. With --check it
+rebuilds nothing and fails when a committed ZIP's members differ from the
+source directory.
 """
 from __future__ import annotations
 
@@ -73,10 +76,44 @@ def package(lab: str) -> dict:
     }
 
 
+def check(lab: str) -> list[str]:
+    """Compare a committed ZIP with its source directory, member by member.
+
+    Byte-identical archives are not required (deflate output may differ between
+    zlib builds); the member names and every member's bytes must be equal, so a
+    stale or hand-edited download cannot pass.
+    """
+    source = EXERCISES / lab
+    target = DOWNLOADS / f"{lab}.zip"
+    if not target.exists():
+        return [f"{lab}: missing {target.relative_to(ROOT)}"]
+    expected = {p.relative_to(source).as_posix(): p.read_bytes() for p in members(source)}
+    problems = []
+    with zipfile.ZipFile(target) as archive:
+        names = [i.filename for i in archive.infolist()]
+        if sorted(names) != sorted(expected):
+            missing = sorted(set(expected) - set(names))
+            extra = sorted(set(names) - set(expected))
+            problems.append(f"{lab}: members differ (missing {missing}, extra {extra})")
+        for name in set(names) & set(expected):
+            if archive.read(name) != expected[name]:
+                problems.append(f"{lab}: {name} differs from its source file")
+    return problems
+
+
 def main(argv: list[str]) -> None:
+    checking = "--check" in argv
+    argv = [a for a in argv if a != "--check"]
     labs = argv or sorted(
-        p.name for p in EXERCISES.iterdir() if p.is_dir() and p.name.startswith("lab-")
+        p.name for p in EXERCISES.iterdir() if p.is_dir() and p.name.startswith(("lab-", "capstone-"))
     )
+    if checking:
+        problems = [problem for lab in labs for problem in check(lab)]
+        if problems:
+            print("\n".join(problems), file=sys.stderr)
+            raise SystemExit(1)
+        print(f"PASS: {len(labs)} packages match their source directories member for member")
+        return
     results = [package(lab) for lab in labs]
     print(json.dumps(results, indent=2))
 

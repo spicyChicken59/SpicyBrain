@@ -69,3 +69,51 @@ jobs:
             docs/evidence/reliable-data-ci.json
             docs/evidence/source-availability.json
           retention-days: 14
+  labs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Lab and data-pack downloads match their source directories
+        run: python scripts/package-labs.py --check
+      - name: One environment per recorded lab runtime, from exact pins only
+        run: |
+          python scripts/lab-requirements.py stdlib > stdlib-pins.txt
+          test ! -s stdlib-pins.txt
+          python scripts/lab-requirements.py spark > spark-pins.txt
+          python scripts/lab-requirements.py ml > ml-pins.txt
+          python -m venv .labs/spark
+          .labs/spark/bin/python -m pip install -r spark-pins.txt
+          python -m venv .labs/ml
+          .labs/ml/bin/python -m pip install -r ml-pins.txt
+      - name: Execute every lab from its committed download and compare with committed evidence
+        run: >-
+          python scripts/run-labs.py --from-zip
+          --python python
+          --spark-python .labs/spark/bin/python
+          --ml-python .labs/ml/bin/python
+          --evidence-dir test-results/labs
+      - name: Exact tested commit
+        if: always()
+        run: |
+          mkdir -p test-results
+          git rev-parse HEAD > test-results/tested-head.txt
+          python --version > test-results/python-version.txt
+          java -version 2> test-results/java-version.txt
+      - name: Lab execution evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: lab-evidence-${{ github.event.pull_request.head.sha }}
+          path: test-results/
+          retention-days: 14
