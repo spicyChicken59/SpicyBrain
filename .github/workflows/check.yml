@@ -49,6 +49,14 @@ jobs:
         run: |
           python -m pip install -r content/exercises/reliable-data/requirements.txt
           python content/exercises/reliable-data/run_tests.py --spark --evidence docs/evidence/reliable-data-ci.json
+      - name: The original exercise download, extracted to a clean directory, passes its advertised commands
+        run: |
+          dir="$RUNNER_TEMP/reliable-data-download"
+          python -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" content/downloads/reliable-data-exercises.zip "$dir"
+          python -m venv "$dir/.venv"
+          "$dir/.venv/bin/python" -m pip install -r "$dir/requirements.txt"
+          cd "$dir"
+          .venv/bin/python run_tests.py --spark --evidence "$GITHUB_WORKSPACE/docs/evidence/reliable-data-download-ci.json"
       - name: Exact tested commit and runtime
         if: always()
         run: |
@@ -67,6 +75,7 @@ jobs:
             docs/evidence/content-extension.json
             docs/evidence/extension-review.png
             docs/evidence/reliable-data-ci.json
+            docs/evidence/reliable-data-download-ci.json
             docs/evidence/source-availability.json
           retention-days: 14
   labs:

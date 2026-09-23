@@ -1,6 +1,8 @@
 """Lab L02 runner: SQL and DataFrame equivalence on local Spark 4.0.4.
 
-    /home/user/labenv/spark-env/bin/python run_tests.py --evidence evidence.json
+    .venv/bin/python run_tests.py --evidence local-evidence.json
+
+(after creating .venv and installing requirements.txt, as README.md shows)
 
 Runs offline on one machine with local[2], the Spark UI disabled and two
 shuffle partitions. Compares both implementations against authored literals

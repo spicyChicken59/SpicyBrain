@@ -1,6 +1,8 @@
 """Lab L03 runner: join cardinality on local Spark 4.0.4.
 
-    /home/user/labenv/spark-env/bin/python run_tests.py --evidence evidence.json
+    .venv/bin/python run_tests.py --evidence local-evidence.json
+
+(after creating .venv and installing requirements.txt, as README.md shows)
 
 Offline, one machine, local[2], UI off, two shuffle partitions. Both the
 DataFrame API and Spark SQL are held to authored literals in expected/*.json.
