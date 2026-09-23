@@ -16,6 +16,7 @@ import { createServer } from "node:http";
 import { chromium, expect } from "@playwright/test";
 import { buildContent, loadCourses, loadPaths, root } from "./content.ts";
 import { stored } from "../tests/browser/helpers.ts";
+import { parseImport } from "../src/study.ts";
 import type { Course, Lesson } from "../src/content-schema.ts";
 import type { TeachingModule } from "../src/teaching-schema.ts";
 type RawCourse = Omit<Course, "modules"> & {
@@ -146,6 +147,18 @@ try {
   expect(photoCourse.modules).toHaveLength(2);
   const extensionPaths = await loadPaths(catalog, join(temp, "content"));
   expect(extensionPaths.some((path) => path.id === "photo-path")).toBe(true);
+  // Collections are content too: tracks, a route, a lab with a download and
+  // a field guide, with counts unlike the released course's.
+  expect(photoCourse.tracks?.map((t) => t.id)).toEqual([
+    "photo-track-capture",
+    "photo-track-composition",
+  ]);
+  expect(photoCourse.routes).toHaveLength(1);
+  expect(photoCourse.labs).toHaveLength(1);
+  expect(photoCourse.guides).toHaveLength(1);
+  const lab = photoCourse.labs![0],
+    guide = photoCourse.guides![0],
+    labDownload = photoCourse.downloads!.find((d) => d.id === lab.downloadId)!;
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const address = server.address();
   if (!address || typeof address === "string") throw Error("No port");
@@ -166,6 +179,12 @@ try {
     page.getByRole("heading", {
       name: "Exposure and composition in photography",
     }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator(".teacher-course-card")
+      .filter({ hasText: "Exposure and composition in photography" })
+      .getByText("2 tracks · 1 lab · 1 field guide", { exact: true }),
   ).toBeVisible();
   await go("#/learn/roadmaps");
   await page
@@ -401,6 +420,82 @@ try {
   await expect(
     page.getByRole("button", { name: "Print course handbook", exact: true }),
   ).toBeEnabled();
+  // The generic collection views render the fixture's tracks, route, lab and
+  // guide; a track handbook assembles only that track's module.
+  await go("#/course/photo");
+  for (const track of photoCourse.tracks!) {
+    const section = page.locator(".academy-track").filter({
+      has: page.getByRole("heading", {
+        level: 2,
+        name: track.title,
+        exact: true,
+      }),
+    });
+    await expect(section.getByText(track.summary)).toBeVisible();
+    await expect(section.locator(".teacher-module-map>li")).toHaveCount(1);
+  }
+  await expect(
+    page
+      .locator(".academy-route--essential")
+      .getByRole("heading", { name: "A first photo walk", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Also in this course" })
+    .getByRole("link", { name: "1 lab", exact: true })
+    .click();
+  await expect(page.locator("main h1")).toHaveText("Labs");
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Tabletop · 1 lab" }),
+  ).toBeVisible();
+  const labCard = page.locator(".academy-card").filter({ hasText: lab.title });
+  await expect(labCard).toContainText(lab.evidence);
+  const labDownloadEvent = page.waitForEvent("download");
+  await labCard.getByRole("link", { name: labDownload.title }).click();
+  expect(
+    createHash("sha256")
+      .update(await readFile((await (await labDownloadEvent).path())!))
+      .digest("hex"),
+  ).toBe(labDownload.sha256);
+  await labCard.getByRole("link", { name: lab.title }).click();
+  await expect(page.locator("main h1")).toHaveText(lab.title);
+  await expect(
+    page.getByRole("heading", { level: 3, name: "A worked log" }),
+  ).toBeVisible();
+  await expect(page.locator("main")).toContainText("about 83 mm");
+  await go(`#/course/photo/guides/${guide.id}`);
+  await expect(page.locator("main h1")).toHaveText(guide.title);
+  const guidePart = (name: string) =>
+    page.locator("section.academy-guide-part").filter({
+      has: page.getByRole("heading", { level: 2, name, exact: true }),
+    });
+  await expect(guidePart("Worked example")).toContainText("f/8 to f/2.8");
+  await guidePart("Template").locator("summary").click();
+  await guidePart("Template")
+    .getByRole("button", { name: "Draft in Notebook", exact: true })
+    .click();
+  const guideDraft = guidePart("Template").getByLabel(
+    "Your draft from this template",
+  );
+  await expect(guideDraft).toBeFocused();
+  await guideDraft.press("ControlOrMeta+End");
+  await guideDraft.pressSequentially("\nSynthetic photography guide draft");
+  await expect
+    .poll(
+      async () => (await stored(page)).notes[`note-${guide.id}`]?.text ?? "",
+    )
+    .toContain("Synthetic photography guide draft");
+  await go("#/handbook/photo?track=photo-track-capture");
+  await expect(page.locator(".handbook-chapter")).toHaveCount(1);
+  await go("#/search");
+  await page
+    .getByLabel("Search courses, concepts, or notes")
+    .fill("against motion blur");
+  await expect(
+    page
+      .locator(".search-result")
+      .filter({ hasText: "Lab · Exposure and composition in photography" })
+      .first(),
+  ).toHaveAttribute("href", `#/course/photo/labs/${lab.id}`);
   // Save a non-first visual stage, a different handbook anchor, and a beat note.
   const beatId = "photo-m01-motion",
     beatPositionKey = beatId;
@@ -460,6 +555,26 @@ try {
       m.lessonFiles[i] = next;
     }
   }
+  // Collections too: tracks reversed and renamed; the lab and the guide
+  // renamed and their body files moved. Their ids, and the guide draft keyed
+  // by the guide id, must survive.
+  raw.tracks!.reverse();
+  for (const track of raw.tracks!)
+    track.title = "Renamed track: " + track.title;
+  const rawCollections = raw as unknown as Record<
+    "labs" | "guides",
+    { title: string; bodyFile: string }[]
+  >;
+  for (const kind of ["labs", "guides"] as const)
+    for (const [i, item] of rawCollections[kind].entries()) {
+      item.title = `Renamed ${kind === "labs" ? "lab" : "guide"}: ${item.title}`;
+      const moved = `${kind}/renamed-${i}.md`;
+      await rename(
+        join(temp, "content/courses/photo", item.bodyFile),
+        join(temp, "content/courses/photo", moved),
+      );
+      item.bodyFile = moved;
+    }
   await writeFile(coursePath, JSON.stringify(raw, null, 2) + "\n");
   for (const [index, module] of photoTeaching.entries()) {
     module.title = "Renamed teaching: " + module.title;
@@ -548,6 +663,26 @@ try {
     "schedules",
   ] as const)
     expect(current[k]).toEqual(stateBefore[k]);
+  await go("#/course/photo");
+  await expect(page.locator(".academy-track h2")).toHaveText([
+    "Renamed track: Composition choices",
+    "Renamed track: Capture choices",
+  ]);
+  await go(`#/course/photo/labs/${lab.id}`);
+  await expect(page.locator("main h1")).toHaveText(`Renamed lab: ${lab.title}`);
+  await expect(
+    page.getByRole("heading", { level: 3, name: "A worked log" }),
+  ).toBeVisible();
+  await go("#/notebook");
+  const guideNote = page.locator(".notes-list > section").filter({
+    hasText: `Field guide · Renamed guide: ${guide.title}`,
+  });
+  await expect(
+    guideNote.getByLabel("Your draft from this template"),
+  ).toHaveValue(/Synthetic photography guide draft/);
+  await expect(
+    guideNote.getByRole("link", { name: "Return to source →" }),
+  ).toHaveAttribute("href", `#/course/photo/guides/${guide.id}`);
   // Material revision flag is exercised in a rebuilt browser bundle, preserving history.
   const targetFile = raw.modules
     .flatMap((m) => m.lessonFiles)
@@ -632,8 +767,46 @@ try {
         (await stored(page)).completions[`beat-${beatId}`]?.contentVersion,
     )
     .toBe("2.0.0");
+  // Export here and import into a fresh browser profile: notes (the guide
+  // draft among them), attempts, reviews, schedules and completions made
+  // before the renames and revisions all transfer unchanged.
+  await go("#/settings");
+  const exportEvent = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export all study data", exact: true })
+    .click();
+  const exportedRaw = await readFile(
+    (await (await exportEvent).path())!,
+    "utf8",
+  );
+  const exportedState = parseImport(exportedRaw);
+  expect(exportedState).toEqual(await stored(page));
+  expect(exportedState.notes[`note-${guide.id}`].text).toContain(
+    "Synthetic photography guide draft",
+  );
+  const freshContext = await browser.newContext(),
+    fresh = await freshContext.newPage();
+  await fresh.goto(url + "/#/settings");
+  await expect(fresh.locator("main h1")).toBeVisible();
+  await fresh.getByLabel("Study data file").setInputFiles({
+    name: "photo-extension.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(exportedRaw),
+  });
+  await expect(
+    fresh.getByRole("heading", { name: "Import preview" }),
+  ).toBeVisible();
+  await fresh
+    .getByRole("button", { name: "Merge import", exact: true })
+    .click();
+  await expect(
+    fresh.getByText("Import committed.", { exact: false }),
+  ).toBeVisible();
+  expect(await stored(fresh)).toEqual(exportedState);
+  await freshContext.close();
   await removeTemporaryTree(join(temp, "content/teaching/photo"));
   await removeTemporaryTree(join(temp, "content/courses/photo"));
+  await removeTemporaryTree(join(temp, "content/downloads/photo"));
   await rm(join(temp, "content/paths/photography.json"));
   for (const n of ["photo-m01-diagram.svg", "photo-m02-diagram.svg"])
     await rm(join(temp, "content/assets", n));
@@ -649,7 +822,7 @@ try {
   await go("#/notebook");
   await expect(
     page.getByText("Removed lesson · note preserved", { exact: true }),
-  ).toHaveCount(2);
+  ).toHaveCount(3);
   expect(
     await page
       .getByLabel("Your lesson note")
@@ -660,6 +833,7 @@ try {
     expect.arrayContaining([
       "Synthetic photography identity note",
       "Synthetic teaching-beat identity note",
+      expect.stringContaining("Synthetic photography guide draft"),
     ]),
   );
   const after = await manifest(temp),
@@ -691,6 +865,11 @@ try {
           beats: 4,
           extensionCards: 8,
           curatedMediaFixtures: 1,
+          tracks: 2,
+          routes: 1,
+          labs: 1,
+          guides: 1,
+          downloads: 1,
         },
         additionDiff: addition,
         renameReorderDiff: renamedDiff,
@@ -710,7 +889,10 @@ try {
           "Beat completion, note, revealed check, visual state and handbook anchor survived content rename/reorder",
           "Home resume returned to the exact stable beat; a revised beat retained prior completion and asked for explicit review",
           "Material question/card revision signaled; old immutable evidence retained",
-          "Fixture removed; original release catalog restored; orphan lesson and beat notes recoverable",
+          "Tracks, an essential route, a tabletop lab with a hash-matching download, a field guide with a Notebook draft, a track handbook and collection search rendered by the generic views",
+          "Tracks reordered and renamed, lab and guide renamed with moved body files; ids, routes and the guide draft survived",
+          "Export after the renames and revisions imported into a fresh profile reproduced the complete study state",
+          "Fixture removed; original release catalog restored; orphan lesson, beat and guide-draft notes recoverable",
         ],
         result: "pass",
       },

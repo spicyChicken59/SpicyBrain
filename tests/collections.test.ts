@@ -36,8 +36,10 @@ import { emptyState, importPreview } from "../src/study.ts";
 
 // The synthetic course-collections fixture: three modules in two tracks (one
 // module from a package file), two routes, two labs, two guides, a case, a
-// crosswalk row and two capstones. The unrelated photography fixture has none
-// of these fields.
+// crosswalk row and two capstones. The unrelated photography fixture carries
+// two tracks, a route, a lab and a guide for the content-only extension proof;
+// `bare` is that course with every collection field removed, the shape every
+// course had before collections existed.
 const fixtureRoot = "tests/fixtures/collections/content";
 const courses = await loadCourses(fixtureRoot);
 const hearth = courses.find((c) => c.id === "hearth")!;
@@ -45,6 +47,17 @@ const teaching = await loadTeaching(courses, fixtureRoot);
 const photoRoot = "tests/fixtures/photography/content";
 const photo = (await loadCourses(photoRoot))[0];
 const photoTeaching = await loadTeaching([photo], photoRoot);
+const bare = structuredClone(photo);
+for (const key of [
+  "tracks",
+  "routes",
+  "labs",
+  "guides",
+  "cases",
+  "crosswalk",
+  "downloads",
+] as const)
+  delete bare[key];
 const moduleById = (id: string) =>
   structuredClone(teaching.modules.find((m) => m.moduleId === id)!);
 /** The runtime index entries the build would write for these modules. */
@@ -413,7 +426,14 @@ test("labs, field guides and case analyses become search entries linking to thei
   assert.match(entries[2].text, /The one change I will test/);
   assert.match(entries[0].text, /python hydration\.py recipe\.json/);
   assert.match(entries[4].text, /customer-authored/);
-  assert.deepEqual(collectionSearchEntries(photo), []);
+  assert.deepEqual(collectionSearchEntries(bare), []);
+  assert.deepEqual(
+    collectionSearchEntries(photo).map((e) => [e.type, e.href]),
+    [
+      ["Lab", "#/course/photo/labs/photo-lab-shutter-log"],
+      ["Field guide", "#/course/photo/guides/photo-guide-blurred-subject"],
+    ],
+  );
   const out = await mkdtemp(join(tmpdir(), "spicybrain-collections-search-"));
   try {
     await buildContent(fixtureRoot, out);
@@ -593,16 +613,23 @@ test("collection helpers: next in track, related labs and guides, route resume, 
     nextInTrack(catalog, "hearth-m03")!.track.id,
     "hearth-track-oven",
   );
-  assert.equal(nextInTrack(stripCourse(photo), "photo-m01"), undefined);
+  assert.equal(nextInTrack(stripCourse(bare), "photo-m01"), undefined);
+  // A one-module track: the module is found, and it is the track's last.
+  assert.deepEqual(nextInTrack(stripCourse(photo), "photo-m01"), {
+    track: photo.tracks![0],
+    next: undefined,
+  });
   const related = relatedCollections(catalog, "hearth-m01");
   assert.deepEqual(
     [related.labs.map((l) => l.id), related.guides.map((g) => g.id)],
     [["hearth-lab-schedule"], ["hearth-guide-dense-loaf"]],
   );
   assert.equal(hasCollections(catalog), true);
-  assert.equal(hasCollections(stripCourse(photo)), false);
-  assert.equal(photo.tracks, undefined);
-  assert.equal(photo.routes, undefined);
+  assert.equal(hasCollections(stripCourse(bare)), false);
+  assert.equal(hasCollections(stripCourse(photo)), true);
+  // Stripping for the catalog never invents an empty track or route list.
+  assert.equal(stripCourse(bare).tracks, undefined);
+  assert.equal(stripCourse(bare).routes, undefined);
   const index = indexEntries(teaching.modules);
   const position = (moduleId: string, beatId: string, updatedAt: string) => ({
     moduleId,
@@ -657,18 +684,13 @@ test("collection helpers: next in track, related labs and guides, route resume, 
   );
 });
 
-test("photography remains a course without collections after the schema additions", () => {
+test("a course without collections still validates after the schema additions", () => {
+  // Every collection field is optional: the photography course validates with
+  // its tracks, route, lab and guide, and again with all of them removed.
+  assert.equal(photo.tracks?.length, 2);
   assert.equal(validateCourses([structuredClone(photo)]).length, 1);
+  assert.equal(validateCourses([structuredClone(bare)]).length, 1);
   assert.equal(photoTeaching.modules.length, 2);
-  for (const key of [
-    "tracks",
-    "routes",
-    "labs",
-    "guides",
-    "cases",
-    "crosswalk",
-  ])
-    assert.equal(key in photo, false, key);
   for (const s of photo.scenarios) {
     assert.equal("revisionNotice" in s, false);
     assert.equal("downloadIds" in s, false);
