@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -42,7 +44,18 @@ def main() -> int:
     parser.add_argument("--from-zip", action="store_true",
                         help="extract each lab's committed download to a clean temp dir and run it there")
     args = parser.parse_args()
-    out = Path(args.evidence_dir)
+    # Each lab runs with its own directory as the working directory, so an
+    # interpreter given as a relative path is resolved against the caller's
+    # directory first and a bare name is looked up on PATH.
+    for name in ("python", "spark_python", "ml_python"):
+        value = getattr(args, name)
+        if value is None:
+            continue
+        if os.sep in value or (os.altsep and os.altsep in value):
+            setattr(args, name, str(Path(value).absolute()))
+        else:
+            setattr(args, name, shutil.which(value) or value)
+    out = Path(args.evidence_dir).absolute()
     out.mkdir(parents=True, exist_ok=True)
     labs = sorted(p.parent.name for p in EXERCISES.glob("lab-*/run_tests.py"))
     if args.only:
