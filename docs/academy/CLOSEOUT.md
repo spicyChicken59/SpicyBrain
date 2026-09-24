@@ -124,3 +124,20 @@ release manifest is refreshed. Manual screenshot inspection remains blocked
 by the recorded artifact-transfer HTTP 403; no repeated transfer was attempted.
 G10/G14 and affected editorial gates remain BLOCKED. Media and the five
 unavailable case/crosswalk pages retain their recorded access outcomes.
+
+### 2026-09-24 — Genie Code claim review checkpoint
+
+All 20 documented AI-assistance claims now have explicit primary-section decisions.
+The ledger has 750 pending, 136 retained, 29 reviewed and 17 corrected-and-reviewed
+claims. Current teaching corrects former-URL redirects, approval behavior, the
+partner-powered setting removal timeline, billing provenance and try_cast
+exceptions. June reader snapshots are explicitly dated; they do not override
+September AWS guidance. Course 4.0.3, lesson 1.2.0 and affected assessed revisions
+preserve stable identities and immutable earlier answers.
+
+The handbook browser selector fix is on fb2ad75283e439af33f3a1b2dc3ff21674d1ae25.
+Run 61 / 35956712137 failed only its two new handbook selectors; labs passed.
+Run 62 / 35957524319 tests the fixed head and does not cover this later teaching.
+Final 4.0.3 build manifest and exact-head CI are pending; G10/G14 and affected
+editorial gates remain BLOCKED. Media access failures are unchanged and were
+not retried. No source quota or access failure is asserted for pending claims.

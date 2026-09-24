@@ -11,6 +11,22 @@ const teaching = JSON.parse(
 ) as TeachingModule;
 const lesson = JSON.parse(await readFile(lessonPath, "utf8")) as Lesson;
 
+test("Genie Code closeout replaces stale mode and administrator instructions with versioned teaching", async () => {
+  const module = JSON.parse(await readFile("content/teaching/dbxfe/dbxfe-ai-assist.json", "utf8")) as TeachingModule;
+  const cards = module.extensionCards;
+  const admin = cards.find((c) => c.id === "dbxfe-ai-assist-extension-admin")!;
+  const agent = cards.find((c) => c.id === "dbxfe-ai-assist-extension-agent")!;
+  assert.equal(admin.revision, "2");
+  assert.equal(agent.revision, "2");
+  assert.match(admin.answer, /API changes remain available until November 1, 2026/);
+  assert.match(agent.explanation, /Auto-approve is the first-use default/);
+  assert.match(agent.explanation, /not a security boundary/);
+  assert.doesNotMatch(JSON.stringify(module), /Agent mode marked Preview|three modes|can disable it for every workspace/);
+  const canonical = JSON.parse(await readFile("content/courses/dbxfe/lessons/dbxfe-ai-assist-l01.json", "utf8")) as Lesson;
+  assert.equal(canonical.contentVersion, "1.2.0");
+  assert.equal(canonical.cards[0].revision, "2");
+});
+
 test("Lakebase restore correction keeps every teaching route consistent and moves assessed revisions", async () => {
   const beat = teaching.beats.find((b) => b.id === "dbxfe-lakebase-branches")!;
   const visual = teaching.visuals.find((v) => v.id === beat.visualId)!;
