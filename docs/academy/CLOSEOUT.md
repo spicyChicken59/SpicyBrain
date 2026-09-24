@@ -141,3 +141,19 @@ Run 62 / 35957524319 tests the fixed head and does not cover this later teaching
 Final 4.0.3 build manifest and exact-head CI are pending; G10/G14 and affected
 editorial gates remain BLOCKED. Media access failures are unchanged and were
 not retried. No source quota or access failure is asserted for pending claims.
+
+### 2026-09-24 — Genie Agents claim review checkpoint
+
+All 23 documented Genie Agents claims now have explicit decisions: 727 pending,
+136 retained, 43 reviewed, 26 corrected-and-reviewed across the academy.
+Current pages resolve the old URLs and document companion dashboard credentials,
+shared prompt context, conversation privacy and Chat-mode trusted answers.
+Affected teaching, cards and the standalone scenario are versioned; course
+4.0.4 keeps all content identities. The old trusted-assets URL redirects to
+setup; the actual quality-tuning and response sections support the corrected claim.
+
+Run 62 passed its browser step but was superseded and cancelled when the Genie
+Code checkpoint was pushed; it is not a passing full-suite run. Run 63 tests
+b8be663f338ed97e2fde1419adf761d92606023d, before this Genie Agents change.
+Manifest refresh and final exact-head acceptance/labs remain pending. G10/G14
+and affected editorial gates remain blocked.

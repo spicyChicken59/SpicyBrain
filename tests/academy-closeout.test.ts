@@ -11,6 +11,19 @@ const teaching = JSON.parse(
 ) as TeachingModule;
 const lesson = JSON.parse(await readFile(lessonPath, "utf8")) as Lesson;
 
+test("Genie access teaching distinguishes standalone queries, dashboard companions and private conversations", async () => {
+  const module = JSON.parse(await readFile("content/teaching/dbxfe/dbxfe-genie.json", "utf8")) as TeachingModule;
+  const access = module.beats.find((b) => b.id === "dbxfe-genie-access")!;
+  const review = module.beats.find((b) => b.id === "dbxfe-genie-review")!;
+  const dashboard = module.extensionCards.find((c) => c.id === "dbxfe-genie-extension-dashboard")!;
+  assert.match(access.handbook.markdown, /standalone Genie Agent/);
+  assert.match(access.handbook.markdown, /publisher's data grants/);
+  assert.match(access.handbook.markdown, /shared as agent context/);
+  assert.match(review.handbook.markdown, /not their full exchange or results/);
+  assert.equal(dashboard.revision, "2");
+  assert.match(dashboard.explanation, /cannot edit companion instructions/);
+});
+
 test("Genie Code closeout replaces stale mode and administrator instructions with versioned teaching", async () => {
   const module = JSON.parse(await readFile("content/teaching/dbxfe/dbxfe-ai-assist.json", "utf8")) as TeachingModule;
   const cards = module.extensionCards;
