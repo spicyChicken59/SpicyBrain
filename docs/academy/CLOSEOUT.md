@@ -98,3 +98,29 @@ socket. This is not rendered evidence and is not hidden by a skip. Browser and
 pinned lab execution are delegated to the existing authorized PR CI workflow;
 no workflow settings were changed. Final run/job/artifact IDs belong in PR
 metadata, avoiding a self-referential commit/run cycle.
+
+## Accessible-source follow-up — 2026-09-24
+
+The prior stop combined actual access failures with unfinished accessible work.
+Direct source inspection continued: 23 Lakebase records are now resolved,
+including the earlier partial authentication/scale-to-zero claim. The ledger
+now has 770 pending, 136 retained, 18 reviewed and 8 corrected-and-reviewed
+claims. All 26 documented claims in the Lakebase module have an explicit review.
+This does not complete the remaining modules' reviews.
+
+Corrections include Postgres 18 in the supported version list; the current
+Lakebase CDF name at the former Lakehouse Sync URL; enabling password connections
+on new projects; the existing app service principal's matching Postgres role;
+and the fact that an empty SKIP LOCKED result does not prove an empty queue.
+The synced-table handbook now allows automatic CDF as well as write-time CDF.
+Relevant beats, the canonical lesson and changed assessed items have new
+revisions. Course version is 4.0.2. L23's documentation is repackaged; SQL,
+checks and historical execution evidence are preserved.
+
+Run 59 / 35938294952 passed on 9b640e9 before this follow-up (162 tests,
+64 browser journeys, all 24 packages / 619 checks). It is not evidence for the
+new content. New exact-head CI will be recorded in PR metadata after the
+release manifest is refreshed. Manual screenshot inspection remains blocked
+by the recorded artifact-transfer HTTP 403; no repeated transfer was attempted.
+G10/G14 and affected editorial gates remain BLOCKED. Media and the five
+unavailable case/crosswalk pages retain their recorded access outcomes.

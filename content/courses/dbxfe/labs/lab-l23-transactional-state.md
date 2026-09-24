@@ -126,7 +126,7 @@ hand-derived order of the follow-up claims, QR-0104, QR-0101, QR-0103, matched.
 They prove that this SQL behaves as described on PostgreSQL 16.13, with real
 concurrent sessions and real error codes. They do not prove anything about
 Lakebase: OAuth tokens, the managed PgBouncer pooler, scale to zero, branches,
-point-in-time restore, synced tables, Lakehouse Sync, performance or failover were
+point-in-time restore, synced tables, Lakebase CDF, performance or failover were
 not executed and are listed as such in the evidence file. The run time (under ten seconds here)
 describes one run, not a benchmark.
 

@@ -92,3 +92,11 @@ partial work. The interrupted environment itself is unavailable. Recovery,
 access checks and incomplete gates are recorded in [`CLOSEOUT.md`](CLOSEOUT.md).
 The earlier PASS labels for source/media/editorial acceptance were not justified
 by the recorded evidence and are now blocked pending real review.
+
+### 2026-09-24 — accessible-source follow-up
+
+Continued accessible research after the status question. Resolved 23 Lakebase
+claim reviews, including the previous partial; 770 claims remain pending.
+Corrected current CDF naming, Postgres version coverage, password setup, app
+role creation and empty SKIP LOCKED interpretation. Saved scoped source
+sections and dates without promoting other modules or media. See CLOSEOUT.md.

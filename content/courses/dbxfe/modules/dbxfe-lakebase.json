@@ -28,7 +28,7 @@
         "Give the authentication and pooling choice for the app's role and say which session state the design avoids.",
         "State freshness and consistency for every synchronized copy, and mark preview features and unconfirmed items as unknown."
       ],
-      "model": "### State\nOperational, in Postgres: review_item, intake_message and reviewer assignments. Analytical, in Delta: decision history and daily counts. Session: filters and sort order in the browser.\n\n### Schema\nreview_item with a state CHECK tying status to claimed_by and decision, a partial unique index allowing one open claim per reviewer, a version column and a partial index over ready rows in claim order; intake_message keyed by message_id; every rule a constraint, so a refused write returns 23514, 23505 or 23503 and the handler maps it to a message.\n\n### Writes\nClaim: one UPDATE with a FOR UPDATE SKIP LOCKED subquery; no row means the queue is empty. Decision: UPDATE ... WHERE version = the loaded version AND claimed_by = the reviewer AND status = 'claimed'; zero rows means reload and show the change. Intake: ON CONFLICT (message_id) DO NOTHING, then DO UPDATE only for a newer source_seq while the item is ready.\n\n### Connections and identity\nThe app runs as its service principal's role. Pooling is documented as needing a password role, so the choice between pooled password access and direct OAuth access is open with the security team. Every write is one transaction with schema-qualified names, so either path works; the design uses no SET, temp tables or session advisory locks, and reconnects after scale to zero.\n\n### Change and recovery\nMigrations are rehearsed on a child branch. The restore window is to be confirmed within the documented 2 to 30 days. After data loss, inspect historical state and reconcile missing rows with current decisions. Restore creates a separate root branch; selective repair and any application cutover are deliberate follow-up operations.\n\n### Synchronization\nRoster: a synced table, triggered daily if Change Data Feed is enabled and snapshot until then; the screen prints 'roster as of'. Decisions to Delta: Lakehouse Sync (Public Preview, needs approval) or a scheduled export, with the dashboard labelled by its as-of time.\n\n### Checklist and unknowns\nVerified on local PostgreSQL 16.13 (lab L23): constraints, claim, decision, intake and isolation behaviour. To confirm on a branch: Postgres version, role type and pooler, reconnect after scale to zero, sync freshness. Unknown: regional availability, restore window value, Change Data Feed on the roster, preview approval.",
+      "model": "### State\nOperational, in Postgres: review_item, intake_message and reviewer assignments. Analytical, in Delta: decision history and daily counts. Session: filters and sort order in the browser.\n\n### Schema\nreview_item with a state CHECK tying status to claimed_by and decision, a partial unique index allowing one open claim per reviewer, a version column and a partial index over ready rows in claim order; intake_message keyed by message_id; every rule a constraint, so a refused write returns 23514, 23505 or 23503 and the handler maps it to a message.\n\n### Writes\nClaim: one UPDATE with a FOR UPDATE SKIP LOCKED subquery; no row means no eligible unlocked item was claimed; eligible items may be locked by another worker, so an empty result does not prove the queue is empty. Decision: UPDATE ... WHERE version = the loaded version AND claimed_by = the reviewer AND status = 'claimed'; zero rows means reload and show the change. Intake: ON CONFLICT (message_id) DO NOTHING, then DO UPDATE only for a newer source_seq while the item is ready.\n\n### Connections and identity\nThe app runs as its service principal's role. Pooling is documented as needing a password role, so the choice between pooled password access and direct OAuth access is open with the security team; new projects require password connections to be explicitly enabled. Every write is one transaction with schema-qualified names, so either path works; the design uses no SET, temp tables or session advisory locks, and reconnects after scale to zero.\n\n### Change and recovery\nMigrations are rehearsed on a child branch. The restore window is to be confirmed within the documented 2 to 30 days. After data loss, inspect historical state and reconcile missing rows with current decisions. Restore creates a separate root branch; selective repair and any application cutover are deliberate follow-up operations.\n\n### Synchronization\nRoster: a synced table, triggered daily if Change Data Feed is enabled and snapshot until then; the screen prints 'roster as of'. Decisions to Delta: Lakebase CDF (Public Preview, needs approval) or a scheduled export, with the dashboard labelled by its as-of time.\n\n### Checklist and unknowns\nVerified on local PostgreSQL 16.13 (lab L23): constraints, claim, decision, intake and isolation behaviour. To confirm on a branch: Postgres version, role type and pooler, reconnect after scale to zero, sync freshness. Unknown: regional availability, restore window value, Change Data Feed on the roster, preview approval.",
       "reasoning": "The note keeps operational and analytical state apart, gives every write a pattern and an observable result the app branches on, ties the pooling choice to the authentication type, and turns each platform feature into a verification item with its evidence label rather than a promise.",
       "rubric": [
         {
@@ -85,7 +85,7 @@
         "dbxfe-fiction"
       ],
       "isCapstone": false,
-      "revisionNotice": "Recovery guidance corrected in course 4.0.1: restore creates a separate branch; application cutover is a separate decision. Earlier saved responses retain their original snapshot."
+      "revisionNotice": "Recovery guidance corrected in course 4.0.1: restore creates a separate branch; application cutover is a separate decision. Earlier saved responses retain their original snapshot. Course 4.0.2 updates current Lakebase CDF terminology and password-connection setup, and the meaning of an empty SKIP LOCKED result; earlier snapshots remain unchanged."
     }
   ],
   "sources": [
@@ -96,9 +96,9 @@
       "publisher": "Databricks",
       "type": "official documentation",
       "context": "Databricks on AWS; Lakebase Autoscaling overview.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "Feature status, regions and prices are checked per account. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Lakebase Postgres; Key features. No managed-service execution is claimed. Earlier review methods remain in git history."
     },
     {
       "id": "dbxfe-lakebase-course-source-compat",
@@ -107,9 +107,9 @@
       "publisher": "Databricks",
       "type": "official documentation",
       "context": "Databricks on AWS; differences from self-managed Postgres.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "Title taken from the Azure Databricks page at the same path. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Postgres version support; Session context; Roles and permissions; Replication; Tablespaces. No managed-service execution is claimed. Earlier review methods remain in git history."
     },
     {
       "id": "dbxfe-lakebase-course-source-auth",
@@ -118,9 +118,9 @@
       "publisher": "Databricks",
       "type": "official documentation",
       "context": "Databricks on AWS; OAuth roles and password roles.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "Token lifetime as documented at review time. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: How OAuth tokens work; Requirements and limitations; Postgres password authentication. No managed-service execution is claimed. Earlier review methods remain in git history."
     },
     {
       "id": "dbxfe-lakebase-course-source-pooling",
@@ -140,9 +140,9 @@
       "publisher": "Databricks",
       "type": "official documentation",
       "context": "Databricks on AWS; suspending idle computes.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "Idle thresholds are configuration-dependent. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Automatic suspension; Configure scale to zero; Session context reset. No managed-service execution is claimed. Earlier review methods remain in git history."
     },
     {
       "id": "dbxfe-lakebase-course-source-branches",
@@ -151,9 +151,9 @@
       "publisher": "Databricks",
       "type": "official documentation",
       "context": "Databricks on AWS; copy-on-write branches.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "Branch limits and costs are not quoted. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Parent-child relationships; Copy-on-write storage; Point-in-time recovery. No managed-service execution is claimed. Earlier review methods remain in git history."
     },
     {
       "id": "dbxfe-lakebase-course-source-restore",
@@ -173,20 +173,20 @@
       "publisher": "Databricks",
       "type": "official documentation",
       "context": "Databricks on AWS; Unity Catalog to Lakebase synced tables.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "Title taken from the Azure Databricks page at the same path. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: How it works; Sync modes; Prerequisites; Create a synced table; Operations allowed on synced tables in Postgres. No managed-service execution is claimed. Earlier review methods remain in git history."
     },
     {
       "id": "dbxfe-lakebase-course-source-lakehousesync",
-      "title": "Lakehouse Sync",
-      "url": "https://docs.databricks.com/aws/en/oltp/projects/lakehouse-sync",
+      "title": "Lakebase CDF",
+      "url": "https://docs.databricks.com/aws/en/oltp/projects/lakebase-cdf",
       "publisher": "Databricks",
       "type": "official documentation",
       "context": "Databricks on AWS; Lakebase to Unity Catalog change capture; Public Preview.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "Preview feature; requirements may change. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: What is Lakebase Change Data Feed?; Enable this preview; Destination table schema. No managed-service execution is claimed. Earlier review methods remain in git history."
     },
     {
       "id": "dbxfe-lakebase-course-source-isolation",
@@ -195,9 +195,9 @@
       "publisher": "The PostgreSQL Global Development Group",
       "type": "primary reference",
       "context": "PostgreSQL 16 documentation.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "Describes PostgreSQL itself, not a managed service. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: 13.2.1. Read Committed Isolation Level; 13.2.2. Repeatable Read Isolation Level. No managed-service execution is claimed. Earlier review methods remain in git history."
     },
     {
       "id": "dbxfe-lakebase-course-source-select",
@@ -206,9 +206,9 @@
       "publisher": "The PostgreSQL Global Development Group",
       "type": "primary reference",
       "context": "PostgreSQL 16 SQL reference.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "Locking clause semantics as documented for version 16. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: The Locking Clause. No managed-service execution is claimed. Earlier review methods remain in git history."
     },
     {
       "id": "dbxfe-lakebase-course-source-insert",
@@ -217,15 +217,15 @@
       "publisher": "The PostgreSQL Global Development Group",
       "type": "primary reference",
       "context": "PostgreSQL 16 SQL reference.",
-      "accessDate": "2026-09-23",
-      "reviewDate": "2026-09-23",
-      "caveat": "ON CONFLICT needs a matching unique index or constraint. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: ON CONFLICT Clause. No managed-service execution is claimed. Earlier review methods remain in git history."
     }
   ],
   "claims": [
     {
       "id": "dbxfe-lakebase-course-claim-lakebase",
-      "description": "Lakebase is Databricks' fully managed Postgres for transactional applications; Lakebase Autoscaling organises projects, branches, computes, databases and roles and supports Postgres 16 and 17 on AWS without a Postgres superuser.",
+      "description": "Lakebase is Databricks' fully managed Postgres for transactional applications; Lakebase Autoscaling organises projects, branches, computes, databases and roles and supports Postgres 16, 17 and 18 on AWS without a Postgres superuser.",
       "kind": "documented",
       "sourceIds": [
         "dbxfe-lakebase-course-source-overview",
@@ -256,7 +256,7 @@
     },
     {
       "id": "dbxfe-lakebase-course-claim-sync",
-      "description": "Synced tables copy Unity Catalog tables into Lakebase as read-only copies in snapshot, triggered or continuous mode, the last two needing Change Data Feed; Lakehouse Sync, in Public Preview, writes Lakebase row changes to Delta history tables.",
+      "description": "Synced tables copy Unity Catalog tables into Lakebase as read-only copies in snapshot, triggered or continuous mode, the last two needing Change Data Feed; Lakebase CDF, in Public Preview, writes Lakebase row changes to Delta history tables.",
       "kind": "documented",
       "sourceIds": [
         "dbxfe-lakebase-course-source-synced",
@@ -417,7 +417,7 @@
       "term": "synced copy",
       "aliases": [
         "synced table",
-        "Lakehouse Sync"
+        "Lakebase CDF"
       ],
       "definition": "An asynchronous copy between Unity Catalog and Lakebase whose freshness is stated as an as-of time.",
       "lessonId": "dbxfe-lakebase-l01",

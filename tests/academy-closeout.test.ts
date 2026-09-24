@@ -21,7 +21,7 @@ test("Lakebase restore correction keeps every teaching route consistent and move
   assert.equal(beat.version, "1.1.0");
   assert.equal(check.revision, "2");
   assert.equal(card.revision, "2");
-  assert.equal(lesson.contentVersion, "1.1.0");
+  assert.equal(lesson.contentVersion, "1.2.0");
   assert.deepEqual(
     visual.states.map((s) => s.id),
     ["incident", "branch", "restore"],
@@ -55,6 +55,17 @@ test("managed-pooler teaching and blocked research are not promoted by generic b
     (b) => b.id === "dbxfe-lakebase-connections",
   )!;
   assert.equal(connections.version, "1.1.0");
+  const auth = teaching.beats.find((b) => b.id === "dbxfe-lakebase-auth")!;
+  const sync = teaching.beats.find((b) => b.id === "dbxfe-lakebase-sync")!;
+  assert.match(auth.handbook.markdown, /disable password connections by default/);
+  assert.match(auth.handbook.markdown, /existing app service principal/);
+  assert.match(sync.handbook.markdown, /Lakebase CDF/);
+  assert.match(sync.handbook.markdown, /automatic Change Data Feed/);
+  const moduleRecord = JSON.parse(
+    await readFile("content/courses/dbxfe/modules/dbxfe-lakebase.json", "utf8"),
+  );
+  assert.match(moduleRecord.scenarios[0].model, /does not prove the queue is empty/);
+
   assert.match(
     connections.handbook.markdown,
     /LISTEN and NOTIFY are both unsupported/,

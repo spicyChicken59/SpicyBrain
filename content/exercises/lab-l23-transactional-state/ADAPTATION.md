@@ -11,13 +11,13 @@ lab's historical local PostgreSQL 16 evidence.
 Sources: *Lakebase Postgres* (docs.databricks.com/aws/en/oltp/), *Core concepts*,
 *About authentication*, *Manage roles*, *Use connection pooling*, *Scale to
 zero*, *Branches*, *Point-in-time restore*, *Serve lakehouse data with synced
-tables*, *Lakehouse Sync*, *Postgres compatibility*, *Lakebase Autoscaling
+tables*, *Lakebase CDF*, *Postgres compatibility*, *Lakebase Autoscaling
 limitations*, *Add a Lakebase resource to a Databricks app* and the *Lakebase
 release notes*, all under docs.databricks.com/aws/en/.
 
 ## 1. What carries over unchanged
 
-Lakebase is managed Postgres; the compatibility page lists Postgres 16 and 17
+Lakebase is managed Postgres; the compatibility page lists Postgres 16, 17 and 18
 for Autoscaling on AWS. The mechanisms this lab tests are PostgreSQL semantics:
 constraints and their SQLSTATEs, transactions, Read Committed and Repeatable
 Read, row locks with `SKIP LOCKED` and `NOWAIT`, and `INSERT ... ON CONFLICT`.
@@ -108,7 +108,7 @@ Primary sections inspected: **Transaction mode** in
   foreign keys in `schema.sql` point at `qr.plant` and `qr.reviewer`: decide
   whether they reference the synced copies or local tables, and say what the app
   does when the copy lags.
-- **Lakehouse Sync** (Lakebase to Unity Catalog, listed as Public Preview) writes
+- **Lakebase CDF** (Lakebase to Unity Catalog, listed as Public Preview) writes
   row changes of Lakebase tables into Unity Catalog Delta tables as history, for
   dashboards and pipelines. A Databricks developer template refers to the feature
   as Lakebase Change Data Feed and lists requirements such as replica identity;
@@ -136,16 +136,20 @@ Primary sections inspected: **Transaction mode** in
 
 | Area | This lab (local PostgreSQL 16.13) | Lakebase, as documented | Action before moving |
 |---|---|---|---|
-| Version | 16.13 | Postgres 16 or 17 on AWS | `SHOW server_version;` on the branch |
+| Version | 16.13 | Postgres 16, 17 or 18 on AWS | `SHOW server_version;` on the branch |
 | Superuser | `lab_admin` is superuser | none; `databricks_superuser` | run DDL as an owner role |
 | Authentication | SCRAM password over loopback | OAuth roles (one-hour tokens) or password roles | choose per access path |
 | Pooling | none | PgBouncer, transaction mode, password roles | one transaction per unit of work |
 | Idle connections | kept open | closed by scale to zero | reconnect; keep no session state |
 | Tablespaces, logical replication | available | not supported | keep them out of scripts |
 | Recovery | none | restore window 2 to 30 days (default 7) | set it; rehearse on a branch |
-| Sync | none | synced tables; Lakehouse Sync (Public Preview) | state freshness per copy |
+| Sync | none | synced tables; Lakebase CDF (Public Preview) | state freshness per copy |
 | Evidence | lab evidence JSON | your own branch run | never relabel one as the other |
 
 Still unknown until measured on a project: regional availability, pricing,
 performance at your load, failover time and the reconnect delay after scale to
 zero.
+
+### Documentation follow-up — 2026-09-24
+
+Current compatibility documentation lists Postgres 16, 17 and 18. New projects require password connections to be enabled explicitly. Lakebase Change Data Feed (CDF), still Public Preview, is the current destination of the former Lakehouse Sync documentation URL. Triggered and continuous synced tables may use write-time or automatic Change Data Feed. These are documentation findings, not managed-service execution. Historical lab evidence retains its original terminology and PostgreSQL 16.13 runtime.

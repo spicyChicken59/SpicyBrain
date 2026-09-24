@@ -10,7 +10,7 @@ Bring SQL fluency (keys, `UPDATE ... WHERE`, joins) and the platform map from [P
 
 A reviewer clicking *Claim* is a transactional request: it changes one row, must answer in milliseconds and competes with other reviewers doing the same. The morning defect dashboard is analytical: it scans a day of inspections and tolerates data minutes old. On one engine each hurts the other: dashboard scans compete with claims, or every click waits on a warehouse that has no row locks to offer.
 
-Lakebase is Databricks' fully managed Postgres for the transactional side. In the current Autoscaling version a **project** holds **branches** (isolated database environments sharing storage with their parent), a **compute** per branch that autoscales and can scale to zero when idle, and the **databases** and **roles** on each branch (default database `databricks_postgres`). The documentation lists Postgres 16 and 17 on AWS and describes Lakebase as generally available, with some features, such as Lakehouse Sync, marked Public Preview; check the release notes before promising one.
+Lakebase is Databricks' fully managed Postgres for the transactional side. In the current Autoscaling version a **project** holds **branches** (isolated database environments sharing storage with their parent), a **compute** per branch that autoscales and can scale to zero when idle, and the **databases** and **roles** on each branch (default database `databricks_postgres`). The documentation lists Postgres 16, 17 and 18 on AWS and describes Lakebase as generally available, with some features, such as Lakebase CDF, marked Public Preview; check the release notes before promising one.
 
 <!-- section:dbxfe-lakebase-l01-model -->
 
@@ -44,13 +44,13 @@ Rehearse migrations on an isolated child branch. **Point-in-time restore** creat
 
 <!-- section:dbxfe-lakebase-l01-sync -->
 
-Synchronization copies data between the two sides; it never makes them one transaction. **Synced tables** copy a Unity Catalog table into Lakebase Postgres in snapshot, triggered or continuous mode. Triggered and continuous need Change Data Feed on the source, a primary key is required, and the app treats the copy as read-only. **Lakehouse Sync**, documented as Public Preview, captures Lakebase row changes into Unity Catalog Delta tables as history.
+Synchronization copies data between the two sides; it never makes them one transaction. **Synced tables** copy a Unity Catalog table into Lakebase Postgres in snapshot, triggered or continuous mode. Triggered and continuous need Change Data Feed on the source, a primary key is required, and the app treats the copy as read-only. **Lakebase CDF**, documented as Public Preview, captures Lakebase row changes into Unity Catalog Delta tables as history.
 
 | Path | Freshness you can promise | Consistency |
 |---|---|---|
 | Synced table, snapshot or triggered | As of the last run | Asynchronous copy |
 | Synced table, continuous | Seconds behind | Asynchronous copy |
-| Lakehouse Sync to Delta | Behind the source | History rows |
+| Lakebase CDF to Delta | Behind the source | History rows |
 | `review_item` read in a transaction | Current | Transactional |
 
 A screen that joins the app's claims with a synced roster mixes two moments; show the roster's as-of time.
@@ -103,7 +103,7 @@ Key the log by source and message, `PRIMARY KEY (source, message_id)`, because t
 
 <!-- section:dbxfe-lakebase-l01-sources -->
 
-Databricks on AWS documentation: Lakebase Postgres, Core concepts, About authentication, Use connection pooling, Scale to zero, Branches, Point-in-time restore, Serve lakehouse data with synced tables, Lakehouse Sync, Postgres compatibility and the Lakebase release notes. PostgreSQL 16 documentation: Transactions, Transaction Isolation, Explicit Locking, SELECT and INSERT. Restore and pooling page bodies were read on 2026-09-23; historical-branching documentation was read on 2026-09-24. Other source records retain their own methods; the source-review ledger identifies unfinished checks. No managed-service execution is claimed.
+Databricks on AWS documentation: Lakebase Postgres, Core concepts, About authentication, Use connection pooling, Scale to zero, Branches, Point-in-time restore, Serve lakehouse data with synced tables, Lakebase CDF, Postgres compatibility and the Lakebase release notes. PostgreSQL 16 documentation: Transactions, Transaction Isolation, Explicit Locking, SELECT and INSERT. Restore and pooling page bodies were read on 2026-09-23; historical-branching documentation was read on 2026-09-24. Other source records retain their own methods; the source-review ledger identifies unfinished checks. No managed-service execution is claimed.
 
 <!-- section:dbxfe-lakebase-l01-related -->
 
@@ -112,3 +112,5 @@ Lab L23, *Transactional state for a quality-review app*, runs every statement he
 <!-- section:dbxfe-lakebase-l01-revisit -->
 
 Revisit whenever you design an app that writes: name each piece of state, the constraint that guards it, the transaction that changes it, the concurrency pattern that protects it, and the freshness of every copy it reads.
+
+Documentation follow-up (2026-09-24): authentication, roles, scale-to-zero, compatibility, branches, HA, synced tables, Lakebase CDF and PostgreSQL transaction sections were directly inspected. New projects disable password connections by default. The current Lakebase CDF name replaces Lakehouse Sync; earlier lab evidence keeps its original label. The claim ledger records the specific source sections.

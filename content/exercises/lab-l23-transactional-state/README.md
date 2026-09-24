@@ -84,7 +84,7 @@ directory, stop its server with `pg_ctl -D <that directory>/data -m fast stop`
 
 - Local PostgreSQL 16 proves PostgreSQL semantics only. Lakebase authentication
   (OAuth roles, one-hour tokens), its PgBouncer pooler, scale to zero, branches,
-  point-in-time restore, synced tables and Lakehouse Sync are described from
+  point-in-time restore, synced tables and Lakebase CDF are described from
   documentation in `ADAPTATION.md` and are listed as not executed in the evidence.
 - PgBouncer is not run. The session-state test uses two direct connections to show
   the mechanism a transaction-mode pooler exposes.

@@ -9,10 +9,10 @@ strongest check any of its records states:
 
 | How the URL was checked | URLs |
 |---|---|
-| Body read in this build (raw files, package pages the build could reach) | 129 |
+| Body read in this build (raw files, package pages the build could reach) | 148 |
 | Facts read from a published package's source | 4 |
 | Reviewed in the previous release, or reused with that review | 83 |
-| Search result title and snippet only | 324 |
+| Search result title and snippet only | 305 |
 | Could not be confirmed (claims hedged or dropped) | 55 |
 | No record states a check | 17 |
 
@@ -71,8 +71,8 @@ Did not answer:
 | Kimball Group | 6 |
 | Apache Software Foundation (apache/spark repository) | 5 |
 | Databricks (terraform-provider-databricks repository) | 5 |
-| GitLab | 5 |
 | The PostgreSQL Global Development Group | 5 |
+| GitLab | 5 |
 | Delta Lake project (delta-io) | 4 |
 | MLflow (open-source project) | 4 |
 | PyTorch | 4 |

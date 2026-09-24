@@ -17,7 +17,7 @@ not research completion. Final CI provenance belongs in PR #4 metadata.
 |---|---|
 | Source commit | the `sourceCommit` recorded in [`release-manifest.json`](release-manifest.json), built from a clean tree; the commit that adds the manifest changes nothing else |
 | Node | 24.19.0 |
-| Course | `dbxfe`, contentVersion `4.0.1`, "Databricks: Build, Explain, Deliver" |
+| Course | `dbxfe`, contentVersion `4.0.2`, "Databricks: Build, Explain, Deliver" |
 | Modules / tracks / routes | 48 / 8 / 9 |
 | Labs / field guides / cases / capstones | 24 (20 local-executed, 2 tabletop, 2 platform guides) / 32 / 8 / 3 |
 | Build manifest | [`release-manifest.json`](release-manifest.json): every file of `dist/` and `dist-nested/` with its size and SHA-256, and the content manifest with every download's SHA-256 |
