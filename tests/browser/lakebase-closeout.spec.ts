@@ -49,13 +49,13 @@ for (const width of [1440, 390]) {
     await noOverflow(page);
     await shot(page, `lakebase-pooler-${width}`);
     await nav(page, "#/module/dbxfe-lakebase/dbxfe-lakebase-auth?view=handbook");
-    await expect(page.locator(".teaching-beat").first()).toContainText(
+    await expect(page.locator("#handbook-dbxfe-lakebase-auth")).toContainText(
       "New projects disable password connections by default",
     );
     await noOverflow(page);
     await nav(page, "#/module/dbxfe-lakebase/dbxfe-lakebase-sync?view=handbook");
-    await expect(page.locator(".teaching-beat").first()).toContainText("Lakebase CDF");
-    await expect(page.locator(".teaching-beat").first()).toContainText(
+    await expect(page.locator("#handbook-dbxfe-lakebase-sync")).toContainText("Lakebase CDF");
+    await expect(page.locator("#handbook-dbxfe-lakebase-sync")).toContainText(
       "write-time or automatic Change Data Feed",
     );
     await noOverflow(page);
