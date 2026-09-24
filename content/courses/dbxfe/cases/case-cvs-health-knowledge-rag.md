@@ -1,3 +1,5 @@
+> Source review remains incomplete (24 September 2026). The cited session URL redirected to the generic Summit page; no session abstract was returned. The historical search-level analysis below is provisional; it has not passed direct-source review.
+
 ### Who reports this and how
 
 The source is the Data + AI Summit 2024 session page "Building the World's Largest RAG for Knowledge Management @ CVS Health". Search results for the session and for its recording (both recorded as sources) identify the presenter as a lead director of machine learning at CVS Health, so this is a customer-presented conference talk. Search results date the recording's YouTube listing 23 July 2024; the session day itself is not stated. Only abstract-level snippets were read; the page itself and the video could not be opened when this analysis was written.

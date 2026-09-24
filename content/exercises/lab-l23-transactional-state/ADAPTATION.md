@@ -2,10 +2,11 @@
 
 **Status of this guide.** Nothing here was executed on Lakebase. The statements
 about Lakebase come from Databricks documentation for Databricks on AWS (Lakebase
-Autoscaling), reviewed at search level on 2026-09-23: page titles and search
-snippets were confirmed, page bodies were not fetched in this build. Check each
-page again before relying on it, and record your own execution separately from
-this lab's local PostgreSQL 16 evidence.
+Autoscaling). Restore and managed pooling page bodies were inspected on
+2026-09-23; the historical-branching page was inspected on 2026-09-24. Other
+source records retain their earlier search-level limitations. This guide was
+corrected for course 4.0.1; record any platform execution separately from this
+lab's historical local PostgreSQL 16 evidence.
 
 Sources: *Lakebase Postgres* (docs.databricks.com/aws/en/oltp/), *Core concepts*,
 *About authentication*, *Manage roles*, *Use connection pooling*, *Scale to
@@ -60,7 +61,7 @@ connection is lent for one transaction. Consequences for this design:
 | schema-qualified names (`qr.review_item`) | works unchanged |
 | `SET search_path` or a temp table kept in the session | does not follow you to the next transaction |
 | session advisory locks | belong to one server connection; do not use across requests |
-| SQL-level `PREPARE` / `DEALLOCATE`, `LISTEN` | documented as not supported (driver-level prepared statements work; NOTIFY works) |
+| SQL-level `PREPARE` / `DEALLOCATE`, `LISTEN` and `NOTIFY` | documented as unsupported by the managed pooler; driver-level prepared statements are distinct; use a direct connection for pub/sub |
 
 The pooling page states that pooling needs **native password authentication**
 and is not available for OAuth roles. Choosing pooled access therefore chooses a
@@ -84,10 +85,18 @@ which case the compute runs continuously.
 - **Restore window.** Point-in-time restore and point-in-time branching work
   within the project's restore window, documented as configurable from 2 to 30
   days with a default of 7. Set it deliberately.
-- **Choose the tool by the question.** A point-in-time branch shows the past
-  without touching production, so you can copy back only the rows you lost. A
-  restore rewinds the branch, including legitimate writes made after the chosen
-  moment.
+- **Separate recovered state from cutover.** A historical branch lets you inspect
+  missing rows. Restore creates a new root branch; the original and its existing
+  connections remain unchanged. Validate and reconcile before a selective repair
+  or an explicit application connection change. Newer writes still exist on the
+  original; blindly switching to an older state would hide them from users.
+
+Primary sections inspected: **Transaction mode** in
+<https://docs.databricks.com/aws/en/oltp/projects/connection-pooling>;
+**What happens after a restore?** and **Connections remain unchanged** in
+<https://docs.databricks.com/aws/en/oltp/projects/point-in-time-restore>;
+**Important considerations** in
+<https://docs.databricks.com/aws/en/oltp/projects/point-in-time-branching>.
 
 ## 7. Synchronization with the lakehouse
 

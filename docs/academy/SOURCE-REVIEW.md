@@ -9,24 +9,29 @@ strongest check any of its records states:
 
 | How the URL was checked | URLs |
 |---|---|
-| Body read in this build (raw files, package pages the build could reach) | 113 |
+| Body read in this build (raw files, package pages the build could reach) | 129 |
 | Facts read from a published package's source | 4 |
 | Reviewed in the previous release, or reused with that review | 83 |
-| Search result title and snippet only | 341 |
-| Could not be confirmed (claims hedged or dropped) | 54 |
+| Search result title and snippet only | 324 |
+| Could not be confirmed (claims hedged or dropped) | 55 |
 | No record states a check | 17 |
 
-## What this build could and could not do
+## Claim-level closeout (G14 remains BLOCKED)
 
-- Documentation hosts (docs.databricks.com, learn.microsoft.com, cloud.google.com,
-  spark.apache.org and others) and video hosts were blocked by the build environment's
-  egress proxy. No page body on those hosts was read in this build. Files published in
-  source repositories and package indexes were reachable and were read where cited.
-- Web search was available for part of the build and then exhausted. A URL confirmed
-  only by its search result's title and snippet is labelled so in its record, and the
-  teaching states only what that snippet or another read source supports.
-- A URL that could not be confirmed is kept only where its record says so, and the
-  statement it would support is hedged or removed.
+- This URL inventory classifies source records; it does not verify each claim or its
+  application in a beat, card, handbook or case. Honest limitations do not pass G14.
+- `CLAIM-REVIEW.json` deduplicates documented claims and links source sections,
+  explicit review decisions and affected content. `CLAIM-REVIEWS.json` contains
+  the inspected section records; pending claims are incomplete review, not an
+  assertion that their URLs are inaccessible.
+- The interrupted build could not fetch documentation/video page bodies. In the
+  2026-09-23/24 continuation the web reader accessed the restore, pooling and
+  historical-branching documentation, four case articles and nine crosswalk pages.
+  `CASE-CROSSWALK-REVIEW.json` records the other four case and one catalog failures.
+  No video playback or transcript inspection is inferred from page metadata.
+- Earlier search-only, unconfirmed and unstated-method records retain their actual
+  provenance until claim-level inspection or correction resolves them. There is no
+  blanket assertion that every remaining unsupported claim has been removed.
 - Availability is a separate question. `npm run report:sources` probes every URL in CI
   and lists the ones that did not answer; a reachable page does not verify a claim and
   an unreachable one does not refute it. Unknown is not unsupported.
@@ -51,8 +56,8 @@ Did not answer:
 | Databricks (databricks/cli repository) | 29 |
 | Python Software Foundation | 22 |
 | Databricks (terraform-provider-databricks, provider documentation in the open-source repository) | 16 |
-| Amazon Web Services | 10 |
 | Databricks Academy | 10 |
+| Amazon Web Services | 10 |
 | Delta Lake project (delta-io/delta repository) | 9 |
 | MLflow project | 9 |
 | Google | 8 |
@@ -91,6 +96,7 @@ Did not answer:
 | Databricks (Data + AI Summit speaker page) | 2 |
 | YouTube (recording listing; posting channel not recorded) | 2 |
 | Microsoft (Microsoft Entra documentation on Microsoft Learn) | 2 |
+| Delta Lake project (delta.io) | 1 |
 | Apache Software Foundation (Apache Iceberg) | 1 |
 | Unity Catalog project (LF AI & Data Foundation) | 1 |
 | Databricks (package published on PyPI) | 1 |
@@ -101,12 +107,13 @@ Did not answer:
 | MLflow project (package published on PyPI) | 1 |
 | urllib3 maintainers (published on PyPI) | 1 |
 | Databricks (dbt-databricks, open-source adapter repository) | 1 |
+| Coinbase | 1 |
+| GetYourGuide (Inside GetYourGuide engineering blog) | 1 |
 | AWS | 1 |
 | Delta Lake | 1 |
 | OpenTelemetry | 1 |
 | Government Digital Service | 1 |
 | Databricks Labs | 1 |
-| Delta Lake project (delta.io) | 1 |
 | Amazon Web Services (Amazon Redshift Management Guide) | 1 |
 | Oracle | 1 |
 | MLflow project (GitHub) | 1 |
@@ -115,8 +122,6 @@ Did not answer:
 | Microsoft (Microsoft Fabric documentation on Microsoft Learn) | 1 |
 | NumPy | 1 |
 | pandas development team | 1 |
-| Coinbase | 1 |
-| GetYourGuide (Inside GetYourGuide engineering blog) | 1 |
 | International Society of Automation (ISA) | 1 |
 | LinkedIn (post by a Databricks employee, per the author's profile title in search results) | 1 |
 | arXiv (Zheng et al., LMSYS) | 1 |

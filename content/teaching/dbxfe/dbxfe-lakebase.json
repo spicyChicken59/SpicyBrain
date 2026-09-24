@@ -83,8 +83,8 @@
    "reviewedAt": "2026-09-23",
    "publishedAt": null,
    "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Built-in PgBouncer pooler for Lakebase Autoscaling.",
-   "caveat": "Pool sizes and limits depend on compute size and may change; read the current page before sizing an application.",
-   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: Lakebase includes a built-in PgBouncer pooler that shares a pool of server connections across many client connections and runs in transaction mode, so a server connection is held only for one transaction; session-local state such as SET search_path, temporary tables and SQL-level PREPARE does not carry between transactions, LISTEN does not work while NOTIFY does, and driver-level prepared statements work; connection pooling requires native Postgres password authentication and is not available for OAuth roles; the direct connection limit depends on compute size."
+   "caveat": "Scope: current Lakebase Autoscaling on AWS; verify project configuration before applying. Earlier search-only record superseded by direct inspection.",
+   "reviewedEvidence": "Primary page body read in this build through the web reader on 2026-09-23. Sections: How connection pooling works; Prerequisites; Transaction mode. The managed pooler uses transaction mode and native password roles. Both LISTEN and NOTIFY are unavailable; applications needing pub/sub use a direct connection. Driver-level prepared statements are distinguished from SQL PREPARE. Documentation inspection, not a managed-service execution."
   },
   {
    "id": "dbxfe-lakebase-source-scalezero",
@@ -127,19 +127,19 @@
    "reviewedAt": "2026-09-23",
    "publishedAt": null,
    "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Restoring a branch to an earlier moment.",
-   "caveat": "The restore window is a project setting; confirm its current value and what a restore does to dependent branches before relying on it. Search showed the page title in lowercase.",
-   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: You can restore from any point in time within the project's restore window to recover from accidental data loss or modification such as an unintended deletion or schema change; the restore window is configurable from 2 days up to 30 days with a default of 7 days and applies to all branches in the project."
+   "caveat": "Scope: current Lakebase Autoscaling on AWS; verify project configuration before applying. Earlier search-only record superseded by direct inspection.",
+   "reviewedEvidence": "Primary page body read in this build through the web reader on 2026-09-23. Sections: What happens after a restore?; Configure your restore window; Creates a new branch, not in-place modification; Connections remain unchanged. A restore creates a new root branch containing the selected historical state. The source branch and existing connections continue unchanged. Using the restored branch requires changing application connection configuration. The project window is 2–30 days, default 7. Documentation inspection, not a managed-service execution."
   },
   {
    "id": "dbxfe-lakebase-source-pitbranch",
    "title": "Querying data at a point in time",
    "url": "https://docs.databricks.com/aws/en/oltp/projects/point-in-time-branching",
    "publisher": "Databricks",
-   "reviewedAt": "2026-09-23",
+   "reviewedAt": "2026-09-24",
    "publishedAt": null,
    "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Creating a branch from a past moment.",
-   "caveat": "Only moments inside the restore window can be branched; older states are gone.",
-   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as previously read: Point-in-time branching creates a new branch with the data as it existed at a moment within the restore window, so historical states can be analysed without affecting production data."
+   "caveat": "Scope: current Lakebase Autoscaling on AWS; verify project configuration before applying. Earlier search-only record superseded by direct inspection.",
+   "reviewedEvidence": "Primary page body read in this build through the web reader on 2026-09-24. Sections: Query data at a point in time; Important considerations. A historical branch isolates past data from current production, within the configured restore window. It contains all databases and schemas at the chosen moment. Documentation inspection, not a managed-service execution."
   },
   {
    "id": "dbxfe-lakebase-source-synced",
@@ -317,7 +317,7 @@
   },
   {
    "id": "dbxfe-lakebase-claim-pooling",
-   "description": "Lakebase's built-in PgBouncer pooler runs in transaction mode: session state such as SET, temporary tables and SQL-level PREPARE does not carry between transactions, LISTEN does not work, and pooling requires native password authentication rather than OAuth roles.",
+   "description": "Lakebase's managed transaction-mode pooler requires native password roles and does not support LISTEN or NOTIFY; use direct connections for pub/sub. Session state cannot be assumed across transactions, and SQL PREPARE differs from driver-level prepared statements.",
    "kind": "documented",
    "sourceIds": [
     "dbxfe-lakebase-source-pooling"
@@ -336,7 +336,7 @@
   },
   {
    "id": "dbxfe-lakebase-claim-restore",
-   "description": "Point-in-time restore and point-in-time branching work inside the project's restore window, configurable from 2 to 30 days with a default of 7 days.",
+   "description": "Lakebase point-in-time restore creates a new root branch and leaves the original branch and its connections unchanged. Application cutover is separate. Historical restore and branching use the project restore window (2–30 days; default 7).",
    "kind": "documented",
    "sourceIds": [
     "dbxfe-lakebase-source-restore",
@@ -683,7 +683,7 @@
     "point-in-time branch",
     "PITR"
    ],
-   "definition": "Returning a branch, or creating a new one, as it was at a chosen moment inside the project's restore window.",
+   "definition": "Creating a new root branch from historical state inside the restore window; original data and connections keep running until a separate recovery action is chosen.",
    "example": "A branch at 10:14 still shows the rows a 10:15 DELETE removed.",
    "sourceIds": [
     "dbxfe-lakebase-source-restore",
@@ -2333,10 +2333,10 @@
   {
    "id": "dbxfe-lakebase-branches-visual",
    "kind": "timeline",
-   "title": "Branch back or restore back",
-   "alt": "An incident timeline on production, then recovery by a point-in-time branch that copies back only the lost rows, then recovery by a full restore that also loses later work.",
-   "caption": "Two recovery tools for one incident; only the branch keeps the 25 minutes of later work. Synthetic teaching example.",
-   "textEquivalent": "The incident on production: A faulty migration deletes decided rows and reviewers keep working until someone notices. Nodes: 06:00 Normal work: Claims and decisions all morning. (context); 10:14 Last good moment: 40 decided items still present. (selected); 10:15 Faulty migration: Deletes the 40 decided items. (warning); 10:40 Discovered: 25 minutes of new claims and decisions since. (warning). Relationships: 06:00 Normal work → 10:14 Last good moment: then; 10:14 Last good moment → 10:15 Faulty migration: then; 10:15 Faulty migration → 10:40 Discovered: then.\n\nPoint-in-time branch, copy back: A branch at 10:14 supplies the 40 rows; production keeps everything written after 10:15. Nodes: Branch at 10:14: New branch; production untouched. (selected); Select the 40 rows: Query the past on the branch. (selected); Insert into production: One transaction; counts checked. (selected); Later work kept: The 25 minutes of claims and decisions stay. (selected). Relationships: Branch at 10:14 → Select the 40 rows: then; Select the 40 rows → Insert into production: then; Insert into production → Later work kept: then.\n\nRestore production to 10:14: A restore brings the 40 rows back and erases everything written after 10:14. Nodes: Restore to 10:14: Inside the restore window. (selected); 40 rows back: The deleted items return. (selected); Later work gone: 25 minutes of claims and decisions lost. (warning). Relationships: Restore to 10:14 → 40 rows back: then; 40 rows back → Later work gone: and.",
+   "title": "Recover historical state, then choose how to use it",
+   "alt": "An incident, selective row recovery from a historical branch, and restore into a separate root branch with production connections preserved.",
+   "caption": "Creating recovered state and adopting it are separate decisions. Synthetic incident; no platform execution.",
+   "textEquivalent": "The incident on production: A faulty migration deletes decided rows and reviewers keep working until someone notices. Nodes: 06:00 Normal work: Claims and decisions all morning. (context); 10:14 Last good moment: 40 decided items still present. (selected); 10:15 Faulty migration: Deletes the 40 decided items. (warning); 10:40 Discovered: 25 minutes of new claims and decisions since. (warning). Relationships: 06:00 Normal work → 10:14 Last good moment: then; 10:14 Last good moment → 10:15 Faulty migration: then; 10:15 Faulty migration → 10:40 Discovered: then.\n\nPoint-in-time branch, copy back: A branch at 10:14 supplies the 40 rows; production keeps everything written after 10:15. Nodes: Branch at 10:14: New branch; production untouched. (selected); Select the 40 rows: Query the past on the branch. (selected); Insert into production: One transaction; counts checked. (selected); Later work kept: The 25 minutes of claims and decisions stay. (selected). Relationships: Branch at 10:14 → Select the 40 rows: then; Select the 40 rows → Insert into production: then; Insert into production → Later work kept: then.\n\nRestore creates a separate root branch: The recovered branch has the 10:14 state. The original still has later work; redirecting applications requires an explicit connection change. Nodes: New root branch: Historical rows at 10:14. (selected); Original branch: Later claims and decisions still present. (selected); Connection choice: Existing sessions stay on the original. Plan any cutover separately. (warning). Relationships: New root branch → Original branch: separate from; Original branch → Connection choice: still serves.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-lakebase-claim-restore",
@@ -2443,25 +2443,25 @@
     },
     {
      "id": "restore",
-     "title": "Restore production to 10:14",
-     "explanation": "A restore brings the 40 rows back and erases everything written after 10:14.",
+     "title": "Restore creates a separate root branch",
+     "explanation": "The recovered branch has the 10:14 state. The original still has later work; redirecting applications requires an explicit connection change.",
      "nodes": [
       {
        "id": "n-r1",
-       "label": "Restore to 10:14",
-       "detail": "Inside the restore window.",
+       "label": "New root branch",
+       "detail": "Historical rows at 10:14.",
        "status": "selected"
       },
       {
        "id": "n-r2",
-       "label": "40 rows back",
-       "detail": "The deleted items return.",
+       "label": "Original branch",
+       "detail": "Later claims and decisions still present.",
        "status": "selected"
       },
       {
        "id": "n-r3",
-       "label": "Later work gone",
-       "detail": "25 minutes of claims and decisions lost.",
+       "label": "Connection choice",
+       "detail": "Existing sessions stay on the original. Plan any cutover separately.",
        "status": "warning"
       }
      ],
@@ -2469,12 +2469,12 @@
       {
        "from": "n-r1",
        "to": "n-r2",
-       "label": "then"
+       "label": "separate from"
       },
       {
        "from": "n-r2",
        "to": "n-r3",
-       "label": "and"
+       "label": "still serves"
       }
      ]
     }
@@ -3119,10 +3119,10 @@
   },
   {
    "id": "dbxfe-lakebase-branches-self",
-   "revision": "1",
+   "revision": "2",
    "prompt": "At 10:15 a faulty migration deleted 40 decided review items; reviewers kept claiming and deciding until 10:40. Describe the recovery you would run with Lakebase's documented features and explain why.",
-   "modelAnswer": "Create a point-in-time branch at 10:14, inside the restore window, and query it to identify the 40 deleted rows. Copy only those rows back into production in one transaction, keeping their original decisions and versions, then check counts against the branch. Do not restore production to 10:14, because that would discard the legitimate claims and decisions made between 10:15 and 10:40. Rehearse the corrected migration on a child branch before running it again.",
-   "reasoning": "A restore rewinds everything; a past-state branch isolates the loss. A full restore is acceptable only if nothing legitimate happened afterwards or later writes can be replayed from their source.",
+   "modelAnswer": "Inspect a branch at 10:14 and identify the 40 missing rows. Compare their keys and versions with production, repair only the verified loss in a transaction, and validate the result. A restore also leaves the original running; choose any application cutover separately, after reconciling later decisions. Rehearse the corrected migration before retrying it.",
+   "reasoning": "Historical state is evidence for a recovery plan. Selective repair or deliberate cutover changes what users see; creating the restored branch alone does not.",
    "conceptIds": [
     "dbxfe-lakebase-restore-concept",
     "dbxfe-lakebase-branch-concept"
@@ -3446,7 +3446,7 @@
   },
   {
    "id": "dbxfe-lakebase-connections",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "A transaction-mode pooler lends connections per transaction, not per session",
    "outcome": "Decide which parts of an app survive a transaction-mode pooler and restructure the rest.",
    "explanation": "Each Postgres connection is a server process, so hundreds of short-lived app workers share a few server connections through a [[dbxfe-lakebase-pooler-concept|transaction-mode pooler]], the PgBouncer mode Lakebase documents. In the first state, notice each transaction borrowing whichever server connection is free. In the second, a SET search_path and a temp table from transaction 1 stay on server connection 1, so transaction 2, running on connection 2, fails with 42P01. Lab L23 reproduced that failure with two direct connections.",
@@ -3466,13 +3466,13 @@
     "dbxfe-lakebase-connections-question"
    ],
    "handbook": {
-    "markdown": "A Postgres connection is a server process with its own memory, so connection count is a capacity limit; the documentation says the direct-connection limit depends on the compute size. Apps with many short-lived workers, such as web handlers or serverless functions, put a pooler in front.\n\nLakebase documents a built-in PgBouncer pooler in **transaction mode**: a client holds a server connection for one transaction, and at COMMIT or ROLLBACK the connection returns to the pool.\n\n| Works through the pooler | Breaks or changes |\n|---|---|\n| One transaction per unit of work (claim, decision, intake) | SET carried to the next transaction |\n| Driver-level prepared statements | SQL-level PREPARE and DEALLOCATE |\n| NOTIFY | LISTEN |\n| Schema-qualified names | Temp tables and session advisory locks across transactions |\n\nLab L23 shows the mechanism with two direct connections (PgBouncer itself was not run): a temp table and a search_path set in session A were invisible to session B (SQLSTATE 42P01), and a session advisory lock held by A kept B out until A's connection closed.\n\n**Design rules.** One request, one transaction. Qualify names (`qr.review_item`). Keep no state in the session; if a setting is needed, use `SET LOCAL` inside the transaction. Scale to zero closes idle connections anyway, so the same rules protect you there.\n\n**Authentication decides access here.** The pooling page states that pooling needs native Postgres password authentication and is not available for OAuth roles, so pooled access means a password role and a secret to rotate.\n\n**Inspect.** `SELECT state, count(*) FROM pg_stat_activity GROUP BY state;` shows connections by state; many `idle in transaction` rows mean the app holds transactions open.",
+    "markdown": "A Postgres connection is a server process with its own memory, so connection count is a capacity limit; the documentation says the direct-connection limit depends on the compute size. Apps with many short-lived workers, such as web handlers or serverless functions, put a pooler in front.\n\nLakebase documents a built-in PgBouncer pooler in **transaction mode**: a client holds a server connection for one transaction, and at COMMIT or ROLLBACK the connection returns to the pool.\n\n| Works through the pooler | Breaks or changes |\n|---|---|\n| One transaction per unit of work (claim, decision, intake) | SET carried to the next transaction |\n| Driver-level prepared statements | SQL-level PREPARE and DEALLOCATE |\n| Direct connections for pub/sub | LISTEN and NOTIFY are both unsupported by the managed pooler |\n| Schema-qualified names | Temp tables and session advisory locks across transactions |\n\nLab L23 shows the mechanism with two direct connections (PgBouncer itself was not run): a temp table and a search_path set in session A were invisible to session B (SQLSTATE 42P01), and a session advisory lock held by A kept B out until A's connection closed.\n\n**Design rules.** One request, one transaction. Qualify names (`qr.review_item`). Keep no state in the session; if a setting is needed, use `SET LOCAL` inside the transaction. Scale to zero closes idle connections anyway, so the same rules protect you there.\n\n**Authentication decides access here.** The pooling page states that pooling needs native Postgres password authentication and is not available for OAuth roles, so pooled access means a password role and a secret to rotate.\n\n**Inspect.** `SELECT state, count(*) FROM pg_stat_activity GROUP BY state;` shows connections by state; many `idle in transaction` rows mean the app holds transactions open.",
     "sourceSectionIds": [
      "dbxfe-lakebase-l01-connections"
     ]
    },
    "recap": "Behind a transaction-mode pooler, keep every unit of work inside one transaction and nothing in the session.",
-   "changeNote": "New academy beat.",
+   "changeNote": "Corrected managed-pooler LISTEN/NOTIFY support from the Lakebase Transaction mode section.",
    "mediaIds": []
   },
   {
@@ -3514,10 +3514,10 @@
   },
   {
    "id": "dbxfe-lakebase-branches",
-   "version": "1.0.0",
-   "title": "A branch and a restore answer different recovery questions",
-   "outcome": "Choose between a point-in-time branch and a restore for a data-loss incident, and use a child branch to rehearse a migration.",
-   "explanation": "A Lakebase [[dbxfe-lakebase-branch-concept|branch]] is a copy-on-write environment from a parent, useful for rehearsing migrations, and [[dbxfe-lakebase-restore-concept|point-in-time restore]] works inside the project's restore window. In the first state, a 10:15 migration deletes 40 decided items and reviewers keep working until 10:40. In the second, notice that a branch at 10:14 supplies only the lost rows and production keeps its later work. In the third, a full restore brings the rows back but erases 25 minutes of legitimate claims.",
+   "version": "1.1.0",
+   "title": "Restore creates recovered state; using it is a separate decision",
+   "outcome": "Separate historical recovery from application cutover and preserve legitimate work when repairing an incident.",
+   "explanation": "A [[dbxfe-lakebase-branch-concept|historical branch]] lets you inspect the past, and [[dbxfe-lakebase-restore-concept|restore]] creates a new root branch. Neither automatically redirects production. In the synthetic incident, 40 items disappear at 10:15 while reviewers continue working. Compare selective copy-back with a deliberate cutover: inspect missing rows, reconcile intervening decisions and verify the result before changing what users see. The final visual keeps the original branch and its connections visible.",
    "lessonId": "dbxfe-lakebase-l01",
    "sectionId": "dbxfe-lakebase-l01-recovery",
    "conceptIds": [
@@ -3535,13 +3535,13 @@
     "dbxfe-lakebase-branches-self"
    ],
    "handbook": {
-    "markdown": "A **branch** is an isolated database environment created from a parent branch at a point in time. Lakebase uses copy-on-write, so the child shares the parent's storage until something changes; creating one does not copy the data. You connect to a branch through its own compute.\n\n**Change safely.** Create a child of production, run the migration there (adding the partial index, say, or a new column with a default), run the lab's statements against it, compare timings, then apply to production and delete the branch.\n\n**Recover precisely.** Point-in-time restore works inside the project's restore window, documented as configurable from 2 to 30 days with a default of 7, and the window applies to every branch in the project. Two tools answer two questions:\n\n| Need | Tool | Effect |\n|---|---|---|\n| See data as it was at 10:14 | point-in-time branch | new branch; production untouched |\n| Put production back to 10:14 | restore | everything written after 10:14 is gone |\n\n**Worked case (synthetic).** A migration at 10:15 deleted 40 decided items; reviewers kept working until 10:40. Branch at 10:14, select the 40 rows, insert them into production in one transaction, check counts, and keep the branch until the incident review closes. A restore would also erase 25 minutes of legitimate work.\n\n**Limits.** States older than the window are gone. A restore does not rewind copies elsewhere: Delta history written by Lakehouse Sync, synced tables' sources, caches in the app. Rehearse the procedure on a branch before you need it, and write down who may run a restore.",
+    "markdown": "A **branch** provides an isolated environment for testing and historical inspection. Rehearse the corrected migration there before touching production.\n\n**Restore behaviour.** Lakebase restores historical state into a new root branch. The original branch and existing connections keep running. The project restore window is documented as 2–30 days, default 7; check the configured value before an incident.\n\n**Worked recovery decision (synthetic guidance).** At 10:15 a migration deletes 40 decided items; reviewers continue until 10:40. Query the 10:14 state, identify exactly which rows are missing, compare keys and versions against current production, and repair only the verified loss in a transaction. Validate decisions and counts before closing the incident.\n\n**Cutover is another operation.** Redirecting the application to historical state without reconciling the intervening work would present stale decisions to users. Pause or coordinate writes, reconcile those changes, validate the candidate and decide whether to change connection configuration. Merely creating restored state does not erase later writes from the original.\n\n**Boundaries.** This recovery plan is authored guidance, not an executed Lakebase drill. Check dependent consumers, permissions and synchronized copies separately; a recovered Postgres branch is not evidence that those systems have been reconciled.",
     "sourceSectionIds": [
      "dbxfe-lakebase-l01-recovery"
     ]
    },
-   "recap": "Branch to look back and copy what was lost; restore only when everything after the moment can go.",
-   "changeNote": "New academy beat.",
+   "recap": "Recover, validate and reconcile first; choose selective repair or explicit cutover separately.",
+   "changeNote": "Corrected restore semantics after direct primary-source inspection; earlier teaching conflated branch creation with production cutover.",
    "mediaIds": []
   },
   {

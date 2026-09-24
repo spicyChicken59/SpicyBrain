@@ -40,7 +40,7 @@ A connection authenticates as an OAuth role tied to a Databricks identity (user,
 
 <!-- section:dbxfe-lakebase-l01-recovery -->
 
-A **branch** is an isolated copy-on-write environment created from a parent; it shares unchanged storage. Run a schema migration on a child branch before production. **Point-in-time restore** returns a branch to a moment inside the project's restore window (documented as 2 to 30 days, 7 by default), and a **point-in-time branch** lets you query the past without touching production. Choose by the question: a restore rewinds legitimate later writes too; a past-state branch lets you copy back only what was lost.
+Rehearse migrations on an isolated child branch. **Point-in-time restore** creates a new root branch; the original branch and its connections remain unchanged. Inspect historical data within the configured restore window, then choose selective row repair or a deliberate application cutover. Reconcile later legitimate writes before directing users to historical state.
 
 <!-- section:dbxfe-lakebase-l01-sync -->
 
@@ -103,7 +103,7 @@ Key the log by source and message, `PRIMARY KEY (source, message_id)`, because t
 
 <!-- section:dbxfe-lakebase-l01-sources -->
 
-Databricks on AWS documentation: Lakebase Postgres, Core concepts, About authentication, Use connection pooling, Scale to zero, Branches, Point-in-time restore, Serve lakehouse data with synced tables, Lakehouse Sync, Postgres compatibility and the Lakebase release notes. PostgreSQL 16 documentation: Transactions, Transaction Isolation, Explicit Locking, SELECT and INSERT. Reviewed at search level on 2026-09-23; page bodies were not fetched in this build.
+Databricks on AWS documentation: Lakebase Postgres, Core concepts, About authentication, Use connection pooling, Scale to zero, Branches, Point-in-time restore, Serve lakehouse data with synced tables, Lakehouse Sync, Postgres compatibility and the Lakebase release notes. PostgreSQL 16 documentation: Transactions, Transaction Isolation, Explicit Locking, SELECT and INSERT. Restore and pooling page bodies were read on 2026-09-23; historical-branching documentation was read on 2026-09-24. Other source records retain their own methods; the source-review ledger identifies unfinished checks. No managed-service execution is claimed.
 
 <!-- section:dbxfe-lakebase-l01-related -->
 

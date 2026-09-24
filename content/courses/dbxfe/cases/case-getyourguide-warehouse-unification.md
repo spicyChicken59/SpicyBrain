@@ -1,27 +1,27 @@
 ### Who reports this and how
 
-The source is a post on "Inside GetYourGuide", the company's own engineering and careers blog, titled "From Snowflake to Databricks: Our cost-effective journey to a unified data warehouse". The reporter is the customer's engineering team (customer-authored). Publication date: not stated in the available summary. Search results also list a Databricks customer page and a Data + AI Summit session about the same company; neither is used as the source record here. The page itself could not be opened when this analysis was written, so this analysis rests on its search-result title and snippets.
+GetYourGuide's engineering article was published on 29 January 2025; it names Robert Bemmann and Houkun Zhu. The body was inspected on 24 September 2026, including Motivation and scope, PoC, Cost projection and Conducting the migration.
 
 ### The problem
 
-The team ran a separate cloud warehouse for analytics and BI alongside its processing platform and wanted a single place where data is processed, modelled and served. The stated aims, per the snippets, were unifying the warehouse, improving business-intelligence capability, tuning SQL query performance and cutting cost. General analysis: two engines means two copies of the important tables, two security models, and a team that pays twice for the same question.
+The team wanted to serve Looker from its Databricks data platform and eliminate redundant warehouse copies.
 
 ### Constraints
 
-As far as the summary states, the migration ran as a proof of concept followed by an incremental rollout, and the notable engineering friction was SQL syntax differences between the two systems, which implies existing queries, views and reports had to be rewritten and re-validated. BI consumers presumably needed continuity throughout (general analysis; not stated). Not stated: data volume, number of dashboards or models, team size, timeline, or which BI tool sits on top.
+The article identifies 750 tables, 25 Looker models and over 20,000 distinct queries requiring validation. Two internal engineers led the work with external support. Minimal disruption was an explicit objective.
 
 ### Architecture as described
 
-Data processing centralised on the Databricks platform with the warehouse layer served from it. A snippet of the blog itself says that Databricks serverless compute, used for serverless SQL warehouses, runs in a compute layer within the Databricks account with its own IP range, and that the challenge was making the team's AWS VPC and the MySQL RDS database behind an external Hive metastore reachable from it. Network access for serverless compute was therefore part of the work; how it was configured is not visible in the snippets.
+Airflow loading, Delta tables and incremental Looker model migration are described. Network connectivity and SQL dialect differences required attention; the historical implementation is not a current cloud-networking prescription.
 
 ### Evidence and its limits
 
-The headline figure, reported by GetYourGuide, is a 20 percent reduction in operational costs. It is the reporter's own accounting; no baseline, period or cost definition is visible in the summary, so a reader cannot tell whether it covers licences, compute, storage, engineering time, or all of them, nor whether one-off migration effort was netted out. The vendor page cites separate performance figures; they are not adopted here. Query-latency, concurrency and dashboard-freshness outcomes are not stated.
+The authors report 20% lower costs. Their PoC compared frequently used dashboards through Looker over five runs, with mixed performance outcomes. The cost projection separates BI compute, copy-related ETL and storage. Neither the headline nor the projection establishes another organization's return or a complete accounting of migration labor.
 
 ### What transfers
 
-Run a proof of concept on the queries that matter to finance and marketing before deciding, then move workloads incrementally so each cut-over has a rollback. Budget the real effort in dialect translation and result parity testing, not in infrastructure. Define "operational cost" before the migration so the after-figure means something. Unifying processing and serving pays mostly by removing copies and the reconciliation around them.
+Authored analysis: benchmark the user-facing report, including its query generation, rather than only the database console. Model dependencies before cutting over shared views. Keep parity checks and rollback criteria beside performance checks.
 
 ### Missing information
 
-Ask which SQL constructs broke and how parity was proven; whether a transformation tool such as dbt was in the path; how long the two systems ran in parallel and who owned the final switch; concurrency and latency targets for dashboards; the cost breakdown behind the 20 percent; and what was deliberately left behind.
+Request the reproducible benchmark inputs, production reconciliation results, ongoing tuning effort and full migration-cost accounting. Team size, BI tool, table count and the comparison method are stated in the article and should not be called unknown.

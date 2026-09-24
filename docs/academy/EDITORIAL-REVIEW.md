@@ -2205,3 +2205,25 @@ The lab's README said its record-resolution rules came from the ingestion module
 
 - **The README** now calls the lab's rules a simplification and sends publication decisions to the ingestion module. The handbook's pointer matches.
 - **The lab** was re-executed from source and from its rebuilt download, and both matched the committed evidence. The download's SHA-256 moved in `course.json`.
+
+## Continuation correction — 2026-09-24
+
+The earlier editorial completion statements do not close G10/G14 or the
+source-dependent teaching and case gates. Two confirmed Lakebase defects
+survived that review: restore was taught as an in-place production rewind,
+and generic pooler behavior was substituted for managed NOTIFY support.
+
+Both now match directly inspected primary documentation. The restore visual,
+handbook, model answer, canonical lesson, scenario, glossary and card were
+corrected. Beats move to 1.1.0; the affected self-check and cards move to
+revision 2; the lesson is 1.1.0 and course 4.0.1. The scenario carries a
+revision notice. IDs, saved responses, notes, reviews and schedules are retained.
+
+Four accessible case articles were reconciled, including previously incorrect
+claims that published latency, migration scope and the NAB percentage were
+unavailable. Nine learning crosswalk pages were directly inspected; the mapping
+and prerequisites were corrected. See CASE-CROSSWALK-REVIEW.json for sections.
+Four session pages and one catalog entry remain blocked; no video was watched.
+
+CLAIM-REVIEW.json records remaining claim-level work. Source-count checks and
+mechanical tests do not supply the missing editorial conclusions.

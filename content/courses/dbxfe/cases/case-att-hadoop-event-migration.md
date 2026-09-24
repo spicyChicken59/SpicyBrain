@@ -1,3 +1,5 @@
+> Source review remains incomplete (24 September 2026). The cited session URL redirected to the generic Summit page; no session abstract was returned. The historical search-level analysis below is provisional; it has not passed direct-source review.
+
 ### Who reports this and how
 
 The source is the Data + AI Summit 2024 session page "AT&T's Migration of Billions of Events Processing From Hadoop". The title names the customer as the subject, so this is treated as a customer-presented conference talk; presenter names are not visible in the snippets. Search results also surface a vendor customer page and a cloud-provider customer story about a related AT&T migration, with different and larger figures; they are deliberately not used as the source record. Session date: not stated beyond the 2024 event. The page itself could not be opened when this analysis was written; only its search-result title and snippets were read.

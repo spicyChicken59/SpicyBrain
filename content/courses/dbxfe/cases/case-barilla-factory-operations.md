@@ -1,3 +1,5 @@
+> Source review remains incomplete (24 September 2026). The web reader reported that the cited session URL was not accessible. The historical search-level analysis below is provisional; it has not passed direct-source review.
+
 ### Who reports this and how
 
 The source is the Data + AI Summit 2023 session page "Made in Italy: How Barilla Uses Databricks Lakehouse to Optimize Operations". The title centres the customer, so this is treated as a customer-presented conference talk; presenter names are not confirmed from the snippets. A separate vendor customer page about Barilla exists in search results and is not used as the source record. Session date: not stated in the summary beyond the 2023 event. The page itself could not be opened when this analysis was written; the analysis rests on its search-result title and abstract-level snippets.

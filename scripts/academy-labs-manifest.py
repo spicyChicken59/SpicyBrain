@@ -80,8 +80,11 @@ def build() -> dict:
             )
         labs.append(entry)
     by_class: dict[str, int] = {}
+    checks_by_class: dict[str, int] = {}
     for lab in labs:
         by_class[lab["executionClass"] or "no evidence"] = by_class.get(lab["executionClass"] or "no evidence", 0) + 1
+        key = lab["executionClass"] or "no evidence"
+        checks_by_class[key] = checks_by_class.get(key, 0) + (lab.get("tests") or 0)
     return {
         "generatedBy": "python scripts/academy-labs-manifest.py",
         "reexecution": "CI job 'labs' extracts every committed lab download to a clean directory and runs it with run-labs.py --from-zip in environments built from the recorded pins; a differing test count, a skip or a differing fixture hash fails the job.",
@@ -89,6 +92,7 @@ def build() -> dict:
         "totals": {
             "labs": len(labs),
             "byClass": by_class,
+            "checksByClass": checks_by_class,
             "tests": sum(lab.get("tests") or 0 for lab in labs),
             "skipped": sum(lab.get("skipped") or 0 for lab in labs),
             "registered": sum(1 for lab in labs if lab["registered"]),

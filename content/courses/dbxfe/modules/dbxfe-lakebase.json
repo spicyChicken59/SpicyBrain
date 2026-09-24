@@ -28,7 +28,7 @@
         "Give the authentication and pooling choice for the app's role and say which session state the design avoids.",
         "State freshness and consistency for every synchronized copy, and mark preview features and unconfirmed items as unknown."
       ],
-      "model": "### State\nOperational, in Postgres: review_item, intake_message and reviewer assignments. Analytical, in Delta: decision history and daily counts. Session: filters and sort order in the browser.\n\n### Schema\nreview_item with a state CHECK tying status to claimed_by and decision, a partial unique index allowing one open claim per reviewer, a version column and a partial index over ready rows in claim order; intake_message keyed by message_id; every rule a constraint, so a refused write returns 23514, 23505 or 23503 and the handler maps it to a message.\n\n### Writes\nClaim: one UPDATE with a FOR UPDATE SKIP LOCKED subquery; no row means the queue is empty. Decision: UPDATE ... WHERE version = the loaded version AND claimed_by = the reviewer AND status = 'claimed'; zero rows means reload and show the change. Intake: ON CONFLICT (message_id) DO NOTHING, then DO UPDATE only for a newer source_seq while the item is ready.\n\n### Connections and identity\nThe app runs as its service principal's role. Pooling is documented as needing a password role, so the choice between pooled password access and direct OAuth access is open with the security team. Every write is one transaction with schema-qualified names, so either path works; the design uses no SET, temp tables or session advisory locks, and reconnects after scale to zero.\n\n### Change and recovery\nMigrations are rehearsed on a child branch. The restore window is to be confirmed within the documented 2 to 30 days. After data loss, branch at the last good moment and copy rows back rather than restoring over later work.\n\n### Synchronization\nRoster: a synced table, triggered daily if Change Data Feed is enabled and snapshot until then; the screen prints 'roster as of'. Decisions to Delta: Lakehouse Sync (Public Preview, needs approval) or a scheduled export, with the dashboard labelled by its as-of time.\n\n### Checklist and unknowns\nVerified on local PostgreSQL 16.13 (lab L23): constraints, claim, decision, intake and isolation behaviour. To confirm on a branch: Postgres version, role type and pooler, reconnect after scale to zero, sync freshness. Unknown: regional availability, restore window value, Change Data Feed on the roster, preview approval.",
+      "model": "### State\nOperational, in Postgres: review_item, intake_message and reviewer assignments. Analytical, in Delta: decision history and daily counts. Session: filters and sort order in the browser.\n\n### Schema\nreview_item with a state CHECK tying status to claimed_by and decision, a partial unique index allowing one open claim per reviewer, a version column and a partial index over ready rows in claim order; intake_message keyed by message_id; every rule a constraint, so a refused write returns 23514, 23505 or 23503 and the handler maps it to a message.\n\n### Writes\nClaim: one UPDATE with a FOR UPDATE SKIP LOCKED subquery; no row means the queue is empty. Decision: UPDATE ... WHERE version = the loaded version AND claimed_by = the reviewer AND status = 'claimed'; zero rows means reload and show the change. Intake: ON CONFLICT (message_id) DO NOTHING, then DO UPDATE only for a newer source_seq while the item is ready.\n\n### Connections and identity\nThe app runs as its service principal's role. Pooling is documented as needing a password role, so the choice between pooled password access and direct OAuth access is open with the security team. Every write is one transaction with schema-qualified names, so either path works; the design uses no SET, temp tables or session advisory locks, and reconnects after scale to zero.\n\n### Change and recovery\nMigrations are rehearsed on a child branch. The restore window is to be confirmed within the documented 2 to 30 days. After data loss, inspect historical state and reconcile missing rows with current decisions. Restore creates a separate root branch; selective repair and any application cutover are deliberate follow-up operations.\n\n### Synchronization\nRoster: a synced table, triggered daily if Change Data Feed is enabled and snapshot until then; the screen prints 'roster as of'. Decisions to Delta: Lakehouse Sync (Public Preview, needs approval) or a scheduled export, with the dashboard labelled by its as-of time.\n\n### Checklist and unknowns\nVerified on local PostgreSQL 16.13 (lab L23): constraints, claim, decision, intake and isolation behaviour. To confirm on a branch: Postgres version, role type and pooler, reconnect after scale to zero, sync freshness. Unknown: regional availability, restore window value, Change Data Feed on the roster, preview approval.",
       "reasoning": "The note keeps operational and analytical state apart, gives every write a pattern and an observable result the app branches on, ties the pooling choice to the authentication type, and turns each platform feature into a verification item with its evidence label rather than a promise.",
       "rubric": [
         {
@@ -84,7 +84,8 @@
         "dbxfe-guidance",
         "dbxfe-fiction"
       ],
-      "isCapstone": false
+      "isCapstone": false,
+      "revisionNotice": "Recovery guidance corrected in course 4.0.1: restore creates a separate branch; application cutover is a separate decision. Earlier saved responses retain their original snapshot."
     }
   ],
   "sources": [
@@ -130,7 +131,7 @@
       "context": "Databricks on AWS; built-in PgBouncer pooler.",
       "accessDate": "2026-09-23",
       "reviewDate": "2026-09-23",
-      "caveat": "Limits depend on compute size and may change. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "caveat": "Primary page body read in this build through the web reader on 2026-09-23. Sections: How connection pooling works; Prerequisites; Transaction mode. The managed pooler uses transaction mode and native password roles. Both LISTEN and NOTIFY are unavailable; applications needing pub/sub use a direct connection. Driver-level prepared statements are distinguished from SQL PREPARE. Documentation inspection, not a managed-service execution."
     },
     {
       "id": "dbxfe-lakebase-course-source-scalezero",
@@ -163,7 +164,7 @@
       "context": "Databricks on AWS; restore window and restore.",
       "accessDate": "2026-09-23",
       "reviewDate": "2026-09-23",
-      "caveat": "The window is a project setting to confirm. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "caveat": "Primary page body read in this build through the web reader on 2026-09-23. Sections: What happens after a restore?; Configure your restore window; Creates a new branch, not in-place modification; Connections remain unchanged. A restore creates a new root branch containing the selected historical state. The source branch and existing connections continue unchanged. Using the restored branch requires changing application connection configuration. The project window is 2–30 days, default 7. Documentation inspection, not a managed-service execution."
     },
     {
       "id": "dbxfe-lakebase-course-source-synced",
@@ -234,7 +235,7 @@
     },
     {
       "id": "dbxfe-lakebase-course-claim-access",
-      "description": "Lakebase connections authenticate as OAuth roles with one-hour tokens checked at login, or as native password roles; the built-in PgBouncer pooler runs in transaction mode, keeps no session state between transactions and needs password authentication; scale to zero closes idle connections and their session state.",
+      "description": "Lakebase connections authenticate as OAuth roles with one-hour tokens checked at login, or as native password roles; the built-in PgBouncer pooler runs in transaction mode, keeps no session state between transactions and needs password authentication; scale to zero closes idle connections and their session state. The managed pooler supports neither LISTEN nor NOTIFY; pub/sub requires direct connections.",
       "kind": "documented",
       "sourceIds": [
         "dbxfe-lakebase-course-source-auth",
@@ -245,7 +246,7 @@
     },
     {
       "id": "dbxfe-lakebase-course-claim-recovery",
-      "description": "Lakebase branches are copy-on-write environments, and point-in-time restore and point-in-time branching work inside a restore window of 2 to 30 days, 7 by default.",
+      "description": "Lakebase branches provide isolated environments. Point-in-time restore creates a new root branch while the original and existing connections remain unchanged; application cutover is separate. The project restore window is 2–30 days, default 7.",
       "kind": "documented",
       "sourceIds": [
         "dbxfe-lakebase-course-source-branches",
@@ -407,7 +408,7 @@
         "restore window",
         "PITR"
       ],
-      "definition": "Copy-on-write environments for rehearsal and inspection, and rewinding a branch to a moment inside the restore window.",
+      "definition": "Isolated environments for rehearsal and historical inspection; restore creates a new root branch without changing the original or redirecting its applications.",
       "lessonId": "dbxfe-lakebase-l01",
       "sectionId": "dbxfe-lakebase-l01-recovery"
     },

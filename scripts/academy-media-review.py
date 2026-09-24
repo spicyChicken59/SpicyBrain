@@ -62,8 +62,12 @@ def main(argv: list[str]) -> int:
         if not d:
             problems.append(f"new module {mid} has no media decision")
             continue
-        if d["decision"] == "no-placement" and mid in placed:
-            problems.append(f"{mid}: decision is no-placement but the course renders a placement")
+        if d["decision"] in ("no-placement", "blocked-review") and mid in placed:
+            problems.append(f"{mid}: decision forbids placement but the course renders a placement")
+        if d["decision"] not in ("no-placement", "blocked-review"):
+            problems.append(f"{mid}: unrecognized media decision")
+        if d["decision"] == "no-placement" and not d.get("editorialEvidence"):
+            problems.append(f"{mid}: no-placement needs completed editorial evidence; access failure is blocked-review")
         for c in d.get("candidates", []):
             if c.get("reviewed") is not False:
                 problems.append(f"{mid}: candidate {c.get('url')} is not marked reviewed: false")
@@ -84,6 +88,7 @@ def main(argv: list[str]) -> int:
                 "date": d.get("date"),
                 "suggestedBeatId": d.get("suggestedBeatId"),
                 "reason": d.get("reason"),
+                "remainingReview": d.get("remainingReview"),
                 "candidates": [{k: c.get(k) for k in ("title", "creator", "url", "foundVia", "reviewed")} for c in d.get("candidates", [])],
             }
             for mid, d in sorted(decisions.items(), key=lambda kv: modules.index(kv[0]) if kv[0] in modules else 999)
@@ -94,6 +99,7 @@ def main(argv: list[str]) -> int:
             "placements": len(placements),
             "newModuleDecisions": len(decisions),
             "noPlacement": sum(1 for d in decisions.values() if d["decision"] == "no-placement"),
+            "blockedReview": sum(1 for d in decisions.values() if d["decision"] == "blocked-review"),
             "unreviewedCandidates": sum(len(d.get("candidates", [])) for d in decisions.values()),
         },
         "problems": problems,
@@ -118,12 +124,12 @@ def markdown(register: dict, placements: list[dict]) -> str:
         f"- {t['placements']} video placements are rendered, one in each of {t['retainedModulesWithPlacement']} retained modules. Each segment was",
         "  reviewed (video and transcript, or transcript where stated) and its playback probed",
         "  in the privacy-enhanced player after explicit consent, on the dates below.",
-        f"- {t['newModuleDecisions']} new modules each record a decision; {t['noPlacement']} are `no-placement`. Video hosts and",
-        "  captions were unreachable from this build environment, so no new segment could be",
-        f"  watched or playback-probed. The {t['unreviewedCandidates']} candidates listed are leads for a later",
-        "  reviewer, marked `reviewed: false`, and are never shown to learners.",
-        "- A module without a placement is complete without one: every beat keeps its authored",
-        "  visual, and a placement is always optional.",
+        f"- {t['newModuleDecisions']} new modules have records: {t['blockedReview']} are `blocked-review`,",
+        f"  and {t['noPlacement']} have a completed `no-placement` decision. The {t['unreviewedCandidates']}",
+        "  candidates remain unreviewed leads and are never shown to learners.",
+        "- G10 remains BLOCKED until candidate evaluation is complete. An optional placement",
+        "  and a complete authored visual do not substitute for the required editorial review.",
+        "- Access attempts and exact outstanding methods are recorded in CLOSEOUT.md.",
         "",
         "Behaviour the browser suite proves for every placement: no provider request before",
         "consent, the original link and the authored equivalent when the player is blocked,",

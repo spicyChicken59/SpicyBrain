@@ -5,13 +5,19 @@ how to check it. It is not an authorization to publish: this PR merges
 nothing, publishes nothing, enables no Pages, creates no preview or tunnel,
 and changes no Site, origin, access model, repository setting or secret.
 
+## Closeout status
+
+This candidate is **not ready for release**. G10/G14 and source-dependent
+editorial gates remain blocked; see CLOSEOUT.md. The manifest verifies bytes,
+not research completion. Final CI provenance belongs in PR #4 metadata.
+
 ## Candidate
 
 | Item | Value |
 |---|---|
 | Source commit | the `sourceCommit` recorded in [`release-manifest.json`](release-manifest.json), built from a clean tree; the commit that adds the manifest changes nothing else |
 | Node | 24.19.0 |
-| Course | `dbxfe`, contentVersion `4.0.0`, "Databricks: Build, Explain, Deliver" |
+| Course | `dbxfe`, contentVersion `4.0.1`, "Databricks: Build, Explain, Deliver" |
 | Modules / tracks / routes | 48 / 8 / 9 |
 | Labs / field guides / cases / capstones | 24 (20 local-executed, 2 tabletop, 2 platform guides) / 32 / 8 / 3 |
 | Build manifest | [`release-manifest.json`](release-manifest.json): every file of `dist/` and `dist-nested/` with its size and SHA-256, and the content manifest with every download's SHA-256 |

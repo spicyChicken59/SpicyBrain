@@ -2,7 +2,7 @@
  "id": "dbxfe-lakebase-l01",
  "title": "Lakebase, Postgres and operational state",
  "summary": "Design Cinderline's quality-review state in PostgreSQL with constraints, short transactions, SKIP LOCKED claims, version checks and idempotent intake, then place it on Lakebase with its authentication, pooler, branches, restore window and synced copies.",
- "contentVersion": "1.0.0",
+ "contentVersion": "1.1.0",
  "teachingFormat": "flexible",
  "estimatedMinutes": 18,
  "objectives": [
@@ -511,10 +511,10 @@
   },
   {
    "id": "dbxfe-lakebase-l01-card10",
-   "revision": "1",
+   "revision": "2",
    "prompt": "Name two things that break behind a transaction-mode pooler and one that keeps working.",
    "answer": "A SET search_path or temp table carried between transactions and SQL-level PREPARE break; a single-transaction claim keeps working.",
-   "explanation": "The pooler lends a server connection for one transaction and then gives it to another client, so session state stays on a connection you may never see again. Work that starts and finishes inside one transaction, with schema-qualified names, is unaffected.",
+   "explanation": "The pooler lends a server connection for one transaction and then gives it to another client, so session state stays on a connection you may never see again. Work that starts and finishes inside one transaction, with schema-qualified names, is unaffected. For Lakebase managed pooling, both LISTEN and NOTIFY require a direct connection; generic PgBouncer behaviour is not a managed-service guarantee.",
    "lessonId": "dbxfe-lakebase-l01",
    "sectionId": "dbxfe-lakebase-l01-connections",
    "conceptIds": [
@@ -544,10 +544,10 @@
   },
   {
    "id": "dbxfe-lakebase-l01-card12",
-   "revision": "1",
-   "prompt": "When is a point-in-time branch better than a restore after an accidental deletion?",
-   "answer": "When legitimate work continued after the deletion, because the branch lets you copy back only the lost rows.",
-   "explanation": "A restore returns the whole branch to the chosen moment and discards everything written after it. A branch from just before the deletion leaves production untouched, so you can select the lost rows there and insert them into production in one transaction.",
+   "revision": "2",
+   "prompt": "After accidental deletion and continued legitimate work, how do you use recovered Lakebase state safely?",
+   "answer": "Inspect historical state, then choose selective repair or an explicit application cutover after reconciliation.",
+   "explanation": "A restore creates a separate root branch. The original and its connections remain unchanged. In this incident, copying verified missing rows preserves later decisions; switching users to an unreconciled historical state would hide their newer work.",
    "lessonId": "dbxfe-lakebase-l01",
    "sectionId": "dbxfe-lakebase-l01-recovery",
    "conceptIds": [

@@ -180,21 +180,32 @@ test("every authored beat has a real visual, explained check, canonical anchor a
     const media = original.media.filter(
       (v) => v.courseId === m.courseId && v.moduleId === m.moduleId,
     );
-    // A module either places reviewed media, or carries a dated editorial
-    // decision record explaining why no placement is made (for example, the
-    // candidate could not be reviewed or played back). The record must name
-    // the beat it would serve, its reason and any leads, never a verified play.
+    // An access failure is unfinished review, not an editorial no-placement
+    // conclusion. Both states leave media unplaced; only the latter carries
+    // completed editorial evidence.
     if (!media.length) {
       const decisionPath = `docs/academy/media-decisions/${m.moduleId}.json`;
       const decision = JSON.parse(await readFile(decisionPath, "utf8")) as {
         moduleId: string;
         decision: string;
         reason: string;
+        editorialEvidence?: string;
+        remainingReview?: string;
         suggestedBeatId?: string;
         candidates: { url: string; reviewed: boolean }[];
       };
       assert.equal(decision.moduleId, m.moduleId, `${decisionPath} identity`);
-      assert.equal(decision.decision, "no-placement");
+      assert.ok(["no-placement", "blocked-review"].includes(decision.decision));
+      if (decision.decision === "blocked-review")
+        assert.ok(
+          decision.remainingReview?.trim(),
+          `${decisionPath} remaining work`,
+        );
+      else
+        assert.ok(
+          decision.editorialEvidence?.trim(),
+          `${decisionPath} completed review`,
+        );
       assert.ok(decision.reason.trim().length > 40, `${decisionPath} reason`);
       assert.ok(
         !decision.suggestedBeatId ||
