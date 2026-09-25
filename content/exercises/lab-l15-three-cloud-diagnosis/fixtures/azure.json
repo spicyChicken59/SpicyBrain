@@ -1,0 +1,478 @@
+{
+  "cloud": "azure",
+  "title": "Azure: a 403 from storage after the catalog agreed, and a backfill that times out",
+  "synthetic": "Fictional teaching case for Cinderline Components. Names, addresses, account and project identifiers and every error text are invented; nothing was deployed or observed. The managed identity's principal ID is written mi-ac-cinderline-uc for readability.",
+  "deployment": [
+    {
+      "item": "Workspace",
+      "value": "dbw-cinderline, injected into vnet-cinderline-data (10.20.0.0/16): snet-dbw-host (10.20.0.0/24), snet-dbw-container (10.20.1.0/24), snet-pe (10.20.2.0/24); one serverless SQL warehouse and classic job clusters"
+    },
+    {
+      "item": "Hub",
+      "value": "vnet-cinderline-hub (10.10.0.0/16) with the hub firewall at 10.10.0.4"
+    },
+    {
+      "item": "Storage",
+      "value": "ADLS Gen2 account stcinderlinelake with public network access disabled; private endpoint pe-lake-dfs (sub-resource dfs, 10.20.2.5) in snet-pe"
+    },
+    {
+      "item": "Unity Catalog",
+      "value": "access connector ac-cinderline-uc (Microsoft.Databricks/accessConnectors) with a system-assigned managed identity; storage credential cinderline_lake_cred; external location cinderline_quality on abfss://quality@stcinderlinelake.dfs.core.windows.net/accepted"
+    },
+    {
+      "item": "Serverless",
+      "value": "network connectivity configuration ncc-cinderline attached to the workspace, with a private endpoint rule to stcinderlinelake (dfs)"
+    }
+  ],
+  "identities": [
+    {
+      "id": "ana@cinderline.example",
+      "kind": "Microsoft Entra user",
+      "memberOf": [
+        "grp-quality-analysts"
+      ],
+      "acts": "In her own notebooks and queries"
+    },
+    {
+      "id": "sp-job-nightly",
+      "kind": "Microsoft Entra application service principal, provisioned into the Databricks account",
+      "memberOf": [],
+      "acts": "As the run-as principal of jobs quality_nightly and quality_backfill"
+    },
+    {
+      "id": "mi-ac-cinderline-uc",
+      "kind": "System-assigned managed identity of access connector ac-cinderline-uc",
+      "memberOf": [],
+      "acts": "On the storage path of Unity Catalog reads; it is not a Databricks principal"
+    },
+    {
+      "id": "grp-platform-admins",
+      "kind": "Microsoft Entra group",
+      "memberOf": [],
+      "acts": "Manages the storage account"
+    }
+  ],
+  "requestPath": [
+    {
+      "path": "Author",
+      "hop": "Ana's browser to the workspace URL after Microsoft Entra sign-in",
+      "identity": "ana@cinderline.example",
+      "segment": null
+    },
+    {
+      "path": "Control",
+      "hop": "Control plane to compute; classic nodes dial out to the relay",
+      "identity": "Not examined in this case",
+      "segment": null
+    },
+    {
+      "path": "Execution",
+      "hop": "Job on the serverless SQL warehouse or a classic job cluster asks Unity Catalog",
+      "identity": "The job's run-as principal",
+      "segment": "execution"
+    },
+    {
+      "path": "Storage (serverless)",
+      "hop": "Serverless compute to stcinderlinelake through the NCC's private endpoint rule",
+      "identity": "The access connector's managed identity",
+      "segment": "storage-serverless"
+    },
+    {
+      "path": "Storage (classic)",
+      "hop": "Classic node in snet-dbw-host to stcinderlinelake through pe-lake-dfs",
+      "identity": "The access connector's managed identity",
+      "segment": "storage-classic"
+    }
+  ],
+  "paths": {
+    "execution": [
+      "run-as",
+      "uc-grants"
+    ],
+    "storage-serverless": [
+      "ncc-private-endpoint-rule",
+      "access-connector-identity",
+      "storage-role-assignment"
+    ],
+    "storage-classic": [
+      "private-dns-zone-link",
+      "private-endpoint-connection",
+      "subnet-route-table",
+      "nsg-host-subnet",
+      "access-connector-identity",
+      "storage-role-assignment"
+    ]
+  },
+  "controls": [
+    {
+      "id": "run-as",
+      "name": "Run-as principal in the job settings",
+      "layer": "identity",
+      "side": "databricks",
+      "type": "run-as",
+      "owner": "The job's owner",
+      "object": "Job settings",
+      "config": {
+        "jobs": {
+          "quality_nightly": "sp-job-nightly",
+          "quality_backfill": "sp-job-nightly"
+        },
+        "note": "Both jobs were set to the service principal when they were scheduled"
+      }
+    },
+    {
+      "id": "uc-grants",
+      "name": "Unity Catalog privileges of the acting principal",
+      "layer": "authorization",
+      "side": "databricks",
+      "type": "uc-grants",
+      "owner": "The owners of the catalog, schema and table",
+      "object": "Unity Catalog grants on catalog, schema and table",
+      "config": {
+        "groups": {
+          "grp-quality-analysts": [
+            "ana@cinderline.example"
+          ]
+        },
+        "grants": [
+          {
+            "principal": "sp-job-nightly",
+            "privilege": "USE CATALOG",
+            "securable": "quality"
+          },
+          {
+            "principal": "sp-job-nightly",
+            "privilege": "USE SCHEMA",
+            "securable": "quality.accepted"
+          },
+          {
+            "principal": "sp-job-nightly",
+            "privilege": "SELECT",
+            "securable": "quality.accepted.inspections"
+          },
+          {
+            "principal": "grp-quality-analysts",
+            "privilege": "USE CATALOG",
+            "securable": "quality"
+          },
+          {
+            "principal": "grp-quality-analysts",
+            "privilege": "USE SCHEMA",
+            "securable": "quality.accepted"
+          },
+          {
+            "principal": "grp-quality-analysts",
+            "privilege": "SELECT",
+            "securable": "quality.accepted.inspections"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ncc-private-endpoint-rule",
+      "name": "Private endpoint rule of network connectivity configuration ncc-cinderline to stcinderlinelake (dfs)",
+      "layer": "reachability",
+      "side": "azure",
+      "type": "endpoint-state",
+      "owner": "Databricks account admin (rule) and the storage owner (approval)",
+      "object": "NCC ncc-cinderline",
+      "config": {
+        "state": "ESTABLISHED",
+        "healthy": [
+          "ESTABLISHED"
+        ]
+      }
+    },
+    {
+      "id": "access-connector-identity",
+      "name": "Access connector ac-cinderline-uc and its managed identity, named by storage credential cinderline_lake_cred",
+      "layer": "identity",
+      "side": "azure",
+      "type": "credential",
+      "owner": "Metastore admin (credential) and Cinderline cloud team (connector)",
+      "object": "Access connector ac-cinderline-uc",
+      "config": {
+        "accessConnector": "ac-cinderline-uc",
+        "storageCredential": "cinderline_lake_cred",
+        "externalLocation": "abfss://quality@stcinderlinelake.dfs.core.windows.net/accepted",
+        "identity": "mi-ac-cinderline-uc"
+      }
+    },
+    {
+      "id": "storage-role-assignment",
+      "name": "Azure role assignments on storage account stcinderlinelake",
+      "layer": "authorization",
+      "side": "azure",
+      "type": "allow-list",
+      "owner": "Cinderline cloud team",
+      "object": "Storage account stcinderlinelake (access control)",
+      "config": {
+        "requires": {
+          "resource": "stcinderlinelake",
+          "anyOf": [
+            "Storage Blob Data Reader",
+            "Storage Blob Data Contributor"
+          ]
+        },
+        "entries": [
+          {
+            "principal": "grp-platform-admins",
+            "resource": "stcinderlinelake",
+            "grants": [
+              "Owner"
+            ],
+            "note": "A management role; it grants no data access through Entra"
+          },
+          {
+            "principal": "sp-job-nightly",
+            "resource": "stcinderlinelake",
+            "grants": [
+              "Storage Blob Data Reader"
+            ],
+            "note": "Added last week as an attempted fix"
+          }
+        ]
+      }
+    },
+    {
+      "id": "private-dns-zone-link",
+      "name": "Private DNS zone privatelink.dfs.core.windows.net and its virtual network links",
+      "layer": "name-resolution",
+      "side": "azure",
+      "type": "dns",
+      "owner": "Cinderline network team",
+      "object": "Private DNS zone privatelink.dfs.core.windows.net",
+      "config": {
+        "networks": [
+          "vnet-cinderline-hub"
+        ],
+        "records": {
+          "stcinderlinelake.dfs.core.windows.net": {
+            "ip": "10.20.2.5",
+            "via": "pe-lake-dfs"
+          }
+        },
+        "note": "Public DNS answers the account name with a CNAME into the privatelink zone; only a network that consults a linked zone gets the private address"
+      }
+    },
+    {
+      "id": "private-endpoint-connection",
+      "name": "Private endpoint pe-lake-dfs and its connection state on stcinderlinelake",
+      "layer": "reachability",
+      "side": "azure",
+      "type": "endpoint-state",
+      "owner": "Storage owner (approval) and Cinderline network team (endpoint)",
+      "object": "Private endpoint pe-lake-dfs",
+      "config": {
+        "state": "Pending",
+        "healthy": [
+          "Approved"
+        ]
+      }
+    },
+    {
+      "id": "subnet-route-table",
+      "name": "Route table rt-dbw-egress on snet-dbw-host and snet-dbw-container",
+      "layer": "reachability",
+      "side": "azure",
+      "type": "route",
+      "owner": "Cinderline network team",
+      "object": "Route table rt-dbw-egress",
+      "config": {
+        "subnets": [
+          "snet-dbw-host",
+          "snet-dbw-container"
+        ],
+        "routes": [
+          {
+            "destination": "10.20.0.0/16",
+            "target": "VnetLocal (system route for the VNet's address space)"
+          },
+          {
+            "destination": "0.0.0.0/0",
+            "target": "VirtualAppliance 10.10.0.4 (hub firewall)"
+          }
+        ],
+        "serviceTagRoutes": [
+          {
+            "destination": "AzureDatabricks",
+            "target": "Internet"
+          }
+        ],
+        "note": "Other system routes are omitted; service tag routes are shown for reading and are not used by this case"
+      }
+    },
+    {
+      "id": "nsg-host-subnet",
+      "name": "Network security group nsg-dbw on snet-dbw-host (outbound rules)",
+      "layer": "reachability",
+      "side": "azure",
+      "type": "filter",
+      "owner": "Cinderline network team",
+      "object": "NSG nsg-dbw",
+      "config": {
+        "semantics": "priority",
+        "direction": "egress",
+        "rules": [
+          {
+            "name": "AllowVnetOutBound",
+            "priority": 65000,
+            "action": "allow",
+            "cidr": "10.20.0.0/16",
+            "ports": "all"
+          },
+          {
+            "name": "AllowInternetOutBound",
+            "priority": 65001,
+            "action": "allow",
+            "cidr": "0.0.0.0/0",
+            "ports": "all"
+          },
+          {
+            "name": "DenyAllOutBound",
+            "priority": 65500,
+            "action": "deny",
+            "cidr": "0.0.0.0/0",
+            "ports": "all"
+          }
+        ],
+        "note": "The default outbound rules only; rules added for an injected workspace are omitted"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "error-record",
+      "control": null,
+      "capture": "The exact error or symptom text, its time, the run or cluster ID, and which service answered (or that none did)",
+      "where": "The job run or cluster event log",
+      "doesNotProve": "Which layer is at fault until the service that answered, if any, has been named"
+    },
+    {
+      "id": "job-run-as-setting",
+      "control": "run-as",
+      "capture": "The job's run-as principal as its settings show it",
+      "where": "Job settings",
+      "doesNotProve": "That the principal holds any privilege, or anything about the network"
+    },
+    {
+      "id": "show-grants-output",
+      "control": "uc-grants",
+      "capture": "SHOW GRANTS on the catalog, the schema and the table, read for the acting principal and its groups",
+      "where": "Unity Catalog",
+      "doesNotProve": "Anything about storage permissions or reachability"
+    },
+    {
+      "id": "ncc-rule-state",
+      "control": "ncc-private-endpoint-rule",
+      "capture": "The NCC attached to the workspace and its private endpoint rule's state, with time",
+      "where": "Account console, NCC ncc-cinderline",
+      "doesNotProve": "That the managed identity holds a data role"
+    },
+    {
+      "id": "connector-identity",
+      "control": "access-connector-identity",
+      "capture": "The storage credential's access connector resource ID and its managed identity's principal ID",
+      "where": "Storage credential cinderline_lake_cred and access connector ac-cinderline-uc",
+      "doesNotProve": "Which roles that identity holds"
+    },
+    {
+      "id": "role-assignment-export",
+      "control": "storage-role-assignment",
+      "capture": "Role assignments on stcinderlinelake and its containers for the managed identity's principal ID, with scope",
+      "where": "Storage account access control",
+      "doesNotProve": "Anything about network rules, DNS or catalog grants"
+    },
+    {
+      "id": "storage-dns-answer",
+      "control": "private-dns-zone-link",
+      "capture": "The storage name's answer resolved on the cluster itself, with time",
+      "where": "A notebook on a cluster in snet-dbw-host",
+      "doesNotProve": "That the endpoint was approved"
+    },
+    {
+      "id": "zone-vnet-links",
+      "control": "private-dns-zone-link",
+      "capture": "The Private DNS zone's virtual network links",
+      "where": "Private DNS zone privatelink.dfs.core.windows.net",
+      "doesNotProve": "What the firewall does with the traffic"
+    },
+    {
+      "id": "endpoint-connection-state",
+      "control": "private-endpoint-connection",
+      "capture": "The private endpoint connection's state on the storage account",
+      "where": "Storage account networking",
+      "doesNotProve": "That a data role exists"
+    },
+    {
+      "id": "effective-routes",
+      "control": "subnet-route-table",
+      "capture": "The route table on snet-dbw-host, or a node network interface's effective routes",
+      "where": "Route table rt-dbw-egress",
+      "doesNotProve": "What the NSG or firewall allow"
+    },
+    {
+      "id": "nsg-effective-rules",
+      "control": "nsg-host-subnet",
+      "capture": "The effective NSG rules for snet-dbw-host and the hub firewall log for the address and time",
+      "where": "NSG nsg-dbw and the firewall log",
+      "doesNotProve": "Anything about permissions"
+    }
+  ],
+  "symptoms": [
+    {
+      "id": "AZ-D",
+      "kind": "denied",
+      "title": "The nightly job gets a 403 from storage",
+      "observed": "HTTP 403 from storage account stcinderlinelake on a read of the accepted folder by the storage credential's identity; the error details name a missing permission, not the network. Unity Catalog raised no PERMISSION_DENIED",
+      "observedIsFictional": true,
+      "context": "A role-assignment cleanup ran on stcinderlinelake last month. Last week a colleague gave sp-job-nightly Storage Blob Data Reader on the account; the job still fails.",
+      "request": {
+        "segments": [
+          "execution",
+          "storage-serverless"
+        ],
+        "job": "quality_nightly",
+        "designPrincipal": "sp-job-nightly",
+        "compute": "serverless SQL warehouse",
+        "table": "quality.accepted.inspections"
+      }
+    },
+    {
+      "id": "AZ-U",
+      "kind": "unreachable",
+      "title": "The backfill on a classic job cluster times out",
+      "observed": "connect timed out: stcinderlinelake.dfs.core.windows.net:443 after retries; no service returned an error",
+      "observedIsFictional": true,
+      "context": "quality_backfill runs on a classic job cluster in snet-dbw-host. The storage account's public network access is disabled and pe-lake-dfs was created last week.",
+      "request": {
+        "segments": [
+          "execution",
+          "storage-classic"
+        ],
+        "job": "quality_backfill",
+        "designPrincipal": "sp-job-nightly",
+        "compute": "classic job cluster",
+        "table": "quality.accepted.inspections",
+        "sourceNetwork": "vnet-cinderline-data",
+        "sourceSubnet": "snet-dbw-host",
+        "sourceIp": "10.20.0.37",
+        "name": "stcinderlinelake.dfs.core.windows.net",
+        "expect": "private",
+        "port": 443
+      }
+    }
+  ],
+  "unknowns": [
+    {
+      "id": "azure-private-network-gateway",
+      "question": "Whether the private network gateway that reaches a customer VNet from serverless is available to Cinderline's account and region",
+      "whyUnknown": "The module's sources describe it, and its availability has to be verified"
+    },
+    {
+      "id": "azure-ncc-limits",
+      "question": "The per-region limits on NCCs and private endpoint rules that apply to Cinderline",
+      "whyUnknown": "Limits exist per region and change; the current page was not read here"
+    }
+  ]
+}

@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  cards,
+  cardIndex,
   courses,
   findLesson,
   lessonEntries,
   lessonHref,
+  loadLessonBody,
   paths,
   teachingIndex,
   beatHref,
 } from "./catalog";
 import { pathForLesson, pathNeighbors } from "./paths";
-import type { Course, Lesson, Question, Section } from "./content-schema";
+import type { Question } from "./content-schema";
+import type {
+  CatalogCourse,
+  CatalogLesson,
+  CatalogSection,
+  LessonBody,
+} from "./catalog-types";
 import { nowISO } from "./study";
 import {
   Diagram,
@@ -28,11 +35,13 @@ export function NoteEditor({
   lessonId,
   sectionId,
   noteId,
+  label = "Your lesson note",
 }: {
   courseId: string;
   lessonId: string;
   sectionId: string;
   noteId?: string;
+  label?: string;
 }) {
   const { data, store } = useStudy();
   const id = noteId ?? `note-${sectionId}`;
@@ -59,7 +68,7 @@ export function NoteEditor({
   return (
     <div className="note-editor">
       <label className="sc-field">
-        Your lesson note
+        {label}
         <textarea
           maxLength={100000}
           className="sc-input"
@@ -87,8 +96,8 @@ function KnowledgeCheck({
   lesson,
 }: {
   question: Question;
-  course: Course;
-  lesson: Lesson;
+  course: CatalogCourse;
+  lesson: CatalogLesson;
 }) {
   const { data, store, status } = useStudy(),
     [selected, setSelected] = useState(""),
@@ -243,9 +252,9 @@ function SectionTools({
   lesson,
   section,
 }: {
-  course: Course;
-  lesson: Lesson;
-  section: Section;
+  course: CatalogCourse;
+  lesson: CatalogLesson;
+  section: CatalogSection;
 }) {
   const { data, store } = useStudy();
   const b = `bookmark-${section.id}`,
@@ -338,8 +347,32 @@ export function Reader({
   const originDetour = /^#\/lesson\/([^/?]+)/.exec(from ?? "")?.[1] === id;
   const entryRef = useRef(entry);
   entryRef.current = entry;
+  // Navigation, notes, bookmarks and positions come from the catalog tier;
+  // the prose and checks arrive with the lesson body.
+  const [body, setBody] = useState<LessonBody | null>(null),
+    [bodyError, setBodyError] = useState(""),
+    [retry, setRetry] = useState(0);
+  const known = !!entry;
   useEffect(() => {
-    if (!entry) return;
+    if (!known) return;
+    let active = true;
+    setBodyError("");
+    void loadLessonBody(id)
+      .then((loaded) => {
+        if (active) setBody(loaded);
+      })
+      .catch((error: Error) => {
+        if (active) setBodyError(error.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, known, retry]);
+  const bodyReady = !!body;
+  useEffect(() => {
+    // Restore and capture positions once the sections have their text, so a
+    // saved offset lands on the same content it was measured against.
+    if (!entry || !bodyReady) return;
     const { lesson, course } = entry;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let restoring = true;
@@ -364,10 +397,15 @@ export function Reader({
       const nodes = lesson.sections
         .map((s) => ({ s, node: document.getElementById(s.id) }))
         .filter((v) => v.node);
-      const selected =
-        nodes
-          .filter((v) => v.node!.getBoundingClientRect().top <= 180)
-          .at(-1) ?? nodes[0];
+      const reached = nodes.filter(
+        (v) => v.node!.getBoundingClientRect().top <= 180,
+      );
+      // Above the first section (title, outcomes, context) no section is being
+      // read, so an existing saved place is kept: scrolling up to the masthead
+      // to search or to reread the outcomes must not move it back to the start.
+      // A first visit still records the first section.
+      if (!reached.length && store.getSnapshot().data.positions[id]) return;
+      const selected = reached.at(-1) ?? nodes[0];
       if (!selected) return;
       const position = {
         courseId: course.id,
@@ -400,7 +438,7 @@ export function Reader({
       window.removeEventListener("scroll", scroll);
       window.removeEventListener("pagehide", capture);
     };
-  }, [id, sectionId, pathId, from, originDetour, store]);
+  }, [id, sectionId, pathId, from, originDetour, store, bodyReady]);
   if (!entry)
     return (
       <>
@@ -437,7 +475,7 @@ export function Reader({
   const checks = (
     <>
       <h3>Check your understanding</h3>
-      {lesson.questions.map((q) => (
+      {body?.questions.map((q) => (
         <KnowledgeCheck
           key={q.id}
           question={q}
@@ -446,8 +484,8 @@ export function Reader({
         />
       ))}
       <p>
-        {cards.filter((c) => c.lessonId === id).length} flashcards connect this
-        lesson to later review.
+        {cardIndex.filter((c) => c.lessonId === id).length} flashcards connect
+        this lesson to later review.
       </p>
       <a href={`#/review/${id}`}>Review this lesson’s cards →</a>
     </>
@@ -593,6 +631,23 @@ export function Reader({
           ))}
         </nav>
         <article className="sc-reading__body sc-doc sc-doc--flat">
+          {bodyError ? (
+            <div className="sc-notice lesson-body-status" role="alert">
+              <p>{bodyError}</p>
+              <button
+                className="sc-btn sc-btn--secondary"
+                onClick={() => setRetry((n) => n + 1)}
+              >
+                Retry lesson
+              </button>
+            </div>
+          ) : (
+            !body && (
+              <p className="lesson-body-status" role="status">
+                Opening the lesson…
+              </p>
+            )
+          )}
           <div className="lesson-outcomes">
             <p className="sc-eyebrow">After this lesson</p>
             <ul>
@@ -697,7 +752,7 @@ export function Reader({
                       )
                     }
                   >
-                    {s.markdown}
+                    {body?.sections[s.id] ?? ""}
                   </MD>
                 </details>
               ) : (
@@ -712,7 +767,7 @@ export function Reader({
                     )
                   }
                 >
-                  {s.markdown}
+                  {body?.sections[s.id] ?? ""}
                 </MD>
               )}
               {s.assetIds.map((a) => {
@@ -723,7 +778,12 @@ export function Reader({
                 <TryDraft course={course} lesson={lesson} section={s} />
               )}{" "}
               {s.id === checkSection?.id && checks}
-              <Sources course={course} claimIds={s.claimIds} />
+              {body && (
+                <Sources
+                  course={course}
+                  claimIds={body.sectionClaims[s.id] ?? []}
+                />
+              )}
               <SectionTools course={course} lesson={lesson} section={s} />
             </section>
           ))}
@@ -821,9 +881,9 @@ function TryDraft({
   course,
   section,
 }: {
-  course: Course;
-  lesson: Lesson;
-  section: Section;
+  course: CatalogCourse;
+  lesson: CatalogLesson;
+  section: CatalogSection;
 }) {
   const { data, store } = useStudy();
   const id = `draft-${section.id}`;

@@ -1,0 +1,444 @@
+{
+  "module": {
+    "id": "dbxfe-apps",
+    "title": "Databricks Apps and application architecture",
+    "summary": "Trace a Databricks App from browser to warehouse, Lakebase, endpoint and tool across three trust boundaries; choose the app's identity or the reviewer's per request; bind resources and secrets; place state where it survives; validate before a grant is spent; and write a deployment you can replay without deploying anything.",
+    "objectives": [
+      "Trace one request through the front end, back end and data, model or tool hops of a Databricks App and name who authenticates and whose permissions apply at each boundary.",
+      "Choose app or user authorization per request, bind resources and secrets without a credential in code, take user context from the platform's headers, and place every piece of state where it must survive.",
+      "Validate a request before the app's grants are spent, assign incident ownership by evidence, and write a blueprint, mocked contract tests and a deployment guide labelled not deployed."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-genai"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-apps-l01.json"
+    ],
+    "scenarioId": "dbxfe-apps-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-apps-scenario",
+      "title": "Write the quality exception review app blueprint for architecture review",
+      "context": "Fictional Cinderline Components keeps quarantined inspection records in a spreadsheet. The quality lead wants reviewers to claim an item, investigate and record a disposition, and the morning dashboard to reflect dispositions. The platform team proposes a Databricks App with a Lakebase database for operational records, a SQL warehouse for the quarantine read, a bound secret for the manuals service and, later, a serving endpoint that suggests a disposition. Lakebase regional availability, the status of user authorization, whether per-plant row filters exist and current CLI flags are unconfirmed.",
+      "task": "Produce a one-page blueprint for the architecture review: the request traces for view queue, claim and record disposition with who authenticates and whose permissions apply at each hop, the resource table, the state classification with each store, the validation rules per request, the operational ownership matrix, the local mocked contract tests as Python labelled not executed here, and a deployment guide labelled not deployed. Nothing is added to SpicyBrain's own runtime.",
+      "requirements": [
+        "Name the identity evaluated at every hop, say which requests use the app's service principal and which, if any, use the reviewer's token, with the declared scope.",
+        "Give every resource one permission and one injected value, with no credential in source or app.yaml, and name the grants a binding does not provide.",
+        "Classify each piece of state and place operational records outside process memory, saying what breaks on a second process, a restart or a redeploy.",
+        "Label the mocked tests as not executed here and the deployment guide as not deployed; list each unverified platform fact as an unknown with an owner."
+      ],
+      "model": "### Request traces (who authenticates, whose permissions apply)\n*View queue.* Browser → app URL (the platform authenticates the reviewer and forwards `X-Forwarded-Email`) → back end → SQL warehouse `wh-quality` under the app's service principal, which holds `SELECT` on `quality.raw.quarantine`, plus open claims from Lakebase; the handler narrows both to the reviewer's plants. Alternative recorded: user authorization with the `sql` scope for the warehouse read, so a per-plant row filter applies to the reviewer; chosen only if the data lead confirms the filter exists, user authorization is available and the reviewers' group holds USE CATALOG, USE SCHEMA and SELECT on the table.\n*Claim.* Same path → schema validation → reviewer taken from the header → plant check in the handler → one insert into Lakebase `quality_ops` under the app's role, with `reviewer` on the row. A second claim on the same key and revision returns `{\"status\": \"conflict\", \"claimed_by\": ...}` as a normal response.\n*Record disposition.* Same path; only the current claimant may write; the disposition and the item's status change together in one transaction, which the Lakebase module designs.\n\n### Resources\n| Resource | Permission for the app's principal | Injected as |\n|---|---|---|\n| SQL warehouse `wh-quality` | Can use, plus Unity Catalog SELECT on the table | `QUALITY_WAREHOUSE_ID` via `valueFrom` |\n| Lakebase database `quality_ops` | CONNECT and CREATE, plus table grants | `PGHOST` and related |\n| Secret `quality-app/manuals-token` | Can read | `MANUALS_TOKEN` via `valueFrom` |\n| Serving endpoint `disposition-suggest` | Can query | `SUGGEST_ENDPOINT`, only if suggestions ship |\n\nNo token appears in source or `app.yaml`; `DATABRICKS_CLIENT_ID` and `DATABRICKS_CLIENT_SECRET` are never logged; a rotation of the manuals token is followed by a restart.\n\n### State\nQueue filter: session, browser. Claims and dispositions: operational, Lakebase, because they must be atomic, concurrent and visible on every process after every redeploy. Reviewer token: per-request, never stored. Morning summary: derived, a Delta table refreshed hourly and labelled as of 07:00. Manual text: cache in memory with expiry.\n\n### Validation\n`inspection_key` matches `^[A-Z]-\\d{4}$`, `revision` 1–999, `disposition` in {accepted, corrected, rejected}, no unknown fields, body under 8 KB, reviewer only from the header, every value bound as a parameter, errors structured with the field name.\n\n### Operations\nDeployment or start failure: app team, deployment log then app log, redeploy the last known good source. Denial naming the app: data owner, grants. Slow queue: the app team's handler timing, then the warehouse owner's query history. Sign-in or platform: platform team and support. Who claimed what is audited from the claim rows, not from logs.\n\n### Mocked contract tests (Python shown, not executed here)\n`FakeClaims` returns claimed then conflict; a fake plant lookup returns `{\"P2\"}` except for Tomas; FastAPI's `TestClient` posts a valid claim, a duplicate, an other-plant reviewer, a body naming another reviewer, a missing header and an injection string, asserting `claimed`, `conflict`, `403` with `reason: plant`, `403` with `reason: reviewer`, `401` and `422` naming `inspection_key`. The record states what each fake replaced.\n\n### Deployment guide (not deployed)\nCreate the app; bind the resources; sync the folder; deploy; read the install step and the first app log lines; open the URL as a named reviewer and make one test claim; read it back from Lakebase; share with the reviewers' group; record the URL, deployment and source revision. CLI flags are checked against the current reference. Unknowns with owners: Lakebase availability in the region (platform lead), user authorization status (platform lead), database-side enforcement of per-reviewer rules versus the handler (data lead), whether a per-plant row filter exists (data lead). Nothing is added to SpicyBrain's own runtime.",
+      "reasoning": "The blueprint follows each request across its three boundaries so the identity question is answered per hop rather than once, uses resources so no credential can leak through files or logs, keeps every value that must be shared or survive out of the process, validates before the app's grants are spent, and turns every unverified platform fact into an owned unknown instead of a promise.",
+      "rubric": [
+        {
+          "id": "dbxfe-apps-scenario-rubric-1",
+          "criterion": "Identity per hop",
+          "weak": "One identity assumed for the whole app, or the browser treated as a caller of the warehouse.",
+          "partial": "App and user authorization named, but not assigned per request, or without the scope and the header.",
+          "strong": "Each request names the principal at each hop, records the reviewer on rows the app's principal writes, and states when user authorization would replace it."
+        },
+        {
+          "id": "dbxfe-apps-scenario-rubric-2",
+          "criterion": "Resources, secrets and validation",
+          "weak": "A token or warehouse path pasted into configuration; validation absent.",
+          "partial": "Resources listed without permissions, a binding treated as a data grant, or validation named without a rule per field.",
+          "strong": "One permission and one injected value per resource, the missing table grants named, secrets bound not pasted, and a validation rule per field with bound parameters."
+        },
+        {
+          "id": "dbxfe-apps-scenario-rubric-3",
+          "criterion": "State placement",
+          "weak": "Claims kept in process memory or in the browser.",
+          "partial": "Operational state placed correctly but caches, tokens and session values unclassified.",
+          "strong": "Every state class placed with its reason and what breaks on a second process, a restart or a redeploy."
+        },
+        {
+          "id": "dbxfe-apps-scenario-rubric-4",
+          "criterion": "Honest limits",
+          "weak": "Mocked tests or a deployment described as done or proven.",
+          "partial": "Labelled, but unknowns unnamed or unowned.",
+          "strong": "Tests labelled not executed, guide labelled not deployed, each unknown with an owner, nothing added to SpicyBrain's runtime."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Does the quarantine table already carry row filters per plant?",
+          "response": "Unknown; the data lead has not confirmed. The blueprint keeps app authorization with a handler-side plant filter and records user authorization with the sql scope as the alternative if filters exist."
+        },
+        {
+          "question": "Is Lakebase available in our region and on our plan?",
+          "response": "Not confirmed. The platform lead owns that check, and it blocks deployment, not design; a local PostgreSQL run in the Lakebase module is not the managed service."
+        },
+        {
+          "question": "Will the app ever run as more than one process?",
+          "response": "Not decided; the platform team will read the current compute and scaling documentation. The design keeps no claim or disposition in process memory, so the answer changes capacity planning, not correctness."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-apps-l01"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-apps-course-claim-overview",
+        "dbxfe-apps-course-claim-headers",
+        "dbxfe-apps-course-claim-principal",
+        "dbxfe-apps-course-claim-user",
+        "dbxfe-apps-course-claim-resources",
+        "dbxfe-apps-course-claim-lakebase",
+        "dbxfe-apps-course-claim-deploy",
+        "dbxfe-apps-course-claim-bundles",
+        "dbxfe-apps-course-claim-masks"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-apps-course-source-overview",
+      "title": "What is Databricks Apps?",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; overview of Databricks Apps: hosting model, platform integrations and the supported Python and Node.js frameworks; entry page of the Apps documentation set.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Framework support, feature status, regional availability and pricing change. The forwarded-header list and the app environment (runtime versions, compute size, pre-installed libraries, the port variable) sit on pages linked from this overview whose own URLs were not confirmed in this build, so details from them are marked for verification rather than quoted as settled. Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list and unconfirmed; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-apps-course-source-auth",
+      "title": "Configure authorization in a Databricks app",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/auth",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; app authorization with the app's dedicated service principal and user authorization (on-behalf-of-user) bounded by declared scopes.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "User authorization has carried a Public Preview label and may need to be enabled for the workspace; scope names and the APIs each scope covers must be read from the current page before an app is designed around them. No app was configured. Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list and unconfirmed; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-apps-course-source-resources",
+      "title": "Add resources to a Databricks app",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/resources",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; resources an app uses (SQL warehouse, model serving endpoint, secret, Lakebase database and others), the permission granted to the app's service principal, and resource keys referenced from app.yaml.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Resource types and the permission choices offered for each type change between releases; confirm them on the current page and grant the narrowest permission listed. Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list and unconfirmed; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-apps-course-source-deploy",
+      "title": "Deploy a Databricks app",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; deploying an app from its source files through the UI or the Databricks CLI, and the steps a deployment runs.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "CLI flags, the handling of combined Python and Node.js projects and other deployment sources change between releases; read the current page and CLI reference before scripting a deployment. Nothing in this module was deployed. Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list and unconfirmed; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-apps-course-source-lakebase",
+      "title": "Add a Lakebase resource to a Databricks app",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/lakebase",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Databricks Apps with a Lakebase database resource.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Role naming, granted privileges and injected variable names are as documented at review time; tables the app did not create still need their own grants, and Lakebase availability must be confirmed for the workspace's region. Title and URL confirmed by web search in this build on 2026-09-23 and recorded in the Lakebase module's source record; no new search was run for this record because the session's search budget was exhausted; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-apps-course-source-agents",
+      "title": "Authentication for agents",
+      "url": "https://docs.databricks.com/aws/en/agents/custom-agents/agent-authentication",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; agents deployed on Databricks Apps; app identity versus user identity.",
+      "accessDate": "2026-09-19",
+      "reviewDate": "2026-09-19",
+      "caveat": "User authorization was marked Public Preview at that review; helper behaviour and prerequisites must be rechecked for the version in use. Reviewed for the GenAI module on 2026-09-19 and recorded in that module's source record; not re-searched or re-read for this record because the session's search budget was exhausted and the documentation host is blocked by the sandbox egress proxy."
+    },
+    {
+      "id": "dbxfe-apps-course-source-masks",
+      "title": "Row filters and column masks",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog row filters and column masks as query-time controls.",
+      "accessDate": "2026-09-20",
+      "reviewDate": "2026-09-20",
+      "caveat": "Supported access paths and compute have explicit limits; a filter is a visibility control evaluated for the principal that runs the query, not an encryption or universal protection. Reviewed for the Unity Catalog module on 2026-09-20 and recorded in that module's source record; not re-searched or re-read for this record because the session's search budget was exhausted and the documentation host is blocked by the sandbox egress proxy."
+    },
+    {
+      "id": "dbxfe-apps-course-source-cli-changelog",
+      "title": "Databricks CLI v1.17.0: CHANGELOG.md (databricks/cli at the v1.17.0 tag commit)",
+      "url": "https://github.com/databricks/cli/blob/7ef3e5cb61364648f86cbe26f4051d34ccfe158a/CHANGELOG.md",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Release notes of the open databricks/cli repository at the v1.17.0 tag commit 7ef3e5c (released 2026-09-16); 'Release v0.295.0 (2026-03-18)' records the rename to Declarative Automation Bundles and 'Release v0.239.0 (2025-01-16)' adds apps as a bundle resource. The file is byte-identical at commit 32e186a (SHA-256 f3f705c0a6b3291bd81600552bafaa85c342a2b9d2490ba023b73dcf230b8956).",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Release notes summarize changes; bundle keys and commands must be checked against the documentation for the CLI version in use. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/cli/7ef3e5cb61364648f86cbe26f4051d34ccfe158a/CHANGELOG.md: 'Databricks Asset Bundles have been renamed to Declarative Automation Bundles (DABs). This is a non-breaking change; no code or configuration modifications are required.' ... 'You can now manage Databricks Apps using DABs by defining an `app` resource in your bundle configuration.' Scope: CLI release notes (interface only)."
+    },
+    {
+      "id": "dbxfe-apps-course-source-devhub-configuration",
+      "title": "Databricks developer documentation source: App configuration (databricks/devhub at a pinned commit)",
+      "url": "https://github.com/databricks/devhub/blob/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/apps/configuration.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Markdown source of developers.databricks.com's App configuration page at commit 35f4745 (2026-09-21); its Configuration files, Resources, Secrets, Environment variables and Auth model sections.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Developer documentation written for AppKit (TypeScript) apps; it says the decrypted secret value is injected at runtime but not whether starting an app again without a redeploy picks up a rotated value. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/devhub/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/apps/configuration.md: '**`databricks.yml`** declares Databricks resources, variables, and deployment targets:' ... 'Apps access Databricks services through declared resources. Each resource has a `name` in `databricks.yml`. Use that name as the `valueFrom` value in `app.yaml`.' ... 'Neither config file contains the secret value.' ... 'The platform injects the decrypted value at runtime.' Scope: product documentation, dated by its commit."
+    },
+    {
+      "id": "dbxfe-apps-course-source-terraform-app",
+      "title": "Databricks Terraform provider: databricks_app resource documentation (terraform-provider-databricks at a pinned commit)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/app.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Vendor-published resource reference at commit b1d7b85; the resources configuration attribute and its permission values.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Interface reference: resource types and permission values an app definition accepts, not release status, availability or runtime behaviour. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/app.md: 'Permission to grant on the SQL warehouse. Supported permissions are: `CAN_MANAGE`, `CAN_USE`, `IS_OWNER`.' ... 'Permission to grant on the serving endpoint. Supported permissions are: `CAN_MANAGE`, `CAN_QUERY`, `CAN_VIEW`.' ... 'Permission to grant on the secret scope. For secrets, only one permission is allowed. Permission must be one of: `READ`, `WRITE`, `MANAGE`.' ... 'Permission to grant on database. Supported permissions are: `CAN_CONNECT_AND_CREATE`.' Scope: Terraform provider documentation (interface only)."
+    },
+    {
+      "id": "dbxfe-apps-course-source-devhub-analytical-reads",
+      "title": "Databricks developer documentation source: Read Unity Catalog tables (databricks/devhub at a pinned commit)",
+      "url": "https://github.com/databricks/devhub/blob/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/lakehouse/analytical-reads.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Markdown source of developers.databricks.com's Read Unity Catalog tables page at commit 35f4745 (2026-09-21); Prerequisites (the warehouse binding) and Where 403s come from.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Developer documentation written for AppKit apps; it names CAN_USE on the bound warehouse and SELECT on the tables, not catalog- or schema-level privileges. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/devhub/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/lakehouse/analytical-reads.md: 'Your app's service principal gets `CAN_USE` automatically when you bind the resource.' ... '- **Service principal queries** (`*.sql`) use the app's service principal. The SP needs `SELECT` on the underlying tables. Permission errors return `403` from the warehouse.' Scope: product documentation, dated by its commit."
+    },
+    {
+      "id": "dbxfe-apps-course-source-sdk-tables",
+      "title": "Databricks SDK for Python v0.141.0: docs/workspace/catalog/tables.rst, TablesAPI",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/catalog/tables.rst",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "SDK API reference at commit 9df82c7 (version 0.141.0): the TablesAPI class description, stating the privileges a caller needs to query a table.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/catalog/tables.rst (tag v0.141.0): 'To query a table, users must have the SELECT permission on the table, and they must have the USE_CATALOG permission on its parent catalog and the USE_SCHEMA permission on its parent schema.' Client library reference, interface scope only: it states the three privileges a query on a table requires, which the lesson teaches for the table the app's principal or the reviewers' group reads; it says nothing about Databricks Apps itself."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-apps-course-claim-overview",
+      "description": "Databricks Apps hosts data and AI web applications on serverless compute that Databricks provisions and manages, integrated with workspace resources such as SQL warehouses, model serving endpoints and Lakebase databases; the documented frameworks include Streamlit, Dash, Gradio, Flask and FastAPI for Python and React, Angular, Svelte and Express for Node.js, and users reach an app at its URL after signing in.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-apps-course-source-overview"
+      ],
+      "context": "Databricks on AWS; framework list and features as the author recalled them, not re-confirmed in this build."
+    },
+    {
+      "id": "dbxfe-apps-course-claim-headers",
+      "description": "The platform forwards the signed-in user's identity to the app in HTTP request headers, including X-Forwarded-Email and X-Forwarded-User, which the back end reads per request.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-apps-course-source-overview"
+      ],
+      "context": "Header names as the author recalled them from a page linked from the Apps overview; that page's URL was not confirmed in this build, so verify the current list before relying on a name."
+    },
+    {
+      "id": "dbxfe-apps-course-claim-principal",
+      "description": "Each Databricks app has a dedicated service principal, unique to the app and not reusable by another app; Databricks injects its OAuth credentials into the app environment as DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET, and under app authorization every call made with them is evaluated against that principal's permissions, whoever is signed in.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-apps-course-source-auth"
+      ],
+      "context": "App authorization in Databricks Apps on AWS."
+    },
+    {
+      "id": "dbxfe-apps-course-claim-user",
+      "description": "User authorization (on-behalf-of-user) forwards the signed-in user's access token to the app in the X-Forwarded-Access-Token header; calls made with it are evaluated with the user's own permissions, bounded by scopes the app declares, such as sql, and access outside approved scopes is blocked even when the user's permissions are broader. The agent authentication page marked it Public Preview and warned that a missing forwarded token can fall back to app identity.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-apps-course-source-auth",
+        "dbxfe-apps-course-source-agents",
+        "dbxfe-apps-course-source-sdk-tables"
+      ],
+      "context": "User authorization status must be verified for the workspace; scope names are read from the current page."
+    },
+    {
+      "id": "dbxfe-apps-course-claim-resources",
+      "description": "An app's resources, such as a SQL warehouse, a model serving endpoint, a secret or a Lakebase database, are each added with a chosen permission for the app's service principal (for example Can use on a warehouse, Can query on an endpoint) and a resource key that app.yaml maps to an environment variable with valueFrom, so no ID or credential is hard-coded.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-apps-course-source-resources",
+        "dbxfe-apps-course-source-devhub-configuration",
+        "dbxfe-apps-course-source-terraform-app",
+        "dbxfe-apps-course-source-devhub-analytical-reads",
+        "dbxfe-apps-course-source-sdk-tables"
+      ],
+      "context": "App resources on Databricks on AWS; permission choices vary by type and release."
+    },
+    {
+      "id": "dbxfe-apps-course-claim-lakebase",
+      "description": "Adding a Lakebase database as an app resource gives the app's service principal a matching Postgres role named after its client ID, grants CONNECT and CREATE on the chosen database and injects connection details such as PGHOST as environment variables; privileges on tables the app did not create are granted separately.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-apps-course-source-lakebase"
+      ],
+      "context": "Databricks Apps with a Lakebase resource; Lakebase availability varies by region."
+    },
+    {
+      "id": "dbxfe-apps-course-claim-deploy",
+      "description": "Deploying an app builds and starts it from its source files: files synced to a workspace folder are deployed through the UI or with databricks apps deploy and a source code path; the deployment installs Python packages from requirements.txt and Node.js packages from package.json, runs a build script when one is defined, and then runs the start command given in app.yaml.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-apps-course-source-deploy"
+      ],
+      "context": "Deployment on Databricks on AWS; CLI flags are checked against the current reference."
+    },
+    {
+      "id": "dbxfe-apps-course-claim-bundles",
+      "description": "Declarative Automation Bundles (formerly Databricks Asset Bundles) are a documented way to define an app and its resources as configuration and deploy it per target.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-apps-course-source-deploy",
+        "dbxfe-apps-course-source-cli-changelog",
+        "dbxfe-apps-course-source-devhub-configuration"
+      ],
+      "context": "As previously read; bundle keys and commands must be checked against the current bundle reference before use."
+    },
+    {
+      "id": "dbxfe-apps-course-claim-masks",
+      "description": "Unity Catalog row filters restrict the rows a query returns and column masks return original or masked values at query time, evaluated for the principal that runs the query, with documented limits on supported access paths.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-apps-course-source-masks"
+      ],
+      "context": "Reviewed for the Unity Catalog module on 2026-09-20."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-apps-l01-path-concept",
+      "term": "application request path",
+      "aliases": [
+        "front end",
+        "back end",
+        "app URL"
+      ],
+      "definition": "The hops a Databricks App request crosses: the browser to the platform's sign-in at the app URL, the platform to the back end process, and the back end to the data, model or tool it calls under a chosen identity.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-path"
+    },
+    {
+      "id": "dbxfe-apps-l01-identity-concept",
+      "term": "app authorization and user authorization",
+      "aliases": [
+        "app service principal",
+        "on-behalf-of-user authorization",
+        "authorization scope"
+      ],
+      "definition": "The choice, made per request, between the app's own dedicated service principal and the signed-in user's forwarded token, narrowed by declared scopes, as the identity a downstream service evaluates.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-identity"
+    },
+    {
+      "id": "dbxfe-apps-l01-binding-concept",
+      "term": "app resource",
+      "aliases": [
+        "resource binding",
+        "resource key",
+        "valueFrom",
+        "secret resource"
+      ],
+      "definition": "A workspace object added to an app with a permission for the app's service principal and a key that app.yaml maps to an environment variable.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-resources"
+    },
+    {
+      "id": "dbxfe-apps-l01-context-concept",
+      "term": "user context",
+      "aliases": [
+        "forwarded identity headers",
+        "X-Forwarded-Email"
+      ],
+      "definition": "The identity facts the platform forwards with each request after sign-in, read by the back end per request and never taken from the client-controlled body.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-resources"
+    },
+    {
+      "id": "dbxfe-apps-l01-state-concept",
+      "term": "application state class",
+      "aliases": [
+        "per-request state",
+        "session state",
+        "operational state",
+        "cache"
+      ],
+      "definition": "A classification of each value an app holds by what must be true after the request ends, which decides whether it may live in process memory or must live in a shared store.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-state"
+    },
+    {
+      "id": "dbxfe-apps-l01-dependency-concept",
+      "term": "dependency manifest",
+      "aliases": [
+        "requirements.txt",
+        "package.json",
+        "app.yaml command"
+      ],
+      "definition": "The files a deployment reads to install packages and start the app, which decide the versions and command that actually run.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-runtime"
+    },
+    {
+      "id": "dbxfe-apps-l01-validation-concept",
+      "term": "request validation",
+      "aliases": [
+        "schema validation",
+        "bound parameter",
+        "injection"
+      ],
+      "definition": "The checks a back end applies to a request's body and parameters before any handler runs under a privileged identity.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-validation"
+    },
+    {
+      "id": "dbxfe-apps-l01-operations-concept",
+      "term": "operational responsibility",
+      "aliases": [
+        "incident ownership",
+        "first evidence"
+      ],
+      "definition": "The agreed split of which team owns which failure, decided by which layer's evidence shows the fault.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-operations"
+    },
+    {
+      "id": "dbxfe-apps-l01-deployment-concept",
+      "term": "app deployment",
+      "aliases": [
+        "workspace-folder deployment",
+        "Declarative Automation Bundles",
+        "Databricks Asset Bundles",
+        "not deployed"
+      ],
+      "definition": "The replayable sequence that turns synced source files into the running app: deploy, build, start, verify and share.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-deploy"
+    },
+    {
+      "id": "dbxfe-apps-l01-mock-concept",
+      "term": "mocked contract test",
+      "aliases": [
+        "local mock",
+        "contract test",
+        "fake dependency"
+      ],
+      "definition": "A local test that exercises the real handler against fakes of its downstream dependencies to prove the request, response and error contract, and nothing about a deployment.",
+      "lessonId": "dbxfe-apps-l01",
+      "sectionId": "dbxfe-apps-l01-solution"
+    }
+  ]
+}

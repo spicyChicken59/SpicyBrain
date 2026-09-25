@@ -1,0 +1,558 @@
+{
+ "module": {
+  "id": "dbxfe-python",
+  "title": "Python for dependable data work",
+  "summary": "Read CSV and JSON records into typed Python values under a written contract, keep every refusal with its reason, and make the program explain itself with tracebacks, logs, assertions and tests in a recorded, pinned environment.",
+  "objectives": [
+   "Predict the type and value csv and json hand you, and keep missing, null, blank and zero apart.",
+   "Write conversion functions that refuse what int(), Decimal() and date.fromisoformat() accept, and land every record once with a named reason.",
+   "Read a traceback to its failing line and input, and use exceptions, assertions, logging and type hints for their actual jobs.",
+   "Prove behaviour with unittest tests against hand-written literals in a recorded, pinned environment."
+  ],
+  "prerequisiteIds": [],
+  "lessonFiles": [
+   "lessons/dbxfe-python-l01.json"
+  ],
+  "scenarioId": "dbxfe-python-scenario"
+ },
+ "scenarios": [
+  {
+   "id": "dbxfe-python-scenario",
+   "title": "Explain Cinderline's reconciled inspection counts to quality engineering",
+   "context": "Fictional Cinderline Components compares defect rates by plant each week. Plant CL-N sends CSV and plant CL-S sends JSON. Last week a notebook converted every value with int() and float() inside a try/except that skipped any row that raised, and reported totals neither plant recognised. The lab's parser now reports 7 accepted and 18 rejected records from 25 received. The quality lead wants to know which numbers to trust, why records were refused and what is still open.",
+   "task": "Write the note that goes with the parsed delivery: what was accepted and rejected and why, how the counts reconcile, what the old notebook got wrong, what was tested and in which environment, and what remains unknown.",
+   "requirements": [
+    "Reconcile received, accepted and rejected counts per source and name every rejection reason with its count.",
+    "Explain at least three silent errors of the old int()/float() approach using specific records.",
+    "Keep code invariants (assertions), data rules (validation) and diagnostics (logs, tracebacks) apart in the explanation.",
+    "State the environment and tests behind the result, and list open questions for the plants instead of guessing."
+   ],
+   "model": "### Counts\n25 records received: 15 from CL-N (CSV) and 10 from CL-S (JSON). 7 accepted (3 CSV, 4 JSON) and 18 rejected, so 7 + 18 = 25; the parser asserts this on every run. Nineteen reasons over 18 records, because CLN-015 carries two.\n\n### Why records were refused\nMalformed quantities (4: 'twelve', '12.0', 12.5 and true), malformed dates (2: '2026/09/03' and '2026-09-31'), one malformed cost ('4,25'), missing values (4), one null quantity, three negative values (negative_inspected_units on CLN-005 and CLN-015, negative_defective_units on CLN-015), one record with 45 defective of 40, one exact repeat of CLN-001 and one conflicting pair, CLN-008 with 15 against 16 inspected.\n\n### What the old notebook did\nIt counted CLS-006's true as 1 unit and CLS-005's 12.5 as 12, summed CLN-001 twice and both conflicting CLN-008 counts, added CLN-005's and CLN-015's negative quantities, and skipped 'twelve' without saying so. None of these raised an error that anyone saw, and the skipped rows left no trace of why the totals shrank.\n\n### Evidence\n36 unit tests against hand-written literals pass on CPython 3.12.3 with the standard library only, zero skipped; the evidence file records the interpreter and SHA-256 hashes of fixtures and outputs. Rejected records keep their raw values, and every rejection is logged.\n\n### Open questions\nCL-S: does a null quantity mean 'not inspected' or 'unknown'? CL-N: which CLN-008 count is right? Until they answer, those records stay rejected and listed with their raw values.",
+   "reasoning": "The note leads with a reconciliation the reader can check, attributes each old error to a specific record and mechanism, keeps the assertion, the validation rules and the logs in their own roles, and turns ambiguity into named questions for the data owners instead of a silent default.",
+   "rubric": [
+    {
+     "id": "dbxfe-python-scenario-rubric-1",
+     "criterion": "Reconciliation",
+     "weak": "Reports only the accepted total.",
+     "partial": "Gives totals but not per source or not per reason.",
+     "strong": "States 25 = 7 + 18 per source, 19 reasons by kind, and names the assertion that guards it."
+    },
+    {
+     "id": "dbxfe-python-scenario-rubric-2",
+     "criterion": "Silent errors explained",
+     "weak": "Says the old numbers were wrong without specifics.",
+     "partial": "Names int() or duplicates in general terms.",
+     "strong": "Names specific records (true as 1, 12.5 as 12, CLN-001 twice, 'twelve' skipped) and the mechanism behind each."
+    },
+    {
+     "id": "dbxfe-python-scenario-rubric-3",
+     "criterion": "Roles of checks",
+     "weak": "Treats logs, asserts and validation as interchangeable.",
+     "partial": "Separates validation from logging but not from assertions.",
+     "strong": "Validation produces reasons, the assertion guards the code's bookkeeping, logs and tracebacks diagnose."
+    },
+    {
+     "id": "dbxfe-python-scenario-rubric-4",
+     "criterion": "Evidence and honesty",
+     "weak": "Claims the parser is correct.",
+     "partial": "Mentions tests without the environment or the open questions.",
+     "strong": "Names tests, literals and interpreter, lists what is unknown and routes it to the plants."
+    }
+   ],
+   "disclosures": [
+    {
+     "question": "Can null quantities simply be treated as zero so the totals look complete?",
+     "response": "Not yet. CL-S's data contact says null is sometimes sent when a tally sheet was not returned, so zero would publish a measurement nobody took. They will confirm the meaning next week."
+    },
+    {
+     "question": "Which CLN-008 count is right, 15 or 16?",
+     "response": "CL-N's supervisor believes 16 is a recount but cannot find the tally sheet; both records stay rejected as conflicting until it is found."
+    }
+   ],
+   "lessonIds": [
+    "dbxfe-python-l01"
+   ],
+   "claimIds": [
+    "dbxfe-python-course-claim-types",
+    "dbxfe-python-course-claim-conversion",
+    "dbxfe-python-course-claim-readers",
+    "dbxfe-python-course-claim-errors",
+    "dbxfe-python-course-claim-logging",
+    "dbxfe-python-course-claim-tests",
+    "dbxfe-python-course-claim-environments",
+    "dbxfe-python-course-claim-lab",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-foundation-python"
+   ],
+   "isCapstone": false
+  }
+ ],
+ "sources": [
+  {
+   "id": "dbxfe-python-course-source-stdtypes",
+   "title": "Built-in Types",
+   "url": "https://docs.python.org/3.12/library/stdtypes.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Reference for truth testing, comparisons and the union type. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-functions",
+   "title": "Built-in Functions",
+   "url": "https://docs.python.org/3.12/library/functions.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Describes int(), isinstance() and type(); the lesson's contract is stricter by design. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-json",
+   "title": "json — JSON encoder and decoder",
+   "url": "https://docs.python.org/3.12/library/json.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "The decoder accepts non-standard NaN and Infinity by default. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-decimal",
+   "title": "decimal — Decimal fixed-point and floating-point arithmetic",
+   "url": "https://docs.python.org/3.12/library/decimal.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Only construction is used; arithmetic contexts are out of scope. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-datetime",
+   "title": "datetime — Basic date and time types",
+   "url": "https://docs.python.org/3.12/library/datetime.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "date.fromisoformat changed in 3.11; check the interpreter version. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-exceptions",
+   "title": "Built-in Exceptions",
+   "url": "https://docs.python.org/3.12/library/exceptions.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Only the exception classes used in the lesson are relied on. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-assert",
+   "title": "7. Simple statements",
+   "url": "https://docs.python.org/3.12/reference/simple_stmts.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 language reference; the assert statement.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Describes CPython's current code generation for assert. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-logging",
+   "title": "logging — Logging facility for Python",
+   "url": "https://docs.python.org/3.12/library/logging.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Handler design beyond basicConfig is out of scope. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-logginghowto",
+   "title": "Logging HOWTO",
+   "url": "https://docs.python.org/3.12/howto/logging.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Guidance for library authors, not a runtime rule. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-modules",
+   "title": "6. Modules",
+   "url": "https://docs.python.org/3.12/tutorial/modules.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Tutorial level; import system details are out of scope. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-main",
+   "title": "__main__ — Top-level code environment",
+   "url": "https://docs.python.org/3.12/library/__main__.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Describes the idiom, not a command-line library. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-unittest",
+   "title": "unittest — Unit testing framework",
+   "url": "https://docs.python.org/3.12/library/unittest.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "The lesson and lab use unittest only. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-typing",
+   "title": "typing — Support for type hints",
+   "url": "https://docs.python.org/3.12/library/typing.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "No type checker was run for this lesson. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-venv",
+   "title": "venv — Creation of virtual environments",
+   "url": "https://docs.python.org/3.12/library/venv.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Activation commands differ by shell and operating system. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-venvtutorial",
+   "title": "12. Virtual Environments and Packages",
+   "url": "https://docs.python.org/3.12/tutorial/venv.html",
+   "publisher": "Python Software Foundation",
+   "type": "official documentation",
+   "context": "Python 3.12 documentation; CPython standard library.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Tutorial level; lock-file tools are out of scope. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-python-course-source-pip",
+   "title": "Repeatable Installs",
+   "url": "https://pip.pypa.io/en/stable/topics/repeatable-installs/",
+   "publisher": "Python Packaging Authority (pip documentation)",
+   "type": "official documentation",
+   "context": "pip documentation, stable branch at review.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "pip's behaviour changes between releases. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-python-course-claim-types",
+   "description": "Python compares by type and never casts text to a number in a comparison, so '12' == 12 is False; bool subclasses int; floats are binary approximations; None, False, 0 and '' are false in a truth test.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-python-course-source-stdtypes",
+    "dbxfe-python-course-source-functions"
+   ],
+   "context": "CPython 3.12; other versions noted where they differ."
+  },
+  {
+   "id": "dbxfe-python-course-claim-collections",
+   "description": "A dict maps unique hashable keys to values, a list is ordered and mutable, a tuple is immutable, a set holds distinct hashable members, and comprehensions build these collections from for and if clauses.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-src-python-records"
+   ],
+   "context": "CPython 3.12; other versions noted where they differ."
+  },
+  {
+   "id": "dbxfe-python-course-claim-conversion",
+   "description": "int() accepts whitespace, a sign and underscores, truncates floats and accepts bool; Decimal built from a float converts its exact binary value and an invalid string signals InvalidOperation; date.fromisoformat accepts forms such as 20260903 only since Python 3.11.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-python-course-source-functions",
+    "dbxfe-python-course-source-decimal",
+    "dbxfe-python-course-source-datetime"
+   ],
+   "context": "CPython 3.12; other versions noted where they differ."
+  },
+  {
+   "id": "dbxfe-python-course-claim-readers",
+   "description": "csv.DictReader returns dicts of strings keyed by the header; json.load maps null to None, true to True and numbers to int or float; with blocks close files even when an exception is raised.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-src-python-csv",
+    "dbxfe-python-course-source-json",
+    "dbxfe-src-python-files"
+   ],
+   "context": "CPython 3.12; other versions noted where they differ."
+  },
+  {
+   "id": "dbxfe-python-course-claim-errors",
+   "description": "A traceback lists the most recent call last and ends with the exception type and message; ValueError, TypeError and KeyError mark a bad value, a bad type and a missing key; assert statements generate no code under python -O.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-src-python-errors",
+    "dbxfe-python-course-source-exceptions",
+    "dbxfe-python-course-source-assert"
+   ],
+   "context": "CPython 3.12; other versions noted where they differ."
+  },
+  {
+   "id": "dbxfe-python-course-claim-logging",
+   "description": "logging.getLogger(name) returns one shared logger per dotted name; basicConfig configures the root logger; libraries should add no handler other than NullHandler.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-python-course-source-logging",
+    "dbxfe-python-course-source-logginghowto"
+   ],
+   "context": "CPython 3.12; other versions noted where they differ."
+  },
+  {
+   "id": "dbxfe-python-course-claim-modules",
+   "description": "Importing a module runs its top level once per session; a module run as a script has __name__ '__main__', so a guarded block runs only then.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-python-course-source-modules",
+    "dbxfe-python-course-source-main"
+   ],
+   "context": "CPython 3.12; other versions noted where they differ."
+  },
+  {
+   "id": "dbxfe-python-course-claim-tests",
+   "description": "unittest tests are TestCase methods named test… that use assertion methods such as assertEqual and assertLogs; assertLogs reports LEVEL:logger:message lines.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-python-course-source-unittest"
+   ],
+   "context": "CPython 3.12; other versions noted where they differ."
+  },
+  {
+   "id": "dbxfe-python-course-claim-hints",
+   "description": "The runtime does not enforce type annotations; X | Y union syntax is available from Python 3.10.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-python-course-source-typing",
+    "dbxfe-python-course-source-stdtypes"
+   ],
+   "context": "CPython 3.12; other versions noted where they differ."
+  },
+  {
+   "id": "dbxfe-python-course-claim-environments",
+   "description": "python -m venv creates an isolated environment with its own site-packages; python -m pip freeze > requirements.txt records exact versions, and pinning uses ==.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-python-course-source-venv",
+    "dbxfe-python-course-source-venvtutorial",
+    "dbxfe-python-course-source-pip"
+   ],
+   "context": "CPython 3.12 and current pip."
+  },
+  {
+   "id": "dbxfe-python-course-claim-lab",
+   "kind": "guidance",
+   "sourceIds": [],
+   "description": "The outputs quoted in the lesson were executed in Lab L01 (lab-l01-python-parsing) with CPython 3.12.3 and the standard library: 36 tests, 0 failures, 0 errors, 0 skipped.",
+   "context": "Local execution only; nothing ran on Databricks or any cloud service."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-python-l01-type-concept",
+   "term": "value type",
+   "aliases": [
+    "type()",
+    "isinstance"
+   ],
+   "definition": "The class of a Python value, such as str, int, float, bool or NoneType, which decides how it compares and converts.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-values"
+  },
+  {
+   "id": "dbxfe-python-l01-dict-concept",
+   "term": "dictionary",
+   "aliases": [
+    "dict",
+    "mapping"
+   ],
+   "definition": "A mutable mapping from unique hashable keys to values, the Python shape of one record keyed by column name.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-values"
+  },
+  {
+   "id": "dbxfe-python-l01-collection-concept",
+   "term": "list, tuple and set",
+   "aliases": [
+    "list",
+    "tuple",
+    "set"
+   ],
+   "definition": "Ordered mutable sequences, immutable groups and unordered collections of distinct hashable values.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-values"
+  },
+  {
+   "id": "dbxfe-python-l01-none-concept",
+   "term": "None",
+   "aliases": [
+    "NoneType",
+    "null"
+   ],
+   "definition": "Python's single object for an explicit absence of a value, distinct from an absent key, an empty string and zero.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-missing"
+  },
+  {
+   "id": "dbxfe-python-l01-conversion-concept",
+   "term": "conversion policy",
+   "aliases": [
+    "converter"
+   ],
+   "definition": "A function that returns one type for the inputs a contract allows and raises ValueError for everything else.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-conversions"
+  },
+  {
+   "id": "dbxfe-python-l01-decimal-concept",
+   "term": "Decimal",
+   "aliases": [
+    "decimal.Decimal"
+   ],
+   "definition": "An exact decimal number type that keeps the digits and scale it was built from, used for money instead of binary float.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-conversions"
+  },
+  {
+   "id": "dbxfe-python-l01-reader-concept",
+   "term": "csv and json readers",
+   "aliases": [
+    "csv.DictReader",
+    "json.load"
+   ],
+   "definition": "Standard-library functions that turn file text into dicts of strings (DictReader) or typed values with null as None (json.load).",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-files"
+  },
+  {
+   "id": "dbxfe-python-l01-rejection-concept",
+   "term": "retained rejection",
+   "aliases": [
+    "quarantined record"
+   ],
+   "definition": "A refused record kept with its source, position, untouched raw input and reasons instead of being dropped.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-contract"
+  },
+  {
+   "id": "dbxfe-python-l01-comprehension-concept",
+   "term": "comprehension",
+   "aliases": [
+    "set comprehension"
+   ],
+   "definition": "An expression that builds a list, set or dict from a for clause and optional if clauses.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-contract"
+  },
+  {
+   "id": "dbxfe-python-l01-traceback-concept",
+   "term": "traceback",
+   "aliases": [
+    "stack trace"
+   ],
+   "definition": "The printed call stack of an unhandled exception, most recent call last, ending with the exception type and message.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-errors"
+  },
+  {
+   "id": "dbxfe-python-l01-except-concept",
+   "term": "exception handler",
+   "aliases": [
+    "try/except"
+   ],
+   "definition": "An except clause that catches named exception types raised in its try block and decides what happens instead.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-errors"
+  },
+  {
+   "id": "dbxfe-python-l01-assert-concept",
+   "term": "assert statement",
+   "aliases": [
+    "assertion"
+   ],
+   "definition": "A statement that raises AssertionError when its expression is false and generates no code under python -O.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-errors"
+  },
+  {
+   "id": "dbxfe-python-l01-logger-concept",
+   "term": "logger",
+   "aliases": [
+    "logging.getLogger"
+   ],
+   "definition": "A named, hierarchical logging channel whose destinations are chosen by the application's handlers.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-tooling"
+  },
+  {
+   "id": "dbxfe-python-l01-module-concept",
+   "term": "module and __main__ guard",
+   "aliases": [
+    "import"
+   ],
+   "definition": "A Python file whose top level runs once on import, with script-only work under a check that __name__ equals '__main__'.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-tooling"
+  },
+  {
+   "id": "dbxfe-python-l01-hint-concept",
+   "term": "type hint",
+   "aliases": [
+    "annotation"
+   ],
+   "definition": "An annotation describing expected types for readers and static tools, which the Python runtime does not enforce.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-tooling"
+  },
+  {
+   "id": "dbxfe-python-l01-test-concept",
+   "term": "unit test",
+   "aliases": [
+    "unittest"
+   ],
+   "definition": "A small automated check that compares code output with an independently written expectation.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-tests"
+  },
+  {
+   "id": "dbxfe-python-l01-venv-concept",
+   "term": "virtual environment",
+   "aliases": [
+    "venv"
+   ],
+   "definition": "A directory created by python -m venv with its own site-packages on top of a base interpreter.",
+   "lessonId": "dbxfe-python-l01",
+   "sectionId": "dbxfe-python-l01-tests"
+  }
+ ]
+}

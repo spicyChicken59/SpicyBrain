@@ -69,8 +69,8 @@ test("A media fallback referencing a concept instead of a visual leaves the less
   ) as TeachingMedia[];
   const item = media.find((m) => m.moduleId === delta.moduleId)!;
   const beat = delta.beats.find((b) => b.id === item.beatId)!;
-  // This ID is real and present in the index's generic reference list, but it
-  // names the wrong kind of content and cannot be rendered as a visual.
+  // This ID is real and present in the index's concept list, but it names the
+  // wrong kind of content and cannot be rendered as a visual.
   item.fallback.visualId = delta.concepts[0].id;
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

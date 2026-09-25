@@ -1,0 +1,363 @@
+{
+  "module": {
+    "id": "dbxfe-industry",
+    "title": "Manufacturing and cross-industry solution patterns",
+    "summary": "Frame plant-floor use cases from operational source to responsible human action: grain and metric contracts, event identity, units, timestamps and asset hierarchies; quality, traceability, engineering, maintenance, demand, scheduling and document patterns; transfer to other industries; and evidence-based verdicts.",
+    "objectives": [
+      "Draw a use case's chain from operational source to responsible human action and write its metric contract at a declared grain.",
+      "Apply event identity, unit, timestamp and effective-dated asset hierarchy rules to quality, traceability, engineering, maintenance, demand, scheduling and document patterns.",
+      "Transfer a manufacturing pattern to retail, financial services or healthcare and write a use-case brief whose verdict may be 'not enough evidence yet'."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-modeling"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-industry-l01.json"
+    ],
+    "scenarioId": "dbxfe-industry-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-industry-scenario",
+      "title": "Brief Cinderline's first plant-floor use case at Harwick",
+      "context": "Fictional Cinderline Components will fund one plant-floor use case at its Harwick plant this quarter. Three candidates: (1) supplier-lot traceability to narrow quality holds; (2) predicting porosity in die castings from process parameters so suspect castings get extra inspection; (3) an assistant answering technicians' questions from work instructions. Known facts: MES consumption events since 2024 at the lot × operation grain, 2.1% of them without a lot id; porosity labels come from X-ray, sampled 1 in 20 castings until March and 100% since, with 23 confirmed findings before March and 41 since; 30% of work instructions have no effective date in the document system; the Line 3 PLC clock drifts about 4 minutes a month and is reset at each shutdown.",
+      "task": "Write a use-case brief for the candidate you would take forward, and a short verdict for each of the other two. The brief contains a metric contract, the architecture from operational source to responsible human action, risks, evaluation criteria and an honest conclusion.",
+      "requirements": [
+        "Give the chosen use case a metric contract with grain, numerator, denominator, aggregation, time basis, exclusions and owner.",
+        "Draw the chain from operational source through governed data and the decision to the named person who acts and records the outcome.",
+        "Name the identity, unit, timestamp, hierarchy and label risks that apply, each with a guard.",
+        "State evaluation criteria that could fail, and give every candidate a verdict; use 'not enough evidence yet' where the evidence cannot support a decision, saying what would change it."
+      ],
+      "model": "### Chosen: supplier-lot traceability for quality holds\n**Decision.** When a supplier or incoming inspection flags an input lot, the quality engineer holds only the produced lots and shipments it reached, instead of a week of output.\n\n**Metric contract.** *Hold scope*: produced lots and shipments reached by a forward trace from the flagged lot. Grain lot × operation; time basis consumption time as a UTC instant, reported in site local days; exclusions none, with untraceable consumption reported beside the scope; owner quality engineering lead. Outcome metric: lots held per incident, and lots later found affected but outside the scope (target zero).\n\n**Architecture.** MES consumption events → landing with source, event id and receive time → governed `genealogy_edges` keyed on (source system, event id, revision) → forward and backward trace job → hold list → quality engineer decides and records hold, release and later findings.\n\n**Risks and guards.** 2.1% of events lack a lot id, mostly at the second casting hopper: report the gap on every trace and widen by time window there. Mixed hoppers: windowed edges marked as such. PLC drift: keep device and receive times; order by receive time within a shift where drift exceeds the window. Lineage shows how the tables were built; it is not the genealogy.\n\n**Evaluation.** Replay the two holds of the last year: the trace must include every lot the manual hold found affected, with a smaller total scope. If either replay misses a lot, stop and fix capture first.\n\n**Conclusion.** Pilot on Line 3 for one quarter.\n\n### Porosity prediction: not enough evidence yet\nLabels before March came from inspector-chosen X-rays, so they over-represent castings with visible defects; only the 41 findings since March come from 100% inspection. Review after two more quarters of full X-ray data, evaluated on a time-based split.\n\n### Work-instruction assistant: fix data first\nWith 30% of instructions undated, the assistant could cite a superseded revision. Proceed after engineering restores effective dates; until then, a pilot limited to dated documents, refusing the rest, is acceptable.",
+      "reasoning": "The model picks the candidate whose decision owner, data and outcome evidence already exist, gives it a contract and guards drawn from identity, clock and completeness risks, and writes evaluation criteria that can fail. It refuses to call a biased label set evidence and treats undated documents as a data fix, so each verdict follows from named evidence rather than from enthusiasm.",
+      "rubric": [
+        {
+          "id": "dbxfe-industry-scenario-rubric-1",
+          "criterion": "Metric contract",
+          "weak": "A metric named without grain, denominator or owner.",
+          "partial": "Grain and ratio stated, but time basis, exclusions or owner missing.",
+          "strong": "Grain, numerator, denominator, aggregation, time basis, exclusions and owner all stated, with an outcome metric that could show harm."
+        },
+        {
+          "id": "dbxfe-industry-scenario-rubric-2",
+          "criterion": "Chain from source to responsible action",
+          "weak": "A platform diagram ending in a dashboard.",
+          "partial": "Sources and tables drawn, but no named person or outcome record.",
+          "strong": "Every link named, with event identity at the governed layer and the engineer's decision and outcome recorded."
+        },
+        {
+          "id": "dbxfe-industry-scenario-rubric-3",
+          "criterion": "Risks with guards",
+          "weak": "Generic risks such as 'data quality'.",
+          "partial": "Specific risks named without guards, or lineage treated as genealogy.",
+          "strong": "Missing lot ids, mixing, clock drift and label bias each named with a guard and a reported measure."
+        },
+        {
+          "id": "dbxfe-industry-scenario-rubric-4",
+          "criterion": "Evaluation and honest verdicts",
+          "weak": "All three candidates approved, or criteria that cannot fail.",
+          "partial": "Criteria stated but a biased label set treated as sufficient.",
+          "strong": "Failable criteria, one pilot, 'not enough evidence yet' for porosity with the evidence and review date that would change it, and a data fix named for the assistant."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Were the X-ray samples before March random?",
+          "response": "No. Until March the inspector chose which castings to X-ray, usually after seeing a surface defect. Since March every casting is X-rayed."
+        },
+        {
+          "question": "Why do 2.1% of consumption events lack a lot id?",
+          "response": "Operators scan the lot label at the hopper; when a label is damaged they key UNKNOWN. Most gaps are at the second hopper of the casting cell."
+        },
+        {
+          "question": "When will the work instructions have effective dates?",
+          "response": "Engineering says the migrated documents will be re-dated within about two months; the document owners have agreed to do it."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-industry-l01"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-industry-course-claim-manufacturing",
+        "dbxfe-industry-course-claim-lineage",
+        "dbxfe-industry-course-claim-timestamp",
+        "dbxfe-industry-course-claim-pillars",
+        "dbxfe-fact-leakage"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-industry-course-source-manufacturing",
+      "title": "Manufacturing Solutions",
+      "url": "https://www.databricks.com/solutions/industries/manufacturing-industry-solutions",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks industry solution page for manufacturing.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Vendor positioning; named outcomes are marketing claims, not evidence for a use case. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-industry-course-source-isa95",
+      "title": "ISA-95 Standard: Enterprise-Control System Integration",
+      "url": "https://www.isa.org/standards-and-publications/isa-standards/isa-95-standard",
+      "publisher": "International Society of Automation (ISA)",
+      "type": "primary reference",
+      "context": "Standards landing page for ANSI/ISA-95 (IEC 62264).",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The standard's text is a purchased document and was not read; level names were confirmed through search results only. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-industry-course-source-lineage",
+      "title": "Lineage in Unity Catalog",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog data lineage.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Lineage records data dependencies, not physical material flow; coverage limits are listed on the page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-industry-course-source-timestamp",
+      "title": "TIMESTAMP_NTZ type",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/data-types/timestamp-ntz-type",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS SQL language manual; Databricks SQL and Runtime 13.3 LTS and above.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Nothing was executed; cast and conversion behavior is read from the current page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-industry-course-source-pillars",
+      "title": "Databricks well-architected framework",
+      "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/well-architected",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; seven pillars of the well-architected framework.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A framework of concerns, not a use-case scoring method. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-industry-course-source-retail",
+      "title": "Retail and Consumer Goods Solutions",
+      "url": "https://www.databricks.com/solutions/industries/retail-industry-solutions",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks industry solution page for retail and consumer goods.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Vendor positioning with no outcome evidence. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-industry-course-source-finance",
+      "title": "Databricks for Financial Services",
+      "url": "https://www.databricks.com/solutions/industries/financial-services",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks industry solution page for financial services.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Vendor positioning; not regulatory guidance. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-industry-course-source-health",
+      "title": "Healthcare and Life Sciences Solutions",
+      "url": "https://www.databricks.com/solutions/industries/healthcare-and-life-sciences",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks industry solution page for healthcare and life sciences.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Vendor positioning; used only to name data shapes, with no clinical or privacy guidance. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-industry-course-claim-manufacturing",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-industry-course-source-manufacturing"
+      ],
+      "description": "Databricks' manufacturing page names MES, ERP, historian, SCADA, MQTT and vision data as sources and predictive maintenance, first-pass yield, defect root-cause analysis and demand forecasting among its use cases.",
+      "context": "Vendor solution page; not evidence for a specific use case."
+    },
+    {
+      "id": "dbxfe-industry-course-claim-isa95",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-industry-course-source-isa95"
+      ],
+      "description": "ISA-95 (IEC 62264) integrates enterprise and control systems, and its equipment hierarchy nests enterprise, site, area, work center and work unit levels.",
+      "context": "Standard text not read; level names confirmed through search results."
+    },
+    {
+      "id": "dbxfe-industry-course-claim-lineage",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-industry-course-source-lineage"
+      ],
+      "description": "Unity Catalog lineage records column-level dependencies between data assets such as tables, views, model versions and paths.",
+      "context": "Data lineage, not material genealogy."
+    },
+    {
+      "id": "dbxfe-industry-course-claim-timestamp",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-industry-course-source-timestamp"
+      ],
+      "description": "TIMESTAMP_NTZ holds date and time fields without a time zone and is not changed by the session time zone, unlike TIMESTAMP, which is an instant normalized to UTC.",
+      "context": "Databricks SQL language manual."
+    },
+    {
+      "id": "dbxfe-industry-course-claim-pillars",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-industry-course-source-pillars"
+      ],
+      "description": "The Databricks well-architected framework has seven pillars, from data and AI governance to cost optimization.",
+      "context": "Architecture concerns; not a scoring method."
+    },
+    {
+      "id": "dbxfe-industry-course-claim-industries",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-industry-course-source-retail",
+        "dbxfe-industry-course-source-finance",
+        "dbxfe-industry-course-source-health"
+      ],
+      "description": "Databricks' industry pages frame retail around demand forecasting and pricing, financial services around fraud, risk and customer engagement, and healthcare around clinical, claims and research data.",
+      "context": "Vendor framing only; no compliance or clinical claim relied on."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-industry-l01-chain-concept",
+      "term": "decision chain",
+      "aliases": [
+        "source-to-action chain"
+      ],
+      "definition": "The path from an operational source through governed data and a decision to a named person who acts and records the outcome.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-chain"
+    },
+    {
+      "id": "dbxfe-industry-l01-contract-concept",
+      "term": "metric contract",
+      "aliases": [
+        "business grain",
+        "metric definition"
+      ],
+      "definition": "A written definition of a metric's grain, numerator, denominator, aggregation, time basis, exclusions and owner.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-contract"
+    },
+    {
+      "id": "dbxfe-industry-l01-identity-concept",
+      "term": "event identity",
+      "aliases": [
+        "natural key"
+      ],
+      "definition": "The fields that name one real occurrence, such as source system, record id and revision.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-identity"
+    },
+    {
+      "id": "dbxfe-industry-l01-hierarchy-concept",
+      "term": "asset hierarchy",
+      "aliases": [
+        "equipment hierarchy"
+      ],
+      "definition": "A dated parent-child structure placing each asset under the one that contains it, from site to sensor.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-hierarchy"
+    },
+    {
+      "id": "dbxfe-industry-l01-fpy-concept",
+      "term": "first-pass yield",
+      "aliases": [
+        "FPY"
+      ],
+      "definition": "Units passing their first inspection without rework, divided by units entering the operation.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-quality"
+    },
+    {
+      "id": "dbxfe-industry-l01-genealogy-concept",
+      "term": "lot genealogy",
+      "aliases": [
+        "traceability"
+      ],
+      "definition": "Recorded consumption links between input lots, produced lots, serials and shipments, walked forward or backward.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-trace"
+    },
+    {
+      "id": "dbxfe-industry-l01-label-concept",
+      "term": "failure label",
+      "aliases": [
+        "target definition"
+      ],
+      "definition": "The recorded maintenance outcome, within a horizon after the prediction time, that a model learns to predict.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-maintenance"
+    },
+    {
+      "id": "dbxfe-industry-l01-censored-concept",
+      "term": "censored demand",
+      "aliases": [
+        "lost sales"
+      ],
+      "definition": "Demand hidden by a stock-out, so recorded shipments for that period are only a lower bound.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-planning"
+    },
+    {
+      "id": "dbxfe-industry-l01-feasible-concept",
+      "term": "feasible schedule",
+      "aliases": [
+        "finite capacity schedule"
+      ],
+      "definition": "A schedule that respects capacity, changeovers, material availability and maintenance windows before it is judged on lateness.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-planning"
+    },
+    {
+      "id": "dbxfe-industry-l01-revision-concept",
+      "term": "controlled document revision",
+      "aliases": [
+        "revision in force"
+      ],
+      "definition": "The status and effective date of one version of a controlled document, deciding which text may be cited.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-documents"
+    },
+    {
+      "id": "dbxfe-industry-l01-transfer-concept",
+      "term": "pattern transfer",
+      "aliases": [
+        "cross-industry transfer"
+      ],
+      "definition": "Re-deriving identity, grain, hierarchy, clock and responsible person when a pattern moves to another industry.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-transfer"
+    },
+    {
+      "id": "dbxfe-industry-l01-verdict-concept",
+      "term": "evidence verdict",
+      "aliases": [
+        "not enough evidence yet"
+      ],
+      "definition": "A use-case conclusion naming the evidence that supports it or the evidence that would change it.",
+      "lessonId": "dbxfe-industry-l01",
+      "sectionId": "dbxfe-industry-l01-evaluate"
+    }
+  ]
+}

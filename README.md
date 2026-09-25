@@ -2,11 +2,32 @@
 
 **Learn it. See it. Use it. Remember it.**
 
-A static, content-driven learning platform. Choose a course, follow its module map, and learn one visual beat at a time. Each module connects **Deck, Handbook and Cards**: concise English teaching, controlled diagrams, optional Samajh analogies, in-context definitions, deliberate answer reveals and exact resumption. Today, Courses, Review and Notebook keep the main route small. Databricks is the first domain; field practice applies the technical foundations.
+A static, content-driven learning platform. Choose a course, follow its module map, and learn one visual beat at a time. Each module connects **Deck, Handbook and Cards**: concise English teaching, controlled diagrams, optional Samajh analogies, in-context definitions, deliberate answer reveals and exact resumption. Today, Courses, Review and Notebook keep the main route small.
 
-The complete course has **16 modules, 135 teaching beats and 208 cards**: the original 144 plus 64 researched extensions. All **43 original lessons, 96 checks, 18 SVG diagrams, 12 scenarios and the capstone** remain accessible with their identities and history. New beats add their own questions, staged visuals, complete handbook sections and 16 curated video references with authored alternatives. Video players contact their providers only after an explicit load choice. Original roadmaps and playbooks remain secondary views of the canonical material.
+The Databricks course is **Databricks: Build, Explain, Deliver**, an independent academy of **48 modules in eight tracks**:
 
-Cinderline, conversations, datasets, targets and figures are fictional or hypothetical. AWS-specific examples are labeled. This is independent education, not official onboarding, an interview question bank, a credential or an employer assessment. Local Python/Spark execution is reported separately; no Databricks execution is claimed.
+- platform and working fluency;
+- reliable data engineering;
+- analytics, performance and economics;
+- governance and cloud architecture;
+- machine learning and production evaluation;
+- GenAI, agents and applications;
+- architecture, migration and operations;
+- customer discovery, evidence and delivery.
+
+It has **580 teaching beats**, **1,367 visual states** and **824 cards** (632 core, 192 extension), a check on every beat and an applied task in every module. Nine suggested routes run through it. An essential route covers the platform through to tables you can trust, and eight deeper routes follow particular interests. Every route is optional reading order, never a lock.
+
+Beside the modules sit:
+
+- a **lab shelf of 24 labs**: 20 executed locally in pinned environments, 2 tabletop exercises and 2 platform guides, each download hash-validated;
+- **32 field guides**, each with an action page, a completed fictional example and a template you can draft in the Notebook;
+- **three capstones** with data packs;
+- **eight source-attributed public case analyses**;
+- an optional crosswalk to official learning paths.
+
+The sixteen modules of the earlier release are part of the academy with their identities and history intact: all 43 original lessons, 96 checks, 18 SVG diagrams, the scenarios, the Cinderline capstone and 16 reviewed video placements. Video players contact their providers only after an explicit load choice.
+
+Cinderline, Harrowgate, Northbrook, the conversations, datasets, targets and figures are fictional or hypothetical. Cloud-specific examples are labelled with their cloud. This is independent education. It is not Databricks Academy, not official onboarding, not an interview question bank, not a credential and not an employer assessment, and it earns no credit with any publisher. Local Python/Spark/ML execution is reported per lab; no execution on the Databricks platform is claimed.
 
 ## Run locally
 
@@ -27,10 +48,20 @@ APP_BASE=/SpicyBrain/ APP_OUT=dist-nested npm run build
 npx playwright install --with-deps chromium webkit
 npm run test:e2e
 npm run test:content-extension
+npm run test:collections
 npm run report:sources
 # Optional exercise runtime: Python 3.12, Java 17
 python -m pip install -r content/exercises/reliable-data/requirements.txt
 python content/exercises/reliable-data/run_tests.py --spark --evidence docs/evidence/reliable-data-ci.json
+```
+
+The academy's labs are checked the way CI's `labs` job checks them: every download must match its source directory, then each local-executed lab runs from its extracted ZIP in the environment its evidence records (Python 3.12 and Java 17; exact pins only):
+
+```sh
+python scripts/package-labs.py --check
+python scripts/lab-requirements.py spark > spark-pins.txt && python -m venv .labs/spark && .labs/spark/bin/python -m pip install -r spark-pins.txt
+python scripts/lab-requirements.py ml > ml-pins.txt && python -m venv .labs/ml && .labs/ml/bin/python -m pip install -r ml-pins.txt
+python scripts/run-labs.py --from-zip --python python --spark-python .labs/spark/bin/python --ml-python .labs/ml/bin/python --evidence-dir test-results/labs
 ```
 
 `npm run check` validates and generates the content catalog/search before typechecking. It does not depend on install scripts or a previous build.
@@ -43,10 +74,20 @@ Reading requires no account or workspace. Notes, drafts, completion, attempts, r
 
 ## Review and authorship
 
+Academy release (this milestone):
+
+- [Sanitized implementation contract](docs/academy/CONTRACT.md) and [acceptance record, gates G01–G25](docs/academy/ACCEPTANCE.md)
+- [Coverage](docs/academy/COVERAGE.md), [preservation and revisions](docs/academy/DISPOSITION.json) and [lab manifest](docs/academy/LABS.json)
+- [Builder editorial review](docs/academy/EDITORIAL-REVIEW.md), [source review](docs/academy/SOURCE-REVIEW.md) and [media review](docs/academy/MEDIA-REVIEW.md)
+- [Visual review of every state](docs/academy/VISUAL-REVIEW.json) and [scale and loading](docs/academy/SCALE.md)
+- [Release candidate, study-data compatibility and rollback](docs/academy/RELEASE.md)
+
+Earlier releases and general reference:
+
 - [Teacher-first milestone and acceptance boundaries](docs/teacher-first/MILESTONE.md)
-- [Complete course coverage](docs/teacher-first/COVERAGE.md), [editorial review](docs/teacher-first/EDITORIAL-REVIEW.md) and [media review](docs/teacher-first/MEDIA-REVIEW.md)
+- [Teacher-first coverage](docs/teacher-first/COVERAGE.md), [editorial review](docs/teacher-first/EDITORIAL-REVIEW.md) and [media review](docs/teacher-first/MEDIA-REVIEW.md)
 - [Architecture and supported boundaries](docs/ARCHITECTURE.md)
-- [Add or revise a content package](docs/AUTHORING.md)
+- [Add or revise a content package](docs/AUTHORING.md), including tracks, routes, labs, field guides, cases and capstones
 - [Study data, migration, and review algorithm](docs/STUDY-DATA.md)
 - [Source review and current caveats](docs/SOURCE-REVIEW.md)
 - [Builder editorial review of every lesson and diagram](docs/EDITORIAL-REVIEW.md)

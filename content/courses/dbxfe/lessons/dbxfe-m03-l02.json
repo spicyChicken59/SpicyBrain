@@ -2,7 +2,7 @@
   "id": "dbxfe-m03-l02",
   "title": "Delta tables: files, log, and snapshots",
   "summary": "Predict committed table rows from a schematic file/log timeline and separate storage correctness from business correctness.",
-  "contentVersion": "2.0.0",
+  "contentVersion": "2.0.2",
   "estimatedMinutes": 12,
   "objectives": [
     "Predict committed table rows from a schematic file/log timeline and separate storage correctness from business correctness.",
@@ -406,7 +406,7 @@
       "revision": "1",
       "prompt": "Why does ACID not mean business correctness?",
       "answer": "A transaction can reliably commit values whose meaning or source is wrong.",
-      "explanation": "Source semantics and validation remain separate work.",
+      "explanation": "Source semantics and validation remain separate work: the transaction guarantees which state was committed, while business rules decide which records should have crossed that boundary at all.",
       "lessonId": "dbxfe-m03-l02",
       "sectionId": "dbxfe-m03-l02-understand",
       "conceptIds": [
@@ -487,6 +487,74 @@
       "claimIds": [
         "dbxfe-fact-delta",
         "dbxfe-fact-delta-protocol",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-l02-card4",
+      "revision": "1",
+      "prompt": "After a commit replaces A0 (10 units) with A1 (12 units) beside unchanged C (8), what does the new snapshot total?",
+      "answer": "20 inspected units: 12 replaces 10, so the total rises by 2, not by 12.",
+      "explanation": "A commit excludes A0 and includes A1 in one atomic membership change; there is no intermediate state with neither or both A files. A0’s bytes may still sit in the folder, but the snapshot no longer selects them, so counting both representations would give the wrong 30.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-example",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-l02-card5",
+      "revision": "1",
+      "prompt": "A table’s history still lists version v0. Why might reading v0 fail anyway?",
+      "answer": "Time travel needs the retained data files and a permitted age; a visible history entry alone guarantees neither.",
+      "explanation": "Operation history, deleted-file retention and runtime age limits are three separate questions. If A0 was removed by retention cleanup, v0 cannot be reproduced and a result silently missing A0 is not a successful reproduction; raising the retention setting later cannot resurrect bytes already deleted.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-limits",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-l02-card6",
+      "revision": "1",
+      "prompt": "Row B1 = (-3, 1) matches the integer column types. Is the row therefore valid?",
+      "answer": "No. Schema enforcement checks structure; a negative inspected quantity breaks a domain rule that needs its own check.",
+      "explanation": "Structural, domain and cross-record checks rest on different evidence. Column names, types and nullability are the schema’s promise; nonnegative quantities, defective not exceeding inspected, and one payload per event identity are business rules enforced at the layer that actually holds that evidence, never by one green quality icon.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-limits",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m03-l02-card7",
+      "revision": "1",
+      "prompt": "Two writers replace the same file from one starting snapshot. What happens at the second commit?",
+      "answer": "Validation compares the second writer’s assumptions with the intervening commit; an overlapping change fails instead of silently corrupting the table.",
+      "explanation": "Optimistic concurrency separates preparation from acceptance: both writers can prepare work, but the later committer is checked against what changed meanwhile. Independent appends occupy a different cell of the documented conflict matrix, so the word concurrent alone does not predict failure, and a retry must re-read the latest state and re-apply the business ordering rule.",
+      "lessonId": "dbxfe-m03-l02",
+      "sectionId": "dbxfe-m03-l02-foundation-limits",
+      "conceptIds": [
+        "dbxfe-m03-l02-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-delta",
+        "dbxfe-guidance",
         "dbxfe-fiction"
       ]
     }

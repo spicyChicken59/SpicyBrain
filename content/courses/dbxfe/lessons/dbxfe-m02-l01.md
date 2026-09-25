@@ -17,11 +17,12 @@ For fictional Cinderline, do not assume a delay caused lost production simply be
 | Person | Decision or concern | Evidence to request |
 |---|---|---|
 | Plant supervisor | Which line needs investigation? | A recent disputed report and the resulting action |
-| Analyst | Which figure is correct? | Two definitions and their calculation inputs |
+| Analyst | Can the figure be reproduced without manual merging? | Calculation inputs and today's manual merge steps |
+| Quality owner | Which definition counts: numerator, denominator, exclusions? | The competing definitions, an agreed formula and worked examples |
 | Security lead | Which data may leave the source? | Classification and access constraints |
 | Sponsor | Is change worth funding? | Baseline, bounded benefit hypothesis, alternatives |
 
-The diagram connects each concern to evidence. No single enthusiastic stakeholder speaks for every acceptance condition.
+The diagram connects each concern to evidence. In it the analyst contributes the metric definition as a proposal; the quality owner, not drawn there, accepts which definition counts. No single enthusiastic stakeholder speaks for every acceptance condition.
 
 <!-- section:deeper -->
 

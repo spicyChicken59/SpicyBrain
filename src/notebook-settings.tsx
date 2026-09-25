@@ -10,6 +10,7 @@ import {
   beatHref,
   teachingTarget,
   scenarios,
+  findGuide,
 } from "./catalog";
 import { NoteEditor } from "./reader";
 import {
@@ -51,7 +52,9 @@ export function Search({ from }: { from?: string }) {
       id: n.id,
       type: "Personal note",
       courseId: n.courseId,
-      title: findLesson(n.lessonId)?.lesson.title ?? "Note for removed content",
+      title: findGuide(n.sectionId)
+        ? `Field guide · ${findGuide(n.sectionId)!.guide.title}`
+        : (findLesson(n.lessonId)?.lesson.title ?? "Note for removed content"),
       text: n.text,
       href: `#/notebook/${n.id}`,
     })),
@@ -189,7 +192,34 @@ export function Notebook({ id }: { id?: string }) {
       <div className="notes-list">
         {notes.map((n) => {
           const entry = findLesson(n.lessonId),
-            section = entry?.lesson.sections.find((s) => s.id === n.sectionId);
+            section = entry?.lesson.sections.find((s) => s.id === n.sectionId),
+            // A field-guide draft is a note whose section is the guide.
+            guide = findGuide(n.sectionId);
+          if (guide)
+            return (
+              <section className="sc-card" id={n.id} key={n.id}>
+                <p className="sc-eyebrow">
+                  {guide.course.title}
+                  {n.id.includes("-conflict-")
+                    ? " · preserved import conflict"
+                    : ""}
+                </p>
+                <h3>Field guide · {guide.guide.title}</h3>
+                <p>{guide.guide.question}</p>
+                <NoteEditor
+                  courseId={n.courseId}
+                  lessonId={n.lessonId}
+                  sectionId={n.sectionId}
+                  noteId={n.id}
+                  label="Your draft from this template"
+                />
+                <a
+                  href={`#/course/${guide.course.id}/guides/${guide.guide.id}`}
+                >
+                  Return to source →
+                </a>
+              </section>
+            );
           return (
             <section className="sc-card" id={n.id} key={n.id}>
               <p className="sc-eyebrow">

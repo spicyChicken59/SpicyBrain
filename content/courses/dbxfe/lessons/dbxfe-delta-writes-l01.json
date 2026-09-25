@@ -1,0 +1,686 @@
+{
+ "id": "dbxfe-delta-writes-l01",
+ "title": "Delta writes, evolution and table maintenance",
+ "summary": "Take one Delta table through incremental merges, a scoped snapshot delete, a refused duplicate delivery, the change data feed, schema enforcement and evolution, and maintenance, with every number from a local open-source run.",
+ "contentVersion": "1.0.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 22,
+ "objectives": [
+  "Predict what a MERGE does to every row, including omitted keys, scoped snapshot deletes, duplicate matches and stale replays, and write the guarded fix.",
+  "Read the change data feed and tell schema enforcement, schema evolution and table features apart by their effect on writers and readers.",
+  "Write a maintenance decision table for OPTIMIZE, VACUUM, liquid clustering and predictive optimization that separates open-source mechanisms from Databricks-only services."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Reliable data engineering",
+  "Delta Lake",
+  "MERGE",
+  "Change data feed",
+  "Schema evolution",
+  "VACUUM",
+  "Liquid clustering",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-delta-writes-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-delta-writes-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept",
+    "dbxfe-delta-writes-l01-maintenance-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-start",
+   "kind": "prerequisites",
+   "title": "Before the first MERGE",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-clauses",
+   "kind": "mechanism",
+   "title": "Three cases, and what silence means",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept",
+    "dbxfe-delta-writes-l01-snapshot-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-duplicates",
+   "kind": "mechanism",
+   "title": "Duplicates, stale replays and the guard",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-duplicate-concept",
+    "dbxfe-delta-writes-l01-guard-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-duplicate",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-feed",
+   "kind": "mechanism",
+   "title": "Deletes, history and the change data feed",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-feed-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-delete",
+    "dbxfe-delta-writes-course-claim-feed",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-schema",
+   "kind": "mechanism",
+   "title": "Enforcement, evolution and table features",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-schema-concept",
+    "dbxfe-delta-writes-l01-feature-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-schema",
+    "dbxfe-delta-writes-course-claim-features",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-maintenance",
+   "kind": "mechanism",
+   "title": "Maintenance: files, retention and who schedules it",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-maintenance-concept",
+    "dbxfe-delta-writes-l01-clustering-concept",
+    "dbxfe-delta-writes-l01-predictive-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-delta-writes-course-claim-clustering",
+    "dbxfe-delta-writes-course-claim-predictive",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-example",
+   "kind": "example",
+   "title": "The whole sequence as Delta reported it",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept",
+    "dbxfe-delta-writes-l01-duplicate-concept",
+    "dbxfe-delta-writes-l01-feed-concept",
+    "dbxfe-delta-writes-l01-schema-concept",
+    "dbxfe-delta-writes-l01-maintenance-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-delta-writes-course-claim-duplicate",
+    "dbxfe-delta-writes-course-claim-feed",
+    "dbxfe-delta-writes-course-claim-schema",
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-exercise",
+   "kind": "exercise",
+   "title": "Try it: new delivery contracts",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept",
+    "dbxfe-delta-writes-l01-snapshot-concept",
+    "dbxfe-delta-writes-l01-guard-concept",
+    "dbxfe-delta-writes-l01-maintenance-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-delta-writes-course-claim-duplicate",
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-solution",
+   "kind": "solution",
+   "title": "One solution",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept",
+    "dbxfe-delta-writes-l01-snapshot-concept",
+    "dbxfe-delta-writes-l01-guard-concept",
+    "dbxfe-delta-writes-l01-schema-concept",
+    "dbxfe-delta-writes-l01-maintenance-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-delta-writes-course-claim-duplicate",
+    "dbxfe-delta-writes-course-claim-schema",
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-mistakes",
+   "kind": "mistakes",
+   "title": "Mistakes to avoid",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept",
+    "dbxfe-delta-writes-l01-duplicate-concept",
+    "dbxfe-delta-writes-l01-schema-concept",
+    "dbxfe-delta-writes-l01-maintenance-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-delta-writes-course-claim-duplicate",
+    "dbxfe-delta-writes-course-claim-schema",
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-sources",
+   "kind": "sources",
+   "title": "Sources and evidence",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-delta-writes-course-claim-feed",
+    "dbxfe-delta-writes-course-claim-clustering",
+    "dbxfe-delta-writes-course-claim-predictive",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-related",
+   "kind": "related",
+   "title": "Where this connects",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-revisit",
+   "kind": "revisit",
+   "title": "Revisit",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-fact-merge",
+    "dbxfe-fact-delta",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-delta-writes-l01-q1",
+   "revision": "1",
+   "prompt": "Day 3's source holds D twice (D exists in the target), a stale A at revision 0 and a new E, and the naive MERGE was refused. Which change commits D at revision 3, inserts E and leaves A at revision 1?",
+   "options": [
+    {
+     "id": "dbxfe-delta-writes-l01-q1-a",
+     "text": "Keep the highest revision per key, then use WHEN MATCHED AND s.revision > t.revision THEN UPDATE and WHEN NOT MATCHED THEN INSERT.",
+     "rationale": "De-duplication removes the ambiguity and the guard rejects A's older revision, exactly as version 5 did."
+    },
+    {
+     "id": "dbxfe-delta-writes-l01-q1-b",
+     "text": "Add WHEN NOT MATCHED BY SOURCE THEN DELETE to the naive statement.",
+     "rationale": "A delete-by-source clause removes unmentioned target rows; the duplicate D rows still make the MERGE fail."
+    },
+    {
+     "id": "dbxfe-delta-writes-l01-q1-c",
+     "text": "Run the same MERGE again, because the refusal is intermittent.",
+     "rationale": "The refusal is deterministic for the same source and target; a retry fails the same way."
+    },
+    {
+     "id": "dbxfe-delta-writes-l01-q1-d",
+     "text": "Keep the highest revision per key and merge without any guard.",
+     "rationale": "Without the guard, A's revision-0 replay matches and overwrites the newer revision 1."
+    }
+   ],
+   "correctOptionId": "dbxfe-delta-writes-l01-q1-a",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-duplicate-concept",
+    "dbxfe-delta-writes-l01-guard-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-duplicate",
+    "dbxfe-fact-merge",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-q2",
+   "revision": "1",
+   "prompt": "An export stream reads the table's change data feed and sometimes lags ten days. The table keeps the seven-day default file retention and VACUUM runs nightly. What is the risk, and what is the fix?",
+   "options": [
+    {
+     "id": "dbxfe-delta-writes-l01-q2-a",
+     "text": "Change files can be vacuumed before the stream reads them; raise delta.deletedFileRetentionDuration above the lag, agreed with the owners, and keep the safety check on.",
+     "rationale": "Change files follow the table's retention, so the retention must outlast the longest consumer lag."
+    },
+    {
+     "id": "dbxfe-delta-writes-l01-q2-b",
+     "text": "There is no risk, because change files are kept until every consumer has read them.",
+     "rationale": "Delta does not track consumers; change files expire with the table's retention like other files."
+    },
+    {
+     "id": "dbxfe-delta-writes-l01-q2-c",
+     "text": "Stop the stream during VACUUM; its lag does not matter after that.",
+     "rationale": "Pausing does not bring back files that VACUUM already deleted; the lag is exactly what matters."
+    },
+    {
+     "id": "dbxfe-delta-writes-l01-q2-d",
+     "text": "Enable schema evolution so the stream can catch up faster.",
+     "rationale": "Schema evolution adds columns; it has no effect on how long change files are kept."
+    }
+   ],
+   "correctOptionId": "dbxfe-delta-writes-l01-q2-a",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-feed-concept",
+    "dbxfe-delta-writes-l01-maintenance-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-feed",
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-q3",
+   "revision": "1",
+   "prompt": "Which delivery licenses a WHEN NOT MATCHED BY SOURCE ... THEN DELETE clause, and how must it be written?",
+   "options": [
+    {
+     "id": "dbxfe-delta-writes-l01-q3-a",
+     "text": "A complete snapshot of a stated scope, with the clause's condition restricted to that scope.",
+     "rationale": "Only a complete snapshot makes absence meaningful, and only for the population it covers."
+    },
+    {
+     "id": "dbxfe-delta-writes-l01-q3-b",
+     "text": "An incremental file of changes, with no condition.",
+     "rationale": "An incremental file omits unchanged rows, so the clause would delete every quiet row."
+    },
+    {
+     "id": "dbxfe-delta-writes-l01-q3-c",
+     "text": "Any delivery whose row count looks normal.",
+     "rationale": "A row count cannot tell a complete snapshot from an incremental file; the delivery contract decides."
+    },
+    {
+     "id": "dbxfe-delta-writes-l01-q3-d",
+     "text": "A change feed with explicit delete records, applied through the delete-by-source clause.",
+     "rationale": "Explicit deletes match their target rows, so they belong in a matched clause with an operation condition."
+    }
+   ],
+   "correctOptionId": "dbxfe-delta-writes-l01-q3-a",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-snapshot-concept",
+    "dbxfe-delta-writes-l01-merge-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-delta-writes-l01-card1",
+   "revision": "1",
+   "prompt": "Which MERGE clause can act on a target row that the source does not mention?",
+   "answer": "Only WHEN NOT MATCHED BY SOURCE, and only if the statement includes it; otherwise the row keeps its values.",
+   "explanation": "WHEN MATCHED needs a matching source row, and WHEN NOT MATCHED handles unmatched source rows, which can only be inserted. A target-only row therefore changes solely through a NOT MATCHED BY SOURCE clause, which may update or delete it without reading any source column.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-clauses",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card2",
+   "revision": "1",
+   "prompt": "Day 2 omits lot A. Why must a correct incremental MERGE leave A untouched?",
+   "answer": "An incremental delivery lists changes only, so omitting A asserts nothing about whether A still exists.",
+   "explanation": "Only an explicit delete record, or a complete snapshot covering A's scope, can justify removing it. A delete-by-source clause on an incremental merge would remove every row that happened not to change that night, turning quiet days into data loss.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-clauses",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-merge-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card3",
+   "revision": "1",
+   "prompt": "An unscoped NOT MATCHED BY SOURCE DELETE meets one plant's complete snapshot. Predict the damage.",
+   "answer": "Every target row the snapshot did not list is deleted, including rows of plants it never covered.",
+   "explanation": "In the lab the unscoped clause, run on a copy of version 5, deleted A, C and E and left only D, while the plant-scoped clause deleted only E. The condition must carry the snapshot's scope because the clause cannot infer it.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-clauses",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-snapshot-concept",
+    "dbxfe-delta-writes-l01-merge-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card4",
+   "revision": "1",
+   "prompt": "What does Delta do when two source rows try to update one matched target row?",
+   "answer": "It refuses the whole MERGE with a multiple-match error, and nothing from the statement is committed.",
+   "explanation": "The update would be ambiguous because either source row could win. In the lab the error was DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE, the table stayed at version 4, and the new key E in the same statement was not inserted either.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-duplicates",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-duplicate-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-duplicate",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card5",
+   "revision": "1",
+   "prompt": "Why can the same duplicated delivery succeed against an older version of the table?",
+   "answer": "If the duplicated key is not yet in the target, nothing is matched twice, so both rows are inserted.",
+   "explanation": "Merged into a copy of version 3, before D existed, day 3 committed five rows with D twice and let A's stale replay overwrite revision 1. The multiple-match error protects matched keys only, so de-duplication must come before every merge.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-duplicates",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-duplicate-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-duplicate",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card6",
+   "revision": "1",
+   "prompt": "A replay carries revision 0 for a lot the table holds at revision 1. What stops it?",
+   "answer": "A guarded matched clause, WHEN MATCHED AND s.revision > t.revision, which is false for the replay.",
+   "explanation": "The guard compares the source revision with the target's, so an older delivery cannot overwrite newer state; in the lab A kept 12 inspected at revision 1. It works only if the revision is trustworthy and increases for each key.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-duplicates",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-guard-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-duplicate",
+    "dbxfe-delta-writes-course-claim-merge",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card7",
+   "revision": "1",
+   "prompt": "After DELETE removes lot E, where can E's values still be read?",
+   "answer": "In older versions through time travel, in change files if the feed is on, and in downstream copies.",
+   "explanation": "Delete commits a version that no longer selects E but keeps the removed files on disk. Only VACUUM after the retention deletes them, together with old change files; downstream copies are outside Delta and need their own handling.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-feed",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-feed-concept",
+    "dbxfe-delta-writes-l01-maintenance-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-delete",
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card8",
+   "revision": "1",
+   "prompt": "Why does a change-feed read that starts before the enabling commit fail?",
+   "answer": "The feed records only changes made after it was enabled, so earlier versions have no change data.",
+   "explanation": "In the lab the feed was enabled at version 3; reading versions 4 to 6 returned seven rows, while reading from version 2 raised DELTA_MISSING_CHANGE_DATA. Nothing rebuilds past changes, so enable the feed before consumers need it.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-feed",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-feed-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-feed",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card9",
+   "revision": "1",
+   "prompt": "Which is refused: an append with an extra column, or one missing a nullable column?",
+   "answer": "The append with an extra column is refused; a missing nullable column is simply written as null.",
+   "explanation": "Every DataFrame column must exist in the table, but table columns absent from the DataFrame are filled with null. The lab's append with an inspector column failed with a schema mismatch and committed nothing.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-schema",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-schema-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-schema",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card10",
+   "revision": "1",
+   "prompt": "Why prefer one write's mergeSchema option over the session-wide autoMerge setting?",
+   "answer": "The option evolves the schema for one reviewed write, while the session setting evolves every later write.",
+   "explanation": "With autoMerge on, a misspelt column in any later batch becomes a permanent column that nobody approved. A per-write option or an explicit ALTER TABLE leaves a deliberate trace in review and in the table's history.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-schema",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-schema-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-schema",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card11",
+   "revision": "1",
+   "prompt": "Enabling the change data feed moved the writer version to 7. Must readers upgrade?",
+   "answer": "No: the change data feed is a writer feature, and the reader version stayed at 1.",
+   "explanation": "Writer features bind only clients that write; reader features such as column mapping or deletion vectors bind readers too. DESCRIBE DETAIL shows both versions and the feature list, which is what to compare with every client before enabling anything.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-schema",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-feature-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-features",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card12",
+   "revision": "1",
+   "prompt": "What does a second OPTIMIZE commit when there is nothing left to compact?",
+   "answer": "Nothing: it reports zero files added and removed and creates no new version.",
+   "explanation": "Bin-packing is idempotent, as the documentation says and the lab observed: the history stayed at version 8. The first run's replaced files still sit on disk until a VACUUM past the retention removes them.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-maintenance",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-maintenance-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card13",
+   "revision": "1",
+   "prompt": "Why did the lab's VACUUM dry run list no data file?",
+   "answer": "Every replaced file had been removed minutes earlier, far inside the seven-day default retention.",
+   "explanation": "A file becomes eligible only when it is unreferenced and was removed longer ago than the retention. The dry run deletes nothing, and the lab's zero-hour request was refused by the safety check, which stays enabled.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-maintenance",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-maintenance-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card14",
+   "revision": "1",
+   "prompt": "What can you change about liquid clustering keys without rewriting existing data?",
+   "answer": "The keys themselves, with ALTER TABLE ... CLUSTER BY; later OPTIMIZE runs and writes use the new keys.",
+   "explanation": "Existing files keep their old layout until OPTIMIZE FULL reclusters everything. Clustering replaces partitioning and ZORDER, adds the clustering and domainMetadata writer features, and allows up to four keys with statistics.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-maintenance",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-clustering-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-clustering",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card15",
+   "revision": "1",
+   "prompt": "Which maintenance scheduler exists only on Databricks, not in open-source Delta?",
+   "answer": "Predictive optimization, which runs maintenance such as OPTIMIZE and VACUUM for Unity Catalog managed tables.",
+   "explanation": "Open-source Delta provides the commands and optional auto compaction but no scheduler, so self-managed tables need scheduled jobs. On Databricks the service is enabled, disabled or inherited per catalog and schema; availability and billing are checked per account.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-maintenance",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-predictive-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-predictive",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-delta-writes-l01-card16",
+   "revision": "1",
+   "prompt": "Name the four effects a maintenance decision row records for every action.",
+   "answer": "Its effect on files, on what readers see, on client compatibility, and on how far back you can recover.",
+   "explanation": "Writing all four, plus who agreed, exposes each action's hidden cost: OPTIMIZE adds files, VACUUM removes history, a feature binds clients, and none of them changes a row.",
+   "lessonId": "dbxfe-delta-writes-l01",
+   "sectionId": "dbxfe-delta-writes-l01-maintenance",
+   "conceptIds": [
+    "dbxfe-delta-writes-l01-maintenance-concept",
+    "dbxfe-delta-writes-l01-feature-concept"
+   ],
+   "claimIds": [
+    "dbxfe-delta-writes-course-claim-maintenance",
+    "dbxfe-delta-writes-course-claim-features",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ]
+}

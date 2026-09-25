@@ -1,10 +1,6 @@
 import { z } from "zod";
-import {
-  idSchema,
-  questionSchema,
-  cardSchema,
-  type Course,
-} from "./content-schema";
+import { idSchema, questionSchema, cardSchema } from "./content-schema";
+import type { CatalogCourse, ExtensionCardRef } from "./catalog-types";
 const text = z.string().trim().min(1).max(100000);
 const ids = z.array(idSchema);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -231,14 +227,14 @@ export type TeachingIndexEntry = Pick<
   | "moduleId"
   | "title"
   | "summary"
-  | "outcomes"
-  | "startingAssumptions"
   | "lessonIds"
   | "optionalBridgeLessonIds"
   | "cardLinks"
-  | "extensionCards"
 > & {
+  /** Identity and mapping only; the full text stays inside the module JSON. */
+  extensionCards: ExtensionCardRef[];
   url: string;
+  /** Check identities (questions and self-questions): the module-level ids study records can reference. */
   referenceIds: string[];
   visualIds: string[];
   conceptIds: string[];
@@ -332,11 +328,31 @@ export const mediaSchema = z
   });
 export type TeachingMedia = z.infer<typeof mediaSchema>;
 
+/**
+ * Module → beat identities that `#/module/<id>[/<beat>]` teaching links may
+ * target. The runtime loader validates one module per call, so it passes a
+ * map built from the teaching index; a single-module content check passes a
+ * map built from every teaching file present. Without a map, links resolve
+ * against the modules in the same call (the full build passes all of them).
+ */
+export type TeachingLinkTargets = Map<string, Set<string>>;
+export function teachingLinkTargets(
+  entries: { moduleId: string; beats: { id: string }[] }[],
+): TeachingLinkTargets {
+  const targets: TeachingLinkTargets = new Map();
+  for (const entry of entries) {
+    const beats = targets.get(entry.moduleId) ?? new Set<string>();
+    for (const beat of entry.beats) beats.add(beat.id);
+    targets.set(entry.moduleId, beats);
+  }
+  return targets;
+}
 export function validateTeaching(
   raw: unknown[],
-  courses: Course[],
+  courses: CatalogCourse[],
   mediaRaw: unknown[] = [],
   validateMediaReferences = true,
+  linkTargets?: TeachingLinkTargets,
 ) {
   const modules = raw.map((m) => teachingModuleSchema.parse(m)),
     media = mediaRaw.map((m) => mediaSchema.parse(m));
@@ -349,13 +365,27 @@ export function validateTeaching(
       ...c.concepts.map((s) => s.id),
       ...c.assets.map((s) => s.id),
       ...(c.downloads ?? []).map((s) => s.id),
+      // Course collections share the one identity space: a beat that reused
+      // a guide's ID would share its note (`note-<id>`) with the guide draft.
+      ...(c.tracks ?? []).map((s) => s.id),
+      ...(c.routes ?? []).map((s) => s.id),
+      ...(c.labs ?? []).map((s) => s.id),
+      ...(c.guides ?? []).map((s) => s.id),
+      ...(c.cases ?? []).map((s) => s.id),
+      ...(c.crosswalk ?? []).map((s) => s.id),
       ...c.scenarios.flatMap((s) => [s.id, ...s.rubric.map((r) => r.id)]),
       ...c.modules.flatMap((m) =>
         m.lessons.flatMap((l) => [
           l.id,
           ...l.sections.map((s) => s.id),
           ...l.cards.map((c) => c.id),
-          ...l.questions.flatMap((q) => [q.id, ...q.options.map((o) => o.id)]),
+          // The runtime catalog carries question references without options.
+          ...l.questions.flatMap((q) => [
+            q.id,
+            ...((q as { options?: { id: string }[] }).options?.map(
+              (o) => o.id,
+            ) ?? []),
+          ]),
         ]),
       ),
     ]),
@@ -395,11 +425,13 @@ export function validateTeaching(
       fail(`Broken teaching lesson link ${url}`);
     if (
       kind === "module" &&
-      !modules.some(
-        (m) =>
-          m.moduleId === id &&
-          (!section || m.beats.some((b) => b.id === section)),
-      )
+      !(linkTargets
+        ? linkTargets.has(id) && (!section || linkTargets.get(id)!.has(section))
+        : modules.some(
+            (m) =>
+              m.moduleId === id &&
+              (!section || m.beats.some((b) => b.id === section)),
+          ))
     )
       fail(`Broken teaching module link ${url}`);
   };

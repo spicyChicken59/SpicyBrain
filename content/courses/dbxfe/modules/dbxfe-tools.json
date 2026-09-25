@@ -1,0 +1,443 @@
+{
+  "module": {
+    "id": "dbxfe-tools",
+    "title": "Tools, MCP and action authorization",
+    "summary": "Put a policy gate between a model's tool proposals and their effects: schemas, identities and delegated permissions, untrusted content, approvals, timeouts and idempotency keys, audit trails and test matrices, and what MCP standardizes versus what your code must still enforce.",
+    "objectives": [
+      "Trace a tool call from proposal to effect and order the gate's checks: session, exposed tool, schema, delegated permission, key, approval and execution.",
+      "Decide the acting identity per tool, refuse retrieved content and system prompts as authority, and design approvals, retries and keys that cannot duplicate an effect.",
+      "Explain MCP's discovery and transport role against the token, handler and target checks, and prove a gate with an audit trail and a tested matrix (Lab L22)."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-genai"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-tools-l01.json"
+    ],
+    "scenarioId": "dbxfe-tools-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-tools-scenario",
+      "title": "Review Cinderline's spare-parts tool before the pilot",
+      "context": "Fictional Cinderline Components wants its maintenance assistant to request spare parts from the North plant's supplier portal. The IT team built a custom MCP server that wraps the portal's order API and plans to host it as an app; the assistant already reads manuals and writes draft notes through a policy gate. The supplier's catalogue PDFs are indexed for retrieval. Technicians may request up to 20 units and supervisors approve. How the portal handles duplicate requests, who approves at night, and the preview status of any Databricks feature involved are unconfirmed.",
+      "task": "Write the tool action review for request_spare_part that the pilot board will sign: the tool card, the identity and delegation design, the schema, the approval step, timeout, retry and idempotency behaviour, the audit fields, a test matrix with expected outcomes, and the unknowns with owners.",
+      "requirements": [
+        "Name the principal that executes each hop (assistant, MCP server, supplier portal) and how the technician's identity is carried, or refused when it is missing.",
+        "Place every constraint in the schema, the gate or the target, and list any rule that still exists only in a prompt.",
+        "Define the approval record, the idempotency key and the behaviour after a timeout, including what the technician sees.",
+        "Give a test matrix of allowed, denied, malformed, replayed, timed-out, approval and injected cases with expected decisions and effect counts, and state what a local stub cannot prove."
+      ],
+      "model": "### Tool card\n`request_spare_part(part_number, quantity, machine_id)`: an external effect, one order in the supplier portal, serving the supervisor's decision to buy. Out of scope: cancelling orders, changing prices, anything for the South plant.\n\n### Identity\nThe assistant calls the MCP server with the technician's delegated token; the server accepts only tokens issued for it (audience check) that carry the parts scope, and binds `machine_id` to a plant before checking the technician's `parts:request:<plant>` grant. The portal is called by the server's own service principal, which holds only the order-create right; the technician's identity travels as the requester field and in the audit. A missing user token is refused, never replaced by the app identity.\n\n### Schema and gate\n`part_number` matches `^P-[0-9]{4}$`, `quantity` is an integer from 1 to 20, `machine_id` matches the machine pattern, and no other properties are allowed. The prompt sentence \"order only parts the manual lists\" is recorded as guidance: no code enforces it yet, which is a finding.\n\n### Approval, key and timeout\nEvery request is held. The approver is a North supervisor other than the requester, sees the exact arguments and the documents that influenced the proposal, and the approval executes once. The assistant creates one key per intent; the server stores it with the arguments' digest for 30 days. A timeout reports \"unknown, safe to retry with the same key\". Because the portal's duplicate handling is unknown, the server also keeps its own key store and reconciles in-doubt keys by reading the portal's order list before any retry.\n\n### Test matrix (local stub first, then the portal's sandbox)\nAllowed; denied (South technician); malformed (quantity 50, an `approved_by` field); replayed; conflict; timed out after commit; approval with self-approval refused; an injected catalogue page, with decisions unchanged when it is removed; an expired session. The stub proves the gate's logic only; portal permissions, duplicates and timing need the sandbox.\n\n### Unknowns and owners\nPortal duplicate behaviour (supplier IT); the night-shift approver (plant manager); preview status and region of any Databricks feature used (platform team).",
+      "reasoning": "The review follows the call from identity to effect, keeps each constraint where code enforces it, treats the supplier's unknown duplicate handling as a design input rather than an assumption, and separates what the stub proves from what the portal's sandbox must still show.",
+      "rubric": [
+        {
+          "id": "dbxfe-tools-scenario-rubric-1",
+          "criterion": "Identity and delegation",
+          "weak": "One identity for everything, or the app's service principal used for every hop.",
+          "partial": "The user's identity is named, but the missing-token case or the audience check is absent.",
+          "strong": "Each hop's principal is named, delegation is an intersection, missing tokens are refused and the token audience is checked."
+        },
+        {
+          "id": "dbxfe-tools-scenario-rubric-2",
+          "criterion": "Constraints enforced in code",
+          "weak": "Limits appear only in the prompt or the tool description.",
+          "partial": "Schema limits are given, but prompt-only rules are not identified.",
+          "strong": "Schema, gate and target constraints are listed, and every prompt-only rule is recorded as a finding with an owner."
+        },
+        {
+          "id": "dbxfe-tools-scenario-rubric-3",
+          "criterion": "Approval, keys and timeouts",
+          "weak": "Retries on any failure with no key; approval is a message to the model.",
+          "partial": "A key and an approval exist, but a timeout is reported as failure or the approval is not bound to the arguments.",
+          "strong": "One key per intent with a digest, a timeout reported as unknown with same-key retry and reconciliation, and approval by another authorized person executing the exact arguments once."
+        },
+        {
+          "id": "dbxfe-tools-scenario-rubric-4",
+          "criterion": "Evidence and honesty",
+          "weak": "Declares the tool safe after a demonstration.",
+          "partial": "A test matrix without expected effect counts, or without its limits.",
+          "strong": "A matrix with expected decisions and counts, the local stub's limits stated, and unknowns with owners."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Does the supplier portal reject a duplicate order if we send the same reference twice?",
+          "response": "Unknown. The portal's API notes mention a client reference field but not what happens on a repeat, and the supplier's IT contact has not answered. Until it is tested in their sandbox, assume duplicates are possible."
+        },
+        {
+          "question": "Who approves requests during the night shift?",
+          "response": "Nobody is named yet. The plant manager says requests after 22:00 can wait for the morning supervisor, but has not confirmed it in writing."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-tools-l01"
+      ],
+      "claimIds": [
+        "dbxfe-tools-course-claim-mcp",
+        "dbxfe-tools-course-claim-mcp-auth",
+        "dbxfe-tools-course-claim-databricks-mcp",
+        "dbxfe-tools-course-claim-identity",
+        "dbxfe-tools-course-claim-owasp",
+        "dbxfe-tools-course-claim-retry",
+        "dbxfe-tools-course-claim-lab",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-tools-course-source-mcp-spec",
+      "title": "Tools: Model Context Protocol specification, revision 2025-11-25",
+      "url": "https://modelcontextprotocol.io/specification/2025-11-25/server/tools",
+      "publisher": "Model Context Protocol project",
+      "type": "primary reference",
+      "context": "Protocol specification; tool definitions, annotations and results.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Enforces nothing by itself. Not confirmed by web search in this build and page body not fetched; the URL is the one the MCP Python SDK 2.2.0 cites, and the wording relied on was read in the schema definitions shipped in mcp-types 2.2.0."
+    },
+    {
+      "id": "dbxfe-tools-course-source-mcp-sdk",
+      "title": "mcp 2.2.0: Model Context Protocol Python SDK",
+      "url": "https://pypi.org/project/mcp/2.2.0/",
+      "publisher": "Model Context Protocol project (published on PyPI)",
+      "type": "primary reference",
+      "context": "Python SDK for MCP clients and servers; transports and server authorization code.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "One SDK's implementation, not the specification. Downloaded from PyPI and read locally on 2026-09-23; the PyPI web page itself was not fetched."
+    },
+    {
+      "id": "dbxfe-tools-course-source-mcp-databricks",
+      "title": "Model Context Protocol (MCP) on Databricks",
+      "url": "https://docs.databricks.com/aws/en/generative-ai/mcp/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; managed, external and custom MCP servers.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Server types, preview status, regions and charges must be verified on the current page. Title and URL as supplied in the build's source list and not confirmed by search (session budget exhausted); page body not fetched (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-tools-course-source-databricks-mcp",
+      "title": "databricks-mcp 0.9.2: MCP helpers for Databricks",
+      "url": "https://pypi.org/project/databricks-mcp/0.9.2/",
+      "publisher": "Databricks (published on PyPI)",
+      "type": "primary reference",
+      "context": "Databricks-authored MCP client helpers, marked experimental.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Client code only; it shows URL shapes and authentication, not server-side permission rules or availability. Downloaded from PyPI and read locally on 2026-09-23."
+    },
+    {
+      "id": "dbxfe-tools-course-source-agent-auth",
+      "title": "Authentication for agents",
+      "url": "https://docs.databricks.com/aws/en/agents/custom-agents/agent-authentication",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; agents on Databricks Apps; app versus user identity.",
+      "accessDate": "2026-09-19",
+      "reviewDate": "2026-09-19",
+      "caveat": "User authorization was marked Public Preview at that review. Reviewed for the GenAI module on 2026-09-19; not re-searched or re-read for this record because the session's search budget was exhausted and the documentation host is blocked by the sandbox egress proxy."
+    },
+    {
+      "id": "dbxfe-tools-course-source-obo",
+      "title": "databricks-ai-bridge 0.22.0: model serving user credentials",
+      "url": "https://pypi.org/project/databricks-ai-bridge/0.22.0/",
+      "publisher": "Databricks (published on PyPI)",
+      "type": "primary reference",
+      "context": "On-behalf-of-user credentials for agents in Databricks Model Serving.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "One library release; the serving feature is a preview whose prerequisites must be read from current documentation. Downloaded from PyPI and read locally on 2026-09-23."
+    },
+    {
+      "id": "dbxfe-tools-course-source-owasp",
+      "title": "OWASP Top 10 for Large Language Model Applications",
+      "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+      "publisher": "OWASP Foundation",
+      "type": "primary reference",
+      "context": "Community risk list for LLM applications; editions number risks differently.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A risk list, not a standard or test. Title and URL as supplied in the build's source list and not confirmed by search; page not fetched. Risk wording read in the OWASP summaries reproduced by garak 0.17.0, downloaded from PyPI."
+    },
+    {
+      "id": "dbxfe-tools-course-source-urllib3",
+      "title": "urllib3 2.6.3: Retry",
+      "url": "https://pypi.org/project/urllib3/2.6.3/",
+      "publisher": "urllib3 maintainers (published on PyPI)",
+      "type": "primary reference",
+      "context": "Python HTTP client; Retry defaults for idempotent methods and backoff.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "One client's defaults; no client setting makes a server operation idempotent. Installed source read locally on 2026-09-23."
+    },
+    {
+      "id": "dbxfe-tools-course-source-mcp-sdk-auth-settings",
+      "title": "MCP Python SDK v2.2.0: src/mcp/server/auth/settings.py (AuthSettings.validate_token_resource)",
+      "url": "https://github.com/modelcontextprotocol/python-sdk/blob/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/settings.py",
+      "publisher": "Model Context Protocol project (python-sdk, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Server authorization settings of the MCP Python SDK 2.2.0: whether the bearer middleware compares a token's RFC 8707 resource indicator with the server's own URL.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/settings.py (tag v2.2.0): 'validate_token_resource: bool | None = Field( default=None,' ... '`AuthSettings.validate_token_resource` is not set, so bearer tokens are not checked' ... 'against `resource_server_url`; it will default to True in 3.0'. One SDK release, implementation scope only: the audience comparison is opt-in in 2.2.0, and the stated 3.0 default is a plan."
+    },
+    {
+      "id": "dbxfe-tools-course-source-mcp-spec-authorization",
+      "title": "Authorization: Model Context Protocol specification, revision 2025-11-25 (specification source)",
+      "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/basic/authorization.mdx",
+      "publisher": "Model Context Protocol project (specification source repository)",
+      "type": "primary reference",
+      "context": "Token handling requirements for MCP servers on HTTP transports: audience validation and the status code for invalid or expired tokens.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/basic/authorization.mdx: 'MCP servers **MUST** validate that access tokens were issued specifically for them as the intended audience,' ... 'Invalid or expired tokens **MUST** receive a HTTP 401'. Specification scope: a requirement on servers that enforces nothing by itself, not a description of any SDK default."
+    },
+    {
+      "id": "dbxfe-tools-course-source-mcp-sdk-token-verifier",
+      "title": "MCP Python SDK v2.2.0: src/mcp/server/auth/provider.py (TokenVerifier.verify_token)",
+      "url": "https://github.com/modelcontextprotocol/python-sdk/blob/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/provider.py",
+      "publisher": "Model Context Protocol project (python-sdk, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "The token verifier interface of the MCP Python SDK 2.2.0, and how the bearer middleware treats a token the verifier rejects.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/provider.py (tag v2.2.0): 'With `AuthSettings.validate_token_resource` the bearer middleware then refuses any token whose resource is not `resource_server_url`; without it, confirming the token was issued for this server (for example by passing the expected audience to your JWT library) is up to the verifier.' and from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/middleware/bearer_auth.py: 'auth_info = await self.token_verifier.verify_token(token)' ... 'if not auth_info: return None' One SDK release, implementation scope only: a token the verifier rejects receives 401, so a verifier that checks the audience refuses a token issued for another server without validate_token_resource."
+    },
+    {
+      "id": "dbxfe-tools-course-source-urllib3-retry",
+      "title": "urllib3 2.6.3: src/urllib3/util/retry.py (connection errors, read errors and allowed_methods)",
+      "url": "https://github.com/urllib3/urllib3/blob/0248277dd7ac0239204889ca991353ad3e3a1ddc/src/urllib3/util/retry.py",
+      "publisher": "urllib3 maintainers (open-source repository)",
+      "type": "primary reference",
+      "context": "How Retry classifies a connect timeout and a read timeout, and which of them allowed_methods gates.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/urllib3/urllib3/0248277dd7ac0239204889ca991353ad3e3a1ddc/src/urllib3/util/retry.py (tag 2.6.3): 'These are errors raised before the request is sent to the remote server, which we assume has not triggered the server to process the request.' ... 'return isinstance(err, ConnectTimeoutError)' ... 'return isinstance(err, (ReadTimeoutError, ProtocolError))' ... 'if read is False or method is None or not self._is_method_retryable(method):' One client library release, implementation scope only: allowed_methods gates read-timeout and status retries, while a connect timeout is retried for any method; no client setting makes a server operation idempotent."
+    },
+    {
+      "id": "dbxfe-tools-course-source-devhub-genie",
+      "title": "Genie Agents: Databricks developer documentation source (src/content/docs/agents/genie.md)",
+      "url": "https://github.com/databricks/devhub/blob/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/genie.md",
+      "publisher": "Databricks (databricks/devhub, source of developers.databricks.com)",
+      "type": "primary reference",
+      "context": "Databricks' developer documentation page on embedding a Genie Agent in an app; used here only for the product's current name.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/devhub/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/genie.md: 'A **Genie Agent** (formerly Genie space) is a Databricks natural-language interface over Unity Catalog tables' Naming scope only: it does not describe the managed MCP server for Genie, its availability or its status; API identifiers such as the genie/<space-id> path keep their spelling."
+    },
+    {
+      "id": "dbxfe-tools-course-source-mcp-spec-tools",
+      "title": "Tools: Model Context Protocol specification, revision 2025-11-25 (specification source)",
+      "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/server/tools.mdx",
+      "publisher": "Model Context Protocol project (specification source repository)",
+      "type": "primary reference",
+      "context": "Protocol specification source: listing and calling tools, tool definitions, annotations and tool execution errors.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/server/tools.mdx: 'To discover available tools, clients send a `tools/list` request.' ... 'To invoke a tool, clients send a `tools/call` request:' ... '\"jsonrpc\": \"2.0\",' ... '`inputSchema`: JSON Schema defining expected parameters' ... '`outputSchema`: Optional JSON Schema' ... 'clients **MUST** consider tool annotations to be untrusted unless they come from trusted servers.' ... '**Tool Execution Errors**: Reported in tool results with `isError: true`' Specification scope: requirements on clients and servers that enforce nothing by themselves, not a description of any implementation."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-tools-course-claim-mcp",
+      "description": "MCP clients list tools with tools/list and call them with tools/call over JSON-RPC 2.0 using stdio or Streamable HTTP; each tool declares a JSON Schema inputSchema, and its annotations are hints that clients should not rely on from untrusted servers.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-tools-course-source-mcp-spec",
+        "dbxfe-tools-course-source-mcp-sdk",
+        "dbxfe-tools-course-source-mcp-spec-tools"
+      ],
+      "context": "MCP revisions 2025-11-25 and 2026-07-28."
+    },
+    {
+      "id": "dbxfe-tools-course-claim-mcp-auth",
+      "description": "In the MCP Python SDK 2.2.0 an HTTP server rejects a missing or expired bearer token with 401 and a token lacking the endpoint's required scopes with 403, and a token issued for another resource with 401 only when AuthSettings.validate_token_resource is enabled or the token verifier checks the audience, which the MCP specification requires servers to check; per-tool checks are left to handler code.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-tools-course-source-mcp-sdk",
+        "dbxfe-tools-course-source-mcp-sdk-auth-settings",
+        "dbxfe-tools-course-source-mcp-spec-authorization",
+        "dbxfe-tools-course-source-mcp-sdk-token-verifier"
+      ],
+      "context": "One SDK release."
+    },
+    {
+      "id": "dbxfe-tools-course-claim-databricks-mcp",
+      "description": "Databricks-managed MCP servers are reached on the workspace host under /api/2.0/mcp/ for Unity Catalog functions, vector search indexes, Genie Agents (formerly Genie spaces) and external connections with the caller's Databricks credentials as a bearer token; custom servers on Databricks Apps require OAuth.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-tools-course-source-databricks-mcp",
+        "dbxfe-tools-course-source-mcp-databricks",
+        "dbxfe-tools-course-source-devhub-genie"
+      ],
+      "context": "databricks-mcp 0.9.2; verify availability and status."
+    },
+    {
+      "id": "dbxfe-tools-course-claim-identity",
+      "description": "Agents on Databricks can act with the app's identity or on behalf of the user; user authorization was marked Public Preview, a missing forwarded token can fall back to the app identity, and in Model Serving the user credential is a downscoped per-request token that fails when absent.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-tools-course-source-agent-auth",
+        "dbxfe-tools-course-source-obo"
+      ],
+      "context": "Databricks on AWS; preview features."
+    },
+    {
+      "id": "dbxfe-tools-course-claim-owasp",
+      "description": "OWASP's LLM risk list names prompt injection, with direct and indirect forms, and excessive agency, caused by excessive functionality, permissions or autonomy.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-tools-course-source-owasp"
+      ],
+      "context": "Risk names used without edition numbers."
+    },
+    {
+      "id": "dbxfe-tools-course-claim-retry",
+      "description": "urllib3 retries a read timeout by default only for methods considered idempotent, which excludes POST.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-tools-course-source-urllib3",
+        "dbxfe-tools-course-source-urllib3-retry"
+      ],
+      "context": "urllib3 2.6.3."
+    },
+    {
+      "id": "dbxfe-tools-course-claim-lab",
+      "description": "Lab L22's decisions and counts come from an executed local run of its reference gate over synthetic fixtures, not from any platform.",
+      "kind": "guidance",
+      "sourceIds": [],
+      "context": "Python 3.12 standard library; no model, MCP server or workspace."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-tools-l01-call-concept",
+      "term": "tool call",
+      "aliases": [
+        "function call",
+        "tool use"
+      ],
+      "definition": "A model's structured proposal of a tool name and JSON arguments, with no effect until application code executes it.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-call"
+    },
+    {
+      "id": "dbxfe-tools-l01-gate-concept",
+      "term": "policy gate",
+      "aliases": [
+        "tool gate"
+      ],
+      "definition": "Application code that decides each proposed tool call from identity, schema, permission, keys and approval policy before any handler runs.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-call"
+    },
+    {
+      "id": "dbxfe-tools-l01-schema-concept",
+      "term": "tool schema",
+      "aliases": [
+        "input schema",
+        "inputSchema"
+      ],
+      "definition": "The JSON Schema declaring a tool's arguments and limits, enforced by the gate before execution.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-call"
+    },
+    {
+      "id": "dbxfe-tools-l01-identity-concept",
+      "term": "acting identity",
+      "aliases": [
+        "principal"
+      ],
+      "definition": "The principal whose credential a target evaluates for a call, the user or the application's service principal.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-identity"
+    },
+    {
+      "id": "dbxfe-tools-l01-delegation-concept",
+      "term": "delegated authorization",
+      "aliases": [
+        "on-behalf-of-user",
+        "OBO"
+      ],
+      "definition": "Acting with the user's identity bounded by the application's scopes, so permission is the intersection of both.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-identity"
+    },
+    {
+      "id": "dbxfe-tools-l01-injection-concept",
+      "term": "prompt injection",
+      "aliases": [
+        "indirect prompt injection"
+      ],
+      "definition": "Text crafted to steer a model into unintended actions, typed directly or arriving inside retrieved content.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-injection"
+    },
+    {
+      "id": "dbxfe-tools-l01-sysprompt-concept",
+      "term": "system prompt",
+      "aliases": [
+        "system message"
+      ],
+      "definition": "Instructions in a model's context that shape behaviour but enforce nothing.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-injection"
+    },
+    {
+      "id": "dbxfe-tools-l01-approval-concept",
+      "term": "approval step",
+      "aliases": [
+        "human approval"
+      ],
+      "definition": "A hold that executes an action only after another authorized person accepts its exact stored arguments.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-approval"
+    },
+    {
+      "id": "dbxfe-tools-l01-retry-concept",
+      "term": "bounded retry",
+      "aliases": [
+        "retry with backoff"
+      ],
+      "definition": "A fixed number of repeated attempts with growing waits, only for failures that may succeed and cannot duplicate an effect.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-retries"
+    },
+    {
+      "id": "dbxfe-tools-l01-idempotency-concept",
+      "term": "idempotency key",
+      "aliases": [
+        "request key"
+      ],
+      "definition": "A client-chosen identifier for one intended effect that turns repeats into lookups and changed repeats into conflicts.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-retries"
+    },
+    {
+      "id": "dbxfe-tools-l01-mcp-concept",
+      "term": "Model Context Protocol (MCP)",
+      "aliases": [
+        "MCP"
+      ],
+      "definition": "An open protocol for discovering and calling tools, resources and prompts exposed by servers over JSON-RPC 2.0.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-mcp"
+    },
+    {
+      "id": "dbxfe-tools-l01-audit-concept",
+      "term": "audit trail",
+      "aliases": [
+        "decision log"
+      ],
+      "definition": "The gate's append-only record of every decision, refusals included.",
+      "lessonId": "dbxfe-tools-l01",
+      "sectionId": "dbxfe-tools-l01-audit"
+    }
+  ]
+}

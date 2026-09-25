@@ -1,0 +1,553 @@
+{
+  "module": {
+    "id": "dbxfe-modeling",
+    "title": "Data modeling and metric contracts",
+    "summary": "Declare the grain, build a star whose joins hold, keep history and missing keys honest, and write a metric contract that reconciles at line-day, plant-day and plant-month and catches five classic failures.",
+    "objectives": [
+      "Declare the grain of a fact and a metric, separate facts from dimensions, and explain why a medallion label is not a modeled entity.",
+      "Join facts to conformed and type 2 dimensions with a known cardinality, keeping missing keys visible and attributing history as-was or as-is on purpose.",
+      "Write and test a metric contract (numerator, denominator, unit, period, window, owner) that catches double counts, empty denominators, unit mixing and window mismatches."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-transformations"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-modeling-l01.json"
+    ],
+    "scenarioId": "dbxfe-modeling-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-modeling-scenario",
+      "title": "Explain two March defect rates before the monthly review",
+      "context": "Fictional Cinderline Components reviews March quality on Monday. For the South plant, the quality lead's workbook shows a March unit defect rate of 2.5% (21 defective of 840 inspected pieces), while the new operations dashboard shows 1.8%. The dashboard reads a wide table built on 1 April: inspections joined to the line history on line_id, quantities summed as recorded, lines missing from the line dimension dropped by an inner join, and a 'last 3 days' tile counted in calendar days. South's packing line records cases of 12 pieces, North's line N1 changed supervisor on 30 March, and line N3 started on 1 April before it was added to the line dimension.",
+      "task": "Write the note the operations director asked for: which number is right and why the other differs, the model you would publish instead of the wide table (grains, keys, history, unknown members), the metric contract for unit_defect_rate, the test that would have caught each defect, and the decisions still open for the owner.",
+      "requirements": [
+        "Explain the 2.5% and the 1.8% with the specific parts that produce each number, not with a general statement about data quality.",
+        "State the grain of the fact, of each dimension and of each published metric value, and the key that makes every fact-to-dimension join many-to-one.",
+        "Write the metric contract: numerator and denominator over one population, unit and conversion, business day, month and window, empty cases, unknown member, owner and version.",
+        "Name one test per defect in the wide table, and keep undecided questions, such as the as-was or as-is supervisor view and rework, as open items for the owner."
+      ],
+      "model": "### Which number is right\nThe workbook's 2.5% follows the contract: South's March parts in pieces are 840 inspected and 21 defective. The dashboard's 1.8% is 10 / 565, because it summed the packing line's cases as if they were pieces (10 + 10 + 5 cases instead of 120 + 120 + 60 pieces), so the two parts shrank by different amounts. South has one version per line and no missing line, so its March difference is units alone.\n\n### Defects that did not change South but will change other numbers\n- Line history joined on line_id: every N1 inspection appears twice; over the period North's pieces rise 80% (1,250 to 2,250) while its rate moves only from 2.16% to 2.13%, so the tile looked plausible.\n- Inner join to the line dimension: N3's 50 April pieces vanish without a message.\n- 'Last 3 days' on Monday 30 March covers Saturday to Monday, one working day: North shows 2.0% instead of 2.25%.\n\n### Model to publish\nfact_inspection, one row per accepted inspection, with line_sk resolved to the version valid on the business day (valid_to exclusive), pieces converted at load and line_sk -1 for missing lines; dim_line (type 2 on supervisor), dim_plant, dim_shift and dim_date (plant calendar). Line-day, plant-day and plant-month values are rebuilt from summed parts. A wide table may return as a rebuildable view of this star, with its grain stated and its row count tested.\n\n### Contract (version 1, proposed to the quality lead)\nNumerator: defective pieces; denominator: inspected pieces of the same accepted inspections. Unit: pieces, cases times 12, anything without a conversion quarantined from both parts. Business day 00:00 to 23:59:59 local; calendar month; window the last three business days of the plant calendar. no_inspections and no_units give no rate. Missing lines go to the unknown member and are listed.\n\n### Tests\nParts reconcile across the three grains; packing-line quantities converted before any sum; fact row count unchanged by every join (22 in, 22 out); orphans listed; window dates read from the calendar; zero denominators give no rate.\n\n### Open items\nThe supervisor view for the review (the director asked for as-was), the treatment of rework, and who owns the plant calendar.",
+      "reasoning": "The note settles the number with the parts that produce it, separates the one defect that explains South's gap from latent defects that did not affect it, replaces the wide table with a model whose joins are provably many-to-one, turns every clause into a test and leaves business decisions to the owner.",
+      "rubric": [
+        {
+          "id": "dbxfe-modeling-scenario-rubric-1",
+          "criterion": "Explaining the two numbers",
+          "weak": "Blames data quality in general or picks the higher number without showing parts.",
+          "partial": "Names the unit problem but gives no parts, or credits defects that did not affect South's March value.",
+          "strong": "Shows 21 / 840 against 10 / 565, attributes the gap to cases summed as pieces, and says why the other defects leave South unchanged."
+        },
+        {
+          "id": "dbxfe-modeling-scenario-rubric-2",
+          "criterion": "Model, keys and history",
+          "weak": "Describes the wide table again or lists tables without grains or keys.",
+          "partial": "States grains but still joins history on line_id or lets unknown lines drop.",
+          "strong": "States every grain, resolves line_sk on the validity window with an exclusive end, keeps an unknown member and converts units at load."
+        },
+        {
+          "id": "dbxfe-modeling-scenario-rubric-3",
+          "criterion": "Contract, tests and open items",
+          "weak": "A one-line definition without denominator population, unit or window.",
+          "partial": "Most clauses present, but tests compare only rates or omit the window and empty cases.",
+          "strong": "Every clause with a test that compares parts, including the business-day window and empty cases, and open items assigned to the owner."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Which supervisor should the March review show for N1's inspections?",
+          "response": "The operations director wants the supervisor on duty at the time (as-was) for the review, and today's supervisor (as-is) only on the staffing page; both views must be labelled."
+        },
+        {
+          "question": "Will the packing line's case size change?",
+          "response": "The packaging engineer expects a 24-piece case from May, so the conversion must be dated rather than a constant."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-modeling-l01"
+      ],
+      "claimIds": [
+        "dbxfe-modeling-course-claim-medallion",
+        "dbxfe-modeling-course-claim-grain",
+        "dbxfe-modeling-course-claim-star",
+        "dbxfe-modeling-course-claim-conformed",
+        "dbxfe-modeling-course-claim-type2",
+        "dbxfe-modeling-course-claim-nulls",
+        "dbxfe-modeling-course-claim-additive",
+        "dbxfe-modeling-course-claim-join",
+        "dbxfe-modeling-course-claim-groupby",
+        "dbxfe-modeling-course-claim-ansi",
+        "dbxfe-modeling-course-claim-metricviews",
+        "dbxfe-modeling-course-claim-metricjoins",
+        "dbxfe-modeling-course-claim-constraints",
+        "dbxfe-modeling-course-claim-autocdc",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-modeling-course-source-medallion",
+      "title": "What is the medallion lakehouse architecture?",
+      "url": "https://docs.databricks.com/aws/en/lakehouse/medallion",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; lakehouse design pattern.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Layers describe data quality and readiness, not table grain or keys. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-warehousing",
+      "title": "Data warehousing architecture",
+      "url": "https://docs.databricks.com/aws/en/sql/get-started/data-warehousing-concepts",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks SQL; data warehousing concepts.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Names modeling approaches for the gold layer without prescribing one. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-metricviews",
+      "title": "Unity Catalog metric views",
+      "url": "https://docs.databricks.com/aws/en/uc-semantics/metric-views/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog semantics. Release status, UI flows and runtime requirements vary.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Nothing was created or queried; check the current page for status and requirements. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-metricjoins",
+      "title": "Joins in metric views",
+      "url": "https://docs.databricks.com/aws/en/uc-semantics/metric-views/joins",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog metric views.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Join behaviour is documented, not tested here. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-measure",
+      "title": "measure aggregate function",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/functions/measure",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks SQL language reference.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Syntax only; not executed in this build. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-constraints",
+      "title": "Constraints on Databricks",
+      "url": "https://docs.databricks.com/aws/en/tables/constraints",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog and Delta Lake tables.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Constraint availability depends on runtime version. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-autocdc",
+      "title": "The AUTO CDC APIs: Simplify change data capture with pipelines",
+      "url": "https://docs.databricks.com/aws/en/ldp/cdc",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Lakeflow pipelines, formerly Delta Live Tables.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "No pipeline was run in this build. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-groupby",
+      "title": "GROUP BY Clause (Spark 4.0.4 SQL reference)",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-syntax-qry-select-groupby.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4 SQL reference.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Grouping syntax does not decide which measures may be summed. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-join",
+      "title": "JOIN (Spark 4.0.4 SQL reference)",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-syntax-qry-select-join.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4 SQL reference.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Join type does not establish key uniqueness or business grain. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-ansi",
+      "title": "ANSI Compliance (Spark 4.0.4 SQL reference)",
+      "url": "https://spark.apache.org/docs/4.0.4/sql-ref-ansi-compliance.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Defaults differ across engines and versions. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-grain",
+      "title": "Grain (Kimball Dimensional Modeling Techniques)",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/grain/",
+      "publisher": "Kimball Group",
+      "type": "primary reference",
+      "context": "Dimensional modeling technique reference; product-independent.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A methodology source, not a platform rule. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-additive",
+      "title": "Additive, Semi-Additive, and Non-Additive Facts (Kimball)",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/",
+      "publisher": "Kimball Group",
+      "type": "primary reference",
+      "context": "Dimensional modeling technique reference; product-independent.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Which components to store depends on the metric's contract. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-conformed",
+      "title": "Conformed Dimensions (Kimball)",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/conformed-dimension/",
+      "publisher": "Kimball Group",
+      "type": "primary reference",
+      "context": "Dimensional modeling technique reference; product-independent.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Conformance is an agreement no engine enforces. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-type2",
+      "title": "Type 2: Add New Row (Kimball)",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/type-2/",
+      "publisher": "Kimball Group",
+      "type": "primary reference",
+      "context": "Dimensional modeling technique reference; product-independent.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Boundary semantics remain a design decision. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-nulls",
+      "title": "Nulls in Fact Tables (Kimball)",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/fact-table-null/",
+      "publisher": "Kimball Group",
+      "type": "primary reference",
+      "context": "Dimensional modeling technique reference; product-independent.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The number of default rows is a design decision. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-modeling-course-source-star",
+      "title": "Star Schemas and OLAP Cubes (Kimball)",
+      "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/star-schema-olap-cube/",
+      "publisher": "Kimball Group",
+      "type": "primary reference",
+      "context": "Dimensional modeling technique reference; product-independent.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Physical layout on a lakehouse is a separate decision. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-modeling-course-claim-medallion",
+      "description": "Medallion layers denote data quality and readiness; the gold layer is a presentation layer that can hold data marts, frequently dimensional models such as a star schema or flattened tables.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-medallion",
+        "dbxfe-modeling-course-source-warehousing"
+      ],
+      "context": "Databricks lakehouse guidance."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-grain",
+      "description": "Declaring the grain establishes what one fact row represents and precedes the choice of dimensions and facts.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-grain"
+      ],
+      "context": "Kimball technique."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-star",
+      "description": "A star schema links fact tables to denormalized dimension tables through primary and foreign keys.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-star"
+      ],
+      "context": "Kimball technique."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-conformed",
+      "description": "Conformed dimensions share column names and domain contents, so separate facts can be combined in one report.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-conformed"
+      ],
+      "context": "Kimball technique."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-type2",
+      "description": "A type 2 change adds a new dimension row with a new surrogate key used by facts from the change onward.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-type2"
+      ],
+      "context": "Kimball technique."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-nulls",
+      "description": "Fact tables avoid null foreign keys by pointing to a default dimension row for the unknown or not applicable condition.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-nulls"
+      ],
+      "context": "Kimball technique."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-additive",
+      "description": "Ratios are non-additive; their additive components are stored and summed before the ratio is computed.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-additive"
+      ],
+      "context": "Kimball technique."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-join",
+      "description": "A Spark SQL inner join returns matching row combinations and a left join keeps unmatched left rows; neither checks key uniqueness.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-join"
+      ],
+      "context": "Apache Spark 4.0.4."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-groupby",
+      "description": "Spark SQL GROUPING SETS equal a union of GROUP BY results; ROLLUP(a, b) equals GROUPING SETS((a, b), (a), ()).",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-groupby"
+      ],
+      "context": "Apache Spark 4.0.4."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-ansi",
+      "description": "Spark 4 enables ANSI mode by default, so division by zero raises an error while try_divide returns NULL.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-ansi"
+      ],
+      "context": "Apache Spark 4.0.4; observed in the local Lab L11 run."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-metricviews",
+      "description": "Unity Catalog metric views define measures once, separately from grouping fields, and evaluate them with MEASURE() at the grain each query selects.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-metricviews",
+        "dbxfe-modeling-course-source-measure"
+      ],
+      "context": "Databricks Unity Catalog; status and requirements must be checked."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-metricjoins",
+      "description": "Metric view joins are many-to-one by default, and when a join finds several rows the first matching row is selected.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-metricjoins"
+      ],
+      "context": "Databricks Unity Catalog metric views."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-constraints",
+      "description": "Primary and foreign key constraints on Databricks are informational and not enforced; with RELY their truth is the user's responsibility.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-constraints"
+      ],
+      "context": "Databricks on AWS."
+    },
+    {
+      "id": "dbxfe-modeling-course-claim-autocdc",
+      "description": "AUTO CDC computes SCD type 1 and type 2 targets; type 2 targets carry __START_AT and __END_AT columns.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-modeling-course-source-autocdc"
+      ],
+      "context": "Lakeflow pipelines."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-modeling-l01-medallion-concept",
+      "term": "medallion label",
+      "aliases": [
+        "bronze, silver, gold"
+      ],
+      "definition": "A layer name that says how refined data is, not what one row of a table represents.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-grain"
+    },
+    {
+      "id": "dbxfe-modeling-l01-grain-concept",
+      "term": "grain",
+      "aliases": [
+        "declared grain",
+        "business grain"
+      ],
+      "definition": "The one-sentence statement of what a single row of a table or metric represents.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-grain"
+    },
+    {
+      "id": "dbxfe-modeling-l01-star-concept",
+      "term": "star schema",
+      "aliases": [
+        "star model",
+        "facts and dimensions"
+      ],
+      "definition": "One fact table of measured events joined many-to-one to dimension tables of descriptions.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-grain"
+    },
+    {
+      "id": "dbxfe-modeling-l01-conformed-concept",
+      "term": "conformed dimension",
+      "aliases": [
+        "conformed key",
+        "drill across"
+      ],
+      "definition": "A dimension whose keys and values mean the same in every fact that uses it.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-keys"
+    },
+    {
+      "id": "dbxfe-modeling-l01-scd-concept",
+      "term": "type 2 slowly changing dimension",
+      "aliases": [
+        "SCD type 2",
+        "as-was",
+        "as-is"
+      ],
+      "definition": "A dimension that keeps each version of a changed attribute as its own row with a surrogate key and validity dates.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-keys"
+    },
+    {
+      "id": "dbxfe-modeling-l01-cardinality-concept",
+      "term": "join cardinality",
+      "aliases": [
+        "many-to-one",
+        "many-to-many",
+        "double-count"
+      ],
+      "definition": "How many rows on each side of a join can match, which decides whether rows are kept or multiplied.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-keys"
+    },
+    {
+      "id": "dbxfe-modeling-l01-unknown-concept",
+      "term": "unknown member",
+      "aliases": [
+        "default dimension row"
+      ],
+      "definition": "A default dimension row that receives facts whose key has no valid dimension row, keeping them visible.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-keys"
+    },
+    {
+      "id": "dbxfe-modeling-l01-unit-concept",
+      "term": "unit conversion",
+      "aliases": [
+        "unit of measure",
+        "pieces per case"
+      ],
+      "definition": "Turning every quantity into the contract's unit before any sum.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-measures"
+    },
+    {
+      "id": "dbxfe-modeling-l01-additivity-concept",
+      "term": "additive parts",
+      "aliases": [
+        "additive facts",
+        "non-additive ratio"
+      ],
+      "definition": "Counts that can be summed across dimensions, from which a non-additive rate is recomputed once per grain.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-measures"
+    },
+    {
+      "id": "dbxfe-modeling-l01-denominator-concept",
+      "term": "empty denominator",
+      "aliases": [
+        "zero denominator",
+        "no_units"
+      ],
+      "definition": "A rate whose divisor is zero or has no rows, shown as no rate with a reason rather than 0% or an error.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-measures"
+    },
+    {
+      "id": "dbxfe-modeling-l01-window-concept",
+      "term": "business-day window",
+      "aliases": [
+        "plant calendar",
+        "trailing business days"
+      ],
+      "definition": "A reporting window counted in the plant calendar's business days, not in calendar days.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-measures"
+    },
+    {
+      "id": "dbxfe-modeling-l01-contract-concept",
+      "term": "metric contract",
+      "aliases": [
+        "metric definition"
+      ],
+      "definition": "An owned, versioned statement of a metric's grain, parts, unit, period, window and empty cases, each with a test.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-contract"
+    },
+    {
+      "id": "dbxfe-modeling-l01-semantic-concept",
+      "term": "metric view",
+      "aliases": [
+        "Unity Catalog metric views",
+        "semantic metric definition"
+      ],
+      "definition": "A Unity Catalog object that stores measure definitions and evaluates them at each query's grain.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-contract"
+    },
+    {
+      "id": "dbxfe-modeling-l01-wide-concept",
+      "term": "wide table",
+      "aliases": [
+        "flattened table",
+        "one big table"
+      ],
+      "definition": "A table that copies dimension attributes onto every fact row, derived from the star and rebuilt on change.",
+      "lessonId": "dbxfe-modeling-l01",
+      "sectionId": "dbxfe-modeling-l01-contract"
+    }
+  ]
+}

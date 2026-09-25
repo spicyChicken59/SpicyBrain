@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import type { Course, LearningPath } from "../../src/content-schema";
+import type { LearningPath } from "../../src/content-schema";
+import type { CatalogCourse } from "../../src/catalog-types";
 import { emptyState, migrateState, parseImport } from "../../src/study";
 import { ready, nav, stored, noOverflow, shot } from "./helpers";
 const paths = JSON.parse(
@@ -8,7 +9,7 @@ const paths = JSON.parse(
 ) as LearningPath[];
 const courses = JSON.parse(
   await readFile("src/generated/catalog.json", "utf8"),
-) as Course[];
+) as CatalogCourse[];
 const path = paths.find((p) => p.defaultStart)!;
 const lessons = courses.flatMap((c) => c.modules.flatMap((m) => m.lessons));
 const sequence = path.groups.flatMap((g) => g.lessonIds);
@@ -20,9 +21,11 @@ test("Study hub: fresh learner, optional bridge, worked topic, solution, downloa
   await expect(
     page.getByRole("navigation", { name: "Main navigation" }).getByRole("link"),
   ).toHaveText(["Today", "Courses", "Review", "Notebook"]);
-  await expect(page.getByRole("heading", { name: "One idea. A little clearer." })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "One idea. A little clearer." }),
+  ).toBeVisible();
   await shot(page, "hub-today-desktop");
-  await nav(page,`#/path/${path.id}`);
+  await nav(page, `#/path/${path.id}`);
   await expect(
     page.getByRole("heading", { name: "Starting assumptions" }),
   ).toBeVisible();
@@ -133,6 +136,9 @@ test("Canonical topics: two paths, direct fallback, reload, history, search and 
   await expect
     .poll(async () => (await stored(page))?.resume?.pathId)
     .toBe(other.id);
+  await expect
+    .poll(async () => (await stored(page))?.positions[shared]?.sectionId)
+    .toBe(section);
   await page.getByRole("link", { name: "Search", exact: true }).click();
   await page.getByLabel("Search courses, concepts, or notes").fill(topic.title);
   await page.locator(".search-result").first().click();
@@ -154,11 +160,23 @@ test("Canonical topics: two paths, direct fallback, reload, history, search and 
   await expect(page.locator(".reader-context")).toContainText(other.title);
   const origin = (await stored(page)).resume!;
   const originLink = `#/lesson/${shared}/${origin.sectionId}?path=${other.id}`;
-  await nav(page, `#/lesson/${shared}/${topic.sections[3].id}?from=${encodeURIComponent(originLink)}`);
+  await nav(
+    page,
+    `#/lesson/${shared}/${topic.sections[3].id}?from=${encodeURIComponent(originLink)}`,
+  );
   // Let the 150ms initial position capture and 300ms scroll debounce both run.
   await page.waitForTimeout(400);
-  expect((await stored(page)).resume).toEqual(expect.objectContaining({ courseId: origin.courseId, lessonId: origin.lessonId, sectionId: origin.sectionId, pathId: origin.pathId }));
-  expect((await stored(page)).positions[shared].sectionId).toBe(origin.sectionId);
+  expect((await stored(page)).resume).toEqual(
+    expect.objectContaining({
+      courseId: origin.courseId,
+      lessonId: origin.lessonId,
+      sectionId: origin.sectionId,
+      pathId: origin.pathId,
+    }),
+  );
+  expect((await stored(page)).positions[shared].sectionId).toBe(
+    origin.sectionId,
+  );
   await page.locator(".detour-return a").click();
   await expect(page).toHaveURL(new RegExp(origin.sectionId));
   await nav(page, `#/lesson/${shared}`);
@@ -277,13 +295,11 @@ test("Native baseline v2 and actual v2-format backup migrate without losing any 
     ["baseline-v2.json", backup, migrateState(old)],
     ["path-v3.json", await readFile(file!, "utf8"), exported],
   ] as const) {
-    await fresh
-      .getByLabel("Study data file")
-      .setInputFiles({
-        name,
-        mimeType: "application/json",
-        buffer: Buffer.from(raw),
-      });
+    await fresh.getByLabel("Study data file").setInputFiles({
+      name,
+      mimeType: "application/json",
+      buffer: Buffer.from(raw),
+    });
     await expect(
       fresh.getByRole("heading", { name: "Import preview" }),
     ).toBeVisible();

@@ -1,0 +1,63 @@
+{
+ "procedure": "dbo.sp_daily_inspections",
+ "parameters": [
+  "@plant_code NVARCHAR(10)"
+ ],
+ "variables": [
+  "@since DATETIME",
+  "@until DATETIME"
+ ],
+ "reads": [
+  "dbo.rpt_quality_detail",
+  "erp.inspection",
+  "erp.inspector",
+  "etl.watermark"
+ ],
+ "writes": [
+  "dbo.rpt_quality_daily",
+  "dbo.rpt_quality_detail",
+  "etl.watermark"
+ ],
+ "temporary_objects": [
+  "#affected_days"
+ ],
+ "time_functions": [
+  "GETDATE"
+ ],
+ "local_time_arithmetic": [
+  "DATEADD(HOUR, -6, i.inspected_at)"
+ ],
+ "integer_division": [
+  "s.units_defective * 100 / s.units_inspected"
+ ],
+ "string_key_comparisons": [
+  "a.plant_code = d.plant_code",
+  "a.plant_code = i.plant_code",
+  "i.plant_code = @plant_code",
+  "s.inspector_code = i.inspector_code",
+  "s.plant_code = @plant_code",
+  "t.plant_code = s.plant_code",
+  "t.shift_code = s.shift_code"
+ ],
+ "null_replacements": [
+  "ISNULL(s.shift_code, N'UNASSIGNED')"
+ ],
+ "outer_join_on_predicates": [
+  "s.inspector_code = i.inspector_code",
+  "s.plant_code = @plant_code"
+ ],
+ "state_tables": [
+  "etl.watermark"
+ ],
+ "transaction": {
+  "explicit": true,
+  "xact_abort": true,
+  "statements_inside": [
+   "DELETE dbo.rpt_quality_detail",
+   "INSERT dbo.rpt_quality_detail",
+   "MERGE dbo.rpt_quality_daily",
+   "UPDATE etl.watermark"
+  ]
+ },
+ "merge_leaves_vanished_groups": true
+}

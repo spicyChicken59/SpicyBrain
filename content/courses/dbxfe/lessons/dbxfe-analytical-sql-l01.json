@@ -1,0 +1,598 @@
+{
+  "id": "dbxfe-analytical-sql-l01",
+  "title": "Advanced analytical SQL: windows, membership, nested fields and time",
+  "summary": "Predict window frames, ties, deduplication, islands, semi and anti joins, set operators, nested fields, safe casts and time-zone results from executed local Spark SQL.",
+  "contentVersion": "1.0.0",
+  "teachingFormat": "flexible",
+  "estimatedMinutes": 18,
+  "objectives": [
+    "Predict the value a window frame, ranking function or deduplication rule produces for each row, including at a tie and around a NULL.",
+    "Ask membership questions with semi and anti joins and combine sets without positional mismatches.",
+    "Read struct and array fields, convert untyped text safely and state which session time zone a date, hour or duration depends on."
+  ],
+  "prerequisiteIds": [
+    "dbxfe-dataframes",
+    "dbxfe-grain-joins"
+  ],
+  "tags": [
+    "Analytics",
+    "Spark SQL",
+    "window functions",
+    "time zones",
+    "Substantive technical topic"
+  ],
+  "bodyFile": "lessons/dbxfe-analytical-sql-l01.md",
+  "sections": [
+    {
+      "id": "dbxfe-analytical-sql-l01-outcome",
+      "kind": "outcome",
+      "title": "What you will be able to predict",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept",
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-start",
+      "kind": "prerequisites",
+      "title": "Bring grain, joins and null rules",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-frames",
+      "kind": "mechanism",
+      "title": "A window computes each row against its frame",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-membership",
+      "kind": "mechanism",
+      "title": "Membership questions and set operators",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-membership-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-join",
+        "dbxfe-analytical-sql-course-claim-null",
+        "dbxfe-analytical-sql-course-claim-setops",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-analytical-sql-course-claim-ansi",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-nested",
+      "kind": "mechanism",
+      "title": "Nested fields, safe casts and null arithmetic",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-cast-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-functions",
+        "dbxfe-analytical-sql-course-claim-null",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-analytical-sql-course-claim-ansi",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-time",
+      "kind": "mechanism",
+      "title": "Instants, session zones and the DST day",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-worked",
+      "kind": "example",
+      "title": "Two executed queries and their rows",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept",
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-task",
+      "kind": "exercise",
+      "title": "Predict three changed cases",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept",
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-solution",
+      "kind": "solution",
+      "title": "The changed answers, explained",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept",
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-analytical-sql-course-claim-tsql",
+        "dbxfe-analytical-sql-course-claim-functions",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-limits",
+      "kind": "mistakes",
+      "title": "Dialect assumptions and other executed traps",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-session-concept",
+        "dbxfe-analytical-sql-l01-membership-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-qualify",
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-analytical-sql-course-claim-tsql",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-sources",
+      "kind": "sources",
+      "title": "Sources and execution scope",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-null",
+        "dbxfe-analytical-sql-course-claim-join",
+        "dbxfe-analytical-sql-course-claim-functions",
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-setops",
+        "dbxfe-analytical-sql-course-claim-qualify",
+        "dbxfe-analytical-sql-course-claim-tsql",
+        "dbxfe-analytical-sql-course-claim-ansi",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-links",
+      "kind": "related",
+      "title": "Where these queries lead",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-guidance"
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-revisit",
+      "kind": "revisit",
+      "title": "Check your understanding",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-guidance"
+      ],
+      "assetIds": []
+    }
+  ],
+  "questions": [
+    {
+      "id": "dbxfe-analytical-sql-l01-q1",
+      "revision": "1",
+      "prompt": "For M1 on 2026-03-01 (day shift 50, night shift 40), what does SUM(units) OVER (PARTITION BY machine_id ORDER BY day) return for the two rows?",
+      "options": [
+        {
+          "id": "dbxfe-analytical-sql-l01-q1-a",
+          "text": "90 and 90",
+          "rationale": "With ORDER BY and no frame, the default RANGE frame includes every peer row sharing the day, so both rows see 50 + 40."
+        },
+        {
+          "id": "dbxfe-analytical-sql-l01-q1-b",
+          "text": "50 and 90",
+          "rationale": "That is the ROWS frame answer; it needs ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW or a unique ordering key."
+        },
+        {
+          "id": "dbxfe-analytical-sql-l01-q1-c",
+          "text": "50 and 40",
+          "rationale": "A window function does not simply echo the row's own value; the frame always includes preceding rows here."
+        },
+        {
+          "id": "dbxfe-analytical-sql-l01-q1-d",
+          "text": "40 and 90",
+          "rationale": "The night shift is not ordered before the day shift, and peers share one value under the default frame anyway."
+        }
+      ],
+      "correctOptionId": "dbxfe-analytical-sql-l01-q1-a",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-q2",
+      "revision": "1",
+      "prompt": "inspections has one row whose machine_id is NULL. What does SELECT machine_id FROM machines WHERE machine_id NOT IN (SELECT machine_id FROM inspections) return?",
+      "options": [
+        {
+          "id": "dbxfe-analytical-sql-l01-q2-a",
+          "text": "No rows at all",
+          "rationale": "x NOT IN (M1, M2, M3, NULL) is unknown for every x because the comparison with NULL is unknown, and WHERE keeps only true."
+        },
+        {
+          "id": "dbxfe-analytical-sql-l01-q2-b",
+          "text": "M4 and M5",
+          "rationale": "That is what NOT EXISTS or a LEFT ANTI JOIN returns; NOT IN differs precisely because of the NULL."
+        },
+        {
+          "id": "dbxfe-analytical-sql-l01-q2-c",
+          "text": "M4, M5 and NULL",
+          "rationale": "machines has no NULL identifier, and the NULL in the subquery removes rows rather than adding one."
+        },
+        {
+          "id": "dbxfe-analytical-sql-l01-q2-d",
+          "text": "An analysis error about NULL",
+          "rationale": "The query is valid; the surprise is a silent empty result, not an error."
+        }
+      ],
+      "correctOptionId": "dbxfe-analytical-sql-l01-q2-a",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-membership-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-null",
+        "dbxfe-analytical-sql-course-claim-join",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-q3",
+      "revision": "1",
+      "prompt": "M2 stopped at 2026-03-08T06:00:00Z and restarted at 08:00:00Z. Under session zone America/New_York, what do TIMESTAMPDIFF(MINUTE, stop, start) and (UNIX_TIMESTAMP(start) - UNIX_TIMESTAMP(stop)) DIV 60 return?",
+      "options": [
+        {
+          "id": "dbxfe-analytical-sql-l01-q3-a",
+          "text": "180 and 120",
+          "rationale": "The local clock reads 01:00 EST and 04:00 EDT, a three-hour wall-clock difference, while only two elapsed hours (7200 seconds) passed."
+        },
+        {
+          "id": "dbxfe-analytical-sql-l01-q3-b",
+          "text": "120 and 120",
+          "rationale": "That is the answer under a UTC session, where no clock change happens; New York skipped 02:00 to 03:00."
+        },
+        {
+          "id": "dbxfe-analytical-sql-l01-q3-c",
+          "text": "120 and 180",
+          "rationale": "Reversed: the wall-clock function is the one inflated by the skipped hour, not the instant difference."
+        },
+        {
+          "id": "dbxfe-analytical-sql-l01-q3-d",
+          "text": "180 and 180",
+          "rationale": "UNIX_TIMESTAMP counts seconds since the epoch and is unaffected by the session clock change."
+        }
+      ],
+      "correctOptionId": "dbxfe-analytical-sql-l01-q3-a",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "id": "dbxfe-analytical-sql-l01-card1",
+      "revision": "1",
+      "prompt": "What does a window frame decide for one row?",
+      "answer": "Which of the partition's ordered rows contribute to that row's value.",
+      "explanation": "PARTITION BY chooses the group and ORDER BY arranges it, but the frame clause picks the rows that feed the function for the current row: a running total takes everything up to here, a moving average takes the last three, and the default takes every peer as well.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-frames",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card2",
+      "revision": "1",
+      "prompt": "Why do two rows with the same ORDER BY value share a running total under the default frame?",
+      "answer": "Because the default frame is RANGE-based, and RANGE includes every peer row with the same ordering value.",
+      "explanation": "When ORDER BY is present and no frame is written, Spark uses RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW. Peers are defined by the ordering value, so both M1 shifts on 1 March see 50 + 40 = 90. A ROWS frame or a unique ordering key restores one-row-at-a-time behaviour.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-frames",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card3",
+      "revision": "1",
+      "prompt": "How does AVG treat a NULL inside a three-row moving frame?",
+      "answer": "It ignores the NULL and divides by the count of non-null values in the frame.",
+      "explanation": "M1's frame (55, 45, NULL) averages 50.0 over two measured values although three rows are in the frame. Reporting COUNT(*) OVER w and COUNT(units) OVER w beside the average shows both an incomplete frame at the partition start and a frame with a missing value.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-frames",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept",
+        "dbxfe-analytical-sql-l01-cast-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-null",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card4",
+      "revision": "1",
+      "prompt": "Where exactly do RANK, DENSE_RANK and ROW_NUMBER give different numbers?",
+      "answer": "Only at a tie: RANK skips after shared ranks, DENSE_RANK does not skip, ROW_NUMBER never shares.",
+      "explanation": "With totals 330, 300, 225, 225 the three functions return 1,2,3,3 / 1,2,3,3 / 1,2,3,4. ROW_NUMBER separates the tied rows arbitrarily unless the ORDER BY adds a tie-breaker such as machine_id, so a deduplication or top-N that relies on it must name one.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-frames",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card5",
+      "revision": "1",
+      "prompt": "Why must a deduplication query state its tie-breaker explicitly?",
+      "answer": "Because two rows can share the top revision, and the engine would otherwise pick one silently and unreproducibly.",
+      "explanation": "I-104 has two different rows both labelled revision 1. ORDER BY revision DESC, CAST(received_at AS TIMESTAMP) DESC picks the later one deterministically, and COUNT(*) OVER (PARTITION BY inspection_id, revision) flags the case so the source defect is reported rather than hidden by the choice.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-frames",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-guidance",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card6",
+      "revision": "1",
+      "prompt": "How does subtracting a row number turn consecutive days into islands?",
+      "answer": "Consecutive dates minus their sequence numbers give one constant value; a gap changes it.",
+      "explanation": "DOWN days 2, 3, 6, 8, 9, 10 numbered 1..6 give 1, 1, 3, 4, 4, 4 (as March dates), so grouping by that key yields islands 2–3, 6 and 8–10. The missing 7 March splits the last two, and comparing the island end with the last observed day marks an island that is still open.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-frames",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-frame-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-window",
+        "dbxfe-guidance",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card7",
+      "revision": "1",
+      "prompt": "Why does NOT IN return nothing when the subquery contains a NULL?",
+      "answer": "Because x NOT IN (a, b, NULL) is unknown for every x, and WHERE keeps only rows that are true.",
+      "explanation": "NOT IN expands to x <> a AND x <> b AND x <> NULL; the last comparison is unknown, so the whole conjunction is unknown and no row survives. NOT EXISTS and LEFT ANTI JOIN are defined on match existence and are unaffected, returning M4 and M5 in the lab.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-membership",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-membership-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-null",
+        "dbxfe-analytical-sql-course-claim-join",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card8",
+      "revision": "1",
+      "prompt": "How do set operators match columns and treat NULL values?",
+      "answer": "By position, never by name; the distinct forms treat all NULLs as one value.",
+      "explanation": "A UNION ALL whose second branch lists plant before machine_id swaps the values without any error. UNION, INTERSECT and EXCEPT deduplicate and group NULLs together, so a NULL appears once; UNION ALL keeps every row. Differing branch types are coerced, and under ANSI a text value can fail with CAST_INVALID_INPUT.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-membership",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-membership-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-setops",
+        "dbxfe-analytical-sql-course-claim-null",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card9",
+      "revision": "1",
+      "prompt": "What is the difference between EXPLODE and LATERAL VIEW OUTER EXPLODE on an empty array?",
+      "answer": "EXPLODE drops the row entirely; the OUTER form keeps it with a NULL element.",
+      "explanation": "Over six latest inspections, four have no defect codes. EXPLODE returns 3 rows (SCRATCH twice, DENT once) and silently loses the four inspections; the OUTER form returns 7 rows. Choose by whether the question is about codes or about inspections, and check the row count against the input.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-nested",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-cast-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-functions",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card10",
+      "revision": "1",
+      "prompt": "When does TRY_CAST return NULL where CAST would raise?",
+      "answer": "For input the target type cannot represent, such as n/a, 1,200, 12.0 as an INT, an INT overflow or the date 2026-02-30.",
+      "explanation": "Under ANSI mode CAST('n/a' AS INT) raises CAST_INVALID_INPUT and stops the query. TRY_CAST returns NULL instead (it did trim ' 8 ' to 8), and the NULL then flows through the null rules: skipped by SUM and AVG, uncounted by COUNT(column), counted by COUNT(*), so report the unparseable count beside the aggregate.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-nested",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-cast-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-functions",
+        "dbxfe-analytical-sql-course-claim-null",
+        "dbxfe-analytical-sql-course-claim-ansi",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card11",
+      "revision": "1",
+      "prompt": "What decides which calendar day a TIMESTAMP value belongs to?",
+      "answer": "The session time zone applied to the instant when a day, hour or month is extracted.",
+      "explanation": "A TIMESTAMP is an instant. 2026-03-08T04:30:00Z is 7 March at hour 23 under America/New_York and 8 March at hour 4 under UTC; CAST(ts AS DATE), HOUR and DATE_FORMAT all read the session zone. Set the zone explicitly so the answer is stated for a named zone, not for the host default.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-time",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card12",
+      "revision": "1",
+      "prompt": "Why did a two-hour stoppage read as 180 wall-clock minutes?",
+      "answer": "Because the local clock skipped 02:00 to 03:00, so wall-clock differences exceed elapsed time across the gap.",
+      "explanation": "M2 stopped at 01:00 EST and restarted at 04:00 EDT: two hours of elapsed time, three hours of clock. TIMESTAMPDIFF and timestamp subtraction (INTERVAL '0 03:00:00' DAY TO SECOND) read the local clock; UNIX_TIMESTAMP differences read the instants. Choose the one the question means and label the column with it.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-time",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card13",
+      "revision": "1",
+      "prompt": "Why is ADD_MONTHS('2026-02-28', 1) not a month end?",
+      "answer": "ADD_MONTHS keeps the day number where possible and clamps only when the month is shorter.",
+      "explanation": "28 February plus one month is 28 March, three days short of the month end, while 31 January plus one month clamps to 28 February. A contract that means 'the end of next month' needs LAST_DAY(ADD_MONTHS(d, 1)), and a period is complete only if the data reaches LAST_DAY of its month.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-time",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-datetime",
+        "dbxfe-analytical-sql-course-claim-functions",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-analytical-sql-l01-card14",
+      "revision": "1",
+      "prompt": "Why is a T-SQL DATEDIFF not copied into Spark SQL unchanged?",
+      "answer": "Spark reads the two-argument DATEDIFF(end, start) in the opposite order, and its unit form counts whole units rather than boundaries crossed.",
+      "explanation": "T-SQL writes DATEDIFF(day, start, end) and counts day boundaries crossed. Spark's two-argument form subtracts the second date from the first, so DATEDIFF(DATE'2026-03-09', DATE'2026-03-08') is 1 and the reversed call is -1; Spark's DATEDIFF(DAY, start, end) keeps T-SQL's order but returned 0 for 23:30 to midnight. Verify each copied expression by executing a known case.",
+      "lessonId": "dbxfe-analytical-sql-l01",
+      "sectionId": "dbxfe-analytical-sql-l01-limits",
+      "conceptIds": [
+        "dbxfe-analytical-sql-l01-session-concept"
+      ],
+      "claimIds": [
+        "dbxfe-analytical-sql-course-claim-functions",
+        "dbxfe-analytical-sql-course-claim-qualify",
+        "dbxfe-analytical-sql-course-claim-tsql",
+        "dbxfe-analytical-sql-course-claim-lab",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    }
+  ]
+}

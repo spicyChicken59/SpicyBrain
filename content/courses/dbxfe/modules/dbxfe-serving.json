@@ -1,0 +1,473 @@
+{
+  "module": {
+    "id": "dbxfe-serving",
+    "title": "Inference, serving and model operations",
+    "summary": "Score a table and answer a request from the same registered version, hold the endpoint to a contract, size its concurrency, release and roll back by traffic, and read drift as a hypothesis that delayed labels test.",
+    "objectives": [
+      "Choose batch or online scoring for a consumer and trace one online request across its identities, contract check, feature lookup and timing.",
+      "Write a local contract test, size provisioned concurrency from arrival rate and service time, and plan a staged release with a one-step rollback.",
+      "Read inference tables and a data profiling monitor as evidence, separate drift from verified quality loss under delayed labels, classify an incident and fill an operational scorecard without provisioning anything."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-mlflow"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-serving-l01.json"
+    ],
+    "scenarioId": "dbxfe-serving-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-serving-scenario",
+      "title": "Write the release, rollback and monitoring runbook for the defect-risk endpoint",
+      "context": "Fictional Cinderline Components serves its coating defect-risk model two ways: a nightly batch job scores every part produced that day into a Delta table the inspection planner reads, and an end-of-line station calls a Model Serving endpoint named defect-risk and diverts a part to the inspection lane when the returned risk is 0.35 or higher, within a 200 ms budget. Version 7 serves under the alias champion; version 8 was trained on three more months of data and scores 0.03 better on held-out precision. Inspection labels arrive one to three days later for diverted parts and for a random 5% audit sample; other parts get a label only from a customer return, weeks later or never. Two features are looked up from an online store at request time. The plant runs two shifts; the humid season starts next month. No endpoint, monitor or job is created in this task, and cost figures are unknown until current pricing is checked.",
+      "task": "Write a one-page runbook for the operations lead: the staged release of version 8 with the evidence gate at each stage and the one-step rollback, the operational scorecard with each measurement's source and owner, the contract test that must pass before any version is served, and the incident classification the on-call engineer follows. Mark what is known, what is hypothesized and what cannot be measured until labels arrive.",
+      "requirements": [
+        "Stage the release as a traffic split with an evidence gate per stage, and state the rollback as a single configuration change that keeps the old served entity available.",
+        "Separate endpoint health, contract, data and feature, and verified model quality as four incident classes, each with its own first check and mitigation.",
+        "Give every scorecard row a source (endpoint metrics, inference table, monitor, labels or billing), an owner and a target, and label drift rows as hypotheses until labels test them.",
+        "State the delayed-label limits honestly: which rows will have labels, when, and which quality numbers therefore cannot be verified for unflagged parts without the audit sample."
+      ],
+      "model": "### Release and rollback\nStage 0: version 8's signature passes the local contract test (the column list, a valid dataframe_split body, and the missing-column, renamed-column and unit-suffix cases, sent as JSON through open-source MLflow's request handler) and a batch replay over last week's inference-table rows, compared with version 7's logged responses. Stage 1: add version 8 as a second served entity at 10% traffic for two days; gate on error rate, P99 latency inside the 200 ms budget and a flagged rate within the 6 to 12% band, all read per served entity from the inference table. Stage 2: 50% for three days; gate adds precision on diverted parts once the first labels arrive, compared with version 7 over the same windows. Stage 3: 100%, version 7 kept as a served entity for seven days. Rollback at any stage: one configuration update setting version 7 to 100%; version 8 stays deployed at 0% for diagnosis. Never roll back by deleting the endpoint.\n\n### Scorecard\nAvailability and P99 latency from endpoint health metrics (platform owner, targets 99.5% and 120 ms); 4xx and 5xx rates from the exported endpoint metrics, explained by inference-table status codes and bodies that can arrive up to an hour later (station app owner for 4xx, platform for 5xx, target under 0.1%); feature freshness as publish lag, the time since the online store's latest publish (feature pipeline owner, under 60 minutes); flagged rate and input drift from the data profiling monitor (model owner; the 6 to 12% band is a trigger, not a verdict); label coverage from the inspection join (quality owner; all diverted parts plus the 5% audit); verified precision on diverted parts from inspection labels with their lag, and audit-sample recall over a trailing week with its count of defective parts; daily cost from billing once pricing is checked.\n\n### Contract test\nRead the version's signature from its MLmodel file, wrap it around a constant stand-in model, and send JSON bodies through open-source MLflow's request handler: the signature names the seven station columns, a valid dataframe_split body is accepted, and bodies missing coat_thickness_um, naming it thickness_um, or sending humidity_pct as \"61%\" are refused with 400. The test proves the contract, not the model's predictions; it runs locally, calls no managed endpoint, and whether the managed endpoint parses exactly as the open-source server does is checked at stage 1 through the 4xx rate.\n\n### Incident classes\nEndpoint health (5xx, timeouts, latency without a request change): roll traffic back if a release is in progress, then read service logs and capacity. Contract (4xx spike): find the caller change, fix the caller or map the field, never widen the signature under incident. Data and features (nulls, freshness, drift): stop the rollout, fix the pipeline, backfill, return an explicit no-score for a missing lookup instead of an imputed zero, and treat any quality claim as hypothesis. Verified quality loss (labelled windows worse than baseline): roll back to version 7 if the loss followed a release, fix the pipeline and backfill if a data incident preceded it, and retrain only when labels show the world changed. Every incident records what was known at each time, and the humid season is pre-declared as an expected input shift so a drift alert alone does not open a quality incident.",
+      "reasoning": "The runbook makes release and rollback the same lever, ties each scorecard row to the system that can actually measure it, keeps the contract test local and honest about what it does not prove, and refuses to let drift stand in for verified loss when labels are delayed and biased toward diverted parts.",
+      "rubric": [
+        {
+          "id": "dbxfe-serving-scenario-rubric-1",
+          "criterion": "Staged release with a reversible rollback",
+          "weak": "Deploy version 8 and watch; rollback described as redeploying version 7.",
+          "partial": "Traffic percentages named but no evidence gate per stage, or the old entity removed before the gate.",
+          "strong": "Each stage has a measurable gate read per served entity; rollback is one traffic change with the old entity retained and the new one kept for diagnosis."
+        },
+        {
+          "id": "dbxfe-serving-scenario-rubric-2",
+          "criterion": "Incident classification by evidence layer",
+          "weak": "All alerts lead to retraining or to a rollback.",
+          "partial": "Health and quality separated but a 4xx spike or a null feature attributed to the model.",
+          "strong": "Four classes with a first check and a mitigation each; a caller's schema change and a feature-pipeline failure are named as non-model incidents."
+        },
+        {
+          "id": "dbxfe-serving-scenario-rubric-3",
+          "criterion": "Scorecard with sources and owners",
+          "weak": "A list of metrics with no source or owner.",
+          "partial": "Sources named but drift rows presented as quality verdicts, or cost given as a number without a pricing source.",
+          "strong": "Every row has source, owner, target and a known or hypothesized status; cost is marked unknown until pricing is checked."
+        },
+        {
+          "id": "dbxfe-serving-scenario-rubric-4",
+          "criterion": "Delayed and biased labels",
+          "weak": "Precision and recall reported as if labels were complete.",
+          "partial": "Label lag acknowledged but selection bias toward diverted parts ignored.",
+          "strong": "States which rows get labels and when, uses the audit sample for unflagged parts, and reports verified numbers with their lag."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can the station tolerate a cold start if we enable scale to zero to save money overnight?",
+          "response": "No. The first request after a scale-down waits seconds to minutes with no promised time, and a part that waits past 200 ms passes uninspected. Scale to zero is refused for this endpoint; the cost is accepted and marked unknown until pricing is checked."
+        },
+        {
+          "question": "Will the humid season make the model wrong?",
+          "response": "Unknown. It will move the humidity input and probably the flagged rate. Whether precision on diverted parts changes is only knowable when labels arrive, so the season is recorded as an expected input shift and the quality question stays open until then."
+        },
+        {
+          "question": "Do we have labels for parts that were not diverted?",
+          "response": "Only for the 5% audit sample and for customer returns. Recall on unflagged parts is estimated from the audit sample alone and reported with its sample size."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-serving-l01"
+      ],
+      "claimIds": [
+        "dbxfe-fact-ml",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-serving-course-claim-serving",
+        "dbxfe-serving-course-claim-batch",
+        "dbxfe-serving-course-claim-score-batch",
+        "dbxfe-serving-course-claim-scoring-server",
+        "dbxfe-serving-course-claim-endpoints",
+        "dbxfe-serving-course-claim-query",
+        "dbxfe-serving-course-claim-multiple",
+        "dbxfe-serving-course-claim-inference-tables",
+        "dbxfe-serving-course-claim-profiling",
+        "dbxfe-serving-course-claim-signatures",
+        "dbxfe-serving-course-claim-lookup",
+        "dbxfe-serving-course-claim-health"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-serving-course-source-serving",
+      "title": "Deploy models using Model Serving",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/model-serving/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; overview of Model Serving for custom models, foundation models and external models.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Overview page; endpoint types, regions and limits change, and nothing here was deployed. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-batch",
+      "title": "Deploy models for batch inference and prediction",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/model-inference/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; scoring a table with a registered MLflow model, including Spark UDF scoring and AI Functions.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Landing page; the exact APIs and the models ai_query accepts are read from the current pages before use. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-endpoints",
+      "title": "Create custom model serving endpoints",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; creating an endpoint with served entities, workload size, scale to zero and traffic settings.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Workload sizes and their concurrency ranges are quoted as read at search time; no endpoint was created. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-query",
+      "title": "Query serving endpoints for custom models",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/model-serving/score-custom-model-endpoints",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; request formats dataframe_split, dataframe_records, instances and inputs, and the response shape.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Request keys and limits may change; no request was sent in this build. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-multiple",
+      "title": "Serve multiple models to a model serving endpoint",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/model-serving/serve-multiple-models-to-serving-endpoint",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; several served entities behind one endpoint with a traffic split.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The maximum number of served entities and the update behaviour are read from the current page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-inference-tables",
+      "title": "Inference tables for monitoring and debugging models",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/model-serving/inference-tables",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; request and response logging into a Unity Catalog Delta table.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Two variants exist in the documentation, AI Gateway-enabled and legacy; column names and requirements differ, so read the one that applies. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-profiling",
+      "title": "Data profiling",
+      "url": "https://docs.databricks.com/aws/en/lakehouse-monitoring/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; data profiling, formerly named Lakehouse Monitoring, with the InferenceLog profile for model inputs and outputs.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The feature was renamed; requirements, refresh schedules and metric names are read from the current page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-signatures",
+      "title": "Model Signatures and Input Examples",
+      "url": "https://mlflow.org/docs/latest/ml/model/signatures/",
+      "publisher": "MLflow",
+      "type": "official documentation",
+      "context": "Open-source MLflow; signature enforcement for pyfunc models and deployment tools.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Enforcement rules depend on the MLflow version that serves the model. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-lookup",
+      "title": "Model Serving with automatic feature lookup",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/automatic-feature-lookup",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; features looked up from an online store at request time for models logged with the feature engineering client.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Online store products and their names have changed; availability is verified for the workspace. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-train-features",
+      "title": "Train models with feature tables",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/train-models-with-feature-store",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; logging a model with feature metadata and batch scoring with score_batch.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Client method signatures and output columns are read from the current page before use. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-scoring-server",
+      "title": "mlflow/mlflow/pyfunc/scoring_server/__init__.py",
+      "url": "https://github.com/mlflow/mlflow/blob/master/mlflow/pyfunc/scoring_server/__init__.py",
+      "publisher": "MLflow project (GitHub)",
+      "type": "primary reference",
+      "context": "Open-source MLflow; the request handler behind the local inference server, used by the lesson's contract test.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Source code, not documentation; the managed endpoint's parser is not claimed to be identical. Search-result title confirmed 2026-09-23; the GitHub page body was not fetched in this build, and the same module was read in the MLflow 3.16.1 package installed in the build's local environment."
+    },
+    {
+      "id": "dbxfe-serving-course-source-health",
+      "title": "Monitor model quality and endpoint health",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/model-serving/monitor-diagnose-endpoints",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; endpoint health metrics, service and build logs, and links to data profiling.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Metric names and export options are read from the current page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-serving-course-source-sdk-serving",
+      "title": "Databricks SDK for Python v0.141.0: service/serving.py (ServingEndpointsAPI.query)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/serving.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Query call input fields, invocations path and predictions response of the Databricks serving client.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/serving.py (tag v0.141.0): 'predictions: Optional[List[Any]] = None \"\"\"The predictions returned by the serving endpoint.\"\"\"' ... ':param dataframe_records: List[Any] (optional) Pandas Dataframe input in the records orientation. :param dataframe_split: :class:`DataframeSplitInput` (optional) Pandas Dataframe input in the split orientation.' ... ':param inputs: Any (optional) Tensor-based input in columnar format. :param instances: List[Any] (optional) Tensor-based input in row format.' ... 'f\"/serving-endpoints/{name}/invocations\",' API reference docstring. Interface scope: the query call's four model-input fields, the path it posts to and the response field. The docstring does not say that exactly one input field is allowed per request, and does not state payload limits, how the managed endpoint parses and casts values, or availability by cloud or region."
+    },
+    {
+      "id": "dbxfe-serving-course-source-mlflow-scoring-server",
+      "title": "MLflow v3.16.1: mlflow/pyfunc/scoring_server/__init__.py (infer_and_parse_data)",
+      "url": "https://github.com/mlflow/mlflow/blob/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/pyfunc/scoring_server/__init__.py",
+      "publisher": "MLflow project (mlflow/mlflow, open-source repository)",
+      "type": "primary reference",
+      "context": "Open-source MLflow's request handler at the v3.16.1 tag, used by the lesson's contract test: accepted input fields, the exactly-one rule and schema-aware parsing.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/mlflow/mlflow/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/pyfunc/scoring_server/__init__.py (tag v3.16.1): 'SUPPORTED_FORMATS = {DF_RECORDS, DF_SPLIT, INSTANCES, INPUTS} ... f\"The input must be a JSON dictionary with exactly one of the input fields {SUPPORTED_FORMATS}\" ... if len(format_keys) != 1: ... error_code=BAD_REQUEST, ... return dataframe_from_parsed_json( data[input_format], pandas_orient=pandas_orient, schema=schema' Open-source scope: MLflow's own scoring server accepts exactly one of the four input fields and hands the model's input schema to its JSON parser; this does not establish how the managed Databricks endpoint parses a request."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-serving-course-claim-serving",
+      "description": "Model Serving deploys MLflow models as REST endpoints without managed infrastructure on the customer's side and supports real-time and batch inference for custom models.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-serving"
+      ],
+      "context": "Databricks Model Serving overview."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-batch",
+      "description": "A registered model can score a Spark DataFrame through mlflow.pyfunc.spark_udf, loaded by name and alias from Unity Catalog; AI Functions such as ai_query can call served models from SQL, including traditional ML models deployed on Model Serving endpoints.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-batch"
+      ],
+      "context": "Batch inference on Databricks; ai_query support is checked per model type."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-score-batch",
+      "description": "A model logged with the feature engineering client keeps references to its features, and FeatureEngineeringClient.score_batch joins point-in-time correct feature values from the offline store to rows that carry only the keys before scoring.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-train-features"
+      ],
+      "context": "Feature Engineering in Unity Catalog; batch path."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-scoring-server",
+      "description": "Open-source MLflow's scoring server accepts exactly one of the four input keys, parses the JSON body with the signature's types before prediction, then enforces the signature, so a castable value is accepted and an uncastable one is refused as a bad request.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-scoring-server",
+        "dbxfe-serving-course-source-signatures",
+        "dbxfe-serving-course-source-mlflow-scoring-server"
+      ],
+      "context": "Open-source MLflow 3.x; the managed endpoint is verified separately."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-endpoints",
+      "description": "An endpoint holds served entities with a workload size mapped to a provisioned-concurrency range (Small 4, Medium 8 to 16, Large 16 to 64 as read at search time), one unit of concurrency serves one request at a time, required concurrency is estimated as queries per second times model execution time, and scale to zero lets the lower bound reach zero after 30 minutes of inactivity, followed by a cold start of usually ten to twenty seconds and sometimes minutes with no SLA.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-endpoints"
+      ],
+      "context": "Custom model endpoints on Databricks."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-query",
+      "description": "Requests carry a JSON-serialized pandas DataFrame under dataframe_split or dataframe_records, or tensors under instances or inputs, and the response returns predictions.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-query",
+        "dbxfe-serving-course-source-sdk-serving"
+      ],
+      "context": "Custom model endpoint request contract."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-multiple",
+      "description": "One endpoint can serve several models or versions with a configured traffic percentage per served entity, so a release and a rollback are traffic changes.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-multiple"
+      ],
+      "context": "Traffic split on custom model endpoints."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-inference-tables",
+      "description": "Inference tables log each request and response as rows of a Delta table in Unity Catalog, which can be joined with labels to evaluate and retrain.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-inference-tables"
+      ],
+      "context": "Inference tables; prerequisites are listed on the applicable variant's page."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-profiling",
+      "description": "Data profiling (formerly Lakehouse Monitoring) computes profile and drift metric tables for a monitored table; the InferenceLog profile adds model performance metrics when prediction and label columns are provided and drift when a baseline table or consecutive windows exist.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-profiling"
+      ],
+      "context": "Data profiling on Databricks."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-signatures",
+      "description": "MLflow schema enforcement validates inputs against the model signature before the model runs: missing required inputs raise, undeclared inputs are ignored, and only lossless type conversions are accepted for column-based signatures, such as int to double but not long to double.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-signatures"
+      ],
+      "context": "MLflow pyfunc and deployment tools."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-lookup",
+      "description": "For a model logged with the feature engineering client, the serving endpoint uses the entity keys in a request to look up precomputed features from an online store at inference time.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-lookup"
+      ],
+      "context": "Automatic feature lookup on Databricks."
+    },
+    {
+      "id": "dbxfe-serving-course-claim-health",
+      "description": "Endpoint health metrics report latency, request rate, error rate, CPU and memory and can be exported to Prometheus and Datadog; service and build logs support deployment debugging; data profiling covers model performance and drift.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-serving-course-source-health"
+      ],
+      "context": "Model Serving monitoring on Databricks."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-serving-l01-batch-concept",
+      "term": "batch inference",
+      "aliases": [
+        "batch scoring"
+      ],
+      "definition": "Scoring a whole table with a loaded model version and writing the predictions back as columns with their provenance.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-paths"
+    },
+    {
+      "id": "dbxfe-serving-l01-endpoint-concept",
+      "term": "model serving endpoint",
+      "aliases": [
+        "online serving",
+        "serving endpoint"
+      ],
+      "definition": "A managed REST endpoint that routes each request to a served model version and returns a JSON prediction.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-paths"
+    },
+    {
+      "id": "dbxfe-serving-l01-contract-concept",
+      "term": "request contract",
+      "aliases": [
+        "request/response contract"
+      ],
+      "definition": "The exact JSON shape, column names and types an endpoint accepts and the response it returns, fixed by the model signature.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-request"
+    },
+    {
+      "id": "dbxfe-serving-l01-concurrency-concept",
+      "term": "provisioned concurrency",
+      "aliases": [
+        "workload size"
+      ],
+      "definition": "The number of requests an endpoint can process at the same time; requests beyond it wait, and a sustained excess grows a backlog.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-capacity"
+    },
+    {
+      "id": "dbxfe-serving-l01-lookup-concept",
+      "term": "automatic feature lookup",
+      "aliases": [
+        "online feature lookup"
+      ],
+      "definition": "Precomputed features fetched from an online store by the keys in a request instead of being sent by the caller.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-capacity"
+    },
+    {
+      "id": "dbxfe-serving-l01-traffic-concept",
+      "term": "traffic split",
+      "aliases": [
+        "canary release"
+      ],
+      "definition": "The percentage of requests an endpoint routes to each served entity, changed by a configuration update.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-release"
+    },
+    {
+      "id": "dbxfe-serving-l01-inference-table-concept",
+      "term": "inference table",
+      "aliases": [
+        "request log"
+      ],
+      "definition": "A Delta table in which the endpoint logs each request, its response, status, served entity and timing.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-evidence"
+    },
+    {
+      "id": "dbxfe-serving-l01-drift-concept",
+      "term": "drift",
+      "aliases": [
+        "data drift",
+        "prediction drift"
+      ],
+      "definition": "A measured change in the distribution of inputs or predictions between windows or against a baseline, which does not by itself prove quality loss.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-drift"
+    },
+    {
+      "id": "dbxfe-serving-l01-delayed-label-concept",
+      "term": "delayed label",
+      "aliases": [
+        "ground truth lag"
+      ],
+      "definition": "The true outcome that arrives after the prediction, only for some rows, and only then permits a verified quality measurement.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-drift"
+    },
+    {
+      "id": "dbxfe-serving-l01-scorecard-concept",
+      "term": "operational scorecard",
+      "aliases": [
+        "runbook scorecard"
+      ],
+      "definition": "A table of named measurements for a served model, each with its source, owner, target and whether it is known or hypothesized.",
+      "lessonId": "dbxfe-serving-l01",
+      "sectionId": "dbxfe-serving-l01-incident"
+    }
+  ]
+}

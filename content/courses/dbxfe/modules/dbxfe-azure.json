@@ -1,0 +1,459 @@
+{
+ "module": {
+  "id": "dbxfe-azure",
+  "title": "Azure deployment and network boundaries",
+  "summary": "Place Cinderline's Entra tenant, subscription, workspace resource, locked managed resource group and both compute planes on Azure, compare the two supported network patterns, keep storage access apart from application access, and diagnose a denied and an unreachable request in order.",
+  "objectives": [
+   "Draw Cinderline's Azure deployment with each resource in the subscription, resource group or account that owns it, and compare the default managed VNet with VNet injection by duty.",
+   "Trace one query's author, control, execution and storage paths, separating application access in Unity Catalog from storage access through the access connector's managed identity.",
+   "Run ordered diagnoses for a denied and an unreachable request, assemble a permissions and network evidence checklist, and list what differs from AWS."
+  ],
+  "prerequisiteIds": [
+   "dbxfe-m03",
+   "dbxfe-m06"
+  ],
+  "lessonFiles": [
+   "lessons/dbxfe-azure-l01.json"
+  ],
+  "scenarioId": "dbxfe-azure-scenario"
+ },
+ "scenarios": [
+  {
+   "id": "dbxfe-azure-scenario",
+   "title": "Write Cinderline's Azure deployment note for security review",
+   "context": "Fictional Cinderline Components runs dbw-cinderline-prod on the default managed VNet and is adding dbw-cinderline-sec with VNet injection in the same region and Entra tenant. Its sources are the ADLS Gen2 account stcinderlinelake in Cinderline's subscription, a supplier drop account stsupplierdrop in another subscription of the same tenant owned by the supplier-relations team, and an Azure SQL database behind a private endpoint that serverless jobs must reach. Security requires no public IPs on compute, no public network access to either storage account, private user access to dbw-cinderline-sec, no storage keys in any configuration, and named evidence for every boundary. Tier, regional support and preview status are unconfirmed.",
+   "task": "Produce a one-page note for the security specialist: the resources per subscription and resource group, the two network patterns with their duties, the identities and both authorization chains for each storage account, the private connectivity with its DNS zones and approvers, the two diagnostic sequences the operations team will follow, and an explicit list of unknowns and AWS differences.",
+   "requirements": [
+    "Place every resource in the subscription, resource group or Databricks account that owns it, including both managed resource groups.",
+    "Give each storage account its application chain and its storage chain separately: principal and privileges; connector identity, data role and network rules.",
+    "Name each private endpoint with its sub-resource, network, Private DNS zone and approver.",
+    "Separate the denied-request sequence from the unreachable-request sequence, with evidence rows.",
+    "Mark tier, region, preview status and charges as unknown until verified; provision nothing."
+   ],
+   "model": "### Resources and planes\nCinderline's Entra tenant trusts `sub-cinderline-data`. `rg-cinderline-data` holds `dbw-cinderline-prod` (default managed VNet), `dbw-cinderline-sec` (VNet injection), the access connector `ac-cinderline-uc` and `stcinderlinelake`; `rg-cinderline-net` holds `vnet-cinderline-data`, the route table, the private endpoints and the Private DNS zones. Each workspace has its own locked managed resource group (workspace storage, cluster VMs; for prod also its VNet, NSG and NAT gateway). `stsupplierdrop` sits in the supplier-relations team's subscription. Control plane and serverless compute run in the Databricks account.\n\n### Patterns and duties\nProd: Databricks operates the network; no routes or endpoints can be added. Sec: host and container subnets delegated to `Microsoft.Databricks/workspaces`, /26 each (59 nodes); `0.0.0.0/0` to the hub firewall plus `AzureDatabricks`, `Storage` and `EventHub` service-tag routes; back-end Private Link once Premium is confirmed.\n\n### Authorization chains\nApplication chain for every source: Entra sign-in, identities provisioned (automatic identity management, or `sp-job-nightly` added by hand), then `USE CATALOG`, `USE SCHEMA`, `SELECT`. Storage chain: `ac-cinderline-uc`'s managed identity holds Storage Blob Data Reader on the `quality` container; credential `cinderline_lake_cred`; external location `cinderline_quality`. For `stsupplierdrop`, the supplier team assigns the same identity a data role and admits Cinderline through private endpoints only: with public network access disabled, a resource instance rule, which acts on the public endpoint, is not an option. No keys, SAS or client secrets anywhere.\n\n### Private connectivity\nFront-end: `databricks_ui_api` and `browser_authentication` endpoints in the transit VNet, `privatelink.azuredatabricks.net` linked to it. Storage: `pe-lake-dfs` (`dfs`) in `snet-pe`, `privatelink.dfs.core.windows.net` linked to `vnet-cinderline-data`. Serverless: NCC `ncc-cinderline` with rules for `stcinderlinelake` (`dfs`) and the SQL database, each approved by its owner.\n\n### Diagnosis\nDenied: record the error and who answered; confirm the run-as principal; check catalog privileges; then the connector identity's role; then the storage network rules; rerun as the same principal; write the row. Unreachable: resolve from the asking network; zone links; endpoint state; effective routes; NSG and firewall logs; NCC rule state for serverless; retest from the same place.\n\n### Unknowns and AWS differences\nUnknown: Premium confirmation, endpoint support for the SQL resource type in the region, NCC limits, networking charges, the supplier team's approval. Differs from AWS: a locked managed group instead of a workspace configuration, delegated subnets, a managed identity with a role instead of a trust policy, Private DNS zone links. Nothing is provisioned.",
+   "reasoning": "The note keeps Azure's own objects in view (the locked managed groups, delegated subnets, managed identities with roles, Private DNS zone links), keeps the two authorization chains apart so a network fault is never answered with a grant, and turns every conditional feature into a verification item rather than a promise.",
+   "rubric": [
+    {
+     "id": "dbxfe-azure-scenario-rubric-1",
+     "criterion": "Resource and plane placement",
+     "weak": "One box labelled Databricks; the managed resource groups are missing.",
+     "partial": "Planes named, but resources placed in the wrong group or AWS terms used.",
+     "strong": "Every resource in its owning subscription, group or account, both managed groups shown as locked, serverless drawn without a Cinderline VNet."
+    },
+    {
+     "id": "dbxfe-azure-scenario-rubric-2",
+     "criterion": "Separate authorization chains",
+     "weak": "A single grant is treated as access, or people are given storage roles.",
+     "partial": "Privileges and the connector's role covered; network rules or the supplier's role owner missing.",
+     "strong": "Application chain and storage chain per account, with the managed identity's role, the network rule type and who assigns each."
+    },
+    {
+     "id": "dbxfe-azure-scenario-rubric-3",
+     "criterion": "Private connectivity and DNS",
+     "weak": "Private endpoints named without DNS or approval.",
+     "partial": "Endpoints and zones named, but zone links, the browser_authentication endpoint or approvers missing.",
+     "strong": "Each endpoint with sub-resource, subnet, linked zone and approver, and the NCC rules with their expected states."
+    },
+    {
+     "id": "dbxfe-azure-scenario-rubric-4",
+     "criterion": "Diagnosis and honest unknowns",
+     "weak": "One generic troubleshooting list; features stated as available.",
+     "partial": "Denied and unreachable named but mixed, or tier and region caveats partial.",
+     "strong": "Two ordered sequences with the first evidence object per step, and every conditional feature listed with what verifies it."
+    }
+   ],
+   "disclosures": [
+    {
+     "question": "Will the supplier-relations team approve private endpoint requests from Databricks against stsupplierdrop?",
+     "response": "Unknown; they approve endpoint requests only through a change ticket. Until one is approved, stsupplierdrop is marked unreadable from serverless in the design."
+    },
+    {
+     "question": "Is dbw-cinderline-sec on the Premium tier?",
+     "response": "The purchase record says Premium, but nobody has confirmed it on the workspace itself; back-end Private Link stays unverified until someone does."
+    }
+   ],
+   "lessonIds": [
+    "dbxfe-azure-l01"
+   ],
+   "claimIds": [
+    "dbxfe-azure-course-claim-workspace",
+    "dbxfe-azure-course-claim-identity",
+    "dbxfe-azure-course-claim-vnet",
+    "dbxfe-azure-course-claim-routes",
+    "dbxfe-azure-course-claim-storage",
+    "dbxfe-azure-course-claim-private",
+    "dbxfe-azure-course-claim-serverless",
+    "dbxfe-guidance",
+    "dbxfe-azure-course-claim-fiction",
+    "dbxfe-fact-architecture",
+    "dbxfe-aws-course-claim-storage"
+   ],
+   "isCapstone": false
+  }
+ ],
+ "sources": [
+  {
+   "id": "dbxfe-azure-course-source-architecture",
+   "title": "High-level architecture - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/getting-started/high-level-architecture",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; control plane, classic compute plane in the customer's subscription, serverless compute plane.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "An overview; tier, region and features are verified separately. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-workspace",
+   "title": "Create a workspace - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/admin/workspace/",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; workspace creation and the managed resource group it provisions.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "No workspace is created in this lesson. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-deny",
+   "title": "List Azure deny assignments - Azure RBAC",
+   "url": "https://learn.microsoft.com/en-us/azure/role-based-access-control/deny-assignments",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure RBAC; deny assignments created and managed by Azure.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "The page does not name Azure Databricks; the managed-group behaviour is corroborated by a Microsoft Q&A answer cited in the teaching module. The rendered page was not confirmed by search or fetch in this build session (documentation host blocked, web-search allowance exhausted); its Markdown source in the MicrosoftDocs/azure-docs repository was read on 2026-09-23 through raw.githubusercontent.com."
+  },
+  {
+   "id": "dbxfe-azure-course-source-identity",
+   "title": "Automatic identity management - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/admin/users-groups/automatic-identity-management/",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; syncing Entra users, groups, nested groups and service principals.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Confirm the account's actual provisioning method rather than inferring it. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-scim",
+   "title": "Sync users and groups from Microsoft Entra ID using SCIM - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/admin/users-groups/scim/",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; SCIM provisioning limits for nested groups and service principals.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Connector steps change; read the current page. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-vnet",
+   "title": "Deploy Azure Databricks in your Azure virtual network (VNet injection) - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/security/network/classic/vnet-inject",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; host and container subnets, delegation, sizing and NSG handling.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Ranges and requirements are version-specific; nothing is provisioned. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-udr",
+   "title": "User-defined route settings for Azure Databricks - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/security/network/classic/udr",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; user-defined routes and service tags for an injected workspace.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "The destination list changes; copy it from the current page. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-storage",
+   "title": "Use Azure managed identities in Unity Catalog to access storage - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/cloud-storage/azure-managed-identities",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; the access connector and its managed identity for Unity Catalog storage access.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Role choices are read from the current page. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-adls",
+   "title": "Connect to an Azure Data Lake Storage Gen2 (ADLS Gen2) external location - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/cloud-storage/external-locations-adls",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; storage credentials, external locations and the abfss path form.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Required privileges are read from the current page. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-sharedkey",
+   "title": "Prevent authorization with Shared Key",
+   "url": "https://learn.microsoft.com/en-us/azure/storage/common/shared-key-authorization-prevent",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Storage; disallowing Shared Key and its effect on SAS tokens.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Other services may depend on Shared Key; check compatibility first. The rendered page was not confirmed by search or fetch in this build session (documentation host blocked, web-search allowance exhausted); its Markdown source in the MicrosoftDocs/azure-docs repository was read on 2026-09-23 through raw.githubusercontent.com."
+  },
+  {
+   "id": "dbxfe-azure-course-source-privatelink",
+   "title": "Private Link concepts - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/security/network/concepts/private-link",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; the three Private Link connection types and workspace URL resolution.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Configuration details are on the linked configuration pages. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-backend",
+   "title": "Configure classic compute plane private connectivity to Azure Databricks - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/security/network/classic/private-link-standard",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; back-end Private Link and its Premium and VNet injection prerequisites.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Plan requirements are read from the current page. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-dns",
+   "title": "Azure Private Endpoint private DNS zone values",
+   "url": "https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-dns",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Private Link; Private DNS zone names and how endpoint resolution works.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Commercial-cloud zone names only. The rendered page was not confirmed by search or fetch in this build session (documentation host blocked, web-search allowance exhausted); its Markdown source in the MicrosoftDocs/azure-docs repository was read on 2026-09-23 through raw.githubusercontent.com."
+  },
+  {
+   "id": "dbxfe-azure-course-source-serverless",
+   "title": "Serverless compute plane networking - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/security/network/serverless-network-security/",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; network connectivity configurations for serverless compute.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Features carry region, tier and limit caveats; networking charges are checked against current pricing. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-ncc",
+   "title": "Configure private connectivity to Azure resources - Azure Databricks",
+   "url": "https://learn.microsoft.com/en-us/azure/databricks/security/network/serverless-network-security/serverless-private-link",
+   "publisher": "Microsoft",
+   "type": "official documentation",
+   "context": "Azure Databricks; NCC private endpoint rules and their approval.",
+   "accessDate": "2026-09-23",
+   "reviewDate": "2026-09-23",
+   "caveat": "Supported resources and limits change. Search-result title and snippet confirmed 2026-09-23 in this build session by this module's earlier, interrupted author; page body not fetched (documentation host blocked by the sandbox egress proxy)."
+  },
+  {
+   "id": "dbxfe-azure-course-source-outbound",
+   "title": "Microsoft docs source: Default outbound access in Azure (MicrosoftDocs/azure-docs at a pinned commit)",
+   "url": "https://github.com/MicrosoftDocs/azure-docs/blob/194fd50fff08b4caa875f2a5b384a74fb8dbb911/articles/virtual-network/ip-services/default-outbound-access.md",
+   "publisher": "Microsoft (azure-docs source repository on GitHub)",
+   "type": "primary reference",
+   "context": "Markdown source of the Default Outbound Access page at a pinned commit; What's affected and Limitations of private subnets.",
+   "accessDate": "2026-09-25",
+   "reviewDate": "2026-09-25",
+   "caveat": "Azure platform behaviour only; delegated PaaS subnets are deferred to the service's own documentation. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/194fd50fff08b4caa875f2a5b384a74fb8dbb911/articles/virtual-network/ip-services/default-outbound-access.md: 'For the API version released after March 31, 2026, subnets in new virtual networks have defaultOutboundAccess set to false by default. ... Existing virtual networks aren't changed. ... In configurations using User Defined Routes (UDRs), any configured routes with next hop type Internet break in a Private subnet. ... Unless an explicit outbound connectivity method is also configured for the source of the connection to these destinations, attempts to connect to these destinations fail, because default outbound access isn't available by default in a Private subnet. ... Private subnets aren't applicable to delegated or managed subnets used for hosting PaaS services. In these scenarios, outbound connectivity is managed by the individual service.' Scope: Azure Virtual Network documentation source (Azure platform behaviour); it does not establish Azure Databricks' own outbound requirements for delegated workspace subnets."
+  },
+  {
+   "id": "dbxfe-azure-course-source-rest-databricks",
+   "title": "Azure REST API specification: Microsoft.Databricks stable 2026-01-01 (openapi.json)",
+   "url": "https://github.com/Azure/azure-rest-api-specs/blob/2094b1ceebc1009888dbcd926eeec827ec11f04b/specification/databricks/resource-manager/Microsoft.Databricks/Databricks/stable/2026-01-01/openapi.json",
+   "publisher": "Microsoft (azure-rest-api-specs repository on GitHub)",
+   "type": "primary reference",
+   "context": "Resource provider specification for Microsoft.Databricks/workspaces at a pinned commit; WorkspaceProperties.computeMode and managedResourceGroupId.",
+   "accessDate": "2026-09-25",
+   "reviewDate": "2026-09-25",
+   "caveat": "Interface specification only; no availability, release status or portal behaviour. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/Azure/azure-rest-api-specs/2094b1ceebc1009888dbcd926eeec827ec11f04b/specification/databricks/resource-manager/Microsoft.Databricks/Databricks/stable/2026-01-01/openapi.json: 'The workspace compute mode. Required on create, cannot be changed. Possible values include: 'Serverless', 'Hybrid' ... The managed resource group Id. Required in Hybrid ComputeMode workspace. Not allowed in Serverless ComputeMode workspace. ... Access Connector Resource that is going to be associated with Databricks Workspace. Not allowed in Serverless ComputeMode workspace. ... The resource ID of Azure Databricks Access Connector Resource.' Scope: Microsoft.Databricks resource provider REST specification, stable 2026-01-01 (interface only); it establishes neither the availability or release status of either compute mode nor portal behaviour."
+  },
+  {
+   "id": "dbxfe-azure-course-source-tf-mws-workspaces",
+   "title": "Databricks Terraform provider v1.134.0: databricks_mws_workspaces resource documentation",
+   "url": "https://github.com/databricks/terraform-provider-databricks/blob/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/mws_workspaces.md",
+   "publisher": "Databricks",
+   "type": "primary reference",
+   "context": "Databricks-published Terraform provider resource page at a pinned commit; attribute reference for effective_compute_mode, used as a terminology bridge for 'classic workspace'.",
+   "accessDate": "2026-09-25",
+   "reviewDate": "2026-09-25",
+   "caveat": "Terminology only: the account-level workspace resource for AWS and GCP, not an Azure page. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/mws_workspaces.md: '`effective_compute_mode` - (String) The effective compute mode for the workspace. This is either `SERVERLESS` for serverless workspaces or `HYBRID` for classic workspaces.' Scope: Databricks-published Terraform provider documentation, v1.134.0 (account API interface); it maps the HYBRID compute mode to a classic workspace and establishes no Azure availability or behaviour."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-azure-course-claim-workspace",
+   "kind": "documented",
+   "description": "The control plane runs in the Azure Databricks account, classic compute in the customer's Azure subscription and serverless compute in the Databricks account; creating a classic workspace provisions a managed resource group holding its virtual machines, storage accounts and networking components, protected by an Azure deny assignment that blocks changes even when a role grants them.",
+   "sourceIds": [
+    "dbxfe-azure-course-source-architecture",
+    "dbxfe-azure-course-source-workspace",
+    "dbxfe-azure-course-source-deny",
+    "dbxfe-azure-course-source-rest-databricks",
+    "dbxfe-azure-course-source-tf-mws-workspaces"
+   ],
+   "context": "Workspace resource, planes and managed resource group on Azure."
+  },
+  {
+   "id": "dbxfe-azure-course-claim-identity",
+   "kind": "documented",
+   "description": "SCIM provisioning cannot sync nested groups or Microsoft Entra service principals; automatic identity management syncs users, groups, memberships, nested groups and service principals.",
+   "sourceIds": [
+    "dbxfe-azure-course-source-scim",
+    "dbxfe-azure-course-source-identity"
+   ],
+   "context": "Azure Databricks identities from Microsoft Entra ID."
+  },
+  {
+   "id": "dbxfe-azure-course-claim-vnet",
+   "kind": "documented",
+   "description": "VNet injection uses two dedicated subnets delegated to Microsoft.Databricks/workspaces, each node taking one address in each and Azure reserving five per subnet; Databricks manages the required NSG rules through the delegation; with secure cluster connectivity nodes have no public IP and connect outbound to the relay.",
+   "sourceIds": [
+    "dbxfe-azure-course-source-vnet"
+   ],
+   "context": "Classic compute plane on Azure."
+  },
+  {
+   "id": "dbxfe-azure-course-claim-routes",
+   "kind": "documented",
+   "description": "An injected workspace needs a user-defined route for every type of outbound connection, and service tags such as AzureDatabricks, Storage and EventHub are recommended over IP addresses.",
+   "sourceIds": [
+    "dbxfe-azure-course-source-udr",
+    "dbxfe-azure-course-source-outbound"
+   ],
+   "context": "User-defined routes for Azure Databricks."
+  },
+  {
+   "id": "dbxfe-azure-course-claim-storage",
+   "kind": "documented",
+   "description": "A Unity Catalog storage credential on Azure names an access connector whose managed identity holds an Azure data role on the storage account; an external location binds an abfss path to it; Shared Key and SAS tokens signed with it authorize the bearer, and disallowing Shared Key rejects them while Entra-authorized requests continue.",
+   "sourceIds": [
+    "dbxfe-azure-course-source-storage",
+    "dbxfe-azure-course-source-adls",
+    "dbxfe-azure-course-source-sharedkey"
+   ],
+   "context": "Unity Catalog storage access on Azure, with the legacy contrast."
+  },
+  {
+   "id": "dbxfe-azure-course-claim-private",
+   "kind": "documented",
+   "description": "Azure Databricks Private Link has front-end, back-end and serverless connection types; back-end requires the Premium plan and VNet injection; a name resolves to an endpoint's private address only through a linked Private DNS zone such as privatelink.azuredatabricks.net or privatelink.dfs.core.windows.net, or DNS forwarding.",
+   "sourceIds": [
+    "dbxfe-azure-course-source-privatelink",
+    "dbxfe-azure-course-source-backend",
+    "dbxfe-azure-course-source-dns"
+   ],
+   "context": "Private connectivity and DNS on Azure."
+  },
+  {
+   "id": "dbxfe-azure-course-claim-serverless",
+   "kind": "documented",
+   "description": "Network connectivity configurations are account-level regional objects attached to workspaces; without a private endpoint serverless reaches Azure storage through service endpoints, and a private endpoint rule is used only after the resource owner approves it.",
+   "sourceIds": [
+    "dbxfe-azure-course-source-serverless",
+    "dbxfe-azure-course-source-ncc"
+   ],
+   "context": "Azure serverless compute plane; availability varies."
+  },
+  {
+   "id": "dbxfe-azure-course-claim-fiction",
+   "kind": "fictional",
+   "description": "Cinderline's Azure tenant, subscription, resource groups, workspaces, storage accounts, identities, addresses, error texts and outcomes are synthetic teaching records.",
+   "sourceIds": [],
+   "context": "No Azure or Databricks resource was created or tested; 203.0.113.25 is a documentation address."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-azure-l01-resources-concept",
+   "term": "managed resource group (Azure)",
+   "aliases": [
+    "workspace resource",
+    "deny assignment"
+   ],
+   "definition": "The resource group Azure provisions with a classic Databricks workspace resource to hold its storage, networking and cluster machines, locked by a system deny assignment.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-resources"
+  },
+  {
+   "id": "dbxfe-azure-l01-entra-concept",
+   "term": "Microsoft Entra ID identity",
+   "aliases": [
+    "Azure Active Directory",
+    "service principal",
+    "managed identity"
+   ],
+   "definition": "A user, group, service principal or managed identity in the Entra tenant, synced to Databricks by provisioning and able to hold Azure roles.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-identity"
+  },
+  {
+   "id": "dbxfe-azure-l01-vnet-concept",
+   "term": "VNet injection",
+   "aliases": [
+    "host subnet",
+    "container subnet",
+    "secure cluster connectivity"
+   ],
+   "definition": "Deploying classic compute into two customer subnets delegated to Databricks, whose required NSG rules Databricks manages and whose nodes have no public IP.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-patterns"
+  },
+  {
+   "id": "dbxfe-azure-l01-connector-concept",
+   "term": "access connector for Azure Databricks",
+   "aliases": [
+    "storage credential",
+    "external location",
+    "abfss"
+   ],
+   "definition": "The Azure resource whose managed identity Unity Catalog uses to reach a storage account, registered as a storage credential and bound to paths by external locations.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-storage"
+  },
+  {
+   "id": "dbxfe-azure-l01-privatelink-concept",
+   "term": "Private Link and Private DNS zone (Azure)",
+   "aliases": [
+    "private endpoint",
+    "privatelink.dfs.core.windows.net"
+   ],
+   "definition": "A private endpoint gives a service a private address in a VNet; a Private DNS zone linked to the asking VNet makes its name resolve there.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-private"
+  },
+  {
+   "id": "dbxfe-azure-l01-ncc-concept",
+   "term": "network connectivity configuration (Azure)",
+   "aliases": [
+    "NCC",
+    "private endpoint rule"
+   ],
+   "definition": "An account-level regional object that gives serverless compute stable subnets or owner-approved private endpoints to customer resources.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-serverless"
+  },
+  {
+   "id": "dbxfe-azure-l01-diagnosis-concept",
+   "term": "denied versus unreachable request",
+   "aliases": [
+    "denial layer",
+    "reachability layer"
+   ],
+   "definition": "A denied request reached a control that refused it and names that layer; an unreachable request never arrived and is diagnosed outward from the asking network.",
+   "lessonId": "dbxfe-azure-l01",
+   "sectionId": "dbxfe-azure-l01-example"
+  }
+ ]
+}

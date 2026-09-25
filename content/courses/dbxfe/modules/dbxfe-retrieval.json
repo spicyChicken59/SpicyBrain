@@ -1,0 +1,331 @@
+{
+  "module": {
+    "id": "dbxfe-retrieval",
+    "title": "Document processing and retrieval engineering",
+    "summary": "Decide which sources may answer, parse and chunk them with their metadata, admit before ranking, compare lexical, vector and hybrid ranking, assemble cited context and grade retrieval with recall@k and MRR, using an executed TF-IDF lab.",
+    "objectives": [
+      "Build a source inventory and a chunk record whose metadata lets authority, version, effective-date and permission rules run before ranking.",
+      "Explain TF-IDF scores term by term and choose between lexical, vector, hybrid and reranked retrieval for a stated question mix.",
+      "Assemble budgeted, cited context and evaluate retrieval with recall@k, MRR and safety counts, mapping each stage to verified AI Search capabilities."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-genai"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-retrieval-l01.json"
+    ],
+    "scenarioId": "dbxfe-retrieval-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-retrieval-scenario",
+      "title": "Specify the retrieval layer for Cinderline's maintenance assistant pilot",
+      "context": "Fictional Cinderline Components wants a read-only maintenance assistant for technicians at its North and South plants. Sources: versioned machine manuals, plant-scoped procedures, bulletins, training notes, a folder of superseded revisions, draft proposals and engineering-only test procedures. A local TF-IDF baseline (Lab L20) has been run over a synthetic sample: admission before ranking returned no restricted chunk, and the relief-valve question still ranks a training note above the answer. The platform team proposes Databricks AI Search; region, endpoint type, sync mode and feature availability are unconfirmed. Security requires that no restricted passage reaches any caller's context, and the maintenance lead wants every answer to cite a current, approved revision.",
+      "task": "Write a two-page retrieval design note for the pilot review: the source inventory, the chunk record, the admission rules and where they run, the ranking plan and how alternatives will be compared, context and citation rules, the labelled evaluation with its pass bar, and the AI Search behaviours to verify before build.",
+      "requirements": [
+        "Classify every collection as citable, context-only or excluded, with an owner and a version rule.",
+        "Specify the chunk fields and which rule reads each; keep contextual header text separate from filter columns.",
+        "Place every admission rule before ranking and name the tests that prove it, including a restricted chunk that matches strongly.",
+        "Define the labelled evaluation: question classes, recall@k and MRR per class, safety counts, and what groundedness review is deferred.",
+        "List AI Search capabilities as verification items without assuming availability, fusion behaviour or pricing."
+      ],
+      "model": "### Inventory\nManuals: citable at the current approved revision; owner maintenance lead; version by revision and effective date. Plant procedures: citable for the caller's plant; owner each plant's operations lead. Bulletins: citable; time-sensitive. Training notes: context only, never cited for a value. Superseded revisions: audit only. Drafts: excluded. Engineering test procedures: citable for engineering only.\n\n### Chunk record and admission\nchunk_id, body, title, heading, doc_type, family, version, effective_date, status, citable, region, audience. Admission runs before any score: approved, effective by the question date, current version, region and audience match. Tests: the South lockout procedure never appears for a North technician; the engineering overpressure test never appears for a contractor; a question dated before and after an effective date cites the right revision.\n\n### Ranking and context\nBaseline TF-IDF with a contextual header; then compare AI Search HYBRID with and without a reranker on the same labels. Mark training notes context-only so they cannot be cited for values; the ranking failure itself is addressed by the HYBRID and reranker comparison. Context: 60 words to start, rank order, every entry labelled; reject citations outside the context or to a chunk that is not citable.\n\n### Evaluation and pass bar\n13 lab questions plus 20 written with the maintenance lead, grouped by class. Pass: zero restricted, superseded, draft or not-yet-effective chunks; recall@3 no lower than the baseline in any class. Groundedness review by the maintenance lead is deferred to the answer pilot.\n\n### Verify before build\nEndpoint type and region, sync mode and lag, filter behaviour with top-k, query types for the index subtype, reranker availability, privileges, preview status, pricing. Mixed outcome to report: governance passes today; ranking quality on settings questions does not yet.",
+      "reasoning": "The note turns each rule into a test that can fail, keeps security's requirement as a blocking pass bar rather than an average, reports the known ranking weakness honestly, and treats every managed capability as a verification item.",
+      "rubric": [
+        {
+          "id": "dbxfe-retrieval-scenario-rubric-1",
+          "criterion": "Source authority and metadata",
+          "weak": "All folders indexed; no owners or version rules.",
+          "partial": "Collections classified but training notes citable or versions read from filenames.",
+          "strong": "Every collection classified with owner and version rule; chunk record carries the columns each rule reads."
+        },
+        {
+          "id": "dbxfe-retrieval-scenario-rubric-2",
+          "criterion": "Admission placement and proof",
+          "weak": "Permissions left to the prompt or to filtering after the top-k.",
+          "partial": "Rules before ranking but no test with a strongly matching restricted chunk.",
+          "strong": "All four rules before ranking, each with a labelled case that would fail if the rule moved or broke."
+        },
+        {
+          "id": "dbxfe-retrieval-scenario-rubric-3",
+          "criterion": "Evaluation design",
+          "weak": "One average of answer quality.",
+          "partial": "Recall@k and MRR reported, but unanswerable questions averaged in or no per-class view.",
+          "strong": "Per-class recall@k and MRR, safety counts as the pass bar, groundedness explicitly deferred with an owner."
+        },
+        {
+          "id": "dbxfe-retrieval-scenario-rubric-4",
+          "criterion": "Managed-service honesty",
+          "weak": "AI Search features and performance assumed.",
+          "partial": "Features named but availability or fusion behaviour asserted without verification.",
+          "strong": "Each capability listed as a verification item, with the same labelled rerun required before trust."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can the North and South procedures share one index?",
+          "response": "Security will accept one index only if the plant rule runs before ranking and a test shows a strongly matching South chunk never reaches a North technician's context; otherwise they want separate indexes."
+        },
+        {
+          "question": "How often do manual revisions change, and are they published early?",
+          "response": "Two or three revisions per machine per year. Engineering often publishes a revision weeks before its effective date so sites can prepare."
+        },
+        {
+          "question": "Is the relief-valve training note wrong?",
+          "response": "No. It is accurate but deliberately gives no values, and the maintenance lead does not want it cited for any setting."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-retrieval-l01"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-retrieval-course-claim-aisearch",
+        "dbxfe-retrieval-course-claim-sync",
+        "dbxfe-retrieval-course-claim-lab",
+        "dbxfe-fact-privileges"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-retrieval-course-source-client",
+      "title": "databricks-ai-search 0.78 (Databricks AI Search Python client)",
+      "url": "https://pypi.org/project/databricks-ai-search/0.78/",
+      "publisher": "Databricks (package published on PyPI)",
+      "type": "primary reference",
+      "context": "Databricks-published client for AI Search, formerly Vector Search; version 0.78, uploaded 2026-08-03.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Package metadata and wheel source read in this build (digest matched PyPI); a client names parameters, not availability, preview status, limits or pricing."
+    },
+    {
+      "id": "dbxfe-retrieval-course-source-sdk",
+      "title": "databricks-sdk 0.141.0 (Databricks SDK for Python)",
+      "url": "https://pypi.org/project/databricks-sdk/0.141.0/",
+      "publisher": "Databricks (package published on PyPI)",
+      "type": "primary reference",
+      "context": "Service definitions generated from Databricks OpenAPI specifications; SDK labelled Beta; uploaded 2026-09-23.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "aisearch.py and aifunctions.py read in this build from the downloaded wheel; generated fields do not establish entitlement or regional availability."
+    },
+    {
+      "id": "dbxfe-retrieval-course-source-docs",
+      "title": "Databricks AI Search",
+      "url": "https://docs.databricks.com/aws/en/ai-search/ai-search",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS overview of AI Search (formerly Vector Search).",
+      "accessDate": "2026-09-19",
+      "reviewDate": "2026-09-19",
+      "caveat": "Reused from the retained GenAI module's source record (review 2026-09-19, reachable probe 2026-09-20); not re-read or re-confirmed in this build because the documentation host refused the request and the search allowance was used up. Reused source record: the retained GenAI module's dbxfe-genai-source-search (same URL, title and publisher), reviewed by that module's editorial review on 2026-09-19 and probed reachable on 2026-09-20 (HTTP 200, same final URL, docs/evidence/source-availabilit"
+    },
+    {
+      "id": "dbxfe-retrieval-course-source-tfidf",
+      "title": "TfidfVectorizer (scikit-learn 1.9 API reference)",
+      "url": "https://scikit-learn.org/1.9/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html",
+      "publisher": "scikit-learn developers",
+      "type": "official documentation",
+      "context": "scikit-learn 1.9.1, pinned and executed in Lab L20.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "URL and title not confirmed by search or fetch in this build; the URL is the installed library's own documentation link and the content was read from the docstrings the page is generated from."
+    },
+    {
+      "id": "dbxfe-retrieval-course-source-mlflow",
+      "title": "mlflow 3.16.1",
+      "url": "https://pypi.org/project/mlflow/3.16.1/",
+      "publisher": "MLflow project (package published on PyPI)",
+      "type": "primary reference",
+      "context": "Open-source MLflow 3.16.1 as installed in the course's ML lab environment.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Docstrings of the installed package read in this build; no scorer or judge was run."
+    },
+    {
+      "id": "dbxfe-retrieval-course-source-sdk-aisearch-query",
+      "title": "Databricks SDK for Python v0.141.0: service/aisearch.py, AiSearchAPI.query_index (score_threshold and reranker)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/aisearch.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "The AI Search query request: the score threshold and the reranker are fields of the request the service executes.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/aisearch.py (tag v0.141.0): 'If set, results are reranked before being returned.' and 'Score threshold for the approximate nearest-neighbor search. Defaults to 0.0.', with the threshold placed in the request body (body[\"score_threshold\"] = score_threshold). API reference docstring, interface scope only: it names request fields, not their order relative to reranking, availability, release status or limits."
+    },
+    {
+      "id": "dbxfe-retrieval-course-source-client-index",
+      "title": "databricks-ai-search 0.78 wheel: databricks/ai_search/index.py, AISearchIndex.similarity_search",
+      "url": "https://files.pythonhosted.org/packages/8c/06/2b20728da15e189c9735d78276182372d5bc2c3dfe7971549301e1178ced/databricks_ai_search-0.78-py3-none-any.whl",
+      "publisher": "Databricks (package published on PyPI)",
+      "type": "primary reference",
+      "context": "The released client's query method: its score_threshold documentation and the request payload it builds.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from the wheel downloaded from https://files.pythonhosted.org/packages/8c/06/2b20728da15e189c9735d78276182372d5bc2c3dfe7971549301e1178ced/databricks_ai_search-0.78-py3-none-any.whl (SHA-256 992502754f6767f2670ad73dec638f2344cafb79a1489db85725b8ef33b135bc, equal to PyPI's published digest), member databricks/ai_search/index.py: ':param score_threshold: Score threshold to use for the query. If reranker is used, the score threshold is applied before reranking.' and 'if score_threshold: json_data[\"score_threshold\"] = score_threshold'. Package source, interface scope only: the client documents the ordering and sends the threshold in the request; it does not apply it itself, and it does not establish availability, preview status, limits or pricing."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-retrieval-course-claim-aisearch",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-retrieval-course-source-client",
+        "dbxfe-retrieval-course-source-sdk",
+        "dbxfe-retrieval-course-source-docs",
+        "dbxfe-retrieval-course-source-sdk-aisearch-query",
+        "dbxfe-retrieval-course-source-client-index"
+      ],
+      "description": "Databricks AI Search, formerly Vector Search, is a managed vector and keyword search service whose queries accept query_type ANN (default), HYBRID or FULL_TEXT, filters, a score threshold applied before reranking, and an optional reranker.",
+      "context": "Read from Databricks-published client 0.78 and SDK 0.141.0; availability verified per workspace."
+    },
+    {
+      "id": "dbxfe-retrieval-course-claim-sync",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-retrieval-course-source-sdk",
+        "dbxfe-retrieval-course-source-client"
+      ],
+      "description": "An AI Search Delta Sync index follows a source Delta table with a TRIGGERED pipeline (one refresh with the data available at its start) or a CONTINUOUS one; a Direct Access index is written through the API; embeddings are computed from a source column by a model endpoint or supplied as vectors.",
+      "context": "Generated SDK definitions and the client; sync latency and cost are not documented here."
+    },
+    {
+      "id": "dbxfe-retrieval-course-claim-parse",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-retrieval-course-source-sdk"
+      ],
+      "description": "ai_parse_document parses PDF, DOCX, DOC, PPTX, PPT, JPG, JPEG, PNG and TIFF files from a Unity Catalog volume path into pages and elements and lists pages that failed.",
+      "context": "REST definition in SDK 0.141.0; limits and availability on the current documentation page."
+    },
+    {
+      "id": "dbxfe-retrieval-course-claim-tfidf",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-retrieval-course-source-tfidf"
+      ],
+      "description": "TfidfVectorizer's defaults lower-case text, keep tokens of two or more alphanumeric characters, weight count × (ln((1 + n)/(1 + df)) + 1) and normalise rows to unit length.",
+      "context": "scikit-learn 1.9.1, executed in Lab L20."
+    },
+    {
+      "id": "dbxfe-retrieval-course-claim-scorers",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-retrieval-course-source-mlflow"
+      ],
+      "description": "MLflow defines recall at k over labelled relevant ids and provides judge-based scorers for retrieval groundedness, relevance and sufficiency.",
+      "context": "Open-source MLflow 3.16.1."
+    },
+    {
+      "id": "dbxfe-retrieval-course-claim-lab",
+      "kind": "guidance",
+      "sourceIds": [],
+      "description": "Recorded local run of Lab L20 (scikit-learn 1.9.1, 18 synthetic documents, 13 labelled questions): admission before ranking returned no restricted, superseded, draft or not-yet-effective chunk; similarity alone returned 21 such chunks; small and large chunks score MRR@5 0.8778 and 0.8917.",
+      "context": "docs/academy/labs/lab-l20-retrieval-quality.json; evidence about this fixture only."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-retrieval-l01-authority-concept",
+      "term": "source authority",
+      "aliases": [
+        "source inventory"
+      ],
+      "definition": "The per-collection decision of whether a source may be cited, may only add context, or is excluded, with an owner and a version rule.",
+      "lessonId": "dbxfe-retrieval-l01",
+      "sectionId": "dbxfe-retrieval-l01-authority"
+    },
+    {
+      "id": "dbxfe-retrieval-l01-chunk-concept",
+      "term": "chunk",
+      "aliases": [
+        "passage",
+        "chunk size"
+      ],
+      "definition": "The unit of text a retriever scores, returns and cites, cut from parsed elements under a size budget.",
+      "lessonId": "dbxfe-retrieval-l01",
+      "sectionId": "dbxfe-retrieval-l01-chunks"
+    },
+    {
+      "id": "dbxfe-retrieval-l01-admission-concept",
+      "term": "admission before ranking",
+      "aliases": [
+        "pre-filtering",
+        "permission filter"
+      ],
+      "definition": "Applying authority, effective-date, version and permission rules so that only admitted chunks are ever scored.",
+      "lessonId": "dbxfe-retrieval-l01",
+      "sectionId": "dbxfe-retrieval-l01-admission"
+    },
+    {
+      "id": "dbxfe-retrieval-l01-version-concept",
+      "term": "supersession and effective date",
+      "aliases": [
+        "current version",
+        "freshness"
+      ],
+      "definition": "Within a document family only the highest approved version effective on the question's date may answer; recency bonuses are separate, scoped preferences.",
+      "lessonId": "dbxfe-retrieval-l01",
+      "sectionId": "dbxfe-retrieval-l01-admission"
+    },
+    {
+      "id": "dbxfe-retrieval-l01-tfidf-concept",
+      "term": "TF-IDF",
+      "aliases": [
+        "lexical retrieval",
+        "keyword search"
+      ],
+      "definition": "Lexical scoring that weights each token by its count in a chunk times its rarity across chunks and ranks by cosine similarity.",
+      "lessonId": "dbxfe-retrieval-l01",
+      "sectionId": "dbxfe-retrieval-l01-ranking"
+    },
+    {
+      "id": "dbxfe-retrieval-l01-hybrid-concept",
+      "term": "hybrid search and reranking",
+      "aliases": [
+        "rank fusion",
+        "reranker",
+        "vector retrieval"
+      ],
+      "definition": "Merging lexical and vector rankings, then optionally reordering the top candidates with a reranker that reads each one with the question.",
+      "lessonId": "dbxfe-retrieval-l01",
+      "sectionId": "dbxfe-retrieval-l01-ranking"
+    },
+    {
+      "id": "dbxfe-retrieval-l01-context-concept",
+      "term": "context assembly and citations",
+      "aliases": [
+        "context budget",
+        "citation check"
+      ],
+      "definition": "Turning a ranked list into budgeted, labelled passages and rejecting any citation that is not among them.",
+      "lessonId": "dbxfe-retrieval-l01",
+      "sectionId": "dbxfe-retrieval-l01-context"
+    },
+    {
+      "id": "dbxfe-retrieval-l01-recall-concept",
+      "term": "recall@k and MRR",
+      "aliases": [
+        "retrieval evaluation",
+        "mean reciprocal rank"
+      ],
+      "definition": "Retrieval metrics computed from labelled relevant chunk ids: the share found in the top k, and the average reciprocal rank of the first relevant result.",
+      "lessonId": "dbxfe-retrieval-l01",
+      "sectionId": "dbxfe-retrieval-l01-evaluation"
+    },
+    {
+      "id": "dbxfe-retrieval-l01-aisearch-concept",
+      "term": "Databricks AI Search",
+      "aliases": [
+        "Vector Search",
+        "Mosaic AI Vector Search"
+      ],
+      "definition": "Databricks' managed vector and keyword search service, formerly called Vector Search.",
+      "lessonId": "dbxfe-retrieval-l01",
+      "sectionId": "dbxfe-retrieval-l01-managed"
+    }
+  ]
+}

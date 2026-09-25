@@ -1,0 +1,657 @@
+{
+  "module": {
+    "id": "dbxfe-bi",
+    "title": "Business intelligence and semantic delivery",
+    "summary": "Design a dashboard backward from the decision it serves, label and bind every number to a metric contract, separate page permissions from data privileges, communicate freshness, define metrics once in a metric view, and compare the native AI/BI page with Power BI, Tableau and driver-based clients, ending in a storyboard and an acceptance script.",
+    "objectives": [
+      "Write a decision chain and defensible, contract-bound labels for a morning quality page.",
+      "Write an access matrix and freshness statement that separate page permissions, the publish-time data-permission choice and table privileges, and order the refresh after the job.",
+      "Compare AI/BI, metric views, Genie One, Power BI, Tableau and ODBC or JDBC clients, and write a storyboard and an acceptance script with independent expected values."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-modeling"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-bi-l01.json"
+    ],
+    "scenarioId": "dbxfe-bi-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-bi-scenario",
+      "title": "Deliver Cinderline's morning quality page",
+      "context": "Fictional Cinderline Components runs a North plant with four lines. Supervisors meet at 8 a.m. to choose which line to investigate first and today argue over two printed reports. The metric contract for unit_defect_rate version 1 is proposed; a nightly job publishes accepted inspections and a publish-run table, normally by 02:10 but occasionally not until after the meeting. The operations director asks the data team to \"connect Power BI and build a dashboard\" for the meeting, and the finance team already uses Power BI.",
+      "task": "Produce the delivery plan the operations director signs before anything is built: a storyboard of the meeting, the metric definitions the page reads, an access matrix for the page and its underlying data, the refresh and freshness design, an acceptance script with exact expected values and signers, and a short recommendation on where Power BI fits, with explicit unknowns.",
+      "requirements": [
+        "Storyboard frames that each name time, actor, surface, what is read and what is decided, including the late-job morning.",
+        "Metric definitions bound to the contract by name and version, with the plant ratio of sums, the empty cases and the restatement mark.",
+        "An access matrix separating page permissions, the publish-time data-permission choice and table privileges, with the identity that writes the data kept apart from the page.",
+        "A refresh ordered after the job and a freshness statement in words for the normal and not-updated states.",
+        "An acceptance script whose expected values come from outside the page, with identity rows and signers, and a Power BI recommendation that says what does not travel."
+      ],
+      "model": "### Storyboard\nFive frames plus the late-morning variant. 07:30, plant analyst in the workspace: reads the freshness line and the four tiles against the reconciliation sheet. 07:45, supervisors on phones through Genie One: read \"Covers Tuesday. Published 06:32. Restated days are marked.\" first. 07:47: compare four line tiles, choose line 2 at 6.0% first. 07:50: see line 2's day-2 mark, 5.1% with previous 5.3%, and accept it. 08:05, quality lead: opens the excluded inspection through the quarantine link. Late variant: frame 2 reads \"Not updated: showing Monday. See the operator note.\" and frame 3 becomes a decision to use Monday knowingly.\n\n### Metric definitions\n`unit_defect_rate` v1 from the metric contract, held as a measure in a metric view: try_divide(SUM(defective_units), SUM(inspected_units)) over the published accepted.daily_line_rate table (accepted inspections only), dimensions line_id and business_day; the plant figure is the same measure with no line grouping, never a mean of line rates. Beside each tile: accepted, excluded and quarantined counts. Empty cases render \"no inspections\" or \"no inspected units\". Restated days carry a flag and the previous value. The freshness tile reads the latest successful publish-run row through the accepted.publish_status view.\n\n### Access matrix\nThe page is published with individual data permissions, so each viewer's own grants protect the rows. north-reporting-analysts: Can View; USE CATALOG, USE SCHEMA on accepted, and SELECT on accepted.daily_line_rate and accepted.publish_status, the two objects the page reads; must not reach raw or quarantine rows through any filter. quality-stewards: Can View and the quarantine link; the same grants plus USE SCHEMA and SELECT on the quarantine table; must not edit. Data team (page owner): Can Edit, working with its own grants and never those of sp-north-nightly, the principal that writes the accepted tables and holds no page permission. Everyone else: nothing on either door. Rejected alternative: shared data permissions from a personal login, which would hand every viewer the author's reach.\n\n### Refresh and freshness\nA dashboard task follows the nightly publishing task; if the job has not published by 7:30 the freshness line says so and the operator and analyst are notified.\n\n### Acceptance script\nFrom the five-day reconciliation sheet: line 3, day 4 = 4.8%; line 2, day 2 counts 20 / 1 / 1 (accepted, excluded, quarantined); line 2's day-2 mark with previous 5.3% after the day-4 correction; line 4, day 5 = \"no inspections\"; line filter 3 leaves the plant at 4.5%; the late-morning simulation shows the not-updated sentence; test analyst sees tiles and is refused the quarantine link; outsider cannot load. Signers: plant analyst (values), quality lead (counts and marks), security lead (access).\n\n### External BI\nThe finance team's Power BI request is a second page: its own connection identity with SELECT on the accepted view, DirectQuery on a SQL warehouse or an Import copy whose sharing Power BI governs, the measure read from the metric view by SQL, its own freshness caption and its own acceptance row. Nothing of the AI/BI page travels.\n\n### Unknowns\nConsumer access for the supervisors' group, phone rendering at 390 pixels, and whether supervisors act on the page, which the pilot readout must observe.",
+      "reasoning": "The plan answers the director's request by the decision the meeting makes rather than by a tool: every tile traces to the contract, the matrix keeps the two doors and the data-permission choice explicit, freshness is designed for the late morning, and the acceptance script is the evidence. Power BI is treated as a second page with its own identity, freshness and acceptance, so the request is met without pretending the page's controls follow the data into another tool.",
+      "rubric": [
+        {
+          "id": "dbxfe-bi-scenario-rubric-1",
+          "criterion": "Decision and storyboard",
+          "weak": "A list of charts or screenshots with no audience or decision.",
+          "partial": "Audience and decision named, but frames do not say what is read or omit the late-job morning.",
+          "strong": "Frames name time, actor, surface, sentence read and decision, including the not-updated variant, and each maps to an acceptance row."
+        },
+        {
+          "id": "dbxfe-bi-scenario-rubric-2",
+          "criterion": "Metric definitions and labels",
+          "weak": "Tiles labelled \"Defect rate\" with a plant average of line rates.",
+          "partial": "Contract named but the empty case or restatement mark is missing, or labels lack period or denominator.",
+          "strong": "Every tile bound to unit_defect_rate v1, plant as ratio of sums, empty cases in words, restatement mark and exclusion counts shown."
+        },
+        {
+          "id": "dbxfe-bi-scenario-rubric-3",
+          "criterion": "Access and freshness",
+          "weak": "\"Share with the supervisors\"; refresh on a clock with a timestamp in the corner.",
+          "partial": "Page and table grants listed, but the data-permission choice is unstated, or freshness says only a time.",
+          "strong": "Two doors per principal, individual data permissions so the grants protect the rows, the writing principal kept off the page, refresh after the job, and freshness in words for both states."
+        },
+        {
+          "id": "dbxfe-bi-scenario-rubric-4",
+          "criterion": "Acceptance and external BI",
+          "weak": "\"Check that it looks right\"; Power BI assumed to inherit the page.",
+          "partial": "Expected values given but copied from the page, or no identity rows; Power BI mentioned without its own controls.",
+          "strong": "Independent expected values, filter, empty, restated, late and identity rows with signers; Power BI given its own identity, freshness and acceptance, with unknowns listed."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Does the finance team's Power BI report have to show the same numbers as the page?",
+          "response": "Yes, to one decimal, on the same business day. Finance is willing to read from a view or metric view the data team owns, but its report is shared through its own Power BI workspace."
+        },
+        {
+          "question": "Do supervisors have consumer access today?",
+          "response": "Unknown. The workspace administrator has not confirmed which groups hold the entitlement; until they do, the phone path is listed as unverified."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-bi-l01"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-bi-course-claim-dashboards",
+        "dbxfe-bi-course-claim-permissions",
+        "dbxfe-bi-course-claim-share",
+        "dbxfe-bi-course-claim-schedule",
+        "dbxfe-bi-course-claim-task",
+        "dbxfe-bi-course-claim-metricviews",
+        "dbxfe-bi-course-claim-genie-one",
+        "dbxfe-bi-course-claim-powerbi",
+        "dbxfe-fact-sql"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-bi-course-source-aibi",
+      "title": "Databricks AI/BI",
+      "url": "https://docs.databricks.com/aws/en/ai-bi/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; overview of AI/BI dashboards, Genie Agents and Genie One.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Names in this product family changed in 2025 and 2026; the AI/BI and Genie One release notes are the place to check current names and availability before writing a runbook. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-dashboards",
+      "title": "Dashboards",
+      "url": "https://docs.databricks.com/aws/en/dashboards/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; AI/BI dashboards landing page (the API still calls them Lakeview dashboards).",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A product overview; feature availability and limits change and are checked on the current page, not assumed from this summary. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-concepts",
+      "title": "Dashboard concepts",
+      "url": "https://docs.databricks.com/aws/en/dashboards/concepts",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; datasets, visualizations and pages of an AI/BI dashboard.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Describes the authoring model; it does not define any business metric, which remains the metric contract's job. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-share",
+      "title": "Share a dashboard",
+      "url": "https://docs.databricks.com/aws/en/dashboards/share/share",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; publishing, data permissions and the sharing dialog for AI/BI dashboards.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Publishing options and defaults are product behaviour that can change; the access matrix is re-checked against the current page at review time. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-acl",
+      "title": "Access control lists",
+      "url": "https://docs.databricks.com/aws/en/security/auth/access-control",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; workspace object access control, including AI/BI dashboard ACLs.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Permission names differ between the UI and the API (Can View is CAN_READ in the API); legacy dashboards are a separate object with their own ACL. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-filters",
+      "title": "Use dashboard filters",
+      "url": "https://docs.databricks.com/aws/en/dashboards/manage/filters/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; filter widgets on AI/BI dashboards.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Browser-side filtering is described for relatively small datasets; the size at which a query re-runs is product behaviour, not a contract. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-filtertypes",
+      "title": "Dashboard filter types",
+      "url": "https://docs.databricks.com/aws/en/dashboards/manage/filter-types",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the filter widget types available to AI/BI dashboards.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The list of types grows between releases; read the current page rather than this summary before designing. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-parameters",
+      "title": "Work with dashboard parameters",
+      "url": "https://docs.databricks.com/aws/en/dashboards/manage/filters/parameters",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; parameters in AI/BI dashboard datasets and query-based parameters.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Parameter syntax and multi-value handling are documented on the page; nothing here was executed against a warehouse. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-schedule",
+      "title": "Manage scheduled dashboard updates and subscriptions",
+      "url": "https://docs.databricks.com/aws/en/dashboards/share/schedule-subscribe",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; refresh schedules and subscriptions for published AI/BI dashboards.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Subscriber limits and destination types are product limits that can change; the schedule costs warehouse time on every run. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-task",
+      "title": "Dashboard task for jobs",
+      "url": "https://docs.databricks.com/aws/en/jobs/tasks/dashboard",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; a Lakeflow Jobs task type that refreshes an AI/BI dashboard.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Task availability and warehouse requirements are stated on the page; no job was created or run in this build. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-caching",
+      "title": "Dataset optimization and caching",
+      "url": "https://docs.databricks.com/aws/en/dashboards/caching",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; how AI/BI dashboards cache query results.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The cache is described as best effort; a design must not depend on a cached result being present. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-api",
+      "title": "Use dashboard APIs to create and manage dashboards",
+      "url": "https://docs.databricks.com/aws/en/dashboards/tutorials/dashboard-crud-api",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; tutorial for the dashboard (Lakeview) REST API, including publishing as a service principal.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A tutorial, not a deployment standard; token handling and secret storage follow the organization's own identity rules. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-embedding",
+      "title": "What is embedding for external users?",
+      "url": "https://docs.databricks.com/aws/en/dashboards/share/embedding/external-embed",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; embedding AI/BI dashboards in applications for viewers without Databricks accounts.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Availability, token lifetime and recommended publishing mode are stated on the page and must be re-read before any design; nothing was embedded in this build. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-metricviews",
+      "title": "Unity Catalog metric views",
+      "url": "https://docs.databricks.com/aws/en/uc-semantics/metric-views/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog semantics. Release status, UI flows and runtime requirements vary; check the page.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Search snippets on 2026-09-23 described metric views as the core implementation of Unity Catalog semantics and reported a runtime requirement and a general-availability announcement; none of this was executed here, so status is checked on the page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-genieone",
+      "title": "Use Genie One",
+      "url": "https://docs.databricks.com/aws/en/genie-one/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the simplified interface for business users, previously named Databricks One.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A renamed product: older pages, videos and community answers say Databricks One; features on the consumer surface change between releases. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-consumers",
+      "title": "What is consumer access?",
+      "url": "https://docs.databricks.com/aws/en/ai-bi/consumers/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the consumer access workspace entitlement.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Entitlement names and defaults are administered per workspace; which groups hold it is checked by an administrator, not assumed. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-powerbi",
+      "title": "Power BI with Databricks",
+      "url": "https://docs.databricks.com/gcp/en/partners/bi/power-bi",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on Google Cloud edition of the Power BI landing page; the AWS edition at the same path surfaced in search without a title.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The landing page names three paths; which apply to Cinderline depends on its cloud, its Power BI licence and tenant settings, which this build cannot check. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-pbidesktop",
+      "title": "Connect Power BI Desktop to Databricks",
+      "url": "https://docs.databricks.com/aws/en/partners/bi/power-bi/desktop",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; connecting Power BI Desktop to clusters and SQL warehouses.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Connector versions, authentication methods and supported modes change; the page recommends the latest Power BI Desktop for Unity Catalog data. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-tableau",
+      "title": "Connect Tableau and Databricks",
+      "url": "https://docs.databricks.com/aws/en/partners/bi/tableau",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Tableau Desktop and Tableau Cloud connections.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Tableau-side licensing, permissions and extract schedules are Tableau's to document; only the Databricks side is summarized. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-drivers",
+      "title": "Databricks ODBC and JDBC Drivers",
+      "url": "https://docs.databricks.com/aws/en/integrations/jdbc-odbc-bi",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; ODBC (Open Database Connectivity) and JDBC (Java Database Connectivity) drivers for tools and clients.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Driver versions, supported platforms and authentication options are on the driver pages; no driver was installed here. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-bi-course-source-measure",
+      "title": "measure aggregate function",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/functions/measure",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks SQL language reference.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Syntax only; not executed in this build. Title and URL reused from this build's data-modeling module record, whose author confirmed them by search on 2026-09-23; page body not fetched in this build."
+    },
+    {
+      "id": "dbxfe-bi-course-source-sdk-lakeview",
+      "title": "Databricks SDK for Python v0.141.0: docs/workspace/dashboards/lakeview.rst, LakeviewAPI.publish",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/dashboards/lakeview.rst",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Generated API reference of the Lakeview (AI/BI) dashboards client: the publish call and its embed_credentials flag.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/dashboards/lakeview.rst (tag v0.141.0): 'Publish the current draft dashboard. Requires the `Databricks SQL access <https://docs.databricks.com/security/auth/entitlements>`__ entitlement. Grant Databricks SQL access in addition to Workspace access.' and 'These embedded credentials will be used to execute the published dashboard's queries.' API reference, interface scope only: a publishing service principal holds these entitlements besides any table grant, so the principal's data grants, not all its grants, bound what viewers reach; the tutorial's permission list, the user-interface default and audit-log behaviour were not read."
+    },
+    {
+      "id": "dbxfe-bi-course-source-sdk-tables",
+      "title": "Databricks SDK for Python v0.141.0: docs/workspace/catalog/tables.rst, TablesAPI",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/catalog/tables.rst",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Generated API reference of the Unity Catalog tables client: the privileges a caller needs to query a table, and that the API treats a view as a kind of table.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/catalog/tables.rst (tag v0.141.0): 'To query a table, users must have the SELECT permission on the table, and they must have the USE_CATALOG permission on its parent catalog and the USE_SCHEMA permission on its parent schema.' and 'From an API perspective, a **VIEW** is a particular kind of table (rather than a managed or external table).' API reference, interface scope only: a principal that runs the page's queries needs USE_CATALOG on the parent catalog and USE_SCHEMA on the parent schema as well as SELECT on each table or view the page reads; limiting its data grants to the accepted objects is the lesson's design, not something this reference states. Dashboards, publishing modes and failed-tile rendering are not covered."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-bi-course-claim-dashboards",
+      "description": "AI/BI dashboards are low-code dashboards built from datasets; each dataset is based on a table, view, metric view or custom SQL query, every visualization reads from one or more datasets, and a published dashboard can be shared with users registered to the Databricks account.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-dashboards",
+        "dbxfe-bi-course-source-concepts"
+      ],
+      "context": "AI/BI dashboards on Databricks; features and limits vary by release."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-filters",
+      "description": "Field filters narrow results by dataset fields and come as single value, multiple values, date picker, date range picker, text entry and range slider; for relatively small datasets they are often applied in the browser without re-running the query.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-filters",
+        "dbxfe-bi-course-source-filtertypes"
+      ],
+      "context": "AI/BI dashboard filter widgets."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-parameters",
+      "description": "Dashboard parameters substitute values into dataset queries at runtime so data is filtered before aggregation; parameter filters come as single value, multiple values, date picker and date range, and query-based parameters draw their allowed values from a dataset.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-parameters",
+        "dbxfe-bi-course-source-filtertypes"
+      ],
+      "context": "AI/BI dashboard parameters; syntax on the current page."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-permissions",
+      "description": "An AI/BI dashboard has its own permission levels, Can View (CAN_READ), Can Run, Can Edit and Can Manage, which govern the dashboard object; whether its queries return data is decided separately by data permissions on the underlying objects.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-acl",
+        "dbxfe-bi-course-source-share"
+      ],
+      "context": "Workspace object ACLs; Unity Catalog privileges are a separate system."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-share",
+      "description": "At publish time the publisher chooses shared data permissions (the default), where viewers' queries run with the publisher's data permissions and share one cache, or individual data permissions, where each viewer's own credentials and access to the data decide the results and the cache is per user.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-share",
+        "dbxfe-bi-course-source-caching"
+      ],
+      "context": "Publishing AI/BI dashboards; defaults may change."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-api",
+      "description": "The dashboard API publishes with embed_credentials; publishing as a service principal needs at least CAN MANAGE on the dashboard, SELECT on its data sources and CAN USE on the warehouse, after which viewers use the principal's permissions and audit logs show the principal as the executor.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-api",
+        "dbxfe-bi-course-source-sdk-lakeview",
+        "dbxfe-bi-course-source-sdk-tables"
+      ],
+      "context": "Dashboard (Lakeview) REST API tutorial."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-schedule",
+      "description": "A dashboard schedule runs all dataset SQL on a periodic cadence and, for a dashboard published with shared data permissions, refreshes the shared cache; subscriptions send snapshots by email, Slack or Microsoft Teams.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-schedule"
+      ],
+      "context": "Published AI/BI dashboards; each run uses warehouse compute."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-task",
+      "description": "A dashboard task in a job refreshes a dashboard and sends a snapshot to its own subscriber list, using a serverless or pro SQL warehouse.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-task"
+      ],
+      "context": "Lakeflow Jobs task types; availability varies."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-metricviews",
+      "description": "A Unity Catalog metric view separates measure definitions from dimensions, is defined in YAML and registered with SQL DDL or Catalog Explorer, lets a query group by any available dimension while the engine generates the computation, and is queried with the MEASURE function.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-metricviews",
+        "dbxfe-bi-course-source-measure"
+      ],
+      "context": "Unity Catalog semantics; status and runtime requirements on the current page."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-aibi",
+      "description": "Databricks AI/BI comprises dashboards for visualization and reporting and, under Genie One, Genie Agents for conversational analytics configured by data teams with trusted data, metrics and business rules.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-aibi"
+      ],
+      "context": "Product family naming as of September 2026."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-genie-one",
+      "description": "Genie One, previously Databricks One, is the simplified interface where business users view AI/BI dashboards, ask questions in natural language and use Databricks Apps; the consumer access entitlement directs users there and is the least-privileged option.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-genieone",
+        "dbxfe-bi-course-source-consumers"
+      ],
+      "context": "Workspace-level Genie One; entitlements administered per workspace."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-powerbi",
+      "description": "Power BI connects to Databricks from Power BI Desktop through Partner Connect, a manual hostname and HTTP path connection or the Delta Sharing connector; the connector supports ADBC, Import and DirectQuery, with SQL warehouses recommended for DirectQuery; data can also be published to the Power BI service and semantic model refreshes orchestrated with a Power BI task.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-powerbi",
+        "dbxfe-bi-course-source-pbidesktop"
+      ],
+      "context": "Power BI integration; licence and tenant settings are Power BI's."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-tableau",
+      "description": "Tableau Desktop connects through Partner Connect or manually, and with Tableau Cloud data sources can be created from Unity Catalog tables or schemas directly from the Databricks UI.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-tableau"
+      ],
+      "context": "Tableau integration; Tableau-side permissions are Tableau's."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-drivers",
+      "description": "Databricks provides ODBC and JDBC drivers for tools and clients; some tools need the ODBC driver installed, such as Tableau Desktop, while recent Power BI Desktop releases include it.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-drivers"
+      ],
+      "context": "Driver-based connectivity to Databricks compute."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-caching",
+      "description": "AI/BI dashboards keep a best-effort 24-hour result cache: shared across viewers for a dashboard published with shared data permissions, per user for drafts and individual data permissions, and populated by scheduled updates.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-caching"
+      ],
+      "context": "Dashboard caching behaviour; best effort, not a guarantee."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-account-share",
+      "description": "A published AI/BI dashboard can be shared with users registered to the Databricks account who lack workspace access; such users are limited to Can Run whatever level the sharing dialog shows.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-dashboards",
+        "dbxfe-bi-course-source-acl"
+      ],
+      "context": "Account-level sharing of published dashboards."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-embedding",
+      "description": "Embedding for external users places a dashboard in an external application for viewers without Databricks accounts, using a service principal with read access to the dashboard and its data and one-hour tokens scoped to each viewer.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-embedding"
+      ],
+      "context": "External embedding; availability checked on the current page."
+    },
+    {
+      "id": "dbxfe-bi-course-claim-filter-url",
+      "description": "A published dashboard stores its field filter and parameter selections in the URL, so a bookmarked or shared link reopens the dashboard with those values applied.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-bi-course-source-filters"
+      ],
+      "context": "Published AI/BI dashboards."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-bi-l01-decision-concept",
+      "term": "decision chain",
+      "aliases": [
+        "audience, decision, action, metric"
+      ],
+      "definition": "The audience, decision, action and metric a dashboard exists to serve, written before any tile is drawn.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-decision"
+    },
+    {
+      "id": "dbxfe-bi-l01-label-concept",
+      "term": "defensible label",
+      "aliases": [
+        "tile label",
+        "freshness stamp"
+      ],
+      "definition": "A tile label carrying axis treatment, units, period, denominator and publish time.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-decision"
+    },
+    {
+      "id": "dbxfe-bi-l01-binding-concept",
+      "term": "contract binding",
+      "aliases": [
+        "metric contract binding"
+      ],
+      "definition": "Tying each tile to a named, versioned metric contract whose grain, denominator and empty rule it inherits.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-binding"
+    },
+    {
+      "id": "dbxfe-bi-l01-filter-concept",
+      "term": "field filter and dashboard parameter",
+      "aliases": [
+        "filter widget",
+        "parameter filter"
+      ],
+      "definition": "Two dashboard controls: a field filter narrows returned rows, a parameter is substituted into the SQL before aggregation.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-binding"
+    },
+    {
+      "id": "dbxfe-bi-l01-permission-concept",
+      "term": "dashboard permission",
+      "aliases": [
+        "Can View",
+        "Can Run",
+        "Can Edit",
+        "Can Manage"
+      ],
+      "definition": "An access level on the dashboard object, separate from privileges on the tables its queries read.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-access"
+    },
+    {
+      "id": "dbxfe-bi-l01-credentials-concept",
+      "term": "shared and individual data permissions",
+      "aliases": [
+        "embedded credentials",
+        "embed_credentials"
+      ],
+      "definition": "The publish-time choice of whether viewers' queries run with the publisher's data permissions or their own.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-access"
+    },
+    {
+      "id": "dbxfe-bi-l01-freshness-concept",
+      "term": "freshness statement",
+      "aliases": [
+        "freshness line",
+        "refresh schedule"
+      ],
+      "definition": "Words on the page naming the period covered, the publish time, restatements and the not-updated state, read from a run table.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-freshness"
+    },
+    {
+      "id": "dbxfe-bi-l01-metricview-concept",
+      "term": "metric view",
+      "aliases": [
+        "Unity Catalog metric view",
+        "semantic layer"
+      ],
+      "definition": "A Unity Catalog object holding measures separately from dimensions so a ratio is recomputed over sums at every grouping.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-semantic"
+    },
+    {
+      "id": "dbxfe-bi-l01-consumer-concept",
+      "term": "Genie One and consumer access",
+      "aliases": [
+        "Databricks One",
+        "AI/BI"
+      ],
+      "definition": "The business-user surface for AI/BI dashboards and the least-privileged entitlement that admits users to it.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-semantic"
+    },
+    {
+      "id": "dbxfe-bi-l01-external-concept",
+      "term": "external BI integration",
+      "aliases": [
+        "Power BI",
+        "Tableau",
+        "ODBC",
+        "JDBC"
+      ],
+      "definition": "A separate BI tool reading Databricks through a connector or driver under its own identity, sharing and refresh.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-external"
+    },
+    {
+      "id": "dbxfe-bi-l01-storyboard-concept",
+      "term": "storyboard",
+      "aliases": [
+        "meeting storyboard"
+      ],
+      "definition": "The meeting drawn as frames naming time, actor, surface, what is read, what is decided and where next.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-example"
+    },
+    {
+      "id": "dbxfe-bi-l01-acceptance-concept",
+      "term": "acceptance script",
+      "aliases": [
+        "validation script"
+      ],
+      "definition": "Checks with expected values from outside the page, the states and identities to try, and a signer per row.",
+      "lessonId": "dbxfe-bi-l01",
+      "sectionId": "dbxfe-bi-l01-example"
+    }
+  ]
+}

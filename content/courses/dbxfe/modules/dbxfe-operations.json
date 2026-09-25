@@ -1,0 +1,583 @@
+{
+  "module": {
+    "id": "dbxfe-operations",
+    "title": "Production operations, observability and recovery",
+    "summary": "Separate four properties of published data, read system evidence for the question it answers, keep a timeline of facts and hypotheses, and recover with an explicit data-loss window.",
+    "objectives": [
+      "Classify a report by availability, durability, freshness or correctness and write countable objectives with error budgets.",
+      "Choose system records, logs, metrics and lineage for each incident question, route alerts to owners and triage by failure shape.",
+      "Write a recovery plan with an explicit data-loss window, a reader update and prevention actions, and explain why table history is not a backup."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-orchestration"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-operations-l01.json"
+    ],
+    "scenarioId": "dbxfe-operations-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-operations-scenario",
+      "title": "Write Cinderline's INC-0412 recovery and prevention packet",
+      "context": "Fictional Cinderline Components publishes a Morning quality dashboard from silver.inspections through a nightly job. On Tuesday the run succeeded, but a cleanup step deployed on Monday blanked 174 Line 3 defect codes at 02:16, and the 06:00 review used a Line 3 scrap rate of 0.4% against 3.1% in the raw records. Three correction commits (25 corrections) followed before the job was paused at 07:45. The table's RPO is one hour and its RTO four hours; a correction queue holds every correction made through the app.",
+      "task": "Produce the packet the plant quality manager and the data platform lead will sign off: triage and severity, a timeline of facts and hypotheses, a recovery plan with its data-loss window and verification, the 08:30 reader update, and a blameless prevention review.",
+      "requirements": [
+        "Classify the failure by property and shape, and justify the severity from impact.",
+        "Give a timeline in which every fact has a time and a source and every hypothesis a label, a test and an outcome.",
+        "State the recovery point, the commits it discards, what is replayed and what is lost for good, and how recovery is verified.",
+        "Write a reader update with impact, instruction, known, not yet known and next update time, and prevention actions with owners and dates."
+      ],
+      "model": "### Triage\nCorrectness failure, shape 'wrong'; availability, durability and freshness held. Severity 2: the figure was used at the internal 06:00 review and nothing had left the company.\n\n### Timeline\n02:31 run r-7731 SUCCESS (job run history). 06:00 dashboard read, 1.8 s (query history). H1 late Line 3 file, refuted 07:05 by the landing record (01:22, 6,450 rows). H2 version 15 cleanup step, supported by table history (version 313, UPDATE, 174 rows) and the audit log (deploy Monday 16:40), confirmed 07:40 by reproduction on a clone, 3 of 3.\n\n### Recovery\nPause quality-nightly, apply_corrections and the feature stream. Restore to version 312 (recount 3.1%); window versions 313 to 316, 02:16 to 07:10; replay 25 of 25 corrections from the queue and check against numUpdatedRows; lost for good: none, subject to the disclosure below. Verify by raw recount within 0.05 points for every line, rebuild Monday's features, then republish. Declared 06:30, verified 09:40, inside the four-hour RTO.\n\n### Update 2 (08:30)\nLine 3's Monday rate is wrong; do not use it, the raw recount is 3.1%; cause known and job paused; export script impact unknown; next update 10:00.\n\n### Prevention\nReconciliation gate before publish (data platform lead, two weeks); test fixture with every line's codes (pipeline developer, one week); deploy check on the code list (quality data owner, two weeks); alerts to the rota (data platform lead, three days).",
+      "reasoning": "The packet classifies before explaining, dates impact from query history, keeps refuted hypotheses visible, states the window before acting and closes it by counted replay, verifies with the same kind of check that detected the problem, and turns contributing conditions into owned actions rather than blame.",
+      "rubric": [
+        {
+          "id": "dbxfe-operations-scenario-rubric-1",
+          "criterion": "Classification and severity",
+          "weak": "Calls it 'a data issue' or blames the job; no severity reasoning.",
+          "partial": "Names correctness but sets severity without reference to who used the figure.",
+          "strong": "Four properties assessed, shape 'wrong', severity justified from use at the review and the export's unknown status."
+        },
+        {
+          "id": "dbxfe-operations-scenario-rubric-2",
+          "criterion": "Timeline discipline",
+          "weak": "A narrative with conclusions and no sources.",
+          "partial": "Times and some sources, but hypotheses mixed with facts or refuted ones deleted.",
+          "strong": "Every fact sourced, every hypothesis labelled with its test and outcome, reproduction counted."
+        },
+        {
+          "id": "dbxfe-operations-scenario-rubric-3",
+          "criterion": "Recovery plan and data-loss window",
+          "weak": "'Restore yesterday's version' with no window.",
+          "partial": "Window named but legitimate corrections or the stream ignored.",
+          "strong": "Writers paused, window by version and time, replay counted, lost-for-good stated, verification by recount and downstream rebuild."
+        },
+        {
+          "id": "dbxfe-operations-scenario-rubric-4",
+          "criterion": "Communication and prevention",
+          "weak": "No update until the cause is known; actions such as 'be more careful'.",
+          "partial": "Update without an instruction or next time; actions without owners or dates.",
+          "strong": "Five-field update with a next time; blameless conditions each with a specific, owned, dated action."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Could anyone have changed silver.inspections outside the correction app on Tuesday morning?",
+          "response": "Two quality engineers have notebook MODIFY on the table. Both say they made no direct edits on Tuesday; table history shows only apply_corrections writes after 02:16, which the packet should cite rather than rely on their word."
+        },
+        {
+          "question": "Will the plant accept Line 3's figure labelled 'under review' until 10:00?",
+          "response": "Yes, if the update gives the raw recount for anyone who must decide before then; the plant quality manager wants the correction confirmed before the 14:00 shift review."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-operations-l01"
+      ],
+      "claimIds": [
+        "dbxfe-fact-reliability",
+        "dbxfe-fact-jobs",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-operations-course-claim-system",
+        "dbxfe-operations-course-claim-runs",
+        "dbxfe-operations-course-claim-history",
+        "dbxfe-operations-course-claim-dr",
+        "dbxfe-operations-course-claim-incident",
+        "dbxfe-operations-course-claim-slo"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-operations-course-source-system-tables",
+      "title": "System tables reference",
+      "url": "https://docs.databricks.com/aws/en/admin/system-tables/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; system catalog overview.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Per-table retention and regional scope are read on each reference page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-audit",
+      "title": "Audit log system table reference",
+      "url": "https://docs.databricks.com/aws/en/admin/system-tables/audit-logs",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; system.access.audit.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Most audit logs are regional; confirm columns before relying on a query. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-jobs-tables",
+      "title": "Jobs system table reference",
+      "url": "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; system.lakeflow job run tables.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Queries in the lesson were not executed. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-query-history",
+      "title": "Query history system table reference",
+      "url": "https://docs.databricks.com/aws/en/admin/system-tables/query-history",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; system.query.history.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "SQL warehouses and serverless compute only. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-jobs-monitor",
+      "title": "Monitor Lakeflow Jobs",
+      "url": "https://docs.databricks.com/aws/en/jobs/monitor",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; job run history and notifications.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "User-interface details change between releases. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-lineage",
+      "title": "Lineage in Unity Catalog",
+      "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; runtime and external lineage.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Dependency evidence, not proof of correctness. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-history",
+      "title": "Work with table history",
+      "url": "https://docs.databricks.com/aws/en/tables/history",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; history, time travel and retention.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Table history is not advised as a long-term backup. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-dr",
+      "title": "Disaster recovery",
+      "url": "https://docs.databricks.com/aws/en/admin/disaster-recovery",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; RPO, RTO and responsibility for customer data.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A planning page, not a runbook. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-ha-dr",
+      "title": "Phase 10: Design high availability and disaster recovery",
+      "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/deployment-guide/ha-dr",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS deployment guide; tiers, replication and DR testing.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Tier figures are planning examples. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-managed-dr",
+      "title": "Managed disaster recovery",
+      "url": "https://docs.databricks.com/aws/en/admin/managed-disaster-recovery",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; gated managed replication and failover.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Gated; availability, tier and cost are verification items. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-sdk-jobs",
+      "title": "databricks-sdk 0.141.0: jobs service (databricks/sdk/service/jobs.py)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/jobs.py",
+      "publisher": "Databricks (databricks-sdk-py repository)",
+      "type": "primary reference",
+      "context": "Jobs API docstrings: run retention and notifications.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Docstrings, not a feature guide. Page source retrieved from raw.githubusercontent.com on 2026-09-23 and the passages used checked against it; the rendered site is blocked in this build."
+    },
+    {
+      "id": "dbxfe-operations-course-source-tf-job",
+      "title": "databricks_job Resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/4eda15ba717a14f53d0ad77a9225ec43cdb40622/docs/resources/job.md",
+      "publisher": "Databricks (terraform-provider-databricks repository)",
+      "type": "official documentation",
+      "context": "Job triggers, notifications and health rules.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Infrastructure-as-code reference; nothing deployed. Page source retrieved from raw.githubusercontent.com on 2026-09-23 and the passages used checked against it; the rendered site is blocked in this build."
+    },
+    {
+      "id": "dbxfe-operations-course-source-tf-alert",
+      "title": "databricks_alert Resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/4eda15ba717a14f53d0ad77a9225ec43cdb40622/docs/resources/alert.md",
+      "publisher": "Databricks (terraform-provider-databricks repository)",
+      "type": "official documentation",
+      "context": "Databricks SQL alert definition.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The alerts user interface is documented separately. Page source retrieved from raw.githubusercontent.com on 2026-09-23 and the passages used checked against it; the rendered site is blocked in this build."
+    },
+    {
+      "id": "dbxfe-operations-course-source-tf-grants",
+      "title": "databricks_grants Resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/4eda15ba717a14f53d0ad77a9225ec43cdb40622/docs/resources/grants.md",
+      "publisher": "Databricks (terraform-provider-databricks repository)",
+      "type": "official documentation",
+      "context": "Unity Catalog grants and ownership.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Ownership as the provider documents it. Page source retrieved from raw.githubusercontent.com on 2026-09-23 and the passages used checked against it; the rendered site is blocked in this build."
+    },
+    {
+      "id": "dbxfe-operations-course-source-delta-utility",
+      "title": "Table utility commands",
+      "url": "https://raw.githubusercontent.com/delta-io/delta/v4.0.0/docs/source/delta-utility.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "official documentation",
+      "context": "Open-source Delta Lake 4.0.0: history, RESTORE, VACUUM and clones.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Open-source semantics; platform defaults can differ. Page source retrieved from raw.githubusercontent.com on 2026-09-23 and the passages used checked against it; the rendered site is blocked in this build."
+    },
+    {
+      "id": "dbxfe-operations-course-source-sre-slo",
+      "title": "Implementing SLOs",
+      "url": "https://sre.google/workbook/implementing-slos/",
+      "publisher": "Google SRE",
+      "type": "primary reference",
+      "context": "Service level indicators, objectives and error budgets.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Written for services; applied to tables by this lesson. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-sre-pipelines",
+      "title": "Data Processing Pipelines",
+      "url": "https://sre.google/workbook/data-processing/",
+      "publisher": "Google SRE",
+      "type": "primary reference",
+      "context": "Freshness and correctness objectives for pipelines.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The objectives in the lesson are fictional. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-sre-incidents",
+      "title": "Managing Incidents",
+      "url": "https://sre.google/sre-book/managing-incidents/",
+      "publisher": "Google SRE",
+      "type": "primary reference",
+      "context": "Incident roles and the live incident document.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Adapted to a fictional data incident. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-sre-postmortem",
+      "title": "Postmortem Culture: Learning from Failure",
+      "url": "https://sre.google/workbook/postmortem-culture/",
+      "publisher": "Google SRE",
+      "type": "primary reference",
+      "context": "Blameless reviews and owned action items.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The review in the lesson is synthetic. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-operations-course-source-sdk-job-notification-settings",
+      "title": "Databricks SDK for Python v0.141.0: service/jobs.py, job notification fields and notification settings",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/jobs.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "The Jobs API notification fields (on_start, on_success, on_failure recipients) and the notification settings that mute on_failure notifications for canceled or skipped runs.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/jobs.py (tag v0.141.0): JobNotificationSettings.no_alert_for_canceled_runs: 'If true, do not send notifications to recipients specified in ``on_failure`` if the run is canceled.'; no_alert_for_skipped_runs: 'If true, do not send notifications to recipients specified in ``on_failure`` if the run is skipped.'; JobEmailNotifications.on_success: 'A list of email addresses to be notified when a run successfully completes.'; on_failure: 'A list of email addresses to be notified when a run unsuccessfully completes. A run is considered to have completed unsuccessfully if it ends with an ``INTERNAL_ERROR`` ``life_cycle_state`` or a ``FAILED``, or ``TIMED_OUT`` result_state.' API reference docstrings, interface scope only: the Jobs API reference's field semantics. on_failure's own definition lists INTERNAL_ERROR, FAILED and TIMED_OUT, and the mute settings show that canceled and skipped runs also reach on_failure recipients unless muted; start and success notifications are separate fields. Delivery timing and user-interface wording were not read."
+    },
+    {
+      "id": "dbxfe-operations-course-source-delta-vacuum",
+      "title": "Delta Lake 4.0.0 documentation source: Table utility commands, 'Remove files no longer referenced by a Delta table'",
+      "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-utility.md",
+      "publisher": "Delta Lake project (delta-io/delta repository)",
+      "type": "primary reference",
+      "context": "Open-source Delta Lake 4.0.0: which data files VACUUM removes and its default retention threshold.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-utility.md (tag v4.0.0): 'You can remove files no longer referenced by a Delta table and are older than the retention threshold ... The default retention threshold for the files is 7 days.' Open-source scope: VACUUM removes data files the table no longer references once they pass the retention threshold, not every file older than 7 days; Databricks runs its own Delta implementation and its defaults were not read here."
+    },
+    {
+      "id": "dbxfe-operations-course-source-sdk-sql",
+      "title": "Databricks SDK for Python v0.141.0: service/sql.py, the Alerts API",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/sql.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "The Databricks SQL Alerts API: what an alert does, the state it takes for an empty result and its rearm interval.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/sql.py (tag v0.141.0): AlertsAPI class docstring: 'An alert is a Databricks SQL object that periodically runs a query, evaluates a condition of its result, and notifies one or more users and/or notification destinations if the condition was met.'; Alert.seconds_to_retrigger: 'Number of seconds an alert must wait after being triggered to rearm itself. After rearming, it can be triggered again. If 0 or not specified, the alert will not be triggered again.'; AlertCondition.empty_result_state: 'Alert state if result is empty.' API reference docstrings, interface scope only: what the Alerts API object does and what its fields mean. The alerts user interface, its labels and evaluation timing were not read."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-operations-course-claim-system",
+      "description": "System tables are a Databricks-hosted store of the account's operational data governed by Unity Catalog; system.access.audit records audited events, mostly per region; system.lakeflow records job and task runs with a result_state; system.query.history covers SQL warehouses and serverless compute.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-operations-course-source-system-tables",
+        "dbxfe-operations-course-source-audit",
+        "dbxfe-operations-course-source-jobs-tables",
+        "dbxfe-operations-course-source-query-history"
+      ],
+      "context": "Databricks on AWS references; queries not executed."
+    },
+    {
+      "id": "dbxfe-operations-course-claim-runs",
+      "description": "The Jobs UI shows run history with task logs and metrics; runs are removed after 60 days; failure notifications cover INTERNAL_ERROR, FAILED and TIMED_OUT runs, and canceled or skipped runs unless muted, but not a run that ends SUCCESS; a file arrival trigger's wait setting waits for quiet, not for a named set of files.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-operations-course-source-jobs-monitor",
+        "dbxfe-operations-course-source-sdk-jobs",
+        "dbxfe-operations-course-source-tf-job",
+        "dbxfe-operations-course-source-sdk-job-notification-settings"
+      ],
+      "context": "Databricks on AWS, databricks-sdk 0.141.0 and the Terraform job resource."
+    },
+    {
+      "id": "dbxfe-operations-course-claim-lineage",
+      "description": "Unity Catalog captures lineage automatically for queries run on Databricks, down to column level, for impact analysis and root-cause work; outside assets appear only when registered as external lineage.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-operations-course-source-lineage"
+      ],
+      "context": "Databricks on AWS."
+    },
+    {
+      "id": "dbxfe-operations-course-claim-owner",
+      "description": "Every Unity Catalog securable has an owner, by default its creator, who holds ALL_PRIVILEGES and can grant privileges.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-operations-course-source-tf-grants"
+      ],
+      "context": "Terraform provider grants resource."
+    },
+    {
+      "id": "dbxfe-operations-course-claim-alerts",
+      "description": "A Databricks SQL alert periodically runs a query, evaluates a condition and notifies; it sets a state for an empty result and is not triggered again without a rearm interval.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-operations-course-source-tf-alert",
+        "dbxfe-operations-course-source-sdk-sql"
+      ],
+      "context": "Terraform alert resource and the SDK Alerts API."
+    },
+    {
+      "id": "dbxfe-operations-course-claim-history",
+      "description": "DESCRIBE HISTORY records each version's operation and metrics; time travel is safe within 7 days unless retention is raised; VACUUM ends time travel to older versions; RESTORE commits a new version that streams may reprocess; table history is not advised as a long-term backup.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-operations-course-source-history",
+        "dbxfe-operations-course-source-delta-utility",
+        "dbxfe-operations-course-source-delta-vacuum"
+      ],
+      "context": "Databricks on AWS and open-source Delta Lake 4.0.0."
+    },
+    {
+      "id": "dbxfe-operations-course-claim-slo",
+      "description": "An SLI counts good events over valid events and an SLO sets a target over a window with an error budget; freshness and correctness are pipeline objectives, and correctness can be measured with known-output checks.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-operations-course-source-sre-slo",
+        "dbxfe-operations-course-source-sre-pipelines"
+      ],
+      "context": "Site Reliability Workbook."
+    },
+    {
+      "id": "dbxfe-operations-course-claim-dr",
+      "description": "The customer defines the RPO for data it stores; RTO bounds the time to restore; the deployment guide suggests deep clone for critical tables and regular DR tests; managed disaster recovery is gated and replicates only opted-in categories.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-operations-course-source-dr",
+        "dbxfe-operations-course-source-ha-dr",
+        "dbxfe-operations-course-source-managed-dr"
+      ],
+      "context": "Databricks on AWS; planning examples, gated feature."
+    },
+    {
+      "id": "dbxfe-operations-course-claim-incident",
+      "description": "Incident response separates coordination, mitigation and communication with a live incident document; blameless reviews produce actionable, bounded, owned action items.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-operations-course-source-sre-incidents",
+        "dbxfe-operations-course-source-sre-postmortem"
+      ],
+      "context": "Google SRE chapters."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-operations-l01-properties-concept",
+      "term": "operating properties of published data",
+      "aliases": [
+        "availability",
+        "durability",
+        "freshness",
+        "correctness"
+      ],
+      "definition": "Four separately checked properties of published data, namely readable when needed, kept once committed, recent and complete enough, and right.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-properties"
+    },
+    {
+      "id": "dbxfe-operations-l01-slo-concept",
+      "term": "service level objective (SLO)",
+      "aliases": [
+        "SLO",
+        "SLI",
+        "error budget"
+      ],
+      "definition": "A target for an indicator counted as good events over valid events across a window.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-objectives"
+    },
+    {
+      "id": "dbxfe-operations-l01-evidence-concept",
+      "term": "system evidence",
+      "aliases": [
+        "system tables",
+        "job run history",
+        "query history",
+        "audit log",
+        "table history"
+      ],
+      "definition": "Platform records that answer incident questions, each with its own scope, retention and blind spot.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-evidence"
+    },
+    {
+      "id": "dbxfe-operations-l01-lineage-concept",
+      "term": "data lineage",
+      "aliases": [
+        "table lineage"
+      ],
+      "definition": "Captured read and write relationships between tables and the jobs, notebooks and dashboards that use them.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-evidence"
+    },
+    {
+      "id": "dbxfe-operations-l01-owner-concept",
+      "term": "operational owner",
+      "aliases": [
+        "on-call owner"
+      ],
+      "definition": "The rota or team paged to restore an object's service, recorded apart from its Unity Catalog owner.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-ownership"
+    },
+    {
+      "id": "dbxfe-operations-l01-alert-concept",
+      "term": "symptom alert",
+      "aliases": [
+        "alert"
+      ],
+      "definition": "A notification on a broken reader promise, such as a reconciliation mismatch, routed to the operational owner.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-ownership"
+    },
+    {
+      "id": "dbxfe-operations-l01-triage-concept",
+      "term": "incident triage",
+      "aliases": [
+        "severity"
+      ],
+      "definition": "Classifying a report as unavailable, stale, wrong or lost and setting severity from impact.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-example"
+    },
+    {
+      "id": "dbxfe-operations-l01-timeline-concept",
+      "term": "incident timeline",
+      "aliases": [
+        "facts and hypotheses"
+      ],
+      "definition": "A timestamped record that keeps sourced facts apart from labelled hypotheses and their tests.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-example"
+    },
+    {
+      "id": "dbxfe-operations-l01-dependency-concept",
+      "term": "dependency failure",
+      "aliases": [
+        "completeness gate"
+      ],
+      "definition": "A failure in an input, service or platform component the pipeline relies on but does not run.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-dependency"
+    },
+    {
+      "id": "dbxfe-operations-l01-rpo-concept",
+      "term": "recovery objectives (RPO and RTO)",
+      "aliases": [
+        "RPO",
+        "RTO"
+      ],
+      "definition": "The agreed limits on data lost (recovery point objective) and on time to restore service (recovery time objective).",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-recovery"
+    },
+    {
+      "id": "dbxfe-operations-l01-window-concept",
+      "term": "data-loss window",
+      "aliases": [
+        "data loss"
+      ],
+      "definition": "The committed writes a restore point discards, with the part replay recovers and the part lost for good.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-recovery"
+    },
+    {
+      "id": "dbxfe-operations-l01-backup-concept",
+      "term": "independent backup copy",
+      "aliases": [
+        "backup"
+      ],
+      "definition": "A restorable copy outside the table's own storage and failure domain, refreshed to meet the RPO and drilled.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-backup"
+    },
+    {
+      "id": "dbxfe-operations-l01-runbook-concept",
+      "term": "runbook",
+      "aliases": [
+        "restore drill"
+      ],
+      "definition": "A tested decision path for a known failure shape, with verification after each action.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-communication"
+    },
+    {
+      "id": "dbxfe-operations-l01-update-concept",
+      "term": "incident update",
+      "aliases": [
+        "status update"
+      ],
+      "definition": "A timed message stating impact, a reader action, known facts, open questions and the next update time.",
+      "lessonId": "dbxfe-operations-l01",
+      "sectionId": "dbxfe-operations-l01-communication"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   "id": "dbxfe-m04-l03",
   "title": "Orchestration, failure, and reconciliation",
   "summary": "Recover a named local failure, compare exact business state, and separate orchestration from data and external-effect guarantees.",
-  "contentVersion": "2.0.0",
+  "contentVersion": "2.0.2",
   "estimatedMinutes": 12,
   "objectives": [
     "Recover a named local failure, compare exact business state, and separate orchestration from data and external-effect guarantees.",
@@ -561,7 +561,7 @@
       "revision": "1",
       "prompt": "Why key a local notification by snapshot identity?",
       "answer": "So repeating the same intended publication does not add a second modeled effect.",
-      "explanation": "Durable real delivery requires additional recipient/outbox guarantees.",
+      "explanation": "Durable real delivery requires additional recipient/outbox guarantees; the local key only stops the model from recording the same intended publication twice.",
       "lessonId": "dbxfe-m04-l03",
       "sectionId": "dbxfe-m04-l03-foundation-mechanism",
       "conceptIds": [
@@ -592,6 +592,75 @@
         "dbxfe-fact-expectations",
         "dbxfe-foundation-policy",
         "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-l03-card4",
+      "revision": "1",
+      "prompt": "A notification send times out after the receiver may already have accepted it. Is retrying safe?",
+      "answer": "Only with a stable intent key and receiver deduplication; otherwise a retry can repeat the effect and refusing to retry can lose it.",
+      "explanation": "The lost acknowledgment leaves the sender unable to know the outcome. A durable outbox record, counted delivery attempts, known receiver behaviour and a reconciliation policy handle that uncertainty deliberately; a successful data write and a green task prove nothing about external delivery.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-foundation-limits",
+      "conceptIds": [
+        "dbxfe-m04-l03-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-jobs",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-l03-card5",
+      "revision": "1",
+      "prompt": "Why not reuse one streaming checkpoint directory for a second query?",
+      "answer": "A checkpoint records one query’s offsets, state and identity; sharing it makes recovery semantics undefined for both queries.",
+      "explanation": "Progress and stateful operator data belong to a particular query. Deleting or switching a checkpoint restarts from fresh behaviour and can replay or skip data, so preserve evidence and decide the reprocessing policy, destination behaviour and reconciliation test before touching it; a table-log checkpoint is a different object.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-deeper",
+      "conceptIds": [
+        "dbxfe-m04-l03-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-pipelines",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-l03-card6",
+      "revision": "1",
+      "prompt": "What must a backfill of last week’s reports preserve that a normal nightly run simply assumes?",
+      "answer": "The historical input boundary, the same resolution rules and publication gate, and the already published snapshots it must not duplicate.",
+      "explanation": "A backfill reruns the logic over a past range. Bound that range by durable retained evidence, apply the publication gate for each period, key effects by snapshot identity so repeats add nothing, and reconcile rows, totals and coverage afterwards; a green backfill task is still execution evidence only.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-foundation-runbook",
+      "conceptIds": [
+        "dbxfe-m04-l03-concept"
+      ],
+      "claimIds": [
+        "dbxfe-fact-jobs",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-foundation-policy"
+      ]
+    },
+    {
+      "id": "dbxfe-m04-l03-card7",
+      "revision": "1",
+      "prompt": "An order-line feed replaces inspections. What must change before the recovery rules can be reused?",
+      "answer": "The grain becomes order plus line, the ordering key changes, and cancellation must be an explicit operation, defined before any replay.",
+      "explanation": "Recovery principles transfer only after identity, ordering and operations are explicit for the new domain. A composite key changes what a duplicate is; cancellation is a named operation rather than an absence; and the replay invariants are recomputed for the new business outputs, not copied from the inspection example.",
+      "lessonId": "dbxfe-m04-l03",
+      "sectionId": "dbxfe-m04-l03-transfer-task",
+      "conceptIds": [
+        "dbxfe-m04-l03-foundation-concept"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-foundation-policy"
       ]
     }
   ],

@@ -31,7 +31,7 @@ For a mixed audience: “The correction changes the accepted total once, and the
 
 <!-- section:try -->
 
-Write a four-step narration for the duplicate delivery of ev1. Include the raw evidence, the identity rule, the expected unchanged accepted output, and a customer question that checks understanding.
+Write a four-step narration for a duplicate delivery: event ev1 (inspection A at revision 1, 10 inspected and 1 defective in the reliable-data example) arrives a second time with an identical payload. Include the raw evidence, the identity rule, the expected unchanged accepted output, and a customer question that checks understanding. The [five-row baseline](#/lesson/dbxfe-m04-l02/dbxfe-m04-l02-foundation-example) shows ev1 in its full input.
 
 <!-- section:revisit -->
 

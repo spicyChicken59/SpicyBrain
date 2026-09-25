@@ -1,0 +1,437 @@
+{
+  "module": {
+    "id": "dbxfe-lakebase",
+    "title": "Lakebase, Postgres and operational state",
+    "summary": "Keep operational state in transactional Postgres with constraints, locks, versions and idempotent writes, and place it on Lakebase with explicit identities, pooling, recovery and sync freshness.",
+    "objectives": [
+      "Separate transactional requests from analytical pipelines and model operational state with constraints and short transactions.",
+      "Protect concurrent writes with SKIP LOCKED claims, version checks and idempotent upserts, and predict their results under each isolation level.",
+      "Adapt the design to Lakebase authentication, pooling, branches, restore and synchronization, with a compatibility checklist."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m03"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-lakebase-l01.json"
+    ],
+    "scenarioId": "dbxfe-lakebase-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-lakebase-scenario",
+      "title": "Write the operational-state design for Cinderline's quality-review app",
+      "context": "Fictional Cinderline Components reviews flagged parts in a shared spreadsheet: two reviewers sometimes work the same part, and late re-sends from the quality pipeline overwrite decisions. The platform team proposes a Lakebase project for a new review app, with the reviewer roster maintained in Unity Catalog and a dashboard that shows decisions. Three plants, twelve reviewers and about 400 flagged parts a day are synthetic planning figures. The app's identity model, regional availability, whether Change Data Feed can be enabled on the roster table and the project's restore window are not yet confirmed.",
+      "task": "Write a design note for the platform lead: the state classification, the schema with its constraints, the concurrency pattern for each write, the connection and authentication plan, change and recovery procedures, the synchronization plan with the freshness each screen can promise, and a compatibility checklist that separates what the local lab verified from what the platform must confirm.",
+      "requirements": [
+        "Classify every piece of state and keep only operational state in Postgres, with constraints for the state machine and one open claim per reviewer.",
+        "Name the concurrency pattern for claim, decision and intake, with the SQLSTATE or row count the app branches on.",
+        "Give the authentication and pooling choice for the app's role and say which session state the design avoids.",
+        "State freshness and consistency for every synchronized copy, and mark preview features and unconfirmed items as unknown."
+      ],
+      "model": "### State\nOperational, in Postgres: review_item, intake_message and reviewer assignments. Analytical, in Delta: decision history and daily counts. Session: filters and sort order in the browser.\n\n### Schema\nreview_item with a state CHECK tying status to claimed_by and decision, a partial unique index allowing one open claim per reviewer, a version column and a partial index over ready rows in claim order; intake_message keyed by message_id; every rule a constraint, so a refused write returns 23514, 23505 or 23503 and the handler maps it to a message.\n\n### Writes\nClaim: one UPDATE with a FOR UPDATE SKIP LOCKED subquery; no row means no eligible unlocked item was claimed; eligible items may be locked by another worker, so an empty result does not prove the queue is empty. Decision: UPDATE ... WHERE version = the loaded version AND claimed_by = the reviewer AND status = 'claimed'; zero rows means reload and show the change. Intake: ON CONFLICT (message_id) DO NOTHING, then DO UPDATE only for a newer source_seq while the item is ready.\n\n### Connections and identity\nThe app runs as its service principal's role. Pooling is documented as needing a password role, so the choice between pooled password access and direct OAuth access is open with the security team; new projects require password connections to be explicitly enabled. Every write is one transaction with schema-qualified names, so either path works; the design uses no SET, temp tables or session advisory locks, and reconnects after scale to zero.\n\n### Change and recovery\nMigrations are rehearsed on a child branch. The restore window is to be confirmed within the documented 2 to 30 days. After data loss, inspect historical state and reconcile missing rows with current decisions. Restore creates a separate root branch; selective repair and any application cutover are deliberate follow-up operations.\n\n### Synchronization\nRoster: a synced table, triggered daily if Change Data Feed is enabled and snapshot until then; the screen prints 'roster as of'. Decisions to Delta: Lakebase CDF (Public Preview, needs approval) or a scheduled export, with the dashboard labelled by its as-of time.\n\n### Checklist and unknowns\nVerified on local PostgreSQL 16.13 (lab L23): constraints, claim, decision, intake and isolation behaviour. To confirm on a branch: Postgres version, role type and pooler, reconnect after scale to zero, sync freshness. Unknown: regional availability, restore window value, Change Data Feed on the roster, preview approval.",
+      "reasoning": "The note keeps operational and analytical state apart, gives every write a pattern and an observable result the app branches on, ties the pooling choice to the authentication type, and turns each platform feature into a verification item with its evidence label rather than a promise.",
+      "rubric": [
+        {
+          "id": "dbxfe-lakebase-scenario-rubric-1",
+          "criterion": "State and schema",
+          "weak": "One table for everything, no constraints, and state kept in the app server.",
+          "partial": "Sensible tables, but the state machine or the one-open-claim rule lives only in handler code.",
+          "strong": "Operational state in Postgres with the state CHECK, the partial unique index and a version column; analytical and session state placed elsewhere."
+        },
+        {
+          "id": "dbxfe-lakebase-scenario-rubric-2",
+          "criterion": "Concurrency",
+          "weak": "Read then update for claims, and last write wins on intake.",
+          "partial": "A SKIP LOCKED claim, but decisions overwrite blindly or intake has no message key.",
+          "strong": "SKIP LOCKED claim, version-checked decision and keyed, sequence-guarded intake, each with the row count or SQLSTATE the app handles."
+        },
+        {
+          "id": "dbxfe-lakebase-scenario-rubric-3",
+          "criterion": "Access and identity",
+          "weak": "A shared administrator password in the app configuration.",
+          "partial": "OAuth or password roles named, but pooling and session state ignored.",
+          "strong": "Role type chosen per access path with the documented pooler requirement, least-privilege grants, and no session state across transactions."
+        },
+        {
+          "id": "dbxfe-lakebase-scenario-rubric-4",
+          "criterion": "Synchronization and evidence",
+          "weak": "Copies treated as live and preview features promised.",
+          "partial": "Sync modes named, but no freshness statement or evidence labels.",
+          "strong": "Freshness and consistency stated per copy, preview and unknown items marked, and local evidence kept apart from documentation."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can we enable Change Data Feed on the reviewer roster table?",
+          "response": "The data platform owner agrees in principle but will only change the table after the quarter-end freeze; until then only snapshot mode is possible."
+        },
+        {
+          "question": "Will the security team accept a password role for the app?",
+          "response": "Only with the password in the workspace secret store and rotation every 90 days; they prefer OAuth wherever pooling is not needed."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-lakebase-l01"
+      ],
+      "claimIds": [
+        "dbxfe-lakebase-course-claim-lakebase",
+        "dbxfe-lakebase-course-claim-access",
+        "dbxfe-lakebase-course-claim-recovery",
+        "dbxfe-lakebase-course-claim-sync",
+        "dbxfe-lakebase-course-claim-isolation",
+        "dbxfe-lakebase-course-claim-locking",
+        "dbxfe-lakebase-course-claim-upsert",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false,
+      "revisionNotice": "Recovery guidance corrected in course 4.0.1: restore creates a separate branch; application cutover is a separate decision. Earlier saved responses retain their original snapshot. Course 4.0.2 updates current Lakebase CDF terminology and password-connection setup, and the meaning of an empty SKIP LOCKED result; earlier snapshots remain unchanged."
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-lakebase-course-source-overview",
+      "title": "Lakebase Postgres",
+      "url": "https://docs.databricks.com/aws/en/oltp/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Lakebase Autoscaling overview.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Lakebase Postgres; Key features. No managed-service execution is claimed. Earlier review methods remain in git history."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-compat",
+      "title": "Postgres compatibility",
+      "url": "https://docs.databricks.com/aws/en/oltp/projects/compatibility",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; differences from self-managed Postgres.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Postgres version support; Session context; Roles and permissions; Replication; Tablespaces. No managed-service execution is claimed. Earlier review methods remain in git history."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-auth",
+      "title": "About authentication",
+      "url": "https://docs.databricks.com/aws/en/oltp/projects/authentication",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; OAuth roles and password roles.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: How OAuth tokens work; Requirements and limitations; Postgres password authentication. No managed-service execution is claimed. Earlier review methods remain in git history."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-pooling",
+      "title": "Use connection pooling",
+      "url": "https://docs.databricks.com/aws/en/oltp/projects/connection-pooling",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; built-in PgBouncer pooler.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Primary page body read in this build through the web reader on 2026-09-23. Sections: How connection pooling works; Prerequisites; Transaction mode. The managed pooler uses transaction mode and native password roles. Both LISTEN and NOTIFY are unavailable; applications needing pub/sub use a direct connection. Driver-level prepared statements are distinguished from SQL PREPARE. Documentation inspection, not a managed-service execution."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-scalezero",
+      "title": "Scale to zero",
+      "url": "https://docs.databricks.com/aws/en/oltp/projects/scale-to-zero",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; suspending idle computes.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Automatic suspension; Configure scale to zero; Session context reset. No managed-service execution is claimed. Earlier review methods remain in git history."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-branches",
+      "title": "Branches",
+      "url": "https://docs.databricks.com/aws/en/oltp/projects/branches",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; copy-on-write branches.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Parent-child relationships; Copy-on-write storage; Point-in-time recovery. No managed-service execution is claimed. Earlier review methods remain in git history."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-restore",
+      "title": "Point-in-time restore",
+      "url": "https://docs.databricks.com/aws/en/oltp/projects/point-in-time-restore",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; restore window and restore.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Primary page body read in this build through the web reader on 2026-09-23. Sections: What happens after a restore?; Configure your restore window; Creates a new branch, not in-place modification; Connections remain unchanged. A restore creates a new root branch containing the selected historical state. The source branch and existing connections continue unchanged. Using the restored branch requires changing application connection configuration. The project window is 2–30 days, default 7. Documentation inspection, not a managed-service execution."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-synced",
+      "title": "Serve lakehouse data with synced tables",
+      "url": "https://docs.databricks.com/aws/en/oltp/projects/sync-tables",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Unity Catalog to Lakebase synced tables.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: How it works; Sync modes; Prerequisites; Create a synced table; Operations allowed on synced tables in Postgres. No managed-service execution is claimed. Earlier review methods remain in git history."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-lakehousesync",
+      "title": "Lakebase CDF",
+      "url": "https://docs.databricks.com/aws/en/oltp/projects/lakebase-cdf",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Lakebase to Unity Catalog change capture; Public Preview.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: What is Lakebase Change Data Feed?; Enable this preview; Destination table schema. No managed-service execution is claimed. Earlier review methods remain in git history."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-isolation",
+      "title": "13.2. Transaction Isolation",
+      "url": "https://www.postgresql.org/docs/16/transaction-iso.html",
+      "publisher": "The PostgreSQL Global Development Group",
+      "type": "primary reference",
+      "context": "PostgreSQL 16 documentation.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: 13.2.1. Read Committed Isolation Level; 13.2.2. Repeatable Read Isolation Level. No managed-service execution is claimed. Earlier review methods remain in git history."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-select",
+      "title": "SELECT",
+      "url": "https://www.postgresql.org/docs/16/sql-select.html",
+      "publisher": "The PostgreSQL Global Development Group",
+      "type": "primary reference",
+      "context": "PostgreSQL 16 SQL reference.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: The Locking Clause. No managed-service execution is claimed. Earlier review methods remain in git history."
+    },
+    {
+      "id": "dbxfe-lakebase-course-source-insert",
+      "title": "INSERT",
+      "url": "https://www.postgresql.org/docs/16/sql-insert.html",
+      "publisher": "The PostgreSQL Global Development Group",
+      "type": "primary reference",
+      "context": "PostgreSQL 16 SQL reference.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: ON CONFLICT Clause. No managed-service execution is claimed. Earlier review methods remain in git history."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-lakebase-course-claim-lakebase",
+      "description": "Lakebase is Databricks' fully managed Postgres for transactional applications; Lakebase Autoscaling organises projects, branches, computes, databases and roles and supports Postgres 16, 17 and 18 on AWS without a Postgres superuser.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-lakebase-course-source-overview",
+        "dbxfe-lakebase-course-source-compat"
+      ],
+      "context": "Databricks on AWS documentation at review time."
+    },
+    {
+      "id": "dbxfe-lakebase-course-claim-access",
+      "description": "Lakebase connections authenticate as OAuth roles with one-hour tokens checked at login, or as native password roles; the built-in PgBouncer pooler runs in transaction mode, keeps no session state between transactions and needs password authentication; scale to zero closes idle connections and their session state. The managed pooler supports neither LISTEN nor NOTIFY; pub/sub requires direct connections.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-lakebase-course-source-auth",
+        "dbxfe-lakebase-course-source-pooling",
+        "dbxfe-lakebase-course-source-scalezero"
+      ],
+      "context": "Lakebase Autoscaling access paths."
+    },
+    {
+      "id": "dbxfe-lakebase-course-claim-recovery",
+      "description": "Lakebase branches provide isolated environments. Point-in-time restore creates a new root branch while the original and existing connections remain unchanged; application cutover is separate. The project restore window is 2–30 days, default 7.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-lakebase-course-source-branches",
+        "dbxfe-lakebase-course-source-restore"
+      ],
+      "context": "Lakebase Autoscaling change and recovery."
+    },
+    {
+      "id": "dbxfe-lakebase-course-claim-sync",
+      "description": "Synced tables copy Unity Catalog tables into Lakebase as read-only copies in snapshot, triggered or continuous mode, the last two needing Change Data Feed; Lakebase CDF, in Public Preview, writes Lakebase row changes to Delta history tables.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-lakebase-course-source-synced",
+        "dbxfe-lakebase-course-source-lakehousesync"
+      ],
+      "context": "Synchronization between Lakebase and Unity Catalog."
+    },
+    {
+      "id": "dbxfe-lakebase-course-claim-isolation",
+      "description": "PostgreSQL defaults to Read Committed with a snapshot per statement; Repeatable Read keeps the first statement's snapshot and fails an update of a concurrently changed row with a serialization failure that the application retries.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-lakebase-course-source-isolation"
+      ],
+      "context": "PostgreSQL 16."
+    },
+    {
+      "id": "dbxfe-lakebase-course-claim-locking",
+      "description": "In PostgreSQL's SELECT locking clause, NOWAIT errors on a row that cannot be locked immediately and SKIP LOCKED skips it, which suits queue-like tables.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-lakebase-course-source-select"
+      ],
+      "context": "PostgreSQL 16."
+    },
+    {
+      "id": "dbxfe-lakebase-course-claim-upsert",
+      "description": "INSERT ... ON CONFLICT DO NOTHING skips a conflicting row, and ON CONFLICT DO UPDATE gives an atomic insert-or-update outcome with an optional WHERE condition.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-lakebase-course-source-insert"
+      ],
+      "context": "PostgreSQL 16."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-lakebase-l01-workload-concept",
+      "term": "transactional versus analytical access",
+      "aliases": [
+        "OLTP",
+        "OLAP"
+      ],
+      "definition": "Short concurrent row-level changes that must be atomic, contrasted with scans and aggregates that tolerate older data.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-workloads"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-lakebase-concept",
+      "term": "Lakebase",
+      "aliases": [
+        "Lakebase Postgres",
+        "Lakebase Autoscaling"
+      ],
+      "definition": "Databricks' fully managed Postgres for transactional applications, organised as projects, branches and computes.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-workloads"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-constraint-concept",
+      "term": "integrity constraint",
+      "aliases": [
+        "CHECK",
+        "foreign key",
+        "unique index"
+      ],
+      "definition": "A database rule checked on every write that refuses a row breaking it with a specific SQLSTATE.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-model"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-state-concept",
+      "term": "operational state",
+      "aliases": [
+        "application state"
+      ],
+      "definition": "The current facts an application acts on, kept as committed rows rather than in memory or open transactions.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-model"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-isolation-concept",
+      "term": "isolation level",
+      "aliases": [
+        "Read Committed",
+        "Repeatable Read",
+        "Serializable"
+      ],
+      "definition": "The rule deciding which committed changes of other transactions a statement or transaction can see.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-transactions"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-lock-concept",
+      "term": "SKIP LOCKED claim",
+      "aliases": [
+        "FOR UPDATE",
+        "NOWAIT"
+      ],
+      "definition": "A queue claim that locks the chosen row and passes over rows other sessions have locked.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-concurrency"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-version-concept",
+      "term": "version-checked update",
+      "aliases": [
+        "optimistic concurrency"
+      ],
+      "definition": "An update that succeeds only if the row still has the version the writer read, so conflicts show as zero rows.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-concurrency"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-idempotency-concept",
+      "term": "idempotent upsert",
+      "aliases": [
+        "idempotency key",
+        "ON CONFLICT"
+      ],
+      "definition": "A write keyed by message and guarded by sequence that leaves the same state however often a message arrives.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-concurrency"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-pooling-concept",
+      "term": "transaction-mode pooling",
+      "aliases": [
+        "PgBouncer"
+      ],
+      "definition": "Lending a server connection to a client for one transaction, so no session state survives to the next.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-connections"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-auth-concept",
+      "term": "OAuth role and password role",
+      "aliases": [
+        "Lakebase authentication"
+      ],
+      "definition": "The two documented ways a Lakebase connection authenticates: a Databricks identity with a one-hour token, or a Postgres password.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-connections"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-branch-concept",
+      "term": "branch and point-in-time restore",
+      "aliases": [
+        "restore window",
+        "PITR"
+      ],
+      "definition": "Isolated environments for rehearsal and historical inspection; restore creates a new root branch without changing the original or redirecting its applications.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-recovery"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-sync-concept",
+      "term": "synced copy",
+      "aliases": [
+        "synced table",
+        "Lakebase CDF"
+      ],
+      "definition": "An asynchronous copy between Unity Catalog and Lakebase whose freshness is stated as an as-of time.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-sync"
+    },
+    {
+      "id": "dbxfe-lakebase-l01-compat-concept",
+      "term": "platform compatibility checklist",
+      "aliases": [
+        "Postgres compatibility"
+      ],
+      "definition": "A list pairing each documented Lakebase difference with an action and an evidence label before a design moves.",
+      "lessonId": "dbxfe-lakebase-l01",
+      "sectionId": "dbxfe-lakebase-l01-mistakes"
+    }
+  ]
+}

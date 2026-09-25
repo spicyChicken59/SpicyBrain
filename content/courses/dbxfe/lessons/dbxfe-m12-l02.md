@@ -16,7 +16,7 @@ For fictional Cinderline, the follow-up might confirm the unit-based quality def
 
 “Thanks for reviewing the quality flow. We agreed that the proposed metric uses defective units divided by inspected units. The synthetic example illustrates the correction rule; it does not validate your source connection.
 
-The data lead will confirm inspection keys and correction ordering. The security lead will identify approved fields and network restrictions. I will coordinate a specialist review of the exact source/version and AWS path. Please confirm these owners and the next review date so we can finalize the bounded pilot charter.”
+The quality lead will confirm correction ordering and the restatement rule; the data lead will confirm how inspection keys appear in the source. The security lead will identify approved fields and network restrictions. I will coordinate a specialist review of the exact source/version and AWS path. Please confirm these owners and the next review date so we can finalize the bounded pilot charter.”
 
 The message distinguishes agreement, example evidence, and open work in three short paragraphs.
 

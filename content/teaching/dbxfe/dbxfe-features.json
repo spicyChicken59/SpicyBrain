@@ -1,0 +1,3535 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-features",
+ "title": "Features, point-in-time correctness and data contracts",
+ "summary": "A feature row has an entity, a time it describes and a time it became usable: join on the second, decide missing values by cause, keep one transformation for training and serving, and verify platform feature capabilities after the mechanism.",
+ "outcomes": [
+  "Define a feature by its entity key, window, transformation and inputs, and write a feature contract that code can check.",
+  "Build a point-in-time training set on availability time and diagnose event-time joins, latest-value lookups and overwrite backfills as future-data leakage.",
+  "Apply one missingness and freshness policy in training and serving, and detect training/serving skew with consistency checks on edge-case inputs.",
+  "Choose batch, online or on-demand feature delivery from the decision, and map each mechanism onto documented Databricks Feature Store capabilities with their caveats."
+ ],
+ "startingAssumptions": [
+  "The machine-learning fundamentals module has defined a prediction time, a label horizon and leakage from fields written after the fact.",
+  "You can read SQL joins and GROUP BY aggregations and a short pandas program."
+ ],
+ "lessonIds": [
+  "dbxfe-features-l01"
+ ],
+ "optionalBridgeLessonIds": [
+  "dbxfe-m07-l01"
+ ],
+ "editorialRationale": "Feature teaching fails when it starts from a product: learners then see a feature store as the solution to a problem they cannot state. The module first makes a feature row concrete (entity, window, value), adds the second time that decides usability, and only then builds the point-in-time join and its two classic leaks. Keys, missingness, contracts, skew and late data follow as separate failure modes, each tied to one executed lab result, before reuse and delivery choices. Databricks Feature Store capabilities come last, mapped onto the mechanism with their documented conditions, including the online lookback gap and preview status, and the module closes on how to prove point-in-time correctness honestly.",
+ "sources": [
+  {
+   "id": "dbxfe-features-source-store",
+   "title": "Databricks Feature Store",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; feature management in Unity Catalog, feature tables and Feature Views.",
+   "caveat": "Feature Views are marked Public Preview; entitlement, region and runtime must be verified per workspace.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Databricks Feature Store is a central registry for features used in AI and ML models; registering features and models in Unity Catalog gives governance, lineage, point-in-time joins and cross-workspace sharing; the workspace must be enabled for Unity Catalog; features are authored either as Feature Views, defined declaratively with pipelines computed and managed by Databricks (Public Preview), or as feature tables populated by writing feature values to a Delta table; Feature Views are recommended for most new cases and feature tables fit flexible, multi-stage batch workloads."
+  },
+  {
+   "id": "dbxfe-features-source-glossary",
+   "title": "Databricks Feature Store overview and glossary",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/concepts",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; glossary of feature tables, keys, training sets and stores.",
+   "caveat": "A glossary summarizes terms; behaviour details live on the linked task pages.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: each feature table must have a primary key and is backed by a Delta table; timestamp keys are columns containing the event time associated with a feature value, and together with the primary keys they uniquely identify the feature value at a point in time; a training set from time series feature tables represents the latest known feature values as of each row's timestamp; the offline store serves discovery, training and batch inference, and a feature table can be published to an online store for real-time inference."
+  },
+  {
+   "id": "dbxfe-features-source-pit",
+   "title": "Point-in-time feature joins",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/time-series",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; time series feature tables and point-in-time lookups with the Feature Engineering client.",
+   "caveat": "Runtime and client versions are stated on the page and change; the exact boundary behaviour at an equal timestamp should be tested.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: a FeatureLookup on a time series feature table must specify timestamp_lookup_key; the lookup retrieves the latest feature values prior to each timestamp whose primary keys match the lookup keys, or null if none exists; a time series feature table has one timestamp key of TimestampType or DateType and no partition columns; with Databricks Runtime 13.3 LTS and above any Delta table in Unity Catalog with primary keys and timestamp keys can be used; lookback_window takes a datetime.timedelta, defaults to None (all values used regardless of age) and is applied during training and batch inference, while during online inference the latest feature value is always used regardless of the lookback window."
+  },
+  {
+   "id": "dbxfe-features-source-uc",
+   "title": "Feature tables in Unity Catalog",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/uc/feature-tables-uc",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; creating and managing feature tables governed by Unity Catalog.",
+   "caveat": "Syntax and runtime minimums are per page version; verify before running any statement.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: any Delta table in Unity Catalog with a primary key can be a feature table; to create a time series feature table, add a time column to the primary key with the TIMESERIES keyword, for example PRIMARY KEY (customer_id, ts TIMESERIES), which requires Databricks Runtime 13.3 LTS or above; after a primary key constraint is added the table appears in the Features UI."
+  },
+  {
+   "id": "dbxfe-features-source-online",
+   "title": "Databricks Online Feature Stores",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/online-feature-store",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; online stores powered by Lakebase, synced from offline Unity Catalog feature tables.",
+   "caveat": "Availability, capacity options and pricing vary by region and account; nothing was created or measured here.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Online Feature Stores serve feature data to online applications and real-time models, powered by Databricks Lakebase; they sync data from offline Unity Catalog feature tables with publish modes TRIGGERED (default, incremental on a schedule or by API), CONTINUOUS (streaming pipeline updates) and SNAPSHOT (one-time full copy); new stores are created as Lakebase Autoscaling projects."
+  },
+  {
+   "id": "dbxfe-features-source-migrate",
+   "title": "Migrate from legacy and third-party online tables",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/migrate-from-online-tables",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Feature Store documentation for online serving.",
+   "caveat": "Only the page title and its place in the documentation were confirmed; migration steps were not reviewed.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: the Feature Store documentation includes a page for migrating from legacy online tables and third-party online stores, which shows that earlier online serving names remain in circulation beside Databricks Online Feature Stores."
+  },
+  {
+   "id": "dbxfe-features-source-lookup",
+   "title": "Model Serving with automatic feature lookup",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/automatic-feature-lookup",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Model Serving endpoints for models logged with feature metadata.",
+   "caveat": "Endpoint features and logging options depend on creation date, region and entitlement.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Model Serving automatically looks up feature values from an online store when scoring a model logged with FeatureEngineeringClient.log_model, so the most recent feature values are always used for predictions; for endpoints created starting February 2025 the augmented DataFrame with looked-up feature values and function return values can be logged to inference tables."
+  },
+  {
+   "id": "dbxfe-features-source-workflows",
+   "title": "Use features in online workflows",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/online-workflows",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; publishing feature tables and serving them in real time.",
+   "caveat": "Requirements such as Change Data Feed apply to specific publish modes; read the current page before designing.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: after an online store is available, publish_table synchronizes an offline feature table to it; published feature tables need a primary key constraint with non-nullable primary keys, and Change Data Feed must be enabled for the CONTINUOUS and TRIGGERED publish modes; when a scoring request arrives, Model Serving retrieves the published values the model needs."
+  },
+  {
+   "id": "dbxfe-features-source-serving",
+   "title": "Feature Serving endpoints",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/feature-function-serving",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; endpoints that return feature values rather than model predictions.",
+   "caveat": "Endpoint availability and limits vary; no endpoint was created in this build.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Feature Serving makes data in the Databricks platform available to applications deployed outside Databricks and provides structured data for RAG applications; a FeatureSpec defines the endpoint and is stored in Unity Catalog with lineage to its feature tables and functions; endpoints scale automatically and are queried through the UI or REST API."
+  },
+  {
+   "id": "dbxfe-features-source-ondemand",
+   "title": "On-demand feature computation",
+   "url": "https://docs.databricks.com/en/machine-learning/feature-store/on-demand-features.html",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; request-time features computed with Python user-defined functions in Unity Catalog.",
+   "caveat": "Requires Unity Catalog and Databricks Runtime 13.3 LTS ML or above according to the page; verify current requirements.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: on-demand features are computed at inference time with Python user-defined functions when values depend on request-time inputs; during training the function and its input bindings are passed as a FeatureFunction in the feature_lookups of create_training_set; the model must be logged with the feature engineering log_model method so it evaluates the on-demand features automatically at inference."
+  },
+  {
+   "id": "dbxfe-features-source-constraints",
+   "title": "Constraints on Databricks",
+   "url": "https://docs.databricks.com/aws/en/tables/constraints",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Delta Lake table constraints.",
+   "caveat": "Constraint support differs between Delta tables, materialized views and other table types.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Databricks does not enforce primary key, foreign key or unique constraints, which are informational; Delta Lake enforces CHECK and NOT NULL constraints and verifies check constraints against new and existing data, raising an error when a row violates them."
+  },
+  {
+   "id": "dbxfe-features-source-rely",
+   "title": "Query optimization using primary key and unique constraints",
+   "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-optimization-constraints",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the RELY option on informational key constraints.",
+   "caveat": "Optimizations require Photon-enabled compute according to the page; behaviour must be tested per workload.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: when a primary key or unique constraint is known to be valid, specifying it with RELY lets Databricks exploit the constraint to rewrite queries; it is the user's responsibility to ensure the constraint is satisfied, and relying on a constraint that is not satisfied may lead to incorrect query results; these optimizations require Photon-enabled compute."
+  },
+  {
+   "id": "dbxfe-features-source-views",
+   "title": "Feature Views",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/feature-store/feature-views",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; declarative feature definitions and their materialization.",
+   "caveat": "Public Preview: terms, regions and APIs may change; the create_pipeline method is described as deprecated.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Feature Views are in Public Preview and define features from Delta tables, Kafka streams or request-time data with computations such as time-windowed aggregations using sliding and tumbling windows for point-in-time correct feature computation; materialization creates Lakeflow pipelines that populate Unity Catalog tables for training, batch scoring or online serving."
+  },
+  {
+   "id": "dbxfe-features-source-asof",
+   "title": "pandas.merge_asof",
+   "url": "https://pandas.pydata.org/docs/reference/api/pandas.merge_asof.html",
+   "publisher": "pandas development team",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "pandas 3.0.x API reference; independent of any cloud.",
+   "caveat": "Library semantics only; the lab pins pandas 3.0.6 and was executed locally.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: merge_asof matches on the nearest key rather than equal keys and requires both inputs sorted by the key; a backward search, the default, selects the last row in the right DataFrame whose on key is less than or equal to the left key; allow_exact_matches, default True, allows equal keys and False makes the match strict; by matches on equal columns before the as-of search; tolerance limits the distance."
+  },
+  {
+   "id": "dbxfe-features-source-pitfalls",
+   "title": "Common pitfalls and recommended practices",
+   "url": "https://scikit-learn.org/stable/common_pitfalls.html",
+   "publisher": "scikit-learn contributors",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "scikit-learn 1.9 user guide; general predictive-modelling practice, independent of cloud.",
+   "caveat": "General guidance; it does not describe feature stores or temporal joins specifically.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: transforms used when training a model must also be applied to subsequent datasets, whether test or production data, and must be learnt from the training subset only; data leakage occurs when information that would not be available at prediction time is used when building the model, giving overly optimistic performance estimates."
+  },
+  {
+   "id": "dbxfe-features-source-impute",
+   "title": "SimpleImputer",
+   "url": "https://scikit-learn.org/stable/modules/generated/sklearn.impute.SimpleImputer.html",
+   "publisher": "scikit-learn contributors",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "scikit-learn 1.9 API reference.",
+   "caveat": "Parameter behaviour is per release; re-read the page for the version you pin.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: with add_indicator=True a MissingIndicator transform is stacked onto the imputer's output so an estimator can account for missingness despite imputation; if a feature has no missing values at fit time, it will not appear on the missing indicator even if there are missing values at transform time."
+  },
+  {
+   "id": "dbxfe-features-source-rules",
+   "title": "Rules of Machine Learning",
+   "url": "https://developers.google.com/machine-learning/guides/rules-of-ml",
+   "publisher": "Google for Developers",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Google's engineering guidance for production machine learning; not Databricks-specific.",
+   "caveat": "Practitioner guidance from one organization; adapt to the actual system.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: training-serving skew is a difference between performance during training and during serving, which can be caused by a discrepancy between how data is handled in the training and serving pipelines; re-use code between the pipelines, avoid using two different programming languages, and explicitly monitor training-serving skew, at least for a small fraction of traffic, to verify consistency between serving and training."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-features-claim-store",
+   "description": "Databricks Feature Store registers features in Unity Catalog with governance, lineage, point-in-time joins and online serving; it needs a Unity Catalog-enabled workspace; features are authored as feature tables you populate or as Feature Views that Databricks computes and manages (Public Preview).",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-store"
+   ],
+   "context": "Databricks on AWS; preview status and entitlement vary."
+  },
+  {
+   "id": "dbxfe-features-claim-keys",
+   "description": "A feature table has a primary key and is backed by a Delta table; timestamp keys hold the event time associated with a feature value and, with the primary keys, uniquely identify the value at a point in time; the offline store serves training and batch inference, and a table can be published to an online store for real-time inference.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-glossary"
+   ],
+   "context": "Databricks Feature Store glossary."
+  },
+  {
+   "id": "dbxfe-features-claim-pit",
+   "description": "A point-in-time lookup with timestamp_lookup_key returns the latest feature values prior to each timestamp for the matching keys, or null; lookback_window excludes older values (default None) during training and batch inference, while online inference always uses the latest value regardless of the lookback window; a time series table has one TimestampType or DateType timestamp key and no partition columns.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-pit"
+   ],
+   "context": "Databricks point-in-time feature joins; runtime and client versions apply."
+  },
+  {
+   "id": "dbxfe-features-claim-uc",
+   "description": "Any Delta table in Unity Catalog with a primary key can be a feature table, and a TIMESERIES keyword on a primary key column makes it a time series feature table (Databricks Runtime 13.3 LTS and above).",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-uc"
+   ],
+   "context": "Feature tables in Unity Catalog."
+  },
+  {
+   "id": "dbxfe-features-claim-online",
+   "description": "Online Feature Stores, powered by Lakebase, sync offline Unity Catalog feature tables with TRIGGERED (default), CONTINUOUS or SNAPSHOT publish modes; published tables need non-nullable primary keys and Change Data Feed for TRIGGERED and CONTINUOUS; Model Serving automatic feature lookup uses the most recent published values and, for endpoints created from February 2025, can log looked-up values to inference tables; Feature Serving endpoints return feature values to applications; the documentation keeps a migration page for legacy online tables.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-online",
+    "dbxfe-features-source-workflows",
+    "dbxfe-features-source-lookup",
+    "dbxfe-features-source-serving",
+    "dbxfe-features-source-migrate"
+   ],
+   "context": "Databricks on AWS; region, entitlement and pricing unverified."
+  },
+  {
+   "id": "dbxfe-features-claim-ondemand",
+   "description": "On-demand features are computed at inference time by Python user-defined functions bound with FeatureFunction in create_training_set and evaluated automatically at inference for models logged with the feature engineering log_model method.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-ondemand"
+   ],
+   "context": "Databricks on-demand feature computation."
+  },
+  {
+   "id": "dbxfe-features-claim-constraints",
+   "description": "Databricks primary key, foreign key and unique constraints are informational and not enforced, while Delta Lake enforces CHECK and NOT NULL constraints on new and existing data.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-constraints"
+   ],
+   "context": "Delta tables on Databricks."
+  },
+  {
+   "id": "dbxfe-features-claim-rely",
+   "description": "With RELY, Databricks may use an informational primary key or unique constraint to rewrite queries; ensuring it holds is the user's responsibility and an unsatisfied constraint may yield incorrect results; Photon is required.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-rely"
+   ],
+   "context": "Databricks SQL query optimization."
+  },
+  {
+   "id": "dbxfe-features-claim-views",
+   "description": "Feature Views (Public Preview) define features declaratively, including sliding and tumbling time-windowed aggregations, and materialization creates Lakeflow pipelines that populate Unity Catalog tables for training, batch scoring or online serving.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-views",
+    "dbxfe-features-source-store"
+   ],
+   "context": "Public Preview; verify availability."
+  },
+  {
+   "id": "dbxfe-features-claim-asof",
+   "description": "pandas merge_asof with direction='backward' selects the last right-hand row whose key is less than or equal to the left key, within groups given by `by`; allow_exact_matches defaults to True; inputs must be sorted by the key.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-asof"
+   ],
+   "context": "pandas 3.0.x; executed locally in Lab L18."
+  },
+  {
+   "id": "dbxfe-features-claim-preprocessing",
+   "description": "Transforms used in training must be applied to test and production data and learnt from training data only; information unavailable at prediction time makes performance estimates overly optimistic.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-pitfalls"
+   ],
+   "context": "General predictive-model practice."
+  },
+  {
+   "id": "dbxfe-features-claim-indicator",
+   "description": "SimpleImputer(add_indicator=True) stacks a MissingIndicator, but a feature with no missing values at fit time gets no indicator even if values are missing at transform time.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-impute"
+   ],
+   "context": "scikit-learn 1.9."
+  },
+  {
+   "id": "dbxfe-features-claim-skew",
+   "description": "Training-serving skew arises from differences in how training and serving pipelines handle data; shared code, one programming language and explicit monitoring of a fraction of traffic reduce it.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-features-source-rules"
+   ],
+   "context": "Google engineering guidance, general."
+  },
+  {
+   "id": "dbxfe-features-guidance",
+   "description": "Original SpicyBrain reasoning: the two-time feature row, the join rule 'newest window, then newest version, among rows published by the prediction time', the missingness policy by cause, the lineage rule, the consistency-check practice and the delivery questions; not a Databricks runbook.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "Independent curriculum; adapt to the actual decision, data and platform."
+  },
+  {
+   "id": "dbxfe-features-fiction",
+   "description": "Cinderline Components, presses PR-01 to PR-03, their readings, windows, schedules, labels, outcomes, policies, recall figures and serving port are synthetic teaching records; the lab values come from a local pandas run on these fixtures.",
+   "kind": "fictional",
+   "sourceIds": [],
+   "context": "No Databricks workspace, feature table, online store or endpoint was created, read or measured."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-features-feature-concept",
+   "term": "feature",
+   "aliases": [
+    "feature value",
+    "feature row"
+   ],
+   "definition": "A named value computed by a transformation from raw data for one entity as of one time, used as a model input.",
+   "example": "temp_mean_2h = 70.0 for PR-02 over the window ending 10:00.",
+   "sourceIds": [
+    "dbxfe-features-source-glossary",
+    "dbxfe-features-source-pitfalls"
+   ]
+  },
+  {
+   "id": "dbxfe-features-availability-concept",
+   "term": "availability time",
+   "aliases": [
+    "available_at",
+    "publication time",
+    "feature availability"
+   ],
+   "definition": "The first moment a feature value could be read by a consumer, after ingestion and computation, as distinct from the time it describes.",
+   "example": "PR-02's 10:00 window is available at 10:30, when the scheduled run publishes it.",
+   "sourceIds": [
+    "dbxfe-features-source-glossary",
+    "dbxfe-features-source-pitfalls"
+   ]
+  },
+  {
+   "id": "dbxfe-features-pit-concept",
+   "term": "point-in-time join",
+   "aliases": [
+    "as-of join",
+    "point-in-time lookup",
+    "merge_asof"
+   ],
+   "definition": "A join that gives each labelled row the newest feature value of the same entity that was available at or before its prediction time.",
+   "example": "PR-02 at 10:15 receives the 08:00 window, published at 08:30.",
+   "sourceIds": [
+    "dbxfe-features-source-pit",
+    "dbxfe-features-source-asof"
+   ]
+  },
+  {
+   "id": "dbxfe-features-latest-concept",
+   "term": "latest-value lookup",
+   "aliases": [
+    "current value",
+    "latest row per entity"
+   ],
+   "definition": "Reading each entity's newest feature value regardless of time; correct at request time, a leak when building historical rows.",
+   "example": "A 09:00 training row reading PR-01's 12:00 window published at 12:30.",
+   "sourceIds": [
+    "dbxfe-features-source-pit",
+    "dbxfe-features-source-pitfalls"
+   ]
+  },
+  {
+   "id": "dbxfe-features-entity-concept",
+   "term": "entity key",
+   "aliases": [
+    "primary key",
+    "lookup key",
+    "join key"
+   ],
+   "definition": "The column or columns naming the thing a feature describes, which must match exactly across features, labels and requests.",
+   "example": "machine_id PR-02, never pr-02, in every table and request.",
+   "sourceIds": [
+    "dbxfe-features-source-glossary",
+    "dbxfe-features-source-constraints"
+   ]
+  },
+  {
+   "id": "dbxfe-features-missing-concept",
+   "term": "missingness policy",
+   "aliases": [
+    "null handling",
+    "imputation policy"
+   ],
+   "definition": "A written rule per cause of an absent feature value stating what training and serving each do with it.",
+   "example": "No row yet is none_available and excluded; an empty vibration column stays null.",
+   "sourceIds": [
+    "dbxfe-features-source-pitfalls",
+    "dbxfe-features-source-impute"
+   ]
+  },
+  {
+   "id": "dbxfe-features-contract-concept",
+   "term": "feature contract",
+   "aliases": [
+    "data contract",
+    "feature table contract"
+   ],
+   "definition": "The producer's checkable promise about a feature table's keys, time meanings, units, null semantics, bounds and publication cadence.",
+   "example": "vib_count_2h between 0 and reading_count_2h; source_max_ingested_at never after available_at.",
+   "sourceIds": [
+    "dbxfe-features-source-constraints",
+    "dbxfe-features-source-glossary"
+   ]
+  },
+  {
+   "id": "dbxfe-features-skew-concept",
+   "term": "training/serving skew",
+   "aliases": [
+    "training-serving skew",
+    "online/offline skew"
+   ],
+   "definition": "A difference between the feature values a model saw in training and those it receives in serving for the same entity and moment.",
+   "example": "Training keeps PR-03's vibration null; a serving port sends 0.0.",
+   "sourceIds": [
+    "dbxfe-features-source-rules",
+    "dbxfe-features-source-pitfalls"
+   ]
+  },
+  {
+   "id": "dbxfe-features-version-concept",
+   "term": "feature version",
+   "aliases": [
+    "republication",
+    "late-arriving data"
+   ],
+   "definition": "An appended row for the same entity and window with a later availability time, published when late inputs change the value.",
+   "example": "PR-01's 10:00 window: 77.0 at 10:30, then 78.0 at 11:30.",
+   "sourceIds": [
+    "dbxfe-features-source-glossary"
+   ]
+  },
+  {
+   "id": "dbxfe-features-lineage-concept",
+   "term": "lineage timestamp",
+   "aliases": [
+    "source_max_ingested_at",
+    "input watermark"
+   ],
+   "definition": "The latest arrival time among the inputs a feature row used, letting a check prove the row could exist when it claims.",
+   "example": "A row stamped 10:30 whose lineage says 11:05 is refused.",
+   "sourceIds": [
+    "dbxfe-features-source-glossary"
+   ]
+  },
+  {
+   "id": "dbxfe-features-reuse-concept",
+   "term": "feature reuse",
+   "aliases": [
+    "shared features",
+    "feature sharing"
+   ],
+   "definition": "Several models reading one governed feature definition and table, each applying its own decision times and freshness limit.",
+   "example": "The failure model and the handover model both read the six sensor rows.",
+   "sourceIds": [
+    "dbxfe-features-source-store"
+   ]
+  },
+  {
+   "id": "dbxfe-features-freshness-concept",
+   "term": "feature freshness",
+   "aliases": [
+    "feature age",
+    "staleness"
+   ],
+   "definition": "The age of a feature value when used, the prediction time minus the time the value describes, judged against a consumer's limit.",
+   "example": "PR-03 at 13:30 uses a window ending 10:00: 210 minutes, stale under 180.",
+   "sourceIds": [
+    "dbxfe-features-source-pit"
+   ]
+  },
+  {
+   "id": "dbxfe-features-delivery-concept",
+   "term": "batch versus online delivery",
+   "aliases": [
+    "offline store",
+    "online store",
+    "batch inference",
+    "online inference"
+   ],
+   "definition": "Precomputing features for scheduled scoring versus looking them up with low latency when a request arrives.",
+   "example": "A 06:00 maintenance list is batch; a press-side alert is online.",
+   "sourceIds": [
+    "dbxfe-features-source-glossary",
+    "dbxfe-features-source-online"
+   ]
+  },
+  {
+   "id": "dbxfe-features-timeseries-concept",
+   "term": "time series feature table",
+   "aliases": [
+    "TIMESERIES key",
+    "timestamp key"
+   ],
+   "definition": "A Unity Catalog feature table whose primary key includes one timestamp key, enabling point-in-time lookups.",
+   "example": "PRIMARY KEY (machine_id, available_at TIMESERIES).",
+   "sourceIds": [
+    "dbxfe-features-source-uc",
+    "dbxfe-features-source-pit"
+   ]
+  },
+  {
+   "id": "dbxfe-features-online-store-concept",
+   "term": "online feature store",
+   "aliases": [
+    "Databricks Online Feature Store",
+    "online table (legacy)"
+   ],
+   "definition": "A low-latency store, synced from offline Unity Catalog feature tables, that serving endpoints read at request time.",
+   "example": "PR-03's newest published row served to a Model Serving endpoint.",
+   "sourceIds": [
+    "dbxfe-features-source-online",
+    "dbxfe-features-source-lookup",
+    "dbxfe-features-source-migrate"
+   ]
+  },
+  {
+   "id": "dbxfe-features-evidence-concept",
+   "term": "leakage test",
+   "aliases": [
+    "point-in-time test",
+    "future-information guard"
+   ],
+   "definition": "A test that fails when a training row uses information published after its prediction time, shown failing on a deliberately leaky input.",
+   "example": "The event-time join refused for PR-02 at 10:15 and PR-03 at 10:20.",
+   "sourceIds": [
+    "dbxfe-features-source-pitfalls"
+   ]
+  },
+  {
+   "id": "dbxfe-features-extension-rely-concept",
+   "term": "RELY constraint",
+   "aliases": [
+    "RELY option"
+   ],
+   "definition": "An option on an informational primary or unique key that lets Databricks use it to rewrite queries, trusting the user that it holds.",
+   "example": "Declaring the sensor_features primary key with RELY.",
+   "sourceIds": [
+    "dbxfe-features-source-rely"
+   ]
+  },
+  {
+   "id": "dbxfe-features-extension-indicator-concept",
+   "term": "missing indicator",
+   "aliases": [
+    "MissingIndicator",
+    "add_indicator"
+   ],
+   "definition": "A binary column recording whether a value was missing before imputation, so a model can tell filled from measured values.",
+   "example": "vib_max_2h_missing = 1 for PR-03's 10:00 window.",
+   "sourceIds": [
+    "dbxfe-features-source-impute"
+   ]
+  },
+  {
+   "id": "dbxfe-features-extension-inference-log-concept",
+   "term": "feature lookup log",
+   "aliases": [
+    "inference table",
+    "served feature log"
+   ],
+   "definition": "A record of the feature values looked up for each served request, kept so they can be compared with training-time computation.",
+   "example": "A logged row with request time, machine_id and the served temp_mean_2h.",
+   "sourceIds": [
+    "dbxfe-features-source-lookup",
+    "dbxfe-features-source-rules"
+   ]
+  },
+  {
+   "id": "dbxfe-features-extension-feature-views-concept",
+   "term": "Feature View",
+   "aliases": [
+    "declarative features",
+    "materialized features"
+   ],
+   "definition": "A declarative Databricks feature definition over a source and computation, whose pipelines Databricks creates and manages; Public Preview.",
+   "example": "A two-hour tumbling-window mean of temp_c per machine declared as a Feature View.",
+   "sourceIds": [
+    "dbxfe-features-source-views",
+    "dbxfe-features-source-store"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-features-definition-visual",
+   "kind": "table",
+   "title": "From three readings to one feature row",
+   "alt": "Three PR-02 readings between 08:30 and 10:00 are aggregated into one feature row keyed by machine and window end.",
+   "caption": "The entity and the window end identify the row; counts separate rows from values. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "Three raw readings: PR-02 sends three readings in the window (08:00, 10:00]; one has no vibration value and one sits exactly on 10:00. Table columns: machine_id | observed_at | ingested_at | temp_c | vibration. Rows: PR-02 | 08:30 | 08:32 | 68 | 1.7; PR-02 | 09:10 | 09:12 | 70 | no value; PR-02 | 10:00 | 10:02 | 72 | 1.9.\n\nOne window row: The transformation groups by machine and window end and computes a mean, a maximum and two different counts. Table columns: machine_id | feature_time | temp_mean_2h | vib_max_2h | reading_count_2h | vib_count_2h. Rows: PR-02 | 10:00 | 70.0 | 1.9 | 3 | 2.\n\nWhat identifies the row: The entity and the window end identify the row; the values are what it says about them. Table columns: part | value | meaning. Rows: machine_id | PR-02 | the entity described; feature_time | 10:00 | end of window (08:00, 10:00]; temp_mean_2h | 70.0 | mean of 68, 70 and 72; vib_count_2h | 2 | one reading had no vibration value.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "readings",
+     "title": "Three raw readings",
+     "explanation": "PR-02 sends three readings in the window (08:00, 10:00]; one has no vibration value and one sits exactly on 10:00.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "machine_id",
+       "observed_at",
+       "ingested_at",
+       "temp_c",
+       "vibration"
+      ],
+      "rows": [
+       [
+        "PR-02",
+        "08:30",
+        "08:32",
+        "68",
+        "1.7"
+       ],
+       [
+        "PR-02",
+        "09:10",
+        "09:12",
+        "70",
+        "no value"
+       ],
+       [
+        "PR-02",
+        "10:00",
+        "10:02",
+        "72",
+        "1.9"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "row",
+     "title": "One window row",
+     "explanation": "The transformation groups by machine and window end and computes a mean, a maximum and two different counts.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "machine_id",
+       "feature_time",
+       "temp_mean_2h",
+       "vib_max_2h",
+       "reading_count_2h",
+       "vib_count_2h"
+      ],
+      "rows": [
+       [
+        "PR-02",
+        "10:00",
+        "70.0",
+        "1.9",
+        "3",
+        "2"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "identity",
+     "title": "What identifies the row",
+     "explanation": "The entity and the window end identify the row; the values are what it says about them.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "part",
+       "value",
+       "meaning"
+      ],
+      "rows": [
+       [
+        "machine_id",
+        "PR-02",
+        "the entity described"
+       ],
+       [
+        "feature_time",
+        "10:00",
+        "end of window (08:00, 10:00]"
+       ],
+       [
+        "temp_mean_2h",
+        "70.0",
+        "mean of 68, 70 and 72"
+       ],
+       [
+        "vib_count_2h",
+        "2",
+        "one reading had no vibration value"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-times-visual",
+   "kind": "timeline",
+   "title": "Readings, publication and labels on one timeline",
+   "alt": "A timeline of PR-02's readings, the 10:00 window closing, its 10:30 publication, a 10:15 prediction and its label time, then a late PR-01 reading producing a second version.",
+   "caption": "A row exists from its publication, not from the end of the window it describes; labels carry their own times. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "Readings and publication: Three readings fall in the window ending 10:00; the job computes the row after the window closes and publishes it at 10:30. Nodes: 08:30 reading: PR-02 observed 08:30, ingested 08:32. (context); 09:10 reading: No vibration value; ingested 09:12. (context); 10:00 reading: On the boundary; belongs to the window ending 10:00. (context); 10:00 window closes: feature_time 10:00; the row does not exist yet. (pending); 10:30 run publishes: available_at 10:30: the first moment any model can read it. (selected). Relationships: 08:30 reading → 10:00 window closes: in window; 09:10 reading → 10:00 window closes: in window; 10:00 reading → 10:00 window closes: in window; 10:00 window closes → 10:30 run publishes: computed, published.\n\nLabels have their own times: A prediction at 10:15 may use only rows published by 10:15; its outcome is known four hours later. Nodes: 08:00 window: Published 08:30; usable at 10:15. (selected); 10:15 prediction: PR-02 decision time. (selected); 10:00 window: Published 10:30; not usable at 10:15. (excluded); 14:15 label known: No failure in four hours; known only when the horizon ends. (pending). Relationships: 08:00 window → 10:15 prediction: usable; 10:00 window → 10:15 prediction: not yet; 10:15 prediction → 14:15 label known: outcome.\n\nA late reading: PR-01's 09:50 reading lands at 11:05; the 11:30 run appends version 2 of the 10:00 window without changing version 1. Nodes: 09:50 observed: PR-01 reading inside the 10:00 window. (context); 10:30 version 1: Mean 77.0 from two readings. (selected); 11:00 prediction: Still sees version 1. (selected); 11:05 ingested: The reading lands after version 1 was published. (warning); 11:30 version 2: Mean 78.0 from three readings; appended. (selected); 11:45 prediction: Sees version 2. (selected). Relationships: 09:50 observed → 11:05 ingested: arrives late; 10:30 version 1 → 11:00 prediction: used by; 11:05 ingested → 11:30 version 2: triggers; 11:30 version 2 → 11:45 prediction: used by.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "publish",
+     "title": "Readings and publication",
+     "explanation": "Three readings fall in the window ending 10:00; the job computes the row after the window closes and publishes it at 10:30.",
+     "nodes": [
+      {
+       "id": "read-0830",
+       "label": "08:30 reading",
+       "detail": "PR-02 observed 08:30, ingested 08:32.",
+       "status": "context"
+      },
+      {
+       "id": "read-0910",
+       "label": "09:10 reading",
+       "detail": "No vibration value; ingested 09:12.",
+       "status": "context"
+      },
+      {
+       "id": "read-1000",
+       "label": "10:00 reading",
+       "detail": "On the boundary; belongs to the window ending 10:00.",
+       "status": "context"
+      },
+      {
+       "id": "close",
+       "label": "10:00 window closes",
+       "detail": "feature_time 10:00; the row does not exist yet.",
+       "status": "pending"
+      },
+      {
+       "id": "pub",
+       "label": "10:30 run publishes",
+       "detail": "available_at 10:30: the first moment any model can read it.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "read-0830",
+       "to": "close",
+       "label": "in window"
+      },
+      {
+       "from": "read-0910",
+       "to": "close",
+       "label": "in window"
+      },
+      {
+       "from": "read-1000",
+       "to": "close",
+       "label": "in window"
+      },
+      {
+       "from": "close",
+       "to": "pub",
+       "label": "computed, published"
+      }
+     ]
+    },
+    {
+     "id": "labels",
+     "title": "Labels have their own times",
+     "explanation": "A prediction at 10:15 may use only rows published by 10:15; its outcome is known four hours later.",
+     "nodes": [
+      {
+       "id": "w08",
+       "label": "08:00 window",
+       "detail": "Published 08:30; usable at 10:15.",
+       "status": "selected"
+      },
+      {
+       "id": "pred",
+       "label": "10:15 prediction",
+       "detail": "PR-02 decision time.",
+       "status": "selected"
+      },
+      {
+       "id": "w10",
+       "label": "10:00 window",
+       "detail": "Published 10:30; not usable at 10:15.",
+       "status": "excluded"
+      },
+      {
+       "id": "known",
+       "label": "14:15 label known",
+       "detail": "No failure in four hours; known only when the horizon ends.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "w08",
+       "to": "pred",
+       "label": "usable"
+      },
+      {
+       "from": "w10",
+       "to": "pred",
+       "label": "not yet"
+      },
+      {
+       "from": "pred",
+       "to": "known",
+       "label": "outcome"
+      }
+     ]
+    },
+    {
+     "id": "late",
+     "title": "A late reading",
+     "explanation": "PR-01's 09:50 reading lands at 11:05; the 11:30 run appends version 2 of the 10:00 window without changing version 1.",
+     "nodes": [
+      {
+       "id": "obs",
+       "label": "09:50 observed",
+       "detail": "PR-01 reading inside the 10:00 window.",
+       "status": "context"
+      },
+      {
+       "id": "version-1",
+       "label": "10:30 version 1",
+       "detail": "Mean 77.0 from two readings.",
+       "status": "selected"
+      },
+      {
+       "id": "p11",
+       "label": "11:00 prediction",
+       "detail": "Still sees version 1.",
+       "status": "selected"
+      },
+      {
+       "id": "ing",
+       "label": "11:05 ingested",
+       "detail": "The reading lands after version 1 was published.",
+       "status": "warning"
+      },
+      {
+       "id": "version-2",
+       "label": "11:30 version 2",
+       "detail": "Mean 78.0 from three readings; appended.",
+       "status": "selected"
+      },
+      {
+       "id": "p1145",
+       "label": "11:45 prediction",
+       "detail": "Sees version 2.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "obs",
+       "to": "ing",
+       "label": "arrives late"
+      },
+      {
+       "from": "version-1",
+       "to": "p11",
+       "label": "used by"
+      },
+      {
+       "from": "ing",
+       "to": "version-2",
+       "label": "triggers"
+      },
+      {
+       "from": "version-2",
+       "to": "p1145",
+       "label": "used by"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-asof-visual",
+   "kind": "table",
+   "title": "Point-in-time join: before and after",
+   "alt": "Three labelled predictions joined to published feature rows, first on window end, then on availability.",
+   "caption": "Joining on the window end hands two predictions rows that did not exist yet; joining on availability does not. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "Published feature rows: The rows the job published, with the window they describe and the time they became readable. Table columns: machine | window end | published | temp_mean_2h. Rows: PR-02 | 08:00 | 08:30 | 65.5; PR-02 | 10:00 | 10:30 | 70.0; PR-03 | 10:00 | 10:30 | 61.0.\n\nJoined on window end: Before: each prediction takes the newest window that ended by its time, ignoring publication. Table columns: prediction | machine | row used | published | verdict. Rows: 10:15 | PR-02 | 10:00 window, 70.0 | 10:30 | leak; 10:20 | PR-03 | 10:00 window, 61.0 | 10:30 | leak; 12:45 | PR-02 | 10:00 window, 70.0 | 10:30 | fine.\n\nJoined on availability: After: each prediction takes the newest window among rows published by its time; PR-03 has none yet. Table columns: prediction | machine | row used | published | verdict. Rows: 10:15 | PR-02 | 08:00 window, 65.5 | 08:30 | ok, 135 min old; 10:20 | PR-03 | none | none | none_available; 12:45 | PR-02 | 10:00 window, 70.0 | 10:30 | ok, 165 min old.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-asof",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "published",
+     "title": "Published feature rows",
+     "explanation": "The rows the job published, with the window they describe and the time they became readable.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "machine",
+       "window end",
+       "published",
+       "temp_mean_2h"
+      ],
+      "rows": [
+       [
+        "PR-02",
+        "08:00",
+        "08:30",
+        "65.5"
+       ],
+       [
+        "PR-02",
+        "10:00",
+        "10:30",
+        "70.0"
+       ],
+       [
+        "PR-03",
+        "10:00",
+        "10:30",
+        "61.0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "before",
+     "title": "Joined on window end",
+     "explanation": "Before: each prediction takes the newest window that ended by its time, ignoring publication.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "prediction",
+       "machine",
+       "row used",
+       "published",
+       "verdict"
+      ],
+      "rows": [
+       [
+        "10:15",
+        "PR-02",
+        "10:00 window, 70.0",
+        "10:30",
+        "leak"
+       ],
+       [
+        "10:20",
+        "PR-03",
+        "10:00 window, 61.0",
+        "10:30",
+        "leak"
+       ],
+       [
+        "12:45",
+        "PR-02",
+        "10:00 window, 70.0",
+        "10:30",
+        "fine"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "after",
+     "title": "Joined on availability",
+     "explanation": "After: each prediction takes the newest window among rows published by its time; PR-03 has none yet.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "prediction",
+       "machine",
+       "row used",
+       "published",
+       "verdict"
+      ],
+      "rows": [
+       [
+        "10:15",
+        "PR-02",
+        "08:00 window, 65.5",
+        "08:30",
+        "ok, 135 min old"
+       ],
+       [
+        "10:20",
+        "PR-03",
+        "none",
+        "none",
+        "none_available"
+       ],
+       [
+        "12:45",
+        "PR-02",
+        "10:00 window, 70.0",
+        "10:30",
+        "ok, 165 min old"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-latest-visual",
+   "kind": "comparison",
+   "title": "The same latest-value lookup at two moments",
+   "alt": "A latest-value lookup answered at request time for serving, and the same lookup used for a historical training row.",
+   "caption": "Latest is the point-in-time answer only when the prediction time is now. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "Serving at 12:45: A request at 12:45 reads PR-01's newest published row, published at 12:30: correct. Nodes: 12:45 request: PR-01 is scored now. (selected); Newest row: 12:00 window, published 12:30. (selected); 85.0 used: Published before the request. (selected). Relationships: 12:45 request → Newest row: lookup; Newest row → 85.0 used: returns.\n\nTraining row at 09:00: Rebuilt today, the same lookup hands a 09:00 training row a value from 12:30; the as-of lookup gives the 08:00 window. Nodes: 09:00 training row: History rebuilt today. (selected); Newest row: Still the 12:00 window, published 12:30. (warning); 85.0 used: Did not exist at 09:00: leak. (excluded); 72.0 correct: 08:00 window, published 08:30. (selected). Relationships: 09:00 training row → Newest row: latest lookup; Newest row → 85.0 used: returns; 09:00 training row → 72.0 correct: as-of lookup.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "serve",
+     "title": "Serving at 12:45",
+     "explanation": "A request at 12:45 reads PR-01's newest published row, published at 12:30: correct.",
+     "nodes": [
+      {
+       "id": "req",
+       "label": "12:45 request",
+       "detail": "PR-01 is scored now.",
+       "status": "selected"
+      },
+      {
+       "id": "row",
+       "label": "Newest row",
+       "detail": "12:00 window, published 12:30.",
+       "status": "selected"
+      },
+      {
+       "id": "val",
+       "label": "85.0 used",
+       "detail": "Published before the request.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "req",
+       "to": "row",
+       "label": "lookup"
+      },
+      {
+       "from": "row",
+       "to": "val",
+       "label": "returns"
+      }
+     ]
+    },
+    {
+     "id": "history",
+     "title": "Training row at 09:00",
+     "explanation": "Rebuilt today, the same lookup hands a 09:00 training row a value from 12:30; the as-of lookup gives the 08:00 window.",
+     "nodes": [
+      {
+       "id": "hist",
+       "label": "09:00 training row",
+       "detail": "History rebuilt today.",
+       "status": "selected"
+      },
+      {
+       "id": "row",
+       "label": "Newest row",
+       "detail": "Still the 12:00 window, published 12:30.",
+       "status": "warning"
+      },
+      {
+       "id": "val",
+       "label": "85.0 used",
+       "detail": "Did not exist at 09:00: leak.",
+       "status": "excluded"
+      },
+      {
+       "id": "asof",
+       "label": "72.0 correct",
+       "detail": "08:00 window, published 08:30.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "hist",
+       "to": "row",
+       "label": "latest lookup"
+      },
+      {
+       "from": "row",
+       "to": "val",
+       "label": "returns"
+      },
+      {
+       "from": "hist",
+       "to": "asof",
+       "label": "as-of lookup"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-keys-visual",
+   "kind": "table",
+   "title": "One key, one row",
+   "alt": "A duplicated feature row makes the join depend on storage order, and a mismatched entity key looks like missing data.",
+   "caption": "A duplicate or an unmatched key is a contract error, not a value to average or impute. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "Duplicate entity-time row: Two rows claim PR-01's 10:00 window published at 10:30, with different values. Table columns: machine | window end | published | temp_mean_2h. Rows: PR-01 | 10:00 | 10:30 | 77.0; PR-01 | 10:00 | 10:30 | 99.0.\n\nStorage order decides: An unchecked join that keeps the last matching row gives the 11:00 prediction a different value per file order. Table columns: storage order | value for PR-01 at 11:00. Rows: as appended | 99.0; reversed | 77.0.\n\nA key that matches nothing: Labels written with a lowercase key match no feature row, so every row looks missing unless keys are validated. Table columns: label key | feature keys | result. Rows: pr-02 | PR-01, PR-02, PR-03 | refused: unknown entity key; PR-02 | PR-01, PR-02, PR-03 | matched.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-constraints",
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "duplicate",
+     "title": "Duplicate entity-time row",
+     "explanation": "Two rows claim PR-01's 10:00 window published at 10:30, with different values.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "machine",
+       "window end",
+       "published",
+       "temp_mean_2h"
+      ],
+      "rows": [
+       [
+        "PR-01",
+        "10:00",
+        "10:30",
+        "77.0"
+       ],
+       [
+        "PR-01",
+        "10:00",
+        "10:30",
+        "99.0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "order",
+     "title": "Storage order decides",
+     "explanation": "An unchecked join that keeps the last matching row gives the 11:00 prediction a different value per file order.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "storage order",
+       "value for PR-01 at 11:00"
+      ],
+      "rows": [
+       [
+        "as appended",
+        "99.0"
+       ],
+       [
+        "reversed",
+        "77.0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "mismatch",
+     "title": "A key that matches nothing",
+     "explanation": "Labels written with a lowercase key match no feature row, so every row looks missing unless keys are validated.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "label key",
+       "feature keys",
+       "result"
+      ],
+      "rows": [
+       [
+        "pr-02",
+        "PR-01, PR-02, PR-03",
+        "refused: unknown entity key"
+       ],
+       [
+        "PR-02",
+        "PR-01, PR-02, PR-03",
+        "matched"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-missing-visual",
+   "kind": "table",
+   "title": "Missingness decision table",
+   "alt": "A decision table assigning a training rule and a serving rule to each cause of a missing feature, then its outcome on eleven labelled rows.",
+   "caption": "Each cause gets one rule, applied identically in training and serving; zero is a measurement, not a blank. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "Decide by cause: Five causes of a missing feature and what training and serving each do. Table columns: cause | example | training | serving. Rows: no row yet | PR-03 at 10:20 | exclude: none_available | no score; fallback rule; row too old | PR-03 at 13:30, 210 min | exclude: stale | same limit, same fallback; empty column | vib_max null, 0 values | keep null | keep null, never 0.0; thin window | 2 of 3 readings | keep; low_coverage | same flag; unknown key | label says pr-02 | refuse | refuse.\n\nApplied to eleven labels: Under a 180-minute limit, eight rows are ok and usable, two have no row yet and one is stale. Table columns: status | rows | used for training. Rows: ok | 8 | 8; none_available | 2 | 0; stale | 1 | 0.\n\nZero-filled instead: Filling blanks with zeros turns absences into measurements the sensors never made. Table columns: row | policy value | zero-filled | what it claims. Rows: PR-03 10:00 window | vib_max null | 0.0 | a perfectly smooth press; PR-03 at 10:20 | none_available | all features 0 | a cold, idle new machine.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-claim-indicator",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "policy",
+     "title": "Decide by cause",
+     "explanation": "Five causes of a missing feature and what training and serving each do.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "cause",
+       "example",
+       "training",
+       "serving"
+      ],
+      "rows": [
+       [
+        "no row yet",
+        "PR-03 at 10:20",
+        "exclude: none_available",
+        "no score; fallback rule"
+       ],
+       [
+        "row too old",
+        "PR-03 at 13:30, 210 min",
+        "exclude: stale",
+        "same limit, same fallback"
+       ],
+       [
+        "empty column",
+        "vib_max null, 0 values",
+        "keep null",
+        "keep null, never 0.0"
+       ],
+       [
+        "thin window",
+        "2 of 3 readings",
+        "keep; low_coverage",
+        "same flag"
+       ],
+       [
+        "unknown key",
+        "label says pr-02",
+        "refuse",
+        "refuse"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "applied",
+     "title": "Applied to eleven labels",
+     "explanation": "Under a 180-minute limit, eight rows are ok and usable, two have no row yet and one is stale.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "status",
+       "rows",
+       "used for training"
+      ],
+      "rows": [
+       [
+        "ok",
+        "8",
+        "8"
+       ],
+       [
+        "none_available",
+        "2",
+        "0"
+       ],
+       [
+        "stale",
+        "1",
+        "0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "zero",
+     "title": "Zero-filled instead",
+     "explanation": "Filling blanks with zeros turns absences into measurements the sensors never made.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "row",
+       "policy value",
+       "zero-filled",
+       "what it claims"
+      ],
+      "rows": [
+       [
+        "PR-03 10:00 window",
+        "vib_max null",
+        "0.0",
+        "a perfectly smooth press"
+       ],
+       [
+        "PR-03 at 10:20",
+        "none_available",
+        "all features 0",
+        "a cold, idle new machine"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-contract-visual",
+   "kind": "nodes",
+   "title": "A contract checked at write and at read",
+   "alt": "The feature job publishes under a contract; write checks refuse a backfilled row and a join guard refuses future rows at read.",
+   "caption": "Write checks keep bad rows out of the table; the read guard keeps future rows out of training. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "What the producer promises: The contract names keys, time meanings, bounds and cadence; each line can be tested. Nodes: Feature job: Publishes two-hour windows. (selected); Contract v1: keys, times, bounds. Checked by code, versioned. (selected); Keys: machine_id, feature_time, available_at unique. (selected); Time meanings: Window end versus publication time. (selected); Bounds: temp −40 to 150 °C; vib_count ≤ readings. (selected); Cadence: Runs at half past; age limits belong to consumers. (context). Relationships: Feature job → Contract v1: publishes under; Contract v1 → Keys: states; Contract v1 → Time meanings: states; Contract v1 → Bounds: states; Contract v1 → Cadence: states.\n\nChecks at write: Before rows are published, duplicates, bounds, null meaning and lineage are checked; a backfilled row is refused. Nodes: Feature job: Computes a run. (selected); Write checks: Duplicates, bounds, lineage. (selected); Feature table: Only valid rows published. (selected); Backfilled row: Claims 10:30 but used an 11:05 reading. (excluded). Relationships: Feature job → Write checks: rows; Write checks → Feature table: accepted; Backfilled row → Write checks: refused.\n\nChecks at read: The consumer validates label keys and times, then the guard refuses any row published after its prediction. Nodes: Label rows: Keys and prediction times. (selected); Join guard: available_at ≤ prediction_time. (selected); Training set: 8 usable rows. (selected); Event-time join: 2 rows refused by name. (excluded). Relationships: Label rows → Join guard: joined; Join guard → Training set: passes; Event-time join → Join guard: refused.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-constraints",
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "promise",
+     "title": "What the producer promises",
+     "explanation": "The contract names keys, time meanings, bounds and cadence; each line can be tested.",
+     "nodes": [
+      {
+       "id": "job",
+       "label": "Feature job",
+       "detail": "Publishes two-hour windows.",
+       "status": "selected"
+      },
+      {
+       "id": "contract",
+       "label": "Contract v1",
+       "detail": "Checked by code, versioned.",
+       "status": "selected",
+       "value": "keys, times, bounds"
+      },
+      {
+       "id": "keys",
+       "label": "Keys",
+       "detail": "machine_id, feature_time, available_at unique.",
+       "status": "selected"
+      },
+      {
+       "id": "times",
+       "label": "Time meanings",
+       "detail": "Window end versus publication time.",
+       "status": "selected"
+      },
+      {
+       "id": "bounds",
+       "label": "Bounds",
+       "detail": "temp −40 to 150 °C; vib_count ≤ readings.",
+       "status": "selected"
+      },
+      {
+       "id": "cadence",
+       "label": "Cadence",
+       "detail": "Runs at half past; age limits belong to consumers.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "job",
+       "to": "contract",
+       "label": "publishes under"
+      },
+      {
+       "from": "contract",
+       "to": "keys",
+       "label": "states"
+      },
+      {
+       "from": "contract",
+       "to": "times",
+       "label": "states"
+      },
+      {
+       "from": "contract",
+       "to": "bounds",
+       "label": "states"
+      },
+      {
+       "from": "contract",
+       "to": "cadence",
+       "label": "states"
+      }
+     ]
+    },
+    {
+     "id": "write",
+     "title": "Checks at write",
+     "explanation": "Before rows are published, duplicates, bounds, null meaning and lineage are checked; a backfilled row is refused.",
+     "nodes": [
+      {
+       "id": "job",
+       "label": "Feature job",
+       "detail": "Computes a run.",
+       "status": "selected"
+      },
+      {
+       "id": "check",
+       "label": "Write checks",
+       "detail": "Duplicates, bounds, lineage.",
+       "status": "selected"
+      },
+      {
+       "id": "table",
+       "label": "Feature table",
+       "detail": "Only valid rows published.",
+       "status": "selected"
+      },
+      {
+       "id": "backfill",
+       "label": "Backfilled row",
+       "detail": "Claims 10:30 but used an 11:05 reading.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "job",
+       "to": "check",
+       "label": "rows"
+      },
+      {
+       "from": "check",
+       "to": "table",
+       "label": "accepted"
+      },
+      {
+       "from": "backfill",
+       "to": "check",
+       "label": "refused"
+      }
+     ]
+    },
+    {
+     "id": "read",
+     "title": "Checks at read",
+     "explanation": "The consumer validates label keys and times, then the guard refuses any row published after its prediction.",
+     "nodes": [
+      {
+       "id": "labels",
+       "label": "Label rows",
+       "detail": "Keys and prediction times.",
+       "status": "selected"
+      },
+      {
+       "id": "guard",
+       "label": "Join guard",
+       "detail": "available_at ≤ prediction_time.",
+       "status": "selected"
+      },
+      {
+       "id": "train",
+       "label": "Training set",
+       "detail": "8 usable rows.",
+       "status": "selected"
+      },
+      {
+       "id": "shortcut",
+       "label": "Event-time join",
+       "detail": "2 rows refused by name.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "labels",
+       "to": "guard",
+       "label": "joined"
+      },
+      {
+       "from": "guard",
+       "to": "train",
+       "label": "passes"
+      },
+      {
+       "from": "shortcut",
+       "to": "guard",
+       "label": "refused"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-skew-visual",
+   "kind": "comparison",
+   "title": "Training versus serving on identical inputs",
+   "alt": "The training transformation compared with a serving port on the 10:30 and 08:30 inputs.",
+   "caption": "One shared transformation agrees by construction; a port agrees only on inputs without the edge cases. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "One transformation: Both paths import compute_features, so the 10:30 rows match field for field. Table columns: path | code | PR-02 10:00 mean | PR-03 vib_max. Rows: training | compute_features | 70.0 | null; serving | compute_features | 70.0 | null.\n\nA port on 10:30 inputs: The port buckets by window start and fills absent vibration with 0.0, so two windows differ. Table columns: path | code | PR-02 10:00 mean | PR-03 vib_max. Rows: training | compute_features | 70.0 | null; serving | port: floor windows, fill 0 | 69.0 | 0.0.\n\nThe same port on 08:30 inputs: No boundary reading or missing value has arrived by 08:30, so the broken port agrees. Table columns: path | code | PR-02 08:00 mean | PR-03 row. Rows: training | compute_features | 65.5 | none yet; serving | port | 65.5 | none yet.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-skew",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "shared",
+     "title": "One transformation",
+     "explanation": "Both paths import compute_features, so the 10:30 rows match field for field.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "path",
+       "code",
+       "PR-02 10:00 mean",
+       "PR-03 vib_max"
+      ],
+      "rows": [
+       [
+        "training",
+        "compute_features",
+        "70.0",
+        "null"
+       ],
+       [
+        "serving",
+        "compute_features",
+        "70.0",
+        "null"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "port",
+     "title": "A port on 10:30 inputs",
+     "explanation": "The port buckets by window start and fills absent vibration with 0.0, so two windows differ.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "path",
+       "code",
+       "PR-02 10:00 mean",
+       "PR-03 vib_max"
+      ],
+      "rows": [
+       [
+        "training",
+        "compute_features",
+        "70.0",
+        "null"
+       ],
+       [
+        "serving",
+        "port: floor windows, fill 0",
+        "69.0",
+        "0.0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "easy",
+     "title": "The same port on 08:30 inputs",
+     "explanation": "No boundary reading or missing value has arrived by 08:30, so the broken port agrees.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "path",
+       "code",
+       "PR-02 08:00 mean",
+       "PR-03 row"
+      ],
+      "rows": [
+       [
+        "training",
+        "compute_features",
+        "65.5",
+        "none yet"
+       ],
+       [
+        "serving",
+        "port",
+        "65.5",
+        "none yet"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-late-visual",
+   "kind": "table",
+   "title": "Versions after late readings",
+   "alt": "Feature rows before and after two late readings, the training rows they change, and what an overwrite backfill would have changed.",
+   "caption": "Late data appends versions; only predictions after a new version's publication change. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "Before the late readings: Two windows each published once from two readings. Table columns: machine | window | published | temp | readings. Rows: PR-01 | 10:00 | 10:30 | 77.0 | 2; PR-02 | 08:00 | 08:30 | 65.5 | 2.\n\nTwo versions appended: The 11:30 and 12:30 runs append new versions; the originals stay as published. Table columns: machine | window | published | temp | readings. Rows: PR-01 | 10:00 | 10:30 | 77.0 | 2; PR-01 | 10:00 | 11:30 | 78.0 | 3; PR-02 | 08:00 | 08:30 | 65.5 | 2; PR-02 | 08:00 | 12:30 | 66.0 | 3.\n\nTraining rows before and after: Only the prediction after version 2's publication, whose newest window is still 10:00, changes. Table columns: prediction | before | after. Rows: PR-01 at 11:00 | 77.0 | 77.0: reading landed 11:05; PR-01 at 11:45 | 77.0 | 78.0: version 2 at 11:30; PR-02 at 12:45 | 70.0 | 70.0: 10:00 window is newer.\n\nAn overwrite backfill: Recomputing history once and stamping nominal times would feed three predictions readings that had not arrived. Table columns: prediction | honest | backfilled. Rows: PR-01 at 11:00 | 77.0 | 78.0 from an 11:05 reading; PR-02 at 09:00 | 65.5 | 66.0 from an 11:40 reading; PR-02 at 10:15 | 65.5 | 66.0 from an 11:40 reading.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "before",
+     "title": "Before the late readings",
+     "explanation": "Two windows each published once from two readings.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "machine",
+       "window",
+       "published",
+       "temp",
+       "readings"
+      ],
+      "rows": [
+       [
+        "PR-01",
+        "10:00",
+        "10:30",
+        "77.0",
+        "2"
+       ],
+       [
+        "PR-02",
+        "08:00",
+        "08:30",
+        "65.5",
+        "2"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "after",
+     "title": "Two versions appended",
+     "explanation": "The 11:30 and 12:30 runs append new versions; the originals stay as published.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "machine",
+       "window",
+       "published",
+       "temp",
+       "readings"
+      ],
+      "rows": [
+       [
+        "PR-01",
+        "10:00",
+        "10:30",
+        "77.0",
+        "2"
+       ],
+       [
+        "PR-01",
+        "10:00",
+        "11:30",
+        "78.0",
+        "3"
+       ],
+       [
+        "PR-02",
+        "08:00",
+        "08:30",
+        "65.5",
+        "2"
+       ],
+       [
+        "PR-02",
+        "08:00",
+        "12:30",
+        "66.0",
+        "3"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "rows",
+     "title": "Training rows before and after",
+     "explanation": "Only the prediction after version 2's publication, whose newest window is still 10:00, changes.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "prediction",
+       "before",
+       "after"
+      ],
+      "rows": [
+       [
+        "PR-01 at 11:00",
+        "77.0",
+        "77.0: reading landed 11:05"
+       ],
+       [
+        "PR-01 at 11:45",
+        "77.0",
+        "78.0: version 2 at 11:30"
+       ],
+       [
+        "PR-02 at 12:45",
+        "70.0",
+        "70.0: 10:00 window is newer"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "backfill",
+     "title": "An overwrite backfill",
+     "explanation": "Recomputing history once and stamping nominal times would feed three predictions readings that had not arrived.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "prediction",
+       "honest",
+       "backfilled"
+      ],
+      "rows": [
+       [
+        "PR-01 at 11:00",
+        "77.0",
+        "78.0 from an 11:05 reading"
+       ],
+       [
+        "PR-02 at 09:00",
+        "65.5",
+        "66.0 from an 11:40 reading"
+       ],
+       [
+        "PR-02 at 10:15",
+        "65.5",
+        "66.0 from an 11:40 reading"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-reuse-visual",
+   "kind": "nodes",
+   "title": "One table, two consumers",
+   "alt": "One published feature table read by a failure model and by a handover model with a different freshness limit and decision times.",
+   "caption": "The join is shared; each consumer's limit and decision times decide what is usable. Synthetic teaching example from Lab L18.",
+   "textEquivalent": "Failure model: Predictions between 09:00 and 13:30 with a 180-minute limit: eight usable rows. Nodes: Feature table: Six rows, published at half past. (selected); Failure model: Limit 180 minutes. (selected); 8 usable rows: Feature ok, label known. (selected). Relationships: Feature table → Failure model: as-of join; Failure model → 8 usable rows: yields.\n\nHandover model: Predictions at 10:00 and 12:00 with a 90-minute limit always meet a window that closed two hours earlier. Nodes: Feature table: Same six rows, unchanged. (selected); Handover model: Limit 90 minutes; predicts on the hour. (selected); Age 120 minutes: Newest published window ended two hours earlier. (warning); 0 usable rows: Five stale, one none_available. (excluded). Relationships: Feature table → Handover model: as-of join; Handover model → Age 120 minutes: finds; Age 120 minutes → 0 usable rows: yields.\n\nFix the timing, not the join: Moving the decision or the window grid makes fresh rows exist; joining on window end would only leak. Nodes: Decide at 10:35: Newest window 10:00, age 35 minutes. (selected); Shift the grid: Windows end 09:30, published 10:00: age 30. (selected); Join on window end: Uses rows published after the decision. (excluded).",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-store",
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "failure",
+     "title": "Failure model",
+     "explanation": "Predictions between 09:00 and 13:30 with a 180-minute limit: eight usable rows.",
+     "nodes": [
+      {
+       "id": "table",
+       "label": "Feature table",
+       "detail": "Six rows, published at half past.",
+       "status": "selected"
+      },
+      {
+       "id": "failure-model",
+       "label": "Failure model",
+       "detail": "Limit 180 minutes.",
+       "status": "selected"
+      },
+      {
+       "id": "usable",
+       "label": "8 usable rows",
+       "detail": "Feature ok, label known.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "table",
+       "to": "failure-model",
+       "label": "as-of join"
+      },
+      {
+       "from": "failure-model",
+       "to": "usable",
+       "label": "yields"
+      }
+     ]
+    },
+    {
+     "id": "handover",
+     "title": "Handover model",
+     "explanation": "Predictions at 10:00 and 12:00 with a 90-minute limit always meet a window that closed two hours earlier.",
+     "nodes": [
+      {
+       "id": "table",
+       "label": "Feature table",
+       "detail": "Same six rows, unchanged.",
+       "status": "selected"
+      },
+      {
+       "id": "handover-model",
+       "label": "Handover model",
+       "detail": "Limit 90 minutes; predicts on the hour.",
+       "status": "selected"
+      },
+      {
+       "id": "age",
+       "label": "Age 120 minutes",
+       "detail": "Newest published window ended two hours earlier.",
+       "status": "warning"
+      },
+      {
+       "id": "none",
+       "label": "0 usable rows",
+       "detail": "Five stale, one none_available.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "table",
+       "to": "handover-model",
+       "label": "as-of join"
+      },
+      {
+       "from": "handover-model",
+       "to": "age",
+       "label": "finds"
+      },
+      {
+       "from": "age",
+       "to": "none",
+       "label": "yields"
+      }
+     ]
+    },
+    {
+     "id": "fixes",
+     "title": "Fix the timing, not the join",
+     "explanation": "Moving the decision or the window grid makes fresh rows exist; joining on window end would only leak.",
+     "nodes": [
+      {
+       "id": "move",
+       "label": "Decide at 10:35",
+       "detail": "Newest window 10:00, age 35 minutes.",
+       "status": "selected"
+      },
+      {
+       "id": "grid",
+       "label": "Shift the grid",
+       "detail": "Windows end 09:30, published 10:00: age 30.",
+       "status": "selected"
+      },
+      {
+       "id": "join",
+       "label": "Join on window end",
+       "detail": "Uses rows published after the decision.",
+       "status": "excluded"
+      }
+     ],
+     "connections": []
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-delivery-visual",
+   "kind": "table",
+   "title": "Batch or online, by decision",
+   "alt": "A comparison of batch and online feature delivery, Cinderline's decisions placed on it, and the split between precomputed and request-time inputs.",
+   "caption": "Decision timing, freshness and request-time inputs choose the delivery; each path has its own silent failure. Synthetic teaching example.",
+   "textEquivalent": "Requirements decide: Four questions separate batch scoring from online lookup. Table columns: question | batch | online. Rows: when is the decision made? | on a schedule | when a request arrives; how fresh are inputs? | as of the last run | as of the last sync; where do features come from? | offline table, as-of join | online store, key lookup; what fails silently? | a skipped run | a stalled sync.\n\nCinderline decisions: Each decision is placed by its timing. Table columns: decision | when | delivery. Rows: maintenance priority list | 06:00 daily | batch scoring; press-side alert | each request, seconds | online lookup; handover risk | 10:00 and 12:00 | neither as set: an online lookup serves the same 120-minute-old row; batch if the owner moves it to 10:35, or on demand from raw readings.\n\nRequest-time inputs: Inputs known only in the request are computed on demand by the same function in training and serving. Table columns: input | known when | how it is computed. Rows: two-hour sensor window | after each run | precomputed row; die scanned by the operator | only in the request | on-demand function.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-claim-online",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "requirements",
+     "title": "Requirements decide",
+     "explanation": "Four questions separate batch scoring from online lookup.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "question",
+       "batch",
+       "online"
+      ],
+      "rows": [
+       [
+        "when is the decision made?",
+        "on a schedule",
+        "when a request arrives"
+       ],
+       [
+        "how fresh are inputs?",
+        "as of the last run",
+        "as of the last sync"
+       ],
+       [
+        "where do features come from?",
+        "offline table, as-of join",
+        "online store, key lookup"
+       ],
+       [
+        "what fails silently?",
+        "a skipped run",
+        "a stalled sync"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "decisions",
+     "title": "Cinderline decisions",
+     "explanation": "Each decision is placed by its timing.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "decision",
+       "when",
+       "delivery"
+      ],
+      "rows": [
+       [
+        "maintenance priority list",
+        "06:00 daily",
+        "batch scoring"
+       ],
+       [
+        "press-side alert",
+        "each request, seconds",
+        "online lookup"
+       ],
+       [
+        "handover risk",
+        "10:00 and 12:00",
+        "neither as set: an online lookup serves the same 120-minute-old row; batch if the owner moves it to 10:35, or on demand from raw readings"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "request",
+     "title": "Request-time inputs",
+     "explanation": "Inputs known only in the request are computed on demand by the same function in training and serving.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "input",
+       "known when",
+       "how it is computed"
+      ],
+      "rows": [
+       [
+        "two-hour sensor window",
+        "after each run",
+        "precomputed row"
+       ],
+       [
+        "die scanned by the operator",
+        "only in the request",
+        "on-demand function"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-offline-visual",
+   "kind": "nodes",
+   "title": "A time series feature table and its lookup",
+   "alt": "A Unity Catalog time series feature table queried by FeatureLookup with a timestamp_lookup_key, first with window end as the timestamp key, then with publication time.",
+   "caption": "The lookup returns the latest value prior to each timestamp; what the timestamp key means decides whether that is honest. Schematic of documented behaviour; synthetic values; not executed in a workspace.",
+   "textEquivalent": "Table and lookup: A labelled DataFrame supplies keys and timestamps; create_training_set performs the point-in-time lookup. Nodes: UC feature table: Primary key with one TIMESERIES column. (selected); Label DataFrame: machine_id and prediction_time. (selected); FeatureLookup: lookup_key and timestamp_lookup_key. (selected); Training set: Latest value prior to each timestamp, or null. (selected). Relationships: Label DataFrame → FeatureLookup: keys, times; UC feature table → FeatureLookup: rows; FeatureLookup → Training set: create_training_set.\n\nTimestamp means window end: With the window end stored as the timestamp key, a 10:15 lookup returns a value published at 10:30. Nodes: ts = 10:00: Window end; the value appears at 10:30. (warning); Lookup at 10:15: Latest timestamp prior to 10:15 is 10:00. (warning); Leaked value: Used before it existed. (excluded). Relationships: ts = 10:00 → Lookup at 10:15: matches; Lookup at 10:15 → Leaked value: returns.\n\nTimestamp means publication: With the publication time stored as the key, the same lookup returns what a live model saw; lookback_window adds the age limit. Nodes: ts = 08:30: The 08:00 window's publication time. (selected); ts = 10:30: The 10:00 window's publication time. (excluded); Lookup at 10:15: Latest timestamp prior to 10:15 is 08:30. (selected); Honest value: The 08:00 window, as a live model saw it. (selected); lookback_window: 3 hours: older values become null. (context). Relationships: ts = 08:30 → Lookup at 10:15: prior to 10:15; ts = 10:30 → Lookup at 10:15: after 10:15; Lookup at 10:15 → Honest value: returns; lookback_window → Lookup at 10:15: limits age.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-uc",
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "lookup",
+     "title": "Table and lookup",
+     "explanation": "A labelled DataFrame supplies keys and timestamps; create_training_set performs the point-in-time lookup.",
+     "nodes": [
+      {
+       "id": "uc-table",
+       "label": "UC feature table",
+       "detail": "Primary key with one TIMESERIES column.",
+       "status": "selected"
+      },
+      {
+       "id": "labels",
+       "label": "Label DataFrame",
+       "detail": "machine_id and prediction_time.",
+       "status": "selected"
+      },
+      {
+       "id": "lookup-node",
+       "label": "FeatureLookup",
+       "detail": "lookup_key and timestamp_lookup_key.",
+       "status": "selected"
+      },
+      {
+       "id": "training-set",
+       "label": "Training set",
+       "detail": "Latest value prior to each timestamp, or null.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "labels",
+       "to": "lookup-node",
+       "label": "keys, times"
+      },
+      {
+       "from": "uc-table",
+       "to": "lookup-node",
+       "label": "rows"
+      },
+      {
+       "from": "lookup-node",
+       "to": "training-set",
+       "label": "create_training_set"
+      }
+     ]
+    },
+    {
+     "id": "windowend",
+     "title": "Timestamp means window end",
+     "explanation": "With the window end stored as the timestamp key, a 10:15 lookup returns a value published at 10:30.",
+     "nodes": [
+      {
+       "id": "key",
+       "label": "ts = 10:00",
+       "detail": "Window end; the value appears at 10:30.",
+       "status": "warning"
+      },
+      {
+       "id": "look",
+       "label": "Lookup at 10:15",
+       "detail": "Latest timestamp prior to 10:15 is 10:00.",
+       "status": "warning"
+      },
+      {
+       "id": "leak",
+       "label": "Leaked value",
+       "detail": "Used before it existed.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "key",
+       "to": "look",
+       "label": "matches"
+      },
+      {
+       "from": "look",
+       "to": "leak",
+       "label": "returns"
+      }
+     ]
+    },
+    {
+     "id": "published",
+     "title": "Timestamp means publication",
+     "explanation": "With the publication time stored as the key, the same lookup returns what a live model saw; lookback_window adds the age limit.",
+     "nodes": [
+      {
+       "id": "early",
+       "label": "ts = 08:30",
+       "detail": "The 08:00 window's publication time.",
+       "status": "selected"
+      },
+      {
+       "id": "late",
+       "label": "ts = 10:30",
+       "detail": "The 10:00 window's publication time.",
+       "status": "excluded"
+      },
+      {
+       "id": "look",
+       "label": "Lookup at 10:15",
+       "detail": "Latest timestamp prior to 10:15 is 08:30.",
+       "status": "selected"
+      },
+      {
+       "id": "honest",
+       "label": "Honest value",
+       "detail": "The 08:00 window, as a live model saw it.",
+       "status": "selected"
+      },
+      {
+       "id": "lookback",
+       "label": "lookback_window",
+       "detail": "3 hours: older values become null.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "early",
+       "to": "look",
+       "label": "prior to 10:15"
+      },
+      {
+       "from": "late",
+       "to": "look",
+       "label": "after 10:15"
+      },
+      {
+       "from": "look",
+       "to": "honest",
+       "label": "returns"
+      },
+      {
+       "from": "lookback",
+       "to": "look",
+       "label": "limits age"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-online-visual",
+   "kind": "comparison",
+   "title": "What training and online inference apply",
+   "alt": "The steps applied to a feature value during training and batch inference compared with online inference, and how to close the gap.",
+   "caption": "The documented lookback window applies in training and batch inference, not online; the caller must carry the age rule. Schematic; synthetic values.",
+   "textEquivalent": "Training and batch inference: A point-in-time lookup with a three-hour lookback turns a five-hour-old value into null. Table columns: step | behaviour. Rows: lookup | latest value prior to each row's timestamp; lookback_window 3 h | values older than 3 h excluded; PR-03, 5 h old | null, handled as stale.\n\nOnline inference: Online inference reads the latest published value; the lookback window is not applied. Table columns: step | behaviour. Rows: lookup | latest published value for the key; lookback_window 3 h | not applied; PR-03, 5 h old | value served.\n\nClose the gap: Carry the age with the value, apply the training rule in the caller and log what was served. Table columns: practice | effect. Rows: serve the feature timestamp | caller can compute age; apply the 3 h rule in the caller | stale rows get the fallback; log looked-up values | compare with training rows.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-online",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "training",
+     "title": "Training and batch inference",
+     "explanation": "A point-in-time lookup with a three-hour lookback turns a five-hour-old value into null.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "step",
+       "behaviour"
+      ],
+      "rows": [
+       [
+        "lookup",
+        "latest value prior to each row's timestamp"
+       ],
+       [
+        "lookback_window 3 h",
+        "values older than 3 h excluded"
+       ],
+       [
+        "PR-03, 5 h old",
+        "null, handled as stale"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "online",
+     "title": "Online inference",
+     "explanation": "Online inference reads the latest published value; the lookback window is not applied.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "step",
+       "behaviour"
+      ],
+      "rows": [
+       [
+        "lookup",
+        "latest published value for the key"
+       ],
+       [
+        "lookback_window 3 h",
+        "not applied"
+       ],
+       [
+        "PR-03, 5 h old",
+        "value served"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "close",
+     "title": "Close the gap",
+     "explanation": "Carry the age with the value, apply the training rule in the caller and log what was served.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "practice",
+       "effect"
+      ],
+      "rows": [
+       [
+        "serve the feature timestamp",
+        "caller can compute age"
+       ],
+       [
+        "apply the 3 h rule in the caller",
+        "stale rows get the fallback"
+       ],
+       [
+        "log looked-up values",
+        "compare with training rows"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-features-evidence-visual",
+   "kind": "table",
+   "title": "Tests that must fail first",
+   "alt": "Deliberately wrong approaches and the named reason each test gives, the real pipeline passing, and what the evidence does not show.",
+   "caption": "A guard is proven only by the failures it produces on known-bad inputs. Local pandas execution of Lab L18; synthetic data.",
+   "textEquivalent": "Deliberately wrong inputs: Each wrong approach fails with its reason named. Table columns: wrong approach | result | reason named. Rows: join on window end | 2 rows refused | published after prediction; latest row for history | 7 rows refused | published after prediction; duplicate key | table refused | duplicate entity-time row; drifted port at 10:30 | 2 windows differ | columns and values listed; overwrite backfill | table refused | ingested after published.\n\nThe real pipeline: The point-in-time pipeline passes the same guards, and the late rerun changes exactly one row. Table columns: check | result | detail. Rows: future-information guard | passes | every row published by its prediction; serving versus training | passes | equal at 11 label times; late rerun | 1 row changes | PR-01 at 11:45 only.\n\nWhat it does not show: The tests show mechanism on these inputs, nothing about prediction quality or platform behaviour. Table columns: claim | shown?. Rows: no future information in these rows | yes, for these inputs; the features predict failure | no: no model trained; scale, streaming, clock skew | not tested; a platform's behaviour | verify separately.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values reproduced from the local pandas run of Lab L18 (lab-l18-point-in-time-features); no product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-claim-skew",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "states": [
+    {
+     "id": "wrong",
+     "title": "Deliberately wrong inputs",
+     "explanation": "Each wrong approach fails with its reason named.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "wrong approach",
+       "result",
+       "reason named"
+      ],
+      "rows": [
+       [
+        "join on window end",
+        "2 rows refused",
+        "published after prediction"
+       ],
+       [
+        "latest row for history",
+        "7 rows refused",
+        "published after prediction"
+       ],
+       [
+        "duplicate key",
+        "table refused",
+        "duplicate entity-time row"
+       ],
+       [
+        "drifted port at 10:30",
+        "2 windows differ",
+        "columns and values listed"
+       ],
+       [
+        "overwrite backfill",
+        "table refused",
+        "ingested after published"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "real",
+     "title": "The real pipeline",
+     "explanation": "The point-in-time pipeline passes the same guards, and the late rerun changes exactly one row.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "check",
+       "result",
+       "detail"
+      ],
+      "rows": [
+       [
+        "future-information guard",
+        "passes",
+        "every row published by its prediction"
+       ],
+       [
+        "serving versus training",
+        "passes",
+        "equal at 11 label times"
+       ],
+       [
+        "late rerun",
+        "1 row changes",
+        "PR-01 at 11:45 only"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "limits",
+     "title": "What it does not show",
+     "explanation": "The tests show mechanism on these inputs, nothing about prediction quality or platform behaviour.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "claim",
+       "shown?"
+      ],
+      "rows": [
+       [
+        "no future information in these rows",
+        "yes, for these inputs"
+       ],
+       [
+        "the features predict failure",
+        "no: no model trained"
+       ],
+       [
+        "scale, streaming, clock skew",
+        "not tested"
+       ],
+       [
+        "a platform's behaviour",
+        "verify separately"
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-features-definition-question",
+   "revision": "1",
+   "prompt": "The feature row (PR-02, feature_time 10:00, temp_mean_2h 70.0) was computed from readings at 08:30, 09:10 and 10:00. Which statement about it is accurate?",
+   "options": [
+    {
+     "id": "dbxfe-features-definition-question-a",
+     "text": "It is PR-02's temperature at exactly 10:00.",
+     "rationale": "It is a mean over three readings; the 10:00 reading alone was 72."
+    },
+    {
+     "id": "dbxfe-features-definition-question-b",
+     "text": "It summarizes PR-02's readings in the window (08:00, 10:00]; the machine and the window end identify the row.",
+     "rationale": "The row describes one entity over one window; its identity is the key, not the value 70.0."
+    },
+    {
+     "id": "dbxfe-features-definition-question-c",
+     "text": "Any model could read it from 10:00, when the window ended.",
+     "rationale": "The window end says what the row describes, not when it became readable; the next beat shows the row appears later than 10:00."
+    },
+    {
+     "id": "dbxfe-features-definition-question-d",
+     "text": "It applies to every press that reported in that window.",
+     "rationale": "The entity key limits the value to PR-02; PR-03's window has its own row with a different mean."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-definition-question-b",
+   "conceptIds": [
+    "dbxfe-features-feature-concept",
+    "dbxfe-features-entity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-times-question",
+   "revision": "1",
+   "prompt": "To decide whether a feature row may be used by a labelled training row, which pair of times must be compared?",
+   "options": [
+    {
+     "id": "dbxfe-features-times-question-a",
+     "text": "The feature row's feature_time against the training row's prediction_time.",
+     "rationale": "The window end says what the row describes, not when it existed; it admits the 10:00 window at 10:15."
+    },
+    {
+     "id": "dbxfe-features-times-question-b",
+     "text": "The newest reading's observed_at against the training row's label_time.",
+     "rationale": "The label time is when the outcome became known, hours after the prediction; it admits almost everything."
+    },
+    {
+     "id": "dbxfe-features-times-question-c",
+     "text": "The feature row's available_at against the training row's prediction_time.",
+     "rationale": "Availability is the first moment a model could read the row; the prediction time is when the model would have asked."
+    },
+    {
+     "id": "dbxfe-features-times-question-d",
+     "text": "The feature row's feature_time against the training row's label_time.",
+     "rationale": "Neither time is the decision moment; this comparison admits rows published after the prediction."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-times-question-c",
+   "conceptIds": [
+    "dbxfe-features-availability-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-asof-question",
+   "revision": "1",
+   "prompt": "PR-03 was commissioned at 09:00; its only window ends at 10:00 and is published at 10:30. What does a point-in-time join return for a PR-03 prediction at 10:20?",
+   "options": [
+    {
+     "id": "dbxfe-features-asof-question-a",
+     "text": "No feature row: the label row is kept with null features and the status none_available.",
+     "rationale": "Nothing of PR-03's was published by 10:20, and an honest training row records exactly that."
+    },
+    {
+     "id": "dbxfe-features-asof-question-b",
+     "text": "The 10:00 window, 61.0 °C, because that window ended before 10:20.",
+     "rationale": "That is the event-time join; the row was published at 10:30, ten minutes after the prediction."
+    },
+    {
+     "id": "dbxfe-features-asof-question-c",
+     "text": "PR-02's 08:00 window, the newest row published by 10:20.",
+     "rationale": "The join matches machine_id first; another press's row describes a different entity."
+    },
+    {
+     "id": "dbxfe-features-asof-question-d",
+     "text": "An error, because merge_asof cannot return an unmatched row.",
+     "rationale": "A backward as-of join leaves the right-hand columns null when no row qualifies; it does not raise."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-asof-question-a",
+   "conceptIds": [
+    "dbxfe-features-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-asof",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-latest-question",
+   "revision": "1",
+   "prompt": "A notebook builds last quarter's training set by joining each labelled row to a current_features view holding one row per machine. Offline recall jumps. What is the most likely explanation?",
+   "options": [
+    {
+     "id": "dbxfe-features-latest-question-a",
+     "text": "The view is fresher, so the model genuinely learned a stronger signal.",
+     "rationale": "Fresher than the decision is impossible for a live model; the gain cannot be reproduced in serving."
+    },
+    {
+     "id": "dbxfe-features-latest-question-b",
+     "text": "The view removed duplicate rows, which reduced noise.",
+     "rationale": "One row per machine discards history rather than noise; the timing drives the gain."
+    },
+    {
+     "id": "dbxfe-features-latest-question-c",
+     "text": "Recall rose because the label horizon changed.",
+     "rationale": "Nothing in the change touched the labels; only the feature lookup changed."
+    },
+    {
+     "id": "dbxfe-features-latest-question-d",
+     "text": "Historical rows received values published after their prediction times, so the jump measures future-data leakage.",
+     "rationale": "A current view is the point-in-time answer only at serving time; for past rows it carries later information."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-latest-question-d",
+   "conceptIds": [
+    "dbxfe-features-latest-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-keys-question",
+   "revision": "1",
+   "prompt": "The feature table holds two rows for (PR-01, feature_time 10:00, available_at 10:30): 77.0 and 99.0. The join keeps the last matching row. What should the pipeline do?",
+   "options": [
+    {
+     "id": "dbxfe-features-keys-question-a",
+     "text": "Average the two rows to 88.0 and continue.",
+     "rationale": "An average invents a value that no run produced and hides a producer defect."
+    },
+    {
+     "id": "dbxfe-features-keys-question-b",
+     "text": "Refuse the table with an error naming the key, because the value used would depend on storage order.",
+     "rationale": "The lab shows 99.0 on one file order and 77.0 on the reverse; only the producer can say which is true."
+    },
+    {
+     "id": "dbxfe-features-keys-question-c",
+     "text": "Keep the larger value, because failures correlate with heat.",
+     "rationale": "Choosing by the target's direction is a biased rule that no serving path would reproduce."
+    },
+    {
+     "id": "dbxfe-features-keys-question-d",
+     "text": "Trust the declared PRIMARY KEY to have prevented it.",
+     "rationale": "Primary key constraints on Databricks are informational and not enforced, so the duplicate can exist."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-keys-question-b",
+   "conceptIds": [
+    "dbxfe-features-entity-concept",
+    "dbxfe-features-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-constraints",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-missing-question",
+   "revision": "1",
+   "prompt": "PR-03's only window has two readings and no vibration value. Which feature row follows the module's missingness policy?",
+   "options": [
+    {
+     "id": "dbxfe-features-missing-question-a",
+     "text": "reading_count_2h 2, vib_count_2h 2, vib_max_2h 0.0.",
+     "rationale": "That is zero-filling: it reports two vibration measurements of zero that never happened."
+    },
+    {
+     "id": "dbxfe-features-missing-question-b",
+     "text": "No row at all, because a feature is missing.",
+     "rationale": "Temperature was measured twice; dropping the row discards real data and turns the window into none_available."
+    },
+    {
+     "id": "dbxfe-features-missing-question-c",
+     "text": "reading_count_2h 2, vib_count_2h 0, vib_max_2h null, low_coverage true.",
+     "rationale": "The counts say what arrived, the null says nothing was measured and the flag records the thin window."
+    },
+    {
+     "id": "dbxfe-features-missing-question-d",
+     "text": "vib_max_2h set to the mean vibration of all presses over the whole day.",
+     "rationale": "A whole-day mean uses readings from after this window and from other entities: it leaks and fabricates."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-missing-question-c",
+   "conceptIds": [
+    "dbxfe-features-missing-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-claim-indicator",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-skew-question",
+   "revision": "1",
+   "prompt": "A consistency check between the training transformation and a serving port passes on the 08:30 run and fails on the 10:30 run. What is the best reading?",
+   "options": [
+    {
+     "id": "dbxfe-features-skew-question-a",
+     "text": "The 10:30 run is corrupt, because the port agreed earlier.",
+     "rationale": "The training transformation produced the contract's values at 10:30; the disagreement sits in the port."
+    },
+    {
+     "id": "dbxfe-features-skew-question-b",
+     "text": "Floating-point noise; loosen the tolerance until both runs pass.",
+     "rationale": "A count of 3 against 2 and null against 0.0 are not rounding differences."
+    },
+    {
+     "id": "dbxfe-features-skew-question-c",
+     "text": "Only the 08:30 run matters, because training uses older data.",
+     "rationale": "Serving computes every window, including those with boundary readings and missing values."
+    },
+    {
+     "id": "dbxfe-features-skew-question-d",
+     "text": "The port has drifted; the 08:30 inputs lacked the boundary reading and missing values that expose it.",
+     "rationale": "Agreement is shown only for inputs that were compared; the 10:30 inputs contain the edge cases."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-skew-question-d",
+   "conceptIds": [
+    "dbxfe-features-skew-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-skew",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-late-question",
+   "revision": "1",
+   "prompt": "PR-01's 09:50 reading is ingested at 11:05, and the 11:30 run publishes version 2 of the 10:00 window (78.0). Which PR-01 training rows should change: 11:00, 11:45, 12:45?",
+   "options": [
+    {
+     "id": "dbxfe-features-late-question-a",
+     "text": "Only 11:45: it follows version 2's publication and the 10:00 window is still its newest.",
+     "rationale": "At 11:00 the reading had not arrived, and at 12:45 the 12:00 window is newer."
+    },
+    {
+     "id": "dbxfe-features-late-question-b",
+     "text": "11:00 and 11:45, because both use the 10:00 window.",
+     "rationale": "At 11:00 version 2 did not exist; changing that row imports a reading from 11:05."
+    },
+    {
+     "id": "dbxfe-features-late-question-c",
+     "text": "All three, because the corrected value is more accurate.",
+     "rationale": "Accuracy after the fact is not what a live model had, and 12:45 uses a different window."
+    },
+    {
+     "id": "dbxfe-features-late-question-d",
+     "text": "None, because published rows are never rewritten.",
+     "rationale": "Rows are never rewritten, but a new version is appended and later predictions use it."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-late-question-a",
+   "conceptIds": [
+    "dbxfe-features-version-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-offline-question",
+   "revision": "1",
+   "prompt": "A Databricks time series feature table stores the window end (10:00) as its timestamp key; values are published 30 minutes after each window ends. A point-in-time lookup runs for a training row at 10:15. What does it return?",
+   "options": [
+    {
+     "id": "dbxfe-features-offline-question-a",
+     "text": "The 08:00 window, because the lookup knows the 30-minute publication delay.",
+     "rationale": "The lookup sees only the timestamp key; the delay is recorded nowhere in the table."
+    },
+    {
+     "id": "dbxfe-features-offline-question-b",
+     "text": "Null, because a lookback window is always applied.",
+     "rationale": "lookback_window defaults to None, and when set it removes old values, not future ones."
+    },
+    {
+     "id": "dbxfe-features-offline-question-c",
+     "text": "The 10:00 window's values, which no live model could read until 10:30: a leak unless the key holds publication time.",
+     "rationale": "The lookup returns the latest value prior to 10:15 by the timestamp key, and the key says 10:00."
+    },
+    {
+     "id": "dbxfe-features-offline-question-d",
+     "text": "An error, because timestamp keys must be dates.",
+     "rationale": "A timestamp key may be TimestampType or DateType."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-offline-question-c",
+   "conceptIds": [
+    "dbxfe-features-timeseries-concept",
+    "dbxfe-features-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-online-question",
+   "revision": "1",
+   "prompt": "Training used FeatureLookup(..., lookback_window=timedelta(hours=3)). In production, PR-03's newest online value is five hours old when a request arrives. According to the point-in-time documentation, what does online inference use?",
+   "options": [
+    {
+     "id": "dbxfe-features-online-question-a",
+     "text": "Null, matching training, because the lookback window travels with the model.",
+     "rationale": "That consistency is exactly what the documentation says does not happen during online inference."
+    },
+    {
+     "id": "dbxfe-features-online-question-b",
+     "text": "The latest value, five hours old: the lookback window is not applied online, so the caller must enforce the age rule.",
+     "rationale": "The documentation states the lookback window applies during training and batch inference only."
+    },
+    {
+     "id": "dbxfe-features-online-question-c",
+     "text": "An error that forces the application to retry.",
+     "rationale": "Nothing in the lookup treats an old value as an error."
+    },
+    {
+     "id": "dbxfe-features-online-question-d",
+     "text": "A value recomputed from raw readings at request time.",
+     "rationale": "Only on-demand features are computed at request time; published features are looked up."
+    }
+   ],
+   "correctOptionId": "dbxfe-features-online-question-b",
+   "conceptIds": [
+    "dbxfe-features-online-store-concept",
+    "dbxfe-features-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-online",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-features-contract-self",
+   "revision": "1",
+   "prompt": "Cinderline adds oil_particles_ppm from lab samples: a sample is drawn at the press, analysed in a lab and entered hours later. Write five contract lines for this feature and say which are checked when rows are written and which when training rows are read.",
+   "modelAnswer": "Key: machine_id, sampled_at and result_entered_at are unique together, refused as duplicates at write. Time meanings: sampled_at is what the value describes and result_entered_at is when it became usable; the join uses result_entered_at and the read-side guard refuses later rows. Units and bounds: ppm between 0 and the lab's stated maximum, enforced at write, for example by a CHECK constraint. Null meaning: an unanalysed sample has no row, never 0 ppm, checked at write. Freshness belongs to each consumer: every model states its maximum sample age and applies it at read.",
+   "reasoning": "Each line is testable and sits where the data to test it exists; putting one model's maximum age into the producer contract would impose it on every consumer. Adding the lab method version to the key is an acceptable extension.",
+   "conceptIds": [
+    "dbxfe-features-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-constraints",
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-reuse-self",
+   "revision": "1",
+   "prompt": "The handover model predicts at 10:00 and 12:00 with a 90-minute limit, and no training row is usable. A colleague proposes joining on window end so the 10:00 prediction gets the 10:00 window. Explain why you refuse and propose two fixes.",
+   "modelAnswer": "Joining on window end gives the 10:00 prediction a row published at 10:30, so training would use information a live model at 10:00 cannot have; offline results would be optimistic and irreproducible. Instead, move the decision after a publication, for example to 10:35 when the 10:00 window is 35 minutes old, or shift the window grid so windows end at 09:30 and are published by 10:00, giving a 30-minute age at the handover. Computing the value on request from raw readings is a third option if those readings reach serving.",
+   "reasoning": "The refusal names the leak and its consequence, and each fix changes when data exists or when the decision happens instead of pretending data existed earlier. Relaxing the limit is acceptable only as the model owner's explicit decision.",
+   "conceptIds": [
+    "dbxfe-features-reuse-concept",
+    "dbxfe-features-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-store",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-delivery-self",
+   "revision": "1",
+   "prompt": "Cinderline wants a daily 06:00 maintenance priority list and an alert when an operator scans a die into a press. For each, choose batch scoring, online lookup or on-demand computation for its features, and say what you would monitor.",
+   "modelAnswer": "The 06:00 list is batch: join features as of 06:00, store predictions with the model version and the newest available_at used, and monitor that the run finished and that feature ages stayed within the limit. The die-scan alert needs online lookup for the sensor windows plus on-demand computation for the die identity and scan time known only in the request; monitor sync lag and the age of served rows, and log request inputs so training can recompute the on-demand value the same way.",
+   "reasoning": "The choice follows decision timing and request-time inputs, and each path names its own silent failure. Serving the list from an online store also works but adds a copy and a sync with no benefit.",
+   "conceptIds": [
+    "dbxfe-features-delivery-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-online",
+    "dbxfe-features-claim-ondemand",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-features-evidence-self",
+   "revision": "1",
+   "prompt": "A colleague calls a feature pipeline point-in-time correct because validation AUC is stable across three reruns. What evidence would you ask for instead, and what would that evidence still not prove?",
+   "modelAnswer": "Stable AUC shows repeatability, not correctness; a leaky join repeats perfectly. I would ask for a guard asserting every joined row was published by its prediction time with lineage checked, tests showing that an event-time join, a latest-value lookup, a duplicate key and a backfill each fail for their named reason, and a late-data rerun listing the changed rows. Even then it would not prove the features predict failure, behave the same at scale, or match the platform in the target workspace.",
+   "reasoning": "The answer separates repeatability from correctness and asks for failing tests, the only proof that a guard bites. Adding a forward-period evaluation to the request is a good extension.",
+   "conceptIds": [
+    "dbxfe-features-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-claim-skew",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-features-definition",
+   "version": "1.0.0",
+   "title": "A feature is a value computed for an entity as of a time",
+   "outcome": "Name the entity key, the window, the transformation and the inputs behind a feature value before using it.",
+   "explanation": "A [[dbxfe-features-feature-concept|feature]] is not a column you find; it is a value a transformation computes for one entity over one period. Cinderline's job turns PR-02's three readings between 08:00 and 10:00 into one row: machine_id PR-02, feature_time 10:00, temp_mean_2h 70.0, vib_count_2h 2. Notice in the first state that the 10:00:00 reading belongs to the window it closes, and in the third that the machine and the window end identify the row, not the value.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-feature",
+   "conceptIds": [
+    "dbxfe-features-feature-concept",
+    "dbxfe-features-entity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-definition-visual",
+   "questionIds": [
+    "dbxfe-features-definition-question"
+   ],
+   "hint": "Which two fields name the row, and which field is only a value?",
+   "handbook": {
+    "markdown": "A feature definition has four parts: the entity it describes (`machine_id`), the period it covers (a two-hour window closed on the right), the transformation (mean temperature, maximum vibration, two counts) and the inputs it may read (readings ingested before the job runs). Write all four down before arguing about model quality; most feature defects are a wrong part, not a wrong algorithm.\n\n```python\nknown = observations[observations[\"ingested_at\"] <= run_at].copy()  # ingested by the run\nknown[\"feature_time\"] = known[\"observed_at\"].dt.ceil(\"2h\")  # (start, end]\nknown = known[known[\"feature_time\"] <= run_at]  # windows closed by the run\nrows = known.groupby([\"machine_id\", \"feature_time\"]).agg(\n    temp_mean_2h=(\"temp_c\", \"mean\"),\n    vib_max_2h=(\"vibration_mm_s\", \"max\"),\n    reading_count_2h=(\"temp_c\", \"size\"),\n    vib_count_2h=(\"vibration_mm_s\", \"count\"))\n```\n\nIn SQL the same row is a `GROUP BY machine_id, window_end` with `AVG`, `MAX`, `COUNT(*)` and `COUNT(vibration_mm_s)`. `COUNT(column)` skips NULLs as pandas `count` does, and `COUNT(*)` counts rows like `size`; the pair lets PR-02's row say three readings arrived but only two carried a vibration value.\n\nBoundaries are part of the definition. `ceil` keeps a 10:00:00 reading in the window ending 10:00; `floor` plus two hours pushes it into the next window. Either convention can be chosen, but training and serving must share one and the contract must name it.\n\nWhat to inspect first: the grain (one row per entity per window?), the boundary rule, how missing inputs are counted, and whether the row carries enough keys to be joined later. What the value cannot tell you is when the row became usable, which is the next beat's subject. The lab's fixtures reproduce every number here.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-feature"
+    ]
+   },
+   "recap": "Entity, window, transformation and inputs define a feature; the value alone defines nothing.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-times",
+   "version": "1.0.0",
+   "title": "Every feature row carries the time it describes and the time it became usable",
+   "outcome": "Place readings, window ends, publication times, prediction times and label times on one timeline and say which rows a prediction may use.",
+   "explanation": "The machine-learning fundamentals module separated when a reading happened from when it arrived. A computed feature adds a second delay: Cinderline's job publishes each window 30 minutes after it closes. So every row needs [[dbxfe-features-availability-concept|availability time]], available_at, beside feature_time. Labels carry their own times too: a prediction time and a later time when the outcome is known. Notice in the second state that at 10:15 the 10:00 window does not exist yet, and in the third that a late reading adds a version.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-times",
+   "conceptIds": [
+    "dbxfe-features-availability-concept",
+    "dbxfe-features-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-times-visual",
+   "samajh": {
+    "text": "Socho raat 10 baje ek match khatam hua. Uski khabar subah 6 baje ke akhbaar mein chhapti hai. Khabar 10 baje ki hai, par padhne ke liye subah se pehle kahin available nahi thi. Agar koi poochhe ki raat 11 baje aapko kya pata tha, toh subah ka akhbaar us jawab mein nahi aa sakta, chahe usme kal raat ki hi baat likhi ho.",
+    "mapping": "The match ending at 10 pm is feature_time, the morning edition is available_at and the 11 pm question is the prediction time.",
+    "boundary": "A newspaper is printed once; a feature row can be republished as a new version when late inputs arrive, each version with its own availability time."
+   },
+   "questionIds": [
+    "dbxfe-features-times-question"
+   ],
+   "handbook": {
+    "markdown": "Four clocks meet in a training row. `observed_at` is when a sensor measured; `ingested_at` is when the reading landed; `available_at` is when the feature job published a row that used it; `prediction_time` is when the model would have been asked. A row may feed a prediction only if `available_at <= prediction_time`. For Cinderline the delays stack: readings land about two minutes after measurement, the 10:00 window is computed at the 10:30 run, and a flaky gateway delivered PR-01's 09:50 reading at 11:05.\n\nLabels have their own times. PR-01 fails at 14:10, so its predictions at 11:00, 11:45 and 12:45 are positives, known at 14:10. A negative is known only when its four-hour horizon has passed: PR-03's 13:30 prediction is known at 17:30. A training set cut at 17:00 must leave that row out rather than read 'no failure yet' as 'no failure'. Positives become known earlier than negatives, so an early cutoff over-represents failures.\n\n| time | event |\n|---|---|\n| 10:00 | window (08:00, 10:00] closes |\n| 10:15 | PR-02 prediction: newest usable row is the 08:00 window |\n| 10:30 | 10:00 window published |\n| 11:05 | late PR-01 reading ingested |\n| 11:30 | PR-01 10:00 window, version 2 |\n\nWhat to inspect: whether the feature table stores `available_at` at all. If it stores only the window end, what was knowable cannot be reconstructed and every later check is guesswork. Saying it to a maintenance lead: 'the 10:00 summary exists from 10:30; a 10:15 decision could not have seen it, so training must not either.'",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-times"
+    ]
+   },
+   "recap": "Join on when a row became usable, and train only on labels already known.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-asof",
+   "version": "1.0.0",
+   "title": "The training join asks what was published by the prediction time",
+   "outcome": "Build a point-in-time join with merge_asof or an explicit filter and predict its output for delayed and missing rows.",
+   "explanation": "A [[dbxfe-features-pit-concept|point-in-time join]] gives each labelled row the newest feature row of the same entity whose availability is at or before the prediction time. Notice the second state: joined on the window end, PR-02 at 10:15 and PR-03 at 10:20 receive the 10:00 windows, published at 10:30. The third state joins on availability: PR-02 gets the 08:00 window, 135 minutes old, and PR-03 gets nothing, which is the honest answer.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-join",
+   "conceptIds": [
+    "dbxfe-features-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-asof",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-asof-visual",
+   "samajh": {
+    "text": "Bank passbook yaad karo. Har line ki ek date hoti hai jab woh print hui. Koi poochhe ki 5 tareekh ko aapka balance kya tha, toh aap 5 tareekh tak print hui aakhri line padhoge. Baad mein print hui line, chahe woh 3 tareekh ke kisi cheque ki ho, 5 tareekh ke jawab mein nahi aati, kyunki us din woh passbook mein thi hi nahi.",
+    "mapping": "Passbook lines are published feature rows, the print date is available_at and the date asked about is the prediction time.",
+    "boundary": "A passbook covers one account; a feature join also matches the entity key and prefers the newest window before the newest version."
+   },
+   "questionIds": [
+    "dbxfe-features-asof-question"
+   ],
+   "handbook": {
+    "markdown": "In pandas the join is one call, provided both frames are sorted by their time keys and the entity is passed as `by`:\n\n```python\ntrain = pd.merge_asof(\n    labels.sort_values(\"prediction_time\"),\n    features.sort_values(\"available_at\"),\n    left_on=\"prediction_time\", right_on=\"available_at\",\n    by=\"machine_id\", direction=\"backward\", allow_exact_matches=True)\n```\n\n`direction='backward'` selects the last right-hand row whose key is less than or equal to the left key; `allow_exact_matches=True` lets a row published at 10:30 serve a 10:30 prediction. Setting it to `False` means strictly earlier, a policy to state rather than inherit.\n\nIn SQL, join on `machine_id` with `f.available_at <= l.prediction_time` and keep one row per label by `ROW_NUMBER()` ordered by `feature_time` then `available_at`, both descending.\n\nWhy the explicit order matters: `merge_asof` on `available_at` returns the most recently published row, which is the newest window only while no older window is republished later. In the lab a late reading republished PR-02's 08:00 window at 12:30, and `merge_asof` then handed the 12:45 prediction that older row, 285 minutes old. The explicit rule, newest window first and newest version second, kept the 10:00 window. Test both on data with a late republication.\n\nWhat fails: joining on `feature_time`, forgetting `by`, unsorted inputs (`merge_asof` raises) and key columns with different time zones or resolutions. What to inspect: assert `available_at <= prediction_time` for every joined row, count unmatched rows per entity, and list each chosen row's age. An empty match is data: PR-03 was commissioned at 09:00 and had nothing published until 10:30.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-join"
+    ]
+   },
+   "recap": "Each training row takes the newest row published by its own prediction time, or honestly none.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-latest",
+   "version": "1.0.0",
+   "title": "The newest value is right when serving and a leak in history",
+   "outcome": "Explain why a latest-value lookup is correct at request time and leaks future data when it builds training rows.",
+   "explanation": "At serving time the model asks now, so each machine's newest published row is exactly the point-in-time answer. The same [[dbxfe-features-latest-concept|latest-value lookup]] run today over history is not. Notice in the second state that the 09:00 training row receives PR-01's 12:00 window, published at 12:30, three and a half hours after the decision. In the lab this lookup was wrong for seven of eleven training rows, while the point-in-time join and the online lookup agreed on all eleven.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-join",
+   "conceptIds": [
+    "dbxfe-features-latest-concept",
+    "dbxfe-features-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-latest-visual",
+   "questionIds": [
+    "dbxfe-features-latest-question"
+   ],
+   "handbook": {
+    "markdown": "Leakage through a latest-value lookup is common because the lookup is correct somewhere. An online store holds one current row per entity, a serving request reads it, and the request time is the prediction time: nothing leaks. Reuse that lookup to assemble last month's training set and every historical row receives values published after its decision. Offline metrics improve for exactly the rows a live model will never see.\n\nThe rule is one sentence: evaluate every lookup as of the row's own prediction time. Serving is the special case where that time is now. This also gives a test that ties serving to training: call the online path at each labelled prediction time against the table as it was, and require every field to equal the training row. The lab does this at all eleven label times, before and after the late readings.\n\nSigns of this leak in a review: a feature table without availability times, a training query with no time predicate, a join to a 'current' or 'latest' view, a feature whose importance collapses in production, and a model that looks best on the most recent history. What to inspect: take three historical training rows and check by hand the publication time of every feature value they carry.\n\nExplaining it: 'At 09:00 the 12:00 summary did not exist. A model trained on it learned from the future; the live model will receive the 08:00 summary instead.' The fundamentals module showed the same trap with a repair code written after a failure; here the value itself is legitimate and only its timing is wrong.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-join",
+     "dbxfe-features-l01-serving"
+    ]
+   },
+   "recap": "Latest is the point-in-time answer only when the prediction time is now.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-keys",
+   "version": "1.0.0",
+   "title": "An entity key and a time key must identify exactly one row",
+   "outcome": "Refuse duplicate entity-time rows and unknown entity keys before any join and name the offending key.",
+   "explanation": "An [[dbxfe-features-entity-concept|entity key]] names what a feature describes; with the time keys it must identify exactly one row. Notice in the second state that two rows for PR-01's 10:00 window published at 10:30 make the join return 99.0 or 77.0 depending on storage order. The third state shows the opposite failure: a label written pr-02 matches nothing, so every feature would look missing. Both are contract errors to refuse, not values to average or impute.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-contract",
+   "conceptIds": [
+    "dbxfe-features-entity-concept",
+    "dbxfe-features-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-constraints",
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-keys-visual",
+   "questionIds": [
+    "dbxfe-features-keys-question"
+   ],
+   "handbook": {
+    "markdown": "Uniqueness has to be checked, not assumed. On Databricks, primary key and foreign key constraints are informational: the documentation states they are not enforced, while Delta Lake enforces CHECK and NOT NULL constraints. A feature table can declare `PRIMARY KEY (machine_id, available_at TIMESERIES)` and still receive duplicate rows, so the pipeline must refuse them.\n\n```python\ndup = features[features.duplicated([\"machine_id\", \"feature_time\", \"available_at\"], keep=False)]\nif not dup.empty:\n    raise DuplicateEntityTimeError(\"duplicate entity-time feature row: ...\")  # name keys and count\n```\n\nApply the same check at three grains: readings `(machine_id, observed_at)`, feature rows `(machine_id, feature_time, available_at)` and labels `(machine_id, prediction_time)`. A duplicate reading inflates counts and shifts means, a duplicate feature row makes the join order-dependent, and a duplicate label double-weights an example.\n\nKey matching is the other half. Entity keys must be identical across labels, features and serving requests; case, padding, leading zeros and renamed assets break the match silently, and the damage looks like missingness. Validate label and request keys against a registry of known entities, and alert when the share of `none_available` rows jumps for one entity.\n\nWhat to inspect: duplicate counts per key, the set difference between label keys and feature keys, and `none_available` rates by entity. Explaining it: 'Two different numbers claimed to be PR-01's 10:00 summary; we cannot train on a coin toss, so the job stops and names the key.' Exact re-deliveries of one reading may be dropped by a tested ingestion rule, as the ingestion module's resolver does; conflicting values never can.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-contract",
+     "dbxfe-features-l01-feature"
+    ]
+   },
+   "recap": "One entity, one time key, one row; anything else is refused by name.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-missing",
+   "version": "1.0.0",
+   "title": "Missing values need a cause before they get a rule",
+   "outcome": "Classify each missing feature by cause and apply one written policy in training and serving.",
+   "explanation": "A [[dbxfe-features-missing-concept|missingness policy]] starts from why a value is absent. Notice the first state: no row yet, a row too old for this consumer, a present row with an empty column, a thin window and an unknown key each get a different rule. The second state applies it to eleven labelled rows: eight usable, two none_available, one stale. The third shows what zero-filling would claim: PR-03's absent vibration becomes a perfectly smooth press.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-missing",
+   "conceptIds": [
+    "dbxfe-features-missing-concept",
+    "dbxfe-features-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-claim-indicator",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-missing-visual",
+   "samajh": {
+    "text": "Doctor ke paas report aayi, par ek test ka result abhi lab se nahi aaya. Woh wahan 'pending' likhega, 'normal' nahi. Aur agar report teen mahine purani hai, toh use purani maan kar naya test mangwayega. Khaali jagah ko zero ya normal likh dena ek aisa jhooth hai jo aage ke har faisle mein chala jaata hai.",
+    "mapping": "A pending result is none_available, a three-month-old report is stale and writing normal in the blank is zero-filling a missing feature.",
+    "boundary": "A doctor can order a new test at once; a model at serving time cannot create a missing reading and must follow the stated fallback."
+   },
+   "questionIds": [
+    "dbxfe-features-missing-question"
+   ],
+   "handbook": {
+    "markdown": "Write the policy as a table that the training code and the serving code both implement, then test both against it.\n\n| cause | detected by | training | serving |\n|---|---|---|---|\n| no row yet | nothing published by the prediction time | exclude, `none_available` | no score; fallback rule |\n| too old | age over the consumer's limit (180 min, inclusive) | exclude, `stale` | same limit, same fallback |\n| empty column | `vib_count_2h = 0`, `vib_max_2h` null | keep null | keep null |\n| thin window | `reading_count_2h < 3` | keep, `low_coverage` | same flag |\n| unknown key | not in the entity registry | refuse | refuse |\n\nAge is prediction time minus window end: PR-03 at 13:00 is exactly 180 minutes old and `ok`; at 13:30 it is 210 and `stale`. The boundary belongs to the policy and must be identical in both paths.\n\nImputation is a choice, not a default. If a model cannot accept nulls, fit any imputer on training rows only and apply the fitted values everywhere, as the scikit-learn pitfalls guide requires of every preprocessing step, and keep an indicator column so the model can tell filled from measured. One documented trap: `SimpleImputer(add_indicator=True)` creates indicators only for features that had missing values during fit, so a column missing only at serving time gets no indicator.\n\nWhy not zero? Zero is a measurement. Filling PR-03's absent vibration with 0.0 tells the model the press ran perfectly smooth; zero-filling a new machine's missing row makes it look cold and idle. What to inspect: counts per status per entity per day, and the same counts from serving logs; a divergence between them is skew.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-missing"
+    ]
+   },
+   "recap": "Name the cause, then apply one rule in both paths; zero is a measurement, not a blank.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-contract",
+   "version": "1.0.0",
+   "title": "A feature contract is checked where rows are written and where they are read",
+   "outcome": "Write a feature contract and place each rule at the write step or the read step that can enforce it.",
+   "explanation": "A [[dbxfe-features-contract-concept|feature contract]] is the producer's promise in checkable form: entity and time keys, what each time means, units, what null means, bounds and publication cadence. Notice in the second state that the write step refuses a backfilled row claiming 10:30 while using a reading ingested at 11:05. The third state shows the read step: the join guard refuses any training row using a feature published after its prediction time. Neither check replaces the other.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-contract",
+   "conceptIds": [
+    "dbxfe-features-contract-concept",
+    "dbxfe-features-lineage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-constraints",
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-contract-visual",
+   "questionIds": [
+    "dbxfe-features-contract-self"
+   ],
+   "handbook": {
+    "markdown": "A useful contract fits on one page and every line is testable. Lab L18's `feature_contract.json` states: entities PR-01 to PR-03; key `(machine_id, feature_time, available_at)`; two-hour windows closed on the right; runs at half past each hour; three expected readings per window; `temp_mean_2h` between −40 and 150 °C; `vib_count_2h` between 0 and `reading_count_2h`; `vib_max_2h` null exactly when no vibration value arrived; `low_coverage` equal to `reading_count_2h < 3`; and a lineage rule, `source_max_ingested_at <= available_at`.\n\nWrite-side checks run before rows are published: duplicates, bounds, null meaning, grid alignment, lineage. On Databricks, Delta CHECK constraints can enforce row-level bounds at write time; uniqueness and cross-row rules need pipeline code because primary keys are informational. Read-side checks run in each consumer: label keys against the entity registry, no label describing the past (`event_at` after `prediction_time`), and the future-information guard over every joined row.\n\nThe lineage rule is the one teams skip and regret. A backfill that recomputes history from today's data and stamps nominal publication times produces rows that look punctual; only the latest ingestion time of the inputs reveals that PR-01's 10:00 row, stamped 10:30, used a reading that arrived at 11:05. Without that [[dbxfe-features-lineage-concept|lineage timestamp]] nobody can detect the leak afterwards.\n\nConsumer policy is not producer contract: maximum feature age, training cutoff and fallback belong to each model. Version the contract; a new column, window length or boundary rule is a new version that consumers adopt deliberately. Explaining it: 'The table promises what each row means and when it existed; the job refuses anything that breaks the promise, and the model refuses anything from after its decision.'",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-contract"
+    ]
+   },
+   "recap": "Producers check what rows mean before publishing; consumers check when rows existed before training.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-skew",
+   "version": "1.0.0",
+   "title": "Training and serving must run one transformation, not two lookalikes",
+   "outcome": "Detect training/serving skew with a consistency check over edge-case inputs and prefer one shared transformation.",
+   "explanation": "[[dbxfe-features-skew-concept|Training/serving skew]] appears when the serving path computes a feature differently from training. Notice the second state: a serving port that buckets readings by window start and fills absent vibration with 0.0 disagrees at 10:30 on two windows, PR-02's mean 70.0 against 69.0 and PR-03's vibration null against 0.0. The third state is the trap: at 08:30 no boundary reading or missing value had arrived, so the same broken port agreed.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-serving",
+   "conceptIds": [
+    "dbxfe-features-skew-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-skew",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-skew-visual",
+   "samajh": {
+    "text": "Do darzi ek hi grahak ka naap likh rahe hain. Ek inch wale tape se naapta hai, doosra purane cm tape se, aur kamar ki jagah dono thodi alag maante hain. Aam grahakon par dono ke naap mil jaate hain, sab khush. Phir ek grahak aata hai jiski kamar theek seam par hai, aur kurta tight nikalta hai. Ek hi tape, ek hi tareeka, aur test ke liye mushkil wala grahak chahiye.",
+    "mapping": "The two tailors are the training transformation and the serving port, the easy customers are the 08:30 inputs and the customer on the seam is the reading at exactly 10:00.",
+    "boundary": "A tailor can remeasure the customer; a served prediction cannot be recomputed after the fact, so the check must run before release and on logged traffic."
+   },
+   "questionIds": [
+    "dbxfe-features-skew-question"
+   ],
+   "handbook": {
+    "markdown": "The scikit-learn pitfalls guide states the rule for preprocessing: a transform used in training must be applied to test and production data too, learnt from training data only. For features the stronger form is 'import, do not re-implement'. Google's Rules of Machine Learning names the failure training-serving skew and recommends sharing code between the pipelines and avoiding two programming languages, because shared code is the cheapest guarantee of consistency.\n\nWhen a port is unavoidable, for example a low-latency service in another language, pin it with a check:\n\n```python\nexpected = compute_features(obs, run_at, contract).set_index([\"machine_id\", \"feature_time\"])\nactual = compute_features_port(obs, run_at, contract).set_index([\"machine_id\", \"feature_time\"])\n# compare the union of keys and every feature column; null equals null\n```\n\nThe lab's check lists each differing window and column with both values: PR-02 at 10:00 differs in `temp_mean_2h` (70.0 against 69.0), `vib_max_2h` (1.9 against 1.7), `reading_count_2h` (3 against 2) and `low_coverage`; PR-03 in `vib_max_2h` (null against 0.0) and `vib_count_2h` (0 against 2). Two drifts explain all six: a [start, end) window rule moved the 10:00:00 reading, and a fill turned 'not measured' into 'measured zero'.\n\nA check is only as good as its inputs. Build a fixture containing every edge the contract names: a reading on a boundary, a missing value, an empty window, a late reading and a new entity. Run it in CI, and on a sample of live traffic by logging served values and recomputing them offline. Compare with explicit null handling, an agreed tolerance for floats computed by different engines, and over the union of keys so a missing row counts as a difference. When the check fails, the first differing column usually names the drift.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-serving"
+    ]
+   },
+   "recap": "Import one transformation; if a port is unavoidable, test it on inputs that contain every edge case.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-late",
+   "version": "1.0.0",
+   "title": "A late reading adds a version; it never rewrites what was known",
+   "outcome": "Rerun with late-arriving data and state which training rows change and why the others must not.",
+   "explanation": "When PR-01's 09:50 reading arrives at 11:05, the 11:30 run publishes a second [[dbxfe-features-version-concept|feature version]] of the 10:00 window: 78.0 from three readings. Notice in the third state that only the 11:45 prediction changes; the 11:00 prediction keeps 77.0 because the late reading had not arrived. The fourth state shows the tempting shortcut: recomputing history once from all data stamps 10:30 on a row that used an 11:05 reading.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-contract",
+   "conceptIds": [
+    "dbxfe-features-version-concept",
+    "dbxfe-features-lineage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-late-visual",
+   "samajh": {
+    "text": "Bijli ka bill 5 tareekh ko us din tak ki meter reading se banta hai. Ek reading 12 tareekh ko der se aati hai, toh company ek naya, revised bill nikaalti hai; purana bill jaisa chhapa tha waisa hi rehta hai. Agar koi poochhe ki 6 tareekh ko aapke haath mein kaunsa bill tha, toh jawab purana bill hai, revised wala nahi.",
+    "mapping": "Each bill is a feature version, its issue date is available_at and the question about the 6th is a prediction made between the two versions.",
+    "boundary": "A revised bill replaces the amount owed; a new feature version never replaces history and serves only predictions made after its own publication."
+   },
+   "questionIds": [
+    "dbxfe-features-late-question"
+   ],
+   "handbook": {
+    "markdown": "Append-only versions make time travel possible. The job keeps a signature per machine and window, here the reading count and the latest ingestion time, and publishes a new row only when it changes; nothing published is edited. After two late readings the table grows from six to eight rows:\n\n| machine | window | published | temp | readings |\n|---|---|---|---|---|\n| PR-01 | 10:00 | 10:30 | 77.0 | 2 |\n| PR-01 | 10:00 | 11:30 | 78.0 | 3 |\n| PR-02 | 08:00 | 08:30 | 65.5 | 2 |\n| PR-02 | 08:00 | 12:30 | 66.0 | 3 |\n\nThe join then picks the newest window first and its newest version second, both among rows published by the prediction time. Exactly one training row changes, PR-01 at 11:45. PR-02's republished 08:00 window changes nothing, because its 10:00 window is newer; a plain `merge_asof` on `available_at` would wrongly pick that republished row for PR-02 at 12:45, which is why the lab tests for it.\n\nWhy not overwrite? An overwritten table answers only 'what do we know now'. Training needs 'what did we know then', and so do audits of past model decisions. The lineage column makes an overwrite detectable, because the contract refuses any row whose inputs arrived after its stated publication.\n\nLate data also reaches labels: a corrected failure record is a label version with its own known-at time, and the serving module treats delayed labels in production monitoring. What to inspect after a rerun: rows added per window, proof that no published row changed, and the list of training rows whose values changed with their prediction and publication times. When a watermark guarantees no inputs arrive later than a stated delay, one publication after the watermark is simpler; write the watermark into the contract.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-contract"
+    ]
+   },
+   "recap": "Late inputs append versions; each prediction keeps the version that existed at its time.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-reuse",
+   "version": "1.0.0",
+   "title": "One feature table can feed two models with two freshness limits",
+   "outcome": "Reuse a governed feature table for a second model and diagnose a cadence mismatch without changing the join.",
+   "explanation": "[[dbxfe-features-reuse-concept|Feature reuse]] shares the definition, the contract and the published rows; each consumer still owns its decision times and freshness limit. Notice in the second state that a handover model predicting at 10:00 and 12:00 always finds a window that is 120 minutes old, over its 90-minute limit, so no row is usable. The third state lists fixes that respect time; joining on the window end is not one of them.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-missing",
+   "conceptIds": [
+    "dbxfe-features-reuse-concept",
+    "dbxfe-features-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-store",
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-reuse-visual",
+   "questionIds": [
+    "dbxfe-features-reuse-self"
+   ],
+   "handbook": {
+    "markdown": "Reuse pays because the expensive parts, definitions, backfills, tests and governance, are paid once. Each consumer reads the table and never modifies it; in Lab L18 the second model builds its training set from the same six rows without recomputing anything, and a test proves the table is unchanged afterwards.\n\nWhat is not shared is policy. Each consumer states its prediction times, its maximum feature age and its training cutoff. The failure model allows 180 minutes and finds eight usable rows. The handover model allows 90 minutes and predicts exactly when windows close, at 10:00 and 12:00. At those instants the newest published window ended two hours earlier, so every row is 120 minutes old and `stale`, and PR-03 at 10:00 has no row at all.\n\nThe join is correct; the cadence does not fit the decision. Options, cheapest first: move the decision after a publication (at 10:35 the 10:00 window is 35 minutes old); shift the window grid so a window closes and is published just before each handover (windows ending 09:30, published by 10:00); or compute the value on request from raw readings, which requires those readings at serving time. Publishing sooner alone cannot help a decision made at the instant a window closes. Loosening the limit to 180 minutes makes rows `ok` by accepting older information; that is the model owner's decision, not a data fix.\n\nBefore reusing a table, compare its cadence and publication delay with your decision times, its null meaning with your model's handling, and its contract version with the one you tested. Explaining it: 'The features are fine; they arrive on a schedule that does not match this decision.'",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-missing",
+     "dbxfe-features-l01-serving"
+    ]
+   },
+   "recap": "Share rows and definitions; own your decision times and freshness limit.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-delivery",
+   "version": "1.0.0",
+   "title": "Batch or online follows from when the decision is made",
+   "outcome": "Choose batch scoring, online lookup or on-demand computation for a decision from its timing, freshness and request-time inputs.",
+   "explanation": "[[dbxfe-features-delivery-concept|Batch versus online delivery]] is a requirement, not a taste. Notice in the first state that batch scoring reads the offline table on a schedule while online inference looks up a key when a request arrives, and each has its own silent failure. The second state places Cinderline's decisions: the 06:00 maintenance list is batch, a press-side alert is online, and the 10:00 handover score is neither until its owner moves it, because an online lookup then serves the same 120-minute-old row. The third separates precomputed windows from inputs known only in the request.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-serving",
+   "conceptIds": [
+    "dbxfe-features-delivery-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-claim-online",
+    "dbxfe-features-claim-ondemand",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-delivery-visual",
+   "questionIds": [
+    "dbxfe-features-delivery-self"
+   ],
+   "handbook": {
+    "markdown": "Start from the decision, not the store. Four questions settle most cases: when is the decision made, on a schedule or when a request arrives; how old may inputs be at that moment; are any inputs known only in the request, such as an operator's die scan; and how many decisions per second at what latency.\n\nBatch: a job joins features as of each scoring time, writes predictions with the model version and the feature timestamps used, and consumers read the stored results. Freshness equals the schedule, and the silent failure is a skipped or late run, so monitor the newest `available_at` used. Batch is cheaper, easier to reproduce and the default for lists, reports and planning.\n\nOnline: a service looks up each entity's newest published row at request time and scores it. Freshness equals the publication and sync cadence, and the silent failure is a stalled sync that keeps serving old rows, so return and log the feature timestamp with every response and apply the staleness rule the training set used.\n\nOn demand: a value that depends on the request itself is computed at request time by a function, and the same function must compute it for training rows from logged request inputs, or training and serving diverge.\n\nOnline does not repair a cadence mismatch. At 10:00 the newest published row for the handover model is the 08:00 window, so an online lookup serves the same 120-minute-old row the batch join finds; the fixes are the reuse beat's: the owner moves the decision to 10:35 and batch scores it, or the value is computed on demand from raw readings.\n\nWhen not to go online: if the decision is made on a schedule, an online store adds a second copy of the data, a sync to monitor and another place for skew, for no gain. Explaining it to an operations lead: 'The morning list needs yesterday's data by 06:00; the press alert needs the last minutes' data within a second. They are different products.' The timings here are synthetic; real latency needs come from the process owner.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-serving"
+    ]
+   },
+   "recap": "Scheduled decisions get batch features; request-time decisions get online or on-demand features.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-offline",
+   "version": "1.0.0",
+   "title": "A time series feature table answers the as-of question only if its timestamp means usable",
+   "outcome": "Map the point-in-time join onto a Unity Catalog time series feature table and FeatureLookup and state what its timestamp key must mean.",
+   "explanation": "In Databricks Feature Store, a Unity Catalog table with a primary key is a feature table, and a TIMESERIES key makes it a [[dbxfe-features-timeseries-concept|time series feature table]]. A FeatureLookup with timestamp_lookup_key returns the latest value prior to each row's timestamp. Notice in the second state that if the timestamp key stores the window end, a 10:15 lookup returns the 10:00 window published at 10:30. The third stores publication time instead, and the lookup matches the lab's point-in-time join.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-platform",
+   "conceptIds": [
+    "dbxfe-features-timeseries-concept",
+    "dbxfe-features-pit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-store",
+    "dbxfe-features-claim-uc",
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-keys",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-offline-visual",
+   "questionIds": [
+    "dbxfe-features-offline-question"
+   ],
+   "handbook": {
+    "markdown": "The documented pieces and their conditions. Databricks Feature Store needs a workspace enabled for Unity Catalog. Any Delta table in Unity Catalog with a primary key can be a feature table. A time series feature table has one timestamp key of TimestampType or DateType, marked with the TIMESERIES keyword (Databricks Runtime 13.3 LTS and above), and no partition columns. An illustrative design, not executed here, stores the publication time as that key:\n\n```sql\nCREATE TABLE ml.press.sensor_features (\n  machine_id STRING NOT NULL,\n  available_at TIMESTAMP NOT NULL,\n  feature_time TIMESTAMP,\n  temp_mean_2h DOUBLE,\n  CONSTRAINT sensor_features_pk\n    PRIMARY KEY (machine_id, available_at TIMESERIES))\n```\n\n```python\nfrom datetime import timedelta\nfrom databricks.feature_engineering import FeatureEngineeringClient, FeatureLookup\n\nlookup = FeatureLookup(\n    table_name=\"ml.press.sensor_features\", lookup_key=\"machine_id\",\n    timestamp_lookup_key=\"prediction_time\", lookback_window=timedelta(hours=3))\ntraining_set = FeatureEngineeringClient().create_training_set(\n    df=labels, feature_lookups=[lookup], label=\"label\")\n```\n\nThe glossary calls timestamp keys the event time associated with the feature value, and the lookup returns the latest values prior to each timestamp, or null. If the key holds the window end, a delayed publication leaks exactly as the event-time join did; storing the publication time makes 'prior to the prediction' mean 'published before it'. Test the equal-timestamp boundary yourself. With one timestamp key, a run that republishes an older window beside a newer one would create two rows for one key, and a republished older window would outrank the newer one. Publish at most one row per machine per run, holding that machine's newest window and version and only when it changes, and keep every version in a separate audit table.\n\n`lookback_window` excludes values older than the timedelta (default None, any age) during training and batch inference, which matches the consumer's staleness limit. What the platform does not do for you: enforce uniqueness (keys are informational), store lineage, or check that your timestamp means availability. Verify runtime, client version and entitlement before relying on any of it.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-platform"
+    ]
+   },
+   "recap": "Store when a value became usable as the timestamp key, and the platform's as-of lookup stays honest.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-online",
+   "version": "1.0.0",
+   "title": "Online lookup serves the newest published value, so the age rule moves to the caller",
+   "outcome": "Describe how feature tables reach online stores and serving endpoints, and what the lookback window does not do during online inference.",
+   "explanation": "An [[dbxfe-features-online-store-concept|online feature store]] keeps published rows ready for low-latency lookup, and Model Serving can look up a logged model's features automatically. Notice the second state: the documentation says the lookback window applies in training and batch inference, while online inference always uses the latest value. A row training would treat as stale is served. The third state closes the gap: return the feature timestamp, apply the same age rule and log what was served.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-platform",
+   "conceptIds": [
+    "dbxfe-features-online-store-concept",
+    "dbxfe-features-freshness-concept",
+    "dbxfe-features-skew-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-pit",
+    "dbxfe-features-claim-online",
+    "dbxfe-features-claim-ondemand",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-online-visual",
+   "questionIds": [
+    "dbxfe-features-online-question"
+   ],
+   "handbook": {
+    "markdown": "Documented pieces, as reviewed for this module. Databricks Online Feature Stores are powered by Lakebase and sync data from offline Unity Catalog feature tables with three publish modes: TRIGGERED (the default, incremental on a schedule or by API), CONTINUOUS (streaming updates) and SNAPSHOT (a one-time full copy). Published tables need non-nullable primary keys, and Change Data Feed for TRIGGERED and CONTINUOUS. Model Serving with automatic feature lookup retrieves published values for models logged with `FeatureEngineeringClient.log_model`, so the most recent values are used. Feature Serving endpoints return feature values themselves to applications outside Databricks. On-demand features compute request-time values with Python user-defined functions, bound through `FeatureFunction` in training and evaluated automatically at inference.\n\nThe consistency gap to design for: the point-in-time documentation states that `lookback_window` is applied during training and batch inference, and that online inference always uses the latest value regardless of it. If PR-03's sensor stops, training marks its rows stale after three hours, while the online path keeps serving the last value indefinitely. Choose one remedy and apply it in both paths: include the feature's age as a feature, check age in the calling application and fall back, or have the producer publish an explicit no-data state.\n\nLog what was served. For endpoints created from February 2025, Model Serving can log the augmented DataFrame with looked-up feature values to inference tables; comparing those rows with recomputed training rows is the live version of the lab's consistency check.\n\nCaveats: online stores, Feature Serving and serverless options vary by cloud, region and entitlement, and names here have changed; the documentation keeps a migration page for legacy online tables. Check current pages, pricing and your workspace before promising latency, freshness or cost. Nothing here was deployed or measured.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-platform",
+     "dbxfe-features-l01-serving"
+    ]
+   },
+   "recap": "Online inference serves the newest value; carry its age and enforce the training rule yourself.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-features-evidence",
+   "version": "1.0.0",
+   "title": "Point-in-time correctness is shown with tests that fail first",
+   "outcome": "Assemble evidence that a training set contains no future information and state what that evidence does not prove.",
+   "explanation": "A higher score is not evidence of a correct join; it is often evidence of a leak. Notice the first state: each deliberately wrong approach fails with a named reason, from the event-time join, two rows, to the overwrite backfill, refused by lineage. The second shows the real pipeline passing the same guards, with one training row changed by the late rerun. The third lists what these [[dbxfe-features-evidence-concept|leakage tests]] cannot show, including whether the features predict anything.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-example",
+   "conceptIds": [
+    "dbxfe-features-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-claim-skew",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "visualId": "dbxfe-features-evidence-visual",
+   "questionIds": [
+    "dbxfe-features-evidence-self"
+   ],
+   "handbook": {
+    "markdown": "Evidence has three layers. First, a guard over every training row: `available_at <= prediction_time` and `source_max_ingested_at <= prediction_time`, raising with the offending rows named. Second, tests that prove the guard bites: feed it an event-time join, a latest-value lookup, a duplicate key, a drifted port and a backfill, and assert each fails for its reason, not merely that something failed. Third, a rerun with late data showing which rows changed and that published rows did not.\n\nLab L18 packages this as 25 tests over hand-authored expected rows. Key outputs: the event-time join refused for PR-02 at 10:15 and PR-03 at 10:20; the latest-value lookup refused for seven rows; the drifted port refused on two windows at 10:30 and accepted at 08:30; one training row changed by the late readings; zero usable rows for the handover model at 90 minutes. These are local pandas executions on fictional data that demonstrate mechanism, not a platform and not a model.\n\nAn honest demonstration to a stakeholder shows one timeline with a delayed publication, the leaky join's row beside the corrected row, and the failing test that catches the leaky version. Say what changed in the numbers and why the corrected numbers may be lower. Do not present an accuracy improvement as proof of feature quality.\n\nWhat the evidence does not show: that the features predict failures (no model was trained), behaviour at scale or under streaming, clock skew between systems, or how a particular platform version behaves. Those need their own evidence: evaluation on a forward period, load tests and verification in the target workspace. When reviewing someone else's evidence, ask whether the tests ever failed, whether the expected values were written independently of the code, and whether the fixture contains the edge cases the contract names.",
+    "sourceSectionIds": [
+     "dbxfe-features-l01-example",
+     "dbxfe-features-l01-solution"
+    ]
+   },
+   "recap": "Show the guard failing on known leaks, then passing on the real pipeline, and say what remains unproven.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-features-l01-card1",
+   "beatId": "dbxfe-features-definition"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card2",
+   "beatId": "dbxfe-features-times"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card3",
+   "beatId": "dbxfe-features-asof"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card4",
+   "beatId": "dbxfe-features-latest"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card5",
+   "beatId": "dbxfe-features-keys"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card6",
+   "beatId": "dbxfe-features-missing"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card7",
+   "beatId": "dbxfe-features-contract"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card8",
+   "beatId": "dbxfe-features-skew"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card9",
+   "beatId": "dbxfe-features-late"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card10",
+   "beatId": "dbxfe-features-reuse"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card11",
+   "beatId": "dbxfe-features-delivery"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card12",
+   "beatId": "dbxfe-features-offline"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card13",
+   "beatId": "dbxfe-features-online"
+  },
+  {
+   "cardId": "dbxfe-features-l01-card14",
+   "beatId": "dbxfe-features-evidence"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-features-extension-rely",
+   "revision": "1",
+   "prompt": "What can go wrong if a feature table's primary key is declared with RELY while duplicates exist?",
+   "answer": "Databricks may rewrite queries assuming the key is unique, and relying on an unsatisfied constraint can return incorrect results.",
+   "explanation": "Primary key constraints on Databricks are informational and not enforced. The RELY option tells the optimizer it may exploit the constraint to rewrite queries; the documentation states that making sure the constraint holds is the user's responsibility, that relying on an unsatisfied constraint may lead to incorrect query results, and that these optimizations need Photon-enabled compute. A [[dbxfe-features-extension-rely-concept|RELY constraint]] on Cinderline's feature table is only safe while the pipeline's duplicate check keeps running before every publication: the constraint states a promise, it does not keep one.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-contract",
+   "conceptIds": [
+    "dbxfe-features-extension-rely-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-rely",
+    "dbxfe-features-claim-constraints",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "beatId": "dbxfe-features-keys",
+   "whyItMatters": "It turns an unenforced key from a harmless label into a source of wrong answers once duplicates slip in."
+  },
+  {
+   "id": "dbxfe-features-extension-indicator",
+   "revision": "1",
+   "prompt": "Why can a missing-value indicator be absent for a column that is null only at serving time?",
+   "answer": "SimpleImputer with add_indicator=True creates indicator columns only for features that had missing values during fit.",
+   "explanation": "scikit-learn's SimpleImputer can stack a MissingIndicator onto its output with add_indicator=True, so a model can tell imputed values from measured ones. The documentation notes that a feature with no missing values at fit time does not appear in the indicator even if it has missing values at transform time. If Cinderline's training rows never had a null vib_max_2h but serving does, the served value is silently imputed with no flag. Make sure training data contains the missingness the contract allows, or configure a [[dbxfe-features-extension-indicator-concept|missing indicator]] for every feature, and test the serving path with a null.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-missing",
+   "conceptIds": [
+    "dbxfe-features-extension-indicator-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-indicator",
+    "dbxfe-features-claim-preprocessing",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "beatId": "dbxfe-features-missing",
+   "whyItMatters": "It is a documented way for one pipeline object to treat serving-time nulls differently from training-time nulls."
+  },
+  {
+   "id": "dbxfe-features-extension-inference-log",
+   "revision": "1",
+   "prompt": "How can Cinderline check the feature values that a served model actually received?",
+   "answer": "Log the looked-up feature values with each request, recompute them offline for the same times and compare the two.",
+   "explanation": "Model Serving with automatic feature lookup can log the augmented DataFrame, with looked-up feature values and function return values, to inference tables for endpoints created starting February 2025. Google's Rules of Machine Learning recommends monitoring training-serving skew explicitly, at least on a small fraction of traffic. Joining those [[dbxfe-features-extension-inference-log-concept|feature lookup logs]] to rows recomputed by the training transformation at the same request times turns the lab's 08:30 and 10:30 comparison into a production check that also catches stalled syncs. Confirm the logging configuration, retention and cost in your workspace first.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-platform",
+   "conceptIds": [
+    "dbxfe-features-extension-inference-log-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-online",
+    "dbxfe-features-claim-skew",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "beatId": "dbxfe-features-online",
+   "whyItMatters": "Offline tests cover fixtures; only logged serving inputs show what production actually fed the model."
+  },
+  {
+   "id": "dbxfe-features-extension-feature-views",
+   "revision": "1",
+   "prompt": "What changes if Cinderline declares its two-hour windows as a Feature View instead of building a feature table?",
+   "answer": "Databricks computes and materializes the declared features, including time-windowed aggregations, but Feature Views are in Public Preview.",
+   "explanation": "The Databricks Feature Store page describes two authoring strategies: feature tables that you populate yourself, and Feature Views that define features declaratively while Databricks computes and manages the pipelines; Feature Views are recommended for most new cases, feature tables for flexible multi-stage batch work. Feature Views support sliding and tumbling time windows, and materialization creates Lakeflow pipelines that populate Unity Catalog tables for training, batch scoring or online serving. A [[dbxfe-features-extension-feature-views-concept|Feature View]] moves window and publication mechanics to the platform, so this module's questions become verification items: boundary rule, timestamp meaning, late-data handling and preview terms.",
+   "lessonId": "dbxfe-features-l01",
+   "sectionId": "dbxfe-features-l01-platform",
+   "conceptIds": [
+    "dbxfe-features-extension-feature-views-concept"
+   ],
+   "claimIds": [
+    "dbxfe-features-claim-views",
+    "dbxfe-features-claim-store",
+    "dbxfe-features-guidance",
+    "dbxfe-features-fiction"
+   ],
+   "beatId": "dbxfe-features-offline",
+   "whyItMatters": "It shows where the platform can own the mechanism and which of this module's checks still have to be verified."
+  }
+ ],
+ "recap": {
+  "title": "One row, two times, one rule",
+  "markdown": "**A feature row describes an entity over a window and becomes usable later; training must join on the second time.** A point-in-time join picks, among rows published by each prediction time, the newest window and then its newest version, or honestly nothing. Missing values get a rule per cause, identical in training and serving; zero is a measurement, not a blank. Keys are unique and checked, late data appends versions, and a lineage timestamp exposes backfills. One transformation serves both paths, and delivery follows when the decision is made. Databricks Feature Store provides time series lookups and online stores, but online inference ignores the lookback window, so age rules travel with the caller. **Transfer challenge:** an oil-analysis result is sampled at the press and entered six hours later; draw its timeline, pick its timestamp key and write the policy for a machine sampled nine hours ago.",
+  "visualId": "dbxfe-features-times-visual"
+ },
+ "appliedTask": {
+  "title": "Add a delayed lab feature without leaking it",
+  "prompt": "Cinderline adds oil_particles_ppm from oil samples: a sample is drawn at the press (sampled_at), analysed in a lab and entered about six hours later (result_entered_at); some results are corrected the next day. The failure model predicts every hour with a four-hour horizon. Design the feature row, the join, the missingness policy for machines without a usable result, how corrections are handled, the serving path, and the tests that would show the design leaks nothing.",
+  "modelAnswer": "Feature row: machine_id, sampled_at (what the value describes), result_entered_at (when it became usable) and oil_particles_ppm, unique on all three keys, with a lineage check that the lab entry exists before the stated availability. Join: for each prediction, the newest sample among results entered at or before the prediction time, then its newest version; never join on sampled_at, which would leak six hours of lab time. Missingness: no result yet is none_available; a result older than a stated limit, for example 72 hours from sampling, is stale; both are excluded in training and get the same fallback in serving; never fill 0 ppm. Corrections append a version with the correction's entry time, so predictions before it keep the original. Serving: the hourly model can score in batch at five past each hour; if an online path is added, it serves the entry time with the value and applies the same age rule. Tests: a guard over every joined row, an event-time join on sampled_at failing by name, a duplicate sample refused, and a rerun with a correction showing only later predictions change.",
+  "reasoning": "The answer keeps the two times apart, chooses entry time as the join key, applies one missingness rule in both paths, treats corrections as versions and proves each property with a test that can fail. Choosing a different age limit is acceptable if the model owner states it.",
+  "beatIds": [
+   "dbxfe-features-times",
+   "dbxfe-features-asof",
+   "dbxfe-features-missing",
+   "dbxfe-features-late",
+   "dbxfe-features-evidence"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-features-scenario"
+ ]
+}

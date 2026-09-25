@@ -1,0 +1,644 @@
+{
+ "id": "dbxfe-streaming-l01",
+ "title": "Structured Streaming, event time and recovery",
+ "summary": "Run a real streaming query over files that land late and out of order: read its micro-batches, watermark and state, see a late row dropped in one run and counted in another, and restart it from its checkpoint after a failure that duplicated a naive side effect.",
+ "contentVersion": "1.0.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 18,
+ "objectives": [
+  "Explain a streaming query as an incremental query over an unbounded input table, run in micro-batches whose timing a trigger sets.",
+  "Predict the watermark, the windows emitted and the fate of a late row for each micro-batch, separating event time from processing time.",
+  "Read a checkpoint's offset and commit logs, predict what a restart replays, and key a downstream effect so a replay does not repeat it."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Reliable data engineering",
+  "Structured Streaming",
+  "Watermarks",
+  "Checkpoints",
+  "Exactly-once",
+  "Apache Spark 4.0.4",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-streaming-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-streaming-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-streaming-l01-microbatch-concept",
+    "dbxfe-streaming-l01-watermark-concept",
+    "dbxfe-streaming-l01-checkpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-model",
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-start",
+   "kind": "prerequisites",
+   "title": "Before the first micro-batch",
+   "conceptIds": [
+    "dbxfe-streaming-l01-microbatch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-model",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-model",
+   "kind": "mechanism",
+   "title": "An unbounded table, processed in micro-batches",
+   "conceptIds": [
+    "dbxfe-streaming-l01-microbatch-concept",
+    "dbxfe-streaming-l01-trigger-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-model",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-time",
+   "kind": "mechanism",
+   "title": "Event time, windows and the watermark",
+   "conceptIds": [
+    "dbxfe-streaming-l01-eventtime-concept",
+    "dbxfe-streaming-l01-window-concept",
+    "dbxfe-streaming-l01-watermark-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-time",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-state",
+   "kind": "mechanism",
+   "title": "State, late rows and output modes",
+   "conceptIds": [
+    "dbxfe-streaming-l01-state-concept",
+    "dbxfe-streaming-l01-late-concept",
+    "dbxfe-streaming-l01-mode-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-time",
+    "dbxfe-streaming-course-claim-guarantee",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-joins",
+   "kind": "mechanism",
+   "title": "Stream-static and stream-stream joins",
+   "conceptIds": [
+    "dbxfe-streaming-l01-join-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-joins",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-recovery",
+   "kind": "mechanism",
+   "title": "Offsets, commits and a restart",
+   "conceptIds": [
+    "dbxfe-streaming-l01-checkpoint-concept",
+    "dbxfe-streaming-l01-restart-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-sinks",
+   "kind": "mechanism",
+   "title": "Where exactly-once holds",
+   "conceptIds": [
+    "dbxfe-streaming-l01-exactly-once-concept",
+    "dbxfe-streaming-l01-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-sinks",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-example",
+   "kind": "example",
+   "title": "Worked run: five files and one failure",
+   "conceptIds": [
+    "dbxfe-streaming-l01-watermark-concept",
+    "dbxfe-streaming-l01-checkpoint-concept",
+    "dbxfe-streaming-l01-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-streaming-course-claim-sinks",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-exercise",
+   "kind": "exercise",
+   "title": "Predict the backlog run",
+   "conceptIds": [
+    "dbxfe-streaming-l01-late-concept",
+    "dbxfe-streaming-l01-watermark-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-guarantee",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-solution",
+   "kind": "solution",
+   "title": "Why the backlog counts e011",
+   "conceptIds": [
+    "dbxfe-streaming-l01-late-concept",
+    "dbxfe-streaming-l01-watermark-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-guarantee",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-mistakes",
+   "kind": "mistakes",
+   "title": "Mistakes that look like streaming bugs",
+   "conceptIds": [
+    "dbxfe-streaming-l01-mode-concept",
+    "dbxfe-streaming-l01-restart-concept",
+    "dbxfe-streaming-l01-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-model",
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-streaming-course-claim-sinks",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-sources",
+   "kind": "sources",
+   "title": "Sources and execution scope",
+   "conceptIds": [
+    "dbxfe-streaming-l01-microbatch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-model",
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-streaming-course-claim-sinks",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-related",
+   "kind": "related",
+   "title": "Where this connects",
+   "conceptIds": [
+    "dbxfe-streaming-l01-checkpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-streaming-l01-revisit",
+   "kind": "revisit",
+   "title": "Check and revisit",
+   "conceptIds": [
+    "dbxfe-streaming-l01-watermark-concept",
+    "dbxfe-streaming-l01-checkpoint-concept",
+    "dbxfe-streaming-l01-exactly-once-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-time",
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-streaming-course-claim-sinks",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-streaming-l01-q1",
+   "revision": "1",
+   "prompt": "Scenario S (one file per run) emitted 09:00 L1 as 27; the backlog run of the same five files emitted 36. What explains the difference?",
+   "options": [
+    {
+     "id": "dbxfe-streaming-l01-q1-a",
+     "text": "Micro-batch boundaries: in the backlog e011 reached its window before any batch had evicted it.",
+     "rationale": "Correct: with no no-data batch between files, the 09:00 window was still in state when e011 arrived, and the late check used the previous batch's 09:07:40 watermark."
+    },
+    {
+     "id": "dbxfe-streaming-l01-q1-b",
+     "text": "The backlog run used a longer watermark delay.",
+     "rationale": "Both runs declared 5 minutes; only the grouping of files into micro-batches changed."
+    },
+    {
+     "id": "dbxfe-streaming-l01-q1-c",
+     "text": "Scenario S lost a file during its restart.",
+     "rationale": "The checkpoint shows every file read exactly once; the difference is one late row, e011."
+    },
+    {
+     "id": "dbxfe-streaming-l01-q1-d",
+     "text": "The backlog run counted e011 twice by mistake.",
+     "rationale": "36 is the event-time truth for 09:00 L1 (12 + 10 + 5 + 9); nothing was double-counted."
+    }
+   ],
+   "correctOptionId": "dbxfe-streaming-l01-q1-a",
+   "conceptIds": [
+    "dbxfe-streaming-l01-late-concept",
+    "dbxfe-streaming-l01-watermark-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-guarantee",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-q2",
+   "revision": "1",
+   "prompt": "Which checkpoint evidence shows that a batch was planned but not finished?",
+   "options": [
+    {
+     "id": "dbxfe-streaming-l01-q2-a",
+     "text": "An offsets entry for the batch with no matching commits entry.",
+     "rationale": "Correct: offsets/N is written before the batch runs and commits/N after the sink returns, so the gap marks the batch a restart replays."
+    },
+    {
+     "id": "dbxfe-streaming-l01-q2-b",
+     "text": "A state directory with more versions than files in the landing directory.",
+     "rationale": "State versions follow micro-batches, including no-data batches; their number says nothing about completion."
+    },
+    {
+     "id": "dbxfe-streaming-l01-q2-c",
+     "text": "A commits entry whose next watermark equals the current one.",
+     "rationale": "A commit that repeats the watermark is normal after a batch whose events did not raise the maximum."
+    },
+    {
+     "id": "dbxfe-streaming-l01-q2-d",
+     "text": "A sources entry that lists a file twice.",
+     "rationale": "The file-source log lists each file once per source offset; a duplicate would be a different problem."
+    }
+   ],
+   "correctOptionId": "dbxfe-streaming-l01-q2-a",
+   "conceptIds": [
+    "dbxfe-streaming-l01-checkpoint-concept",
+    "dbxfe-streaming-l01-restart-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-q3",
+   "revision": "1",
+   "prompt": "Which statement about exactly-once is accurate for the lab's windowed query writing through foreachBatch?",
+   "options": [
+    {
+     "id": "dbxfe-streaming-l01-q3-a",
+     "text": "Spark processed batch 7 exactly once, but the sink's effects happened twice unless keyed.",
+     "rationale": "Correct: the batch was replayed from the checkpoint and committed once; the naive outbox repeated its messages and the keyed outbox did not."
+    },
+    {
+     "id": "dbxfe-streaming-l01-q3-b",
+     "text": "The checkpoint guarantees that each notification is sent exactly once.",
+     "rationale": "The checkpoint records offsets, state and commits; it cannot undo or detect effects your function already made."
+    },
+    {
+     "id": "dbxfe-streaming-l01-q3-c",
+     "text": "foreachBatch is exactly-once whenever the source is replayable.",
+     "rationale": "A replayable source is necessary but not sufficient; foreachBatch is at-least-once unless the function deduplicates."
+    },
+    {
+     "id": "dbxfe-streaming-l01-q3-d",
+     "text": "Exactly-once fails because the file source is not replayable.",
+     "rationale": "The file source is fault-tolerant because the files stay in place and offsets record what was read."
+    }
+   ],
+   "correctOptionId": "dbxfe-streaming-l01-q3-a",
+   "conceptIds": [
+    "dbxfe-streaming-l01-exactly-once-concept",
+    "dbxfe-streaming-l01-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-sinks",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-streaming-l01-card1",
+   "revision": "1",
+   "prompt": "Why does the second run of the lab's query read only 4 input rows when the landing directory holds 10?",
+   "answer": "Because 01.json is recorded as read in the checkpoint, so the restarted query plans only 02.json's four new rows.",
+   "explanation": "A streaming query is incremental. The file-source log in the checkpoint maps each source offset to the files it covered, and committed offsets are never planned again. The earlier rows still matter, but through the state store, which carries the running totals of every open window into the next micro-batch.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-model",
+   "conceptIds": [
+    "dbxfe-streaming-l01-microbatch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-model",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card2",
+   "revision": "1",
+   "prompt": "What does trigger(availableNow=True) do that a fixed processingTime trigger does not?",
+   "answer": "It processes everything present at the start, in as many micro-batches as needed, runs a final no-data batch if the watermark moved, and then stops.",
+   "explanation": "A fixed interval keeps the query running and starts a micro-batch at each interval that has new data. availableNow drains the backlog, finishes uncommitted batches first, advances the watermark per batch and terminates by itself, which suits scheduled catch-up runs and made every run in lab L08 bounded.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-model",
+   "conceptIds": [
+    "dbxfe-streaming-l01-trigger-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-model",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card3",
+   "revision": "2",
+   "prompt": "Why did L1's 09:00-09:10 total read 36 by event time but 0 by landing time?",
+   "answer": "Because the four L1 events made before 09:10 did not land until 09:13, 09:19 and 09:28, so landing-time windows place them later.",
+   "explanation": "Event time is when the press counted the parts; landing time is when the file reached the pipeline. Grouping by landing time mixes delivery delay into the business figure: files 01 and 02 both landed in 09:10-09:20, giving 48 units there. Totals over all windows agree at 126; single windows do not.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-time",
+   "conceptIds": [
+    "dbxfe-streaming-l01-eventtime-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-time",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card4",
+   "revision": "1",
+   "prompt": "Why must rows from sliding windows never be summed into a total?",
+   "answer": "Because overlapping windows contain each event more than once, so their rows add up to a multiple of the true total.",
+   "explanation": "A 10-minute window sliding every 5 minutes puts every event in two windows. The lab's 21 sliding rows sum to 252 units, twice the 126 the events carry. Sliding windows give a rolling view; tumbling windows, which do not overlap, are the ones whose rows can be added up.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-time",
+   "conceptIds": [
+    "dbxfe-streaming-l01-window-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-time",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card5",
+   "revision": "1",
+   "prompt": "How is the watermark computed, and when does it make a window final?",
+   "answer": "It is the largest event time seen so far minus the declared delay, and a window is final once the watermark reaches the window's end.",
+   "explanation": "Spark recomputes the watermark at the end of every micro-batch. After 02.json the latest event was 09:18:30, so with a 5-minute delay the watermark became 09:13:30, past the 09:10 end of the 09:00 windows; the next batch emitted them once and removed them from state.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-time",
+   "conceptIds": [
+    "dbxfe-streaming-l01-watermark-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-time",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card6",
+   "revision": "1",
+   "prompt": "What decides how many rows the state store holds after a micro-batch?",
+   "answer": "The number of window and key pairs the watermark has not yet closed: new keys enter, final windows leave.",
+   "explanation": "Each micro-batch loads the previous state version, applies its rows and removes keys whose window end is at or before the watermark. In the lab the store held 4 rows after batch 0, 2 after batch 3 and 1 after batch 9. A longer delay, sliding windows or more keys all raise that number.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-state",
+   "conceptIds": [
+    "dbxfe-streaming-l01-state-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-time",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card7",
+   "revision": "1",
+   "prompt": "Why was e008 counted although it was older than the watermark of its batch?",
+   "answer": "Because lateness is judged by the window's end, and e008's window ended at 09:10, after the 09:07:40 watermark.",
+   "explanation": "e008 happened at 09:05:00 and was read in batch 2 under the watermark 09:07:40. Its window, 09:00 to 09:10, was still open, so the row updated it and 09:00 L2 was emitted as 23. A watermark is not a per-row cutoff; it decides when whole windows are final.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-state",
+   "conceptIds": [
+    "dbxfe-streaming-l01-late-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-guarantee",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card8",
+   "revision": "1",
+   "prompt": "What does the documented watermark guarantee promise, and what does it not promise?",
+   "answer": "It promises that rows less late than the delay are never dropped; it does not promise that later rows are dropped.",
+   "explanation": "The Spark guide calls the guarantee strict in one direction only. Lab L08 shows both sides of the gap: e011, later than the delay, was dropped when files arrived one run at a time and counted when the same files ran as a backlog, because micro-batch boundaries decided when its window left state.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-state",
+   "conceptIds": [
+    "dbxfe-streaming-l01-late-concept",
+    "dbxfe-streaming-l01-watermark-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-guarantee",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card9",
+   "revision": "1",
+   "prompt": "Why does append mode refuse a streaming aggregation without a watermark?",
+   "answer": "Because without a watermark no window is ever final, and append may only write rows that will never change.",
+   "explanation": "Append emits a window once, after the watermark passes its end. Without withWatermark there is no such moment, so start() raises STREAMING_OUTPUT_MODE.UNSUPPORTED_OPERATION before any batch runs, as the lab's negative test asserts. Update and complete modes are allowed without a watermark but keep state that never shrinks.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-state",
+   "conceptIds": [
+    "dbxfe-streaming-l01-mode-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-model",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card10",
+   "revision": "1",
+   "prompt": "Which kind of streaming join keeps state, and what bounds it?",
+   "answer": "A stream-stream join keeps both inputs as state; watermarks on both sides plus an event-time range condition bound it.",
+   "explanation": "A stream-static join matches each micro-batch against a static table and keeps nothing, as the lab's join to the line table did. Two streams are different: a row can match one that has not arrived yet, so both are buffered. Outer and semi joins must declare the watermarks and time range to produce correct results.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-joins",
+   "conceptIds": [
+    "dbxfe-streaming-l01-join-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-joins",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card11",
+   "revision": "1",
+   "prompt": "After a failure the offset log has one more entry than the commit log. What does that mean?",
+   "answer": "The last batch was planned but never committed, so a restart will replay it with the same offsets and watermark.",
+   "explanation": "Spark writes offsets/N before running a micro-batch and commits/N only after the sink returns. In the lab offsets/7 recorded watermark 09:33:00 and source offset 3 while commits stopped at 6; the restart replayed batch 7 with the same id and rows, then wrote commits/7. The gap is expected after a failure.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-recovery",
+   "conceptIds": [
+    "dbxfe-streaming-l01-checkpoint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card12",
+   "revision": "1",
+   "prompt": "Which built-in sinks are exactly-once and which only at-least-once?",
+   "answer": "The file sink is exactly-once; Kafka and foreach sinks are at-least-once; foreachBatch depends on the function you write.",
+   "explanation": "End-to-end exactly-once needs a replayable source, the checkpoint and an idempotent sink. The file sink records committed files in its own log, so the lab's restarted join kept 14 rows for 14 events. Kafka and foreach can write again on replay, and foreachBatch is at-least-once unless it deduplicates by batch id or key.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-sinks",
+   "conceptIds": [
+    "dbxfe-streaming-l01-exactly-once-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-sinks",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card13",
+   "revision": "1",
+   "prompt": "Why did the lab's naive outbox end with 12 messages for 9 windows?",
+   "answer": "Because the replayed batch 7 called the sink again with the same three rows, and the naive outbox appended them a second time.",
+   "explanation": "The sink failed after sending the three 09:20 messages but before the commit. The restart correctly replayed batch 7, and every effect outside Spark happened again. The keyed outbox checked each window and line key before sending and stayed at 9; only an effect keyed by its business identity survives a replay.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-sinks",
+   "conceptIds": [
+    "dbxfe-streaming-l01-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-sinks",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-streaming-l01-card14",
+   "revision": "1",
+   "prompt": "Which changes can a restart from the same checkpoint not absorb?",
+   "answer": "Changing the number or type of sources, or the schema of a stateful operation such as grouping keys or aggregates.",
+   "explanation": "State is restored with the schema it was written with, so the lab's restart with an extra max(units) failed with STATE_STORE_VALUE_SCHEMA_NOT_COMPATIBLE. Some settings are pinned as well: the offset log kept shuffle partitions at 2 when the session asked for 3. Such changes need a new checkpoint and a planned start point.",
+   "lessonId": "dbxfe-streaming-l01",
+   "sectionId": "dbxfe-streaming-l01-recovery",
+   "conceptIds": [
+    "dbxfe-streaming-l01-restart-concept"
+   ],
+   "claimIds": [
+    "dbxfe-streaming-course-claim-recovery",
+    "dbxfe-streaming-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ]
+}

@@ -124,9 +124,14 @@ function completeState() {
 }
 test("baseline schema 2 migrates every record unchanged, persists schema 4, and round-trips path context", async () => {
   const current = completeState();
-  const {beatPositions:_positions,beatResume:_resume,beatChecks:_checks,...legacy}=current;
-  const {showSamajh:_samajh,...oldSettings}=legacy.settings;
-  const old = { ...legacy, settings:oldSettings, schemaVersion: 2 };
+  const {
+    beatPositions: _positions,
+    beatResume: _resume,
+    beatChecks: _checks,
+    ...legacy
+  } = current;
+  const { showSamajh: _samajh, ...oldSettings } = legacy.settings;
+  const old = { ...legacy, settings: oldSettings, schemaVersion: 2 };
   const migrated = migrateState(old);
   assert.deepEqual(migrated, current);
   const name = `baseline-v2-${crypto.randomUUID()}`;

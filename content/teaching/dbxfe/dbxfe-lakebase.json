@@ -1,0 +1,3775 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-lakebase",
+ "title": "Lakebase, Postgres and operational state",
+ "summary": "Keep an application's operational state in transactional Postgres with constraints, short transactions, row locks, versions and idempotent writes, then place it on Lakebase with its identities, pooler, branches, restore window and synchronized copies.",
+ "outcomes": [
+  "Separate transactional requests from analytical pipelines and classify an application's state before choosing storage.",
+  "Model operational state with constraints and short transactions, and choose an isolation level together with its retry duty.",
+  "Protect concurrent writes with SKIP LOCKED claims, version-checked updates and idempotent upserts, and predict their results.",
+  "Adapt the design to Lakebase: authentication, pooling, scale to zero, branches, point-in-time restore and synchronized copies with stated freshness."
+ ],
+ "startingAssumptions": [
+  "SQL fluency with keys, joins and UPDATE ... WHERE.",
+  "The platform module separates storage, compute and governance, and the Delta module covers table-level commits for analytical tables."
+ ],
+ "lessonIds": [
+  "dbxfe-lakebase-l01"
+ ],
+ "optionalBridgeLessonIds": [],
+ "editorialRationale": "Operational-state teaching fails when it starts from a product, so the module starts from the request: which work is transactional, what the state is and which rules the schema enforces. It then builds the concurrency toolkit on real PostgreSQL behaviour (isolation, row locks, versions and idempotent upserts), each shown with lab L23's local results, before placing the design on Lakebase through identities, the pooler, scale to zero, branches, restore and synchronization. It ends with a checklist that keeps local evidence, documentation and unknowns apart.",
+ "sources": [
+  {
+   "id": "dbxfe-lakebase-source-overview",
+   "title": "Lakebase Postgres",
+   "url": "https://docs.databricks.com/aws/en/oltp/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Landing page for Lakebase Postgres documentation.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Lakebase Postgres; Key features. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Lakebase Postgres; Key features. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-autoscaling",
+   "title": "Lakebase Autoscaling",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Entry page for Lakebase Autoscaling projects.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Lakebase Postgres; Key features. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Lakebase Postgres; Key features. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-concepts",
+   "title": "Core concepts",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/core-concepts",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Projects, branches, computes, databases and roles.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Projects; Database branches; Computes and endpoints. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Projects; Database branches; Computes and endpoints. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-auth",
+   "title": "About authentication",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/authentication",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). How Postgres connections to Lakebase authenticate.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: How OAuth tokens work; Requirements and limitations; Postgres password authentication. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: How OAuth tokens work; Requirements and limitations; Postgres password authentication. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-roles",
+   "title": "Manage roles",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/manage-roles",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Creating OAuth roles and native password roles.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Role overview; Create an OAuth role; Manage password connections. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Role overview; Create an OAuth role; Manage password connections. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-pooling",
+   "title": "Use connection pooling",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/connection-pooling",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Built-in PgBouncer pooler for Lakebase Autoscaling.",
+   "caveat": "Scope: current Lakebase Autoscaling on AWS; verify project configuration before applying. Earlier search-only record superseded by direct inspection.",
+   "reviewedEvidence": "Primary page body read in this build through the web reader on 2026-09-23. Sections: How connection pooling works; Prerequisites; Transaction mode. The managed pooler uses transaction mode and native password roles. Both LISTEN and NOTIFY are unavailable; applications needing pub/sub use a direct connection. Driver-level prepared statements are distinguished from SQL PREPARE. Documentation inspection, not a managed-service execution."
+  },
+  {
+   "id": "dbxfe-lakebase-source-scalezero",
+   "title": "Scale to zero",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/scale-to-zero",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Suspending idle computes.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Automatic suspension; Configure scale to zero; Session context reset. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Automatic suspension; Configure scale to zero; Session context reset. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-limits",
+   "title": "Lakebase Autoscaling limitations",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/limitations",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Current limitations of Lakebase Autoscaling.",
+   "caveat": "Limitations change between releases; this page is read again before each design review rather than quoted from memory.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: The page lists current limitations of Lakebase Autoscaling; among them, the scale-to-zero feature closes idle connections, and their session context, including temporary tables, prepared statements and advisory locks, is lost."
+  },
+  {
+   "id": "dbxfe-lakebase-source-branches",
+   "title": "Branches",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/branches",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Branching model of Lakebase Autoscaling.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Parent-child relationships; Copy-on-write storage; Point-in-time recovery. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Parent-child relationships; Copy-on-write storage; Point-in-time recovery. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-restore",
+   "title": "Point-in-time restore",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/point-in-time-restore",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Restoring a branch to an earlier moment.",
+   "caveat": "Scope: current Lakebase Autoscaling on AWS; verify project configuration before applying. Earlier search-only record superseded by direct inspection.",
+   "reviewedEvidence": "Primary page body read in this build through the web reader on 2026-09-23. Sections: What happens after a restore?; Configure your restore window; Creates a new branch, not in-place modification; Connections remain unchanged. A restore creates a new root branch containing the selected historical state. The source branch and existing connections continue unchanged. Using the restored branch requires changing application connection configuration. The project window is 2–30 days, default 7. Documentation inspection, not a managed-service execution."
+  },
+  {
+   "id": "dbxfe-lakebase-source-pitbranch",
+   "title": "Querying data at a point in time",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/point-in-time-branching",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Creating a branch from a past moment.",
+   "caveat": "Scope: current Lakebase Autoscaling on AWS; verify project configuration before applying. Earlier search-only record superseded by direct inspection.",
+   "reviewedEvidence": "Primary page body read in this build through the web reader on 2026-09-24. Sections: Query data at a point in time; Important considerations. A historical branch isolates past data from current production, within the configured restore window. It contains all databases and schemas at the chosen moment. Documentation inspection, not a managed-service execution."
+  },
+  {
+   "id": "dbxfe-lakebase-source-synced",
+   "title": "Serve lakehouse data with synced tables",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/sync-tables",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Synced tables from Unity Catalog into Lakebase Postgres.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: How it works; Sync modes; Prerequisites; Create a synced table; Operations allowed on synced tables in Postgres. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: How it works; Sync modes; Prerequisites; Create a synced table; Operations allowed on synced tables in Postgres. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-lakehousesync",
+   "title": "Lakebase CDF",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/lakebase-cdf",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Change data capture from Lakebase into Unity Catalog; listed as Public Preview.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: What is Lakebase Change Data Feed?; Enable this preview; Destination table schema. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: What is Lakebase Change Data Feed?; Enable this preview; Destination table schema. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-compat",
+   "title": "Postgres compatibility",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/compatibility",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Differences from self-managed Postgres.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Postgres version support; Session context; Roles and permissions; Replication; Tablespaces. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Postgres version support; Session context; Roles and permissions; Replication; Tablespaces. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-apps",
+   "title": "Add a Lakebase resource to a Databricks app",
+   "url": "https://docs.databricks.com/aws/en/dev-tools/databricks-apps/lakebase",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Databricks Apps with a Lakebase database resource.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Add a database resource; Environment variables. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Add a database resource; Environment variables. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-releases",
+   "title": "Lakebase release notes",
+   "url": "https://docs.databricks.com/aws/en/release-notes/lakebase/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; release notes for Lakebase.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Lakebase is now generally available; Lakebase now supports Postgres 18; Lakebase Change Data Feed (CDF) is now in Public Preview. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Lakebase is now generally available; Lakebase now supports Postgres 18; Lakebase Change Data Feed (CDF) is now in Public Preview. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-dataapi",
+   "title": "Lakebase Data API",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/data-api",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). HTTP access to a Lakebase Postgres database.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Overview; PostgREST compatibility. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: Overview; PostgREST compatibility. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-ha",
+   "title": "High availability",
+   "url": "https://docs.databricks.com/aws/en/oltp/projects/high-availability",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Lakebase Autoscaling (the current Lakebase version). Primary and secondary computes across availability zones.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: How high availability works; Automatic failover; Failover with read-only access enabled. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: How high availability works; Automatic failover; Failover with read-only access enabled. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-pgtx",
+   "title": "3.4. Transactions",
+   "url": "https://www.postgresql.org/docs/16/tutorial-transactions.html",
+   "publisher": "The PostgreSQL Global Development Group",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "PostgreSQL 16 documentation, tutorial chapter.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: 3.4. Transactions. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: 3.4. Transactions. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-pgiso",
+   "title": "13.2. Transaction Isolation",
+   "url": "https://www.postgresql.org/docs/16/transaction-iso.html",
+   "publisher": "The PostgreSQL Global Development Group",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "PostgreSQL 16 documentation, concurrency control chapter.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: 13.2.1. Read Committed Isolation Level; 13.2.2. Repeatable Read Isolation Level. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: 13.2.1. Read Committed Isolation Level; 13.2.2. Repeatable Read Isolation Level. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-pglock",
+   "title": "13.3. Explicit Locking",
+   "url": "https://www.postgresql.org/docs/16/explicit-locking.html",
+   "publisher": "The PostgreSQL Global Development Group",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "PostgreSQL 16 documentation, concurrency control chapter.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: 13.3.2. Row-Level Locks; 13.3.4. Deadlocks. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: 13.3.2. Row-Level Locks; 13.3.4. Deadlocks. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-pgselect",
+   "title": "SELECT",
+   "url": "https://www.postgresql.org/docs/16/sql-select.html",
+   "publisher": "The PostgreSQL Global Development Group",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "PostgreSQL 16 SQL command reference.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: The Locking Clause. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: The Locking Clause. No managed-service execution is claimed. Earlier review methods remain in git history."
+  },
+  {
+   "id": "dbxfe-lakebase-source-pginsert",
+   "title": "INSERT",
+   "url": "https://www.postgresql.org/docs/16/sql-insert.html",
+   "publisher": "The PostgreSQL Global Development Group",
+   "reviewedAt": "2026-09-24",
+   "publishedAt": null,
+   "context": "PostgreSQL 16 SQL command reference.",
+   "caveat": "Primary page sections read directly through the web reader on 2026-09-24: ON CONFLICT Clause. No managed-service execution is claimed. Earlier review methods remain in git history.",
+   "reviewedEvidence": "Primary page sections read directly through the web reader on 2026-09-24: ON CONFLICT Clause. No managed-service execution is claimed. Earlier review methods remain in git history."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-lakebase-claim-overview",
+   "description": "Lakebase is a fully managed Postgres database in the Databricks platform for transactional applications and low-latency serving; its Autoscaling version adds autoscaling compute, scale to zero, branching and instant restore.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-overview",
+    "dbxfe-lakebase-source-autoscaling"
+   ],
+   "context": "Databricks on AWS documentation; status per account and region."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-concepts",
+   "description": "A Lakebase Autoscaling project holds branches, computes, roles and databases; a branch is an isolated database environment that shares storage with its parent through copy-on-write; the default database is databricks_postgres.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-concepts",
+    "dbxfe-lakebase-source-branches"
+   ],
+   "context": "Lakebase Autoscaling object model."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-status",
+   "description": "Lakebase is documented as generally available, some capabilities such as Lakebase CDF are listed as Public Preview, and Lakebase Autoscaling on AWS supports Postgres 16, 17 and 18.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-releases",
+    "dbxfe-lakebase-source-compat"
+   ],
+   "context": "Status at review time; check the release notes for the region."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-auth",
+   "description": "Lakebase connections authenticate as OAuth roles linked to Databricks users, service principals or groups, using tokens that expire after one hour and are checked only at login, or as native Postgres password roles.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-auth",
+    "dbxfe-lakebase-source-roles"
+   ],
+   "context": "Lakebase Autoscaling authentication."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-pooling",
+   "description": "Lakebase's managed transaction-mode pooler requires native password roles and does not support LISTEN or NOTIFY; use direct connections for pub/sub. Session state cannot be assumed across transactions, and SQL PREPARE differs from driver-level prepared statements.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pooling"
+   ],
+   "context": "Lakebase Autoscaling connection pooling."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-scalezero",
+   "description": "Scale to zero closes idle connections and loses their session context, including temporary tables, prepared statements and advisory locks; it can be disabled so the compute runs continuously.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-scalezero",
+    "dbxfe-lakebase-source-limits"
+   ],
+   "context": "Lakebase Autoscaling compute behaviour."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-restore",
+   "description": "Lakebase point-in-time restore creates a new root branch and leaves the original branch and its connections unchanged. Application cutover is separate. Historical restore and branching use the project restore window (2–30 days; default 7).",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-restore",
+    "dbxfe-lakebase-source-pitbranch"
+   ],
+   "context": "Lakebase Autoscaling recovery."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-branches",
+   "description": "Lakebase branches are isolated environments for development and testing schema changes that inherit the parent's schema and data by sharing storage and write only changed data.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-branches"
+   ],
+   "context": "Lakebase Autoscaling branching."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-synced",
+   "description": "Synced tables copy Unity Catalog tables into Lakebase Postgres in snapshot, triggered or continuous mode; triggered and continuous need Change Data Feed on the source, continuous has a minimum interval of about 15 seconds, a primary key is required and the copy is treated as read-only.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-synced"
+   ],
+   "context": "Unity Catalog to Lakebase synchronization."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-lakehousesync",
+   "description": "Lakebase CDF, listed as Public Preview, replicates Lakebase Postgres row changes into Unity Catalog managed Delta tables as history using change data capture.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-lakehousesync",
+    "dbxfe-lakebase-source-releases"
+   ],
+   "context": "Lakebase to Unity Catalog synchronization; Public Preview."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-compat",
+   "description": "Lakebase allows no Postgres superuser (databricks_superuser replaces it), no tablespaces, and not yet native logical replication to or from a Lakebase database.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-compat"
+   ],
+   "context": "Differences from self-managed Postgres at review time."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-apps",
+   "description": "Adding Lakebase as a Databricks App resource creates or reuses a Postgres role matching the existing app service principal, grants it CONNECT and CREATE on the chosen database, and injects connection details as environment variables.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-apps"
+   ],
+   "context": "Databricks Apps with a Lakebase resource."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-dataapi",
+   "description": "The Lakebase Data API is a PostgREST-compatible REST interface to a Lakebase Postgres database that uses standard HTTP methods.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-dataapi"
+   ],
+   "context": "HTTP access to Lakebase."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-ha",
+   "description": "Lakebase high availability promotes a secondary in another availability zone from the last committed transaction when the primary fails, and can serve reads from secondaries through a read-only connection string that pauses or shrinks during failover.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-ha",
+    "dbxfe-lakebase-source-releases"
+   ],
+   "context": "Lakebase Autoscaling high availability."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-pgtx",
+   "description": "A PostgreSQL transaction is all or nothing, and its intermediate states are invisible to concurrent transactions.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pgtx"
+   ],
+   "context": "PostgreSQL 16 semantics."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-pgiso",
+   "description": "PostgreSQL defaults to Read Committed, where each statement sees data committed before it began; Repeatable Read keeps the first statement's snapshot and fails an update of a concurrently changed row with a serialization failure; applications must retry such transactions.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pgiso"
+   ],
+   "context": "PostgreSQL 16 semantics."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-pglock",
+   "description": "Row-level locks from FOR UPDATE block other writers and lockers of the same rows, not plain readers, until the transaction ends; PostgreSQL detects deadlocks and aborts one of the transactions.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pglock"
+   ],
+   "context": "PostgreSQL 16 semantics."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-pgselect",
+   "description": "NOWAIT makes a locking SELECT fail when a row cannot be locked immediately, and SKIP LOCKED skips such rows, giving an inconsistent view suited to queue-like tables but not general work.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pgselect"
+   ],
+   "context": "PostgreSQL 16 semantics."
+  },
+  {
+   "id": "dbxfe-lakebase-claim-pginsert",
+   "description": "INSERT ... ON CONFLICT DO NOTHING skips a conflicting row, and ON CONFLICT DO UPDATE gives an atomic insert-or-update outcome with EXCLUDED holding the proposed row and an optional WHERE condition.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pginsert"
+   ],
+   "context": "PostgreSQL 16 semantics."
+  },
+  {
+   "id": "dbxfe-lakebase-guidance",
+   "description": "Original SpicyBrain design reasoning for operational state: state classification, the choice of concurrency pattern, recovery choices, freshness statements and the compatibility checklist; not a Databricks or PostgreSQL runbook.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "Independent curriculum; adapt to the actual application, project and review."
+  },
+  {
+   "id": "dbxfe-lakebase-fiction",
+   "description": "Cinderline Components, its quality-review app, reviewers, items, messages, timings and incidents are synthetic; values labelled as lab L23 results come from a local PostgreSQL 16.13 run on those synthetic records.",
+   "kind": "fictional",
+   "sourceIds": [],
+   "context": "No Lakebase project, Databricks workspace or cloud resource was created or used."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-lakebase-oltp-concept",
+   "term": "transactional workload",
+   "aliases": [
+    "OLTP",
+    "online transaction processing"
+   ],
+   "definition": "Many short concurrent requests that read or change a few rows by key, each committed atomically.",
+   "example": "A reviewer's Claim click updates one review_item row in milliseconds.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pgtx",
+    "dbxfe-lakebase-source-overview"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-olap-concept",
+   "term": "analytical workload",
+   "aliases": [
+    "OLAP",
+    "online analytical processing"
+   ],
+   "definition": "Queries that scan, join and aggregate many rows, usually over data that may be minutes or hours old.",
+   "example": "The morning dashboard counts a day of inspections by plant and defect code.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-overview"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-product-concept",
+   "term": "Lakebase",
+   "aliases": [
+    "Lakebase Postgres",
+    "Lakebase Autoscaling",
+    "Lakebase Provisioned"
+   ],
+   "definition": "Databricks' fully managed Postgres database for transactional applications and low-latency serving beside the lakehouse.",
+   "example": "Cinderline's review app keeps claims and decisions in a Lakebase project's production branch.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-overview",
+    "dbxfe-lakebase-source-autoscaling"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-project-concept",
+   "term": "Lakebase project",
+   "aliases": [
+    "project"
+   ],
+   "definition": "The top-level Lakebase Autoscaling container that holds branches, computes, roles, databases and settings such as the restore window.",
+   "example": "Project cinderline-review has a production branch and a child branch for migration tests.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-concepts"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-scalezero-concept",
+   "term": "scale to zero",
+   "aliases": [
+    "compute suspension"
+   ],
+   "definition": "Suspending an idle compute, which closes idle connections and discards their session state while committed data stays.",
+   "example": "After a quiet night the first claim opens a new connection; yesterday's temp tables are gone.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-scalezero"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-constraint-concept",
+   "term": "integrity constraint",
+   "aliases": [
+    "CHECK constraint",
+    "foreign key",
+    "unique index"
+   ],
+   "definition": "A rule the database enforces on every write, refusing a row that breaks it with a specific SQLSTATE.",
+   "example": "Severity 7 fails review_item_severity_check with SQLSTATE 23514.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-state-concept",
+   "term": "operational state",
+   "aliases": [
+    "application state"
+   ],
+   "definition": "The current facts an application acts on, such as who holds which item and what was decided, stored as committed rows.",
+   "example": "QR-0001 claimed by R-101 at version 3 is operational state; a reviewer's scroll position is not.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-isolation-concept",
+   "term": "isolation level",
+   "aliases": [
+    "Read Committed",
+    "Repeatable Read",
+    "Serializable"
+   ],
+   "definition": "The rule deciding which committed changes of concurrent transactions a statement or transaction can see.",
+   "example": "Under Read Committed A's second count fell from 6 to 5 after B committed a claim.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pgiso"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-serialization-concept",
+   "term": "serialization failure",
+   "aliases": [
+    "SQLSTATE 40001",
+    "could not serialize access"
+   ],
+   "definition": "An error a stricter isolation level raises instead of letting a transaction act on a row changed since its snapshot; the transaction is retried.",
+   "example": "A's Repeatable Read update of QR-0002 failed with 40001 after B claimed it.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pgiso"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-rowlock-concept",
+   "term": "row-level lock",
+   "aliases": [
+    "FOR UPDATE"
+   ],
+   "definition": "A lock on specific rows, taken by UPDATE or SELECT ... FOR UPDATE and held until the transaction ends, that blocks other writers but not plain readers.",
+   "example": "A's open claim transaction holds QR-0001's lock, so B's plain FOR UPDATE waits.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pglock"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-skiplocked-concept",
+   "term": "SKIP LOCKED",
+   "aliases": [
+    "work-queue claim",
+    "NOWAIT"
+   ],
+   "definition": "A locking-clause option that passes over rows another transaction has locked instead of waiting for them.",
+   "example": "B's claim skipped locked QR-0001 and returned QR-0002 at once.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pgselect"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-version-concept",
+   "term": "optimistic concurrency (version column)",
+   "aliases": [
+    "optimistic locking",
+    "compare-and-set"
+   ],
+   "definition": "Detecting a conflicting change at write time by requiring the row's version to still equal the version the writer read.",
+   "example": "WHERE version = 3 updated no row after a supervisor moved QR-0001 to version 4.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-idempotency-concept",
+   "term": "idempotent upsert",
+   "aliases": [
+    "idempotency key",
+    "INSERT ... ON CONFLICT"
+   ],
+   "definition": "A write that leaves the same final state whether a message is applied once or many times.",
+   "example": "Redelivering M-0002 inserted nothing because its message_id was already logged.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pginsert"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-pooler-concept",
+   "term": "transaction-mode pooler",
+   "aliases": [
+    "PgBouncer",
+    "connection pooling"
+   ],
+   "definition": "A proxy that lends a server connection to a client for one transaction and then gives it to another client.",
+   "example": "Hundreds of app workers share a few server connections; a SET from one transaction is gone in the next.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pooling"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-oauth-concept",
+   "term": "OAuth role",
+   "aliases": [
+    "Databricks identity login",
+    "database credential"
+   ],
+   "definition": "A Postgres role linked to a Databricks user, service principal or group that logs in with a short-lived OAuth token.",
+   "example": "The review app's service principal logs in with a token that expires after one hour.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-auth",
+    "dbxfe-lakebase-source-roles"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-branch-concept",
+   "term": "branch (Lakebase)",
+   "aliases": [
+    "copy-on-write branch",
+    "child branch"
+   ],
+   "definition": "An isolated database environment created from a parent branch that shares unchanged storage and writes only new changes.",
+   "example": "A child branch of production tests the version-column migration before production sees it.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-branches",
+    "dbxfe-lakebase-source-concepts"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-restore-concept",
+   "term": "point-in-time restore",
+   "aliases": [
+    "restore window",
+    "point-in-time branch",
+    "PITR"
+   ],
+   "definition": "Creating a new root branch from historical state inside the restore window; original data and connections keep running until a separate recovery action is chosen.",
+   "example": "A branch at 10:14 still shows the rows a 10:15 DELETE removed.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-restore",
+    "dbxfe-lakebase-source-pitbranch"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-synced-concept",
+   "term": "synced table",
+   "aliases": [
+    "reverse ETL",
+    "sync table"
+   ],
+   "definition": "A read-only Postgres copy of a Unity Catalog table kept current in snapshot, triggered or continuous mode.",
+   "example": "The reviewer roster synced from the lakehouse feeds the app's plant lookup.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-synced"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-lakehousesync-concept",
+   "term": "Lakebase CDF",
+   "aliases": [
+    "Lakebase Change Data Feed",
+    "Lakebase change data capture to Delta"
+   ],
+   "definition": "A Lakebase feature in Public Preview that replicates Postgres row changes into Unity Catalog Delta tables as history.",
+   "example": "Decisions on review_item arrive as history rows for the quality dashboard's pipeline.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-lakehousesync"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-freshness-concept",
+   "term": "freshness bound",
+   "aliases": [
+    "staleness",
+    "as-of time"
+   ],
+   "definition": "The maximum age of copied data a consumer can rely on, stated together with the copy's as-of time.",
+   "example": "The roster panel reads 'as of 06:40' because its synced table refreshes daily.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-synced"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-compat-concept",
+   "term": "Postgres compatibility (Lakebase)",
+   "aliases": [
+    "platform compatibility checklist"
+   ],
+   "definition": "The documented differences between Lakebase and self-managed PostgreSQL that a design checks before moving.",
+   "example": "No superuser, no tablespaces and no native logical replication change a migration script.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-compat",
+    "dbxfe-lakebase-source-limits"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-extension-dataapi-concept",
+   "term": "Lakebase Data API",
+   "aliases": [
+    "PostgREST-compatible API"
+   ],
+   "definition": "A REST interface over a Lakebase Postgres database, compatible with PostgREST and used with standard HTTP methods.",
+   "example": "A small client reads a table over HTTP instead of holding a Postgres connection.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-dataapi"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-extension-secondaries-concept",
+   "term": "readable secondary",
+   "aliases": [
+    "high availability",
+    "read-only compute"
+   ],
+   "definition": "A standby compute in another availability zone that can also serve reads through a separate read-only connection string.",
+   "example": "Dashboard lookups use the -ro connection while claims stay on the primary.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-ha"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-extension-retry-concept",
+   "term": "transaction retry loop",
+   "aliases": [
+    "retry on 40001"
+   ],
+   "definition": "Application code that reruns a whole transaction from its first statement after a serialization failure, a bounded number of times.",
+   "example": "A Repeatable Read report retries up to three times when it gets SQLSTATE 40001.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pgiso"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-extension-deadlock-concept",
+   "term": "deadlock",
+   "aliases": [
+    "lock ordering"
+   ],
+   "definition": "Two transactions each waiting for a row lock the other holds; PostgreSQL detects it and aborts one of them.",
+   "example": "A locks QR-0003 then QR-0004 while B locks QR-0004 then QR-0003.",
+   "sourceIds": [
+    "dbxfe-lakebase-source-pglock"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-lakebase-workloads-visual",
+   "kind": "nodes",
+   "title": "Two responsibilities, two engines",
+   "alt": "Two request paths. Reviewer clicks go through the review app to Lakebase Postgres; trends go from Delta tables through a SQL warehouse to a dashboard; two synchronization links connect the stores.",
+   "caption": "Operational requests and analytical pipelines kept apart, then forced onto one engine. Synthetic teaching example.",
+   "textEquivalent": "Requests and pipelines kept apart: Each click is one short transaction on Postgres; trends are scans on Delta tables; copies move between them asynchronously. Nodes: Reviewer browser: Claim and Decide, one item at a time. (selected); Review app: Validates, then runs one short transaction per request. (selected); Lakebase Postgres: OLTP. Rows by key, row locks, constraints. (selected); Delta tables: Inspection and decision history in Unity Catalog. (context); SQL warehouse: OLAP. Scans and aggregates for trends. (context); Quality dashboard: Trends; minutes-old data is fine. (context). Relationships: Reviewer browser → Review app: request; Review app → Lakebase Postgres: one transaction; Delta tables → Lakebase Postgres: roster (synced table); Lakebase Postgres → Delta tables: decisions (Lakebase CDF); Delta tables → SQL warehouse: scan; SQL warehouse → Quality dashboard: aggregate.\n\nOne engine asked to do both: Per-click queries wait on a warehouse that offers no row locks, and dashboard scans compete with claims for the same database. Nodes: Reviewer browser: Claim and Decide, one item at a time. (selected); Review app: Every click waits on a warehouse query. (warning); SQL warehouse: Asked for single-row updates under concurrency. (warning); Lakebase Postgres: Dashboard scans compete with claims. (warning); Quality dashboard: Scans operational tables directly. (warning); Delta tables: No published decision history. (excluded). Relationships: Reviewer browser → Review app: request; Review app → SQL warehouse: per-click query; Quality dashboard → Lakebase Postgres: full scans.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-overview",
+    "dbxfe-lakebase-claim-synced",
+    "dbxfe-lakebase-claim-lakehousesync",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "split",
+     "title": "Requests and pipelines kept apart",
+     "explanation": "Each click is one short transaction on Postgres; trends are scans on Delta tables; copies move between them asynchronously.",
+     "nodes": [
+      {
+       "id": "browser",
+       "label": "Reviewer browser",
+       "detail": "Claim and Decide, one item at a time.",
+       "status": "selected"
+      },
+      {
+       "id": "app",
+       "label": "Review app",
+       "detail": "Validates, then runs one short transaction per request.",
+       "status": "selected"
+      },
+      {
+       "id": "n-pg",
+       "label": "Lakebase Postgres",
+       "detail": "Rows by key, row locks, constraints.",
+       "status": "selected",
+       "value": "OLTP"
+      },
+      {
+       "id": "delta",
+       "label": "Delta tables",
+       "detail": "Inspection and decision history in Unity Catalog.",
+       "status": "context"
+      },
+      {
+       "id": "n-wh",
+       "label": "SQL warehouse",
+       "detail": "Scans and aggregates for trends.",
+       "status": "context",
+       "value": "OLAP"
+      },
+      {
+       "id": "dash",
+       "label": "Quality dashboard",
+       "detail": "Trends; minutes-old data is fine.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "browser",
+       "to": "app",
+       "label": "request"
+      },
+      {
+       "from": "app",
+       "to": "n-pg",
+       "label": "one transaction"
+      },
+      {
+       "from": "delta",
+       "to": "n-pg",
+       "label": "roster (synced table)"
+      },
+      {
+       "from": "n-pg",
+       "to": "delta",
+       "label": "decisions (Lakebase CDF)"
+      },
+      {
+       "from": "delta",
+       "to": "n-wh",
+       "label": "scan"
+      },
+      {
+       "from": "n-wh",
+       "to": "dash",
+       "label": "aggregate"
+      }
+     ]
+    },
+    {
+     "id": "merged",
+     "title": "One engine asked to do both",
+     "explanation": "Per-click queries wait on a warehouse that offers no row locks, and dashboard scans compete with claims for the same database.",
+     "nodes": [
+      {
+       "id": "browser",
+       "label": "Reviewer browser",
+       "detail": "Claim and Decide, one item at a time.",
+       "status": "selected"
+      },
+      {
+       "id": "app",
+       "label": "Review app",
+       "detail": "Every click waits on a warehouse query.",
+       "status": "warning"
+      },
+      {
+       "id": "n-wh",
+       "label": "SQL warehouse",
+       "detail": "Asked for single-row updates under concurrency.",
+       "status": "warning"
+      },
+      {
+       "id": "n-pg",
+       "label": "Lakebase Postgres",
+       "detail": "Dashboard scans compete with claims.",
+       "status": "warning"
+      },
+      {
+       "id": "dash",
+       "label": "Quality dashboard",
+       "detail": "Scans operational tables directly.",
+       "status": "warning"
+      },
+      {
+       "id": "delta",
+       "label": "Delta tables",
+       "detail": "No published decision history.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "browser",
+       "to": "app",
+       "label": "request"
+      },
+      {
+       "from": "app",
+       "to": "n-wh",
+       "label": "per-click query"
+      },
+      {
+       "from": "dash",
+       "to": "n-pg",
+       "label": "full scans"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-platform-visual",
+   "kind": "nodes",
+   "title": "Inside one Lakebase project",
+   "alt": "A project holds a production branch with its compute, database and roles, and a child branch; when idle the compute is suspended while storage stays.",
+   "caption": "The Autoscaling object model, then the same project after scale to zero. Synthetic teaching example.",
+   "textEquivalent": "A project with two branches: The app connects to the production branch's compute; the dev branch is a copy-on-write child. Nodes: Project: cinderline-review. Settings: compute defaults, restore window. (selected); Branch: production: Isolated environment holding the app's data. (selected); Compute: active. Runs Postgres for the branch; autoscales in a range. (selected); databricks_postgres: Default database on the branch. (selected); Roles: Postgres roles: OAuth or password. (selected); Branch: dev: Child of production; shares unchanged storage. (context). Relationships: Project → Branch: production: holds; Project → Branch: dev: holds; Branch: production → Branch: dev: parent of; Branch: production → Compute: served by; Compute → databricks_postgres: hosts; Branch: production → Roles: defines.\n\nIdle compute scaled to zero: Committed rows stay in storage; the suspended compute has closed idle connections and their session state. Nodes: Project: cinderline-review. Unchanged. (selected); Branch: production: Committed rows intact in storage. (selected); Compute: 0. Suspended after inactivity. (pending); Old sessions: Temp tables, prepared statements and advisory locks are gone. (excluded); Next request: Opens a new connection; the compute resumes. (pending). Relationships: Project → Branch: production: holds; Branch: production → Compute: served by; Next request → Compute: reconnects.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-concepts",
+    "dbxfe-lakebase-claim-scalezero",
+    "dbxfe-lakebase-claim-overview",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "running",
+     "title": "A project with two branches",
+     "explanation": "The app connects to the production branch's compute; the dev branch is a copy-on-write child.",
+     "nodes": [
+      {
+       "id": "project",
+       "label": "Project",
+       "detail": "Settings: compute defaults, restore window.",
+       "status": "selected",
+       "value": "cinderline-review"
+      },
+      {
+       "id": "prod",
+       "label": "Branch: production",
+       "detail": "Isolated environment holding the app's data.",
+       "status": "selected"
+      },
+      {
+       "id": "compute",
+       "label": "Compute",
+       "detail": "Runs Postgres for the branch; autoscales in a range.",
+       "status": "selected",
+       "value": "active"
+      },
+      {
+       "id": "n-db",
+       "label": "databricks_postgres",
+       "detail": "Default database on the branch.",
+       "status": "selected"
+      },
+      {
+       "id": "roles",
+       "label": "Roles",
+       "detail": "Postgres roles: OAuth or password.",
+       "status": "selected"
+      },
+      {
+       "id": "dev",
+       "label": "Branch: dev",
+       "detail": "Child of production; shares unchanged storage.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "project",
+       "to": "prod",
+       "label": "holds"
+      },
+      {
+       "from": "project",
+       "to": "dev",
+       "label": "holds"
+      },
+      {
+       "from": "prod",
+       "to": "dev",
+       "label": "parent of"
+      },
+      {
+       "from": "prod",
+       "to": "compute",
+       "label": "served by"
+      },
+      {
+       "from": "compute",
+       "to": "n-db",
+       "label": "hosts"
+      },
+      {
+       "from": "prod",
+       "to": "roles",
+       "label": "defines"
+      }
+     ]
+    },
+    {
+     "id": "idle",
+     "title": "Idle compute scaled to zero",
+     "explanation": "Committed rows stay in storage; the suspended compute has closed idle connections and their session state.",
+     "nodes": [
+      {
+       "id": "project",
+       "label": "Project",
+       "detail": "Unchanged.",
+       "status": "selected",
+       "value": "cinderline-review"
+      },
+      {
+       "id": "prod",
+       "label": "Branch: production",
+       "detail": "Committed rows intact in storage.",
+       "status": "selected"
+      },
+      {
+       "id": "compute",
+       "label": "Compute",
+       "detail": "Suspended after inactivity.",
+       "status": "pending",
+       "value": "0"
+      },
+      {
+       "id": "sessions",
+       "label": "Old sessions",
+       "detail": "Temp tables, prepared statements and advisory locks are gone.",
+       "status": "excluded"
+      },
+      {
+       "id": "next",
+       "label": "Next request",
+       "detail": "Opens a new connection; the compute resumes.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "project",
+       "to": "prod",
+       "label": "holds"
+      },
+      {
+       "from": "prod",
+       "to": "compute",
+       "label": "served by"
+      },
+      {
+       "from": "next",
+       "to": "compute",
+       "label": "reconnects"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-model-visual",
+   "kind": "table",
+   "title": "What the review_item constraints accept and refuse",
+   "alt": "A table of rows the schema accepts, then a table of writes it refuses with their SQLSTATE and rule.",
+   "caption": "Accepted rows follow the state machine; each refused write names its code and rule. The refusals are lab L23 outputs on synthetic rows.",
+   "textEquivalent": "Rows the schema accepts: Status, owner and decision agree in every row, and R-101 holds one open claim. Table columns: item_id, status, claimed_by, decision, version. Rows: item_id QR-0003; status ready; claimed_by null; decision null; version 1 | item_id QR-0001; status claimed; claimed_by R-101; decision null; version 3 | item_id QR-0002; status decided; claimed_by R-102; decision accept; version 3.\n\nWrites the schema refuses (lab L23): Each bad write fails with its own SQLSTATE and leaves the table unchanged. Table columns: Write, SQLSTATE, Rule. Rows: Write severity 7; SQLSTATE 23514; Rule review_item_severity_check | Write part_serial null; SQLSTATE 23502; Rule not null on part_serial | Write plant P9; SQLSTATE 23503; Rule review_item_plant_id_fkey | Write duplicate QR-0001; SQLSTATE 23505; Rule review_item_pkey | Write decided, no decision; SQLSTATE 23514; Rule review_item_state_consistent | Write second open claim for R-101; SQLSTATE 23505; Rule review_item_one_open_claim.",
+   "provenance": "Original SpicyBrain authored visual; the values are outputs of lab L23 run on a local PostgreSQL 16.13 server with synthetic records; no Lakebase, Databricks or cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgtx",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "accepted",
+     "title": "Rows the schema accepts",
+     "explanation": "Status, owner and decision agree in every row, and R-101 holds one open claim.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "item_id",
+       "status",
+       "claimed_by",
+       "decision",
+       "version"
+      ],
+      "rows": [
+       [
+        "QR-0003",
+        "ready",
+        "null",
+        "null",
+        "1"
+       ],
+       [
+        "QR-0001",
+        "claimed",
+        "R-101",
+        "null",
+        "3"
+       ],
+       [
+        "QR-0002",
+        "decided",
+        "R-102",
+        "accept",
+        "3"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "refused",
+     "title": "Writes the schema refuses (lab L23)",
+     "explanation": "Each bad write fails with its own SQLSTATE and leaves the table unchanged.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Write",
+       "SQLSTATE",
+       "Rule"
+      ],
+      "rows": [
+       [
+        "severity 7",
+        "23514",
+        "review_item_severity_check"
+       ],
+       [
+        "part_serial null",
+        "23502",
+        "not null on part_serial"
+       ],
+       [
+        "plant P9",
+        "23503",
+        "review_item_plant_id_fkey"
+       ],
+       [
+        "duplicate QR-0001",
+        "23505",
+        "review_item_pkey"
+       ],
+       [
+        "decided, no decision",
+        "23514",
+        "review_item_state_consistent"
+       ],
+       [
+        "second open claim for R-101",
+        "23505",
+        "review_item_one_open_claim"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-state-visual",
+   "kind": "timeline",
+   "title": "Where the claim lives between two clicks",
+   "alt": "Timeline of a claim, four minutes of inspection with an app restart, and a decision; first as two short transactions, then as one transaction held open.",
+   "caption": "Two short transactions survive a restart; one long transaction does not. Synthetic teaching example.",
+   "textEquivalent": "Two short transactions: The claim is a committed row, so the restart loses nothing and the decision checks the version. Nodes: 09:00:00 Claim: UPDATE commits in milliseconds: R-101, version 3. (selected); 09:00 to 09:04 Inspection: No transaction open; the claim is data. (context); 09:02 App restart: Nothing lost; the next request reads the row. (context); 09:04:10 Decide: version 4. UPDATE checks owner, status and version 3. (selected). Relationships: 09:00:00 Claim → 09:00 to 09:04 Inspection: then; 09:00 to 09:04 Inspection → 09:02 App restart: then; 09:02 App restart → 09:04:10 Decide: then.\n\nOne transaction held open: The claim exists only inside an open transaction, so the restart rolls it back and the decision has nothing to finish. Nodes: 09:00:00 BEGIN and claim: Row lock taken; nothing committed. (warning); 09:00 to 09:04 Inspection: Lock held; server connection pinned. (warning); 09:02 App restart: Connection drops; the claim rolls back. (warning); 09:04:10 Decide: No claim remains; another reviewer may hold the item. (excluded). Relationships: 09:00:00 BEGIN and claim → 09:00 to 09:04 Inspection: then; 09:00 to 09:04 Inspection → 09:02 App restart: then; 09:02 App restart → 09:04:10 Decide: then.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgtx",
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "short",
+     "title": "Two short transactions",
+     "explanation": "The claim is a committed row, so the restart loses nothing and the decision checks the version.",
+     "nodes": [
+      {
+       "id": "n-t1",
+       "label": "09:00:00 Claim",
+       "detail": "UPDATE commits in milliseconds: R-101, version 3.",
+       "status": "selected"
+      },
+      {
+       "id": "n-t2",
+       "label": "09:00 to 09:04 Inspection",
+       "detail": "No transaction open; the claim is data.",
+       "status": "context"
+      },
+      {
+       "id": "n-t3",
+       "label": "09:02 App restart",
+       "detail": "Nothing lost; the next request reads the row.",
+       "status": "context"
+      },
+      {
+       "id": "n-t4",
+       "label": "09:04:10 Decide",
+       "detail": "UPDATE checks owner, status and version 3.",
+       "status": "selected",
+       "value": "version 4"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-t1",
+       "to": "n-t2",
+       "label": "then"
+      },
+      {
+       "from": "n-t2",
+       "to": "n-t3",
+       "label": "then"
+      },
+      {
+       "from": "n-t3",
+       "to": "n-t4",
+       "label": "then"
+      }
+     ]
+    },
+    {
+     "id": "long",
+     "title": "One transaction held open",
+     "explanation": "The claim exists only inside an open transaction, so the restart rolls it back and the decision has nothing to finish.",
+     "nodes": [
+      {
+       "id": "n-t1",
+       "label": "09:00:00 BEGIN and claim",
+       "detail": "Row lock taken; nothing committed.",
+       "status": "warning"
+      },
+      {
+       "id": "n-t2",
+       "label": "09:00 to 09:04 Inspection",
+       "detail": "Lock held; server connection pinned.",
+       "status": "warning"
+      },
+      {
+       "id": "n-t3",
+       "label": "09:02 App restart",
+       "detail": "Connection drops; the claim rolls back.",
+       "status": "warning"
+      },
+      {
+       "id": "n-t4",
+       "label": "09:04:10 Decide",
+       "detail": "No claim remains; another reviewer may hold the item.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-t1",
+       "to": "n-t2",
+       "label": "then"
+      },
+      {
+       "from": "n-t2",
+       "to": "n-t3",
+       "label": "then"
+      },
+      {
+       "from": "n-t3",
+       "to": "n-t4",
+       "label": "then"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-isolation-visual",
+   "kind": "table",
+   "title": "PostgreSQL isolation levels at a glance",
+   "alt": "A matrix of isolation levels against read phenomena, then a table of what each level asks of application code.",
+   "caption": "Dirty reads are impossible at every PostgreSQL level; the levels differ in snapshots and in the duty to retry.",
+   "textEquivalent": "Phenomena each level allows: Read Committed allows nonrepeatable and phantom reads; Repeatable Read in PostgreSQL stops both but not serialization anomalies. Table columns: Level, Nonrepeatable read, Phantom read, Serialization anomaly. Rows: Level Read Committed (default); Nonrepeatable read possible; Phantom read possible; Serialization anomaly possible | Level Repeatable Read; Nonrepeatable read not possible; Phantom read not possible in PostgreSQL; Serialization anomaly possible | Level Serializable; Nonrepeatable read not possible; Phantom read not possible; Serialization anomaly not possible.\n\nWhat each level asks of the app: The snapshot moves from per statement to per transaction, and the price is a retry loop. Table columns: Level, Snapshot, Your code must. Rows: Level Read Committed; Snapshot each statement; Your code must put conditions inside the UPDATE | Level Repeatable Read; Snapshot first statement; Your code must retry the transaction on 40001 | Level Serializable; Snapshot first statement plus conflict checks; Your code must retry the transaction on 40001.",
+   "provenance": "Original SpicyBrain authored summary of the PostgreSQL 16 isolation documentation; no executed result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgiso",
+    "dbxfe-lakebase-guidance"
+   ],
+   "states": [
+    {
+     "id": "phenomena",
+     "title": "Phenomena each level allows",
+     "explanation": "Read Committed allows nonrepeatable and phantom reads; Repeatable Read in PostgreSQL stops both but not serialization anomalies.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Level",
+       "Nonrepeatable read",
+       "Phantom read",
+       "Serialization anomaly"
+      ],
+      "rows": [
+       [
+        "Read Committed (default)",
+        "possible",
+        "possible",
+        "possible"
+       ],
+       [
+        "Repeatable Read",
+        "not possible",
+        "not possible in PostgreSQL",
+        "possible"
+       ],
+       [
+        "Serializable",
+        "not possible",
+        "not possible",
+        "not possible"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "duties",
+     "title": "What each level asks of the app",
+     "explanation": "The snapshot moves from per statement to per transaction, and the price is a retry loop.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Level",
+       "Snapshot",
+       "Your code must"
+      ],
+      "rows": [
+       [
+        "Read Committed",
+        "each statement",
+        "put conditions inside the UPDATE"
+       ],
+       [
+        "Repeatable Read",
+        "first statement",
+        "retry the transaction on 40001"
+       ],
+       [
+        "Serializable",
+        "first statement plus conflict checks",
+        "retry the transaction on 40001"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-timeline-visual",
+   "kind": "timeline",
+   "title": "Two sessions, one timeline (lab L23)",
+   "alt": "Session A reads twice while session B commits a claim between the reads; under Read Committed the count moves, under Repeatable Read it holds and A's later update fails.",
+   "caption": "The order of statements, not their timing, decides the outcome. Values are lab L23 outputs on synthetic rows.",
+   "textEquivalent": "Read Committed: the second read moves: Each statement takes a new snapshot, so A's second count includes B's commit. Nodes: A: BEGIN; count ready: 6. First statement snapshot. (selected); B: claim and commit: Claims QR-0001. (context); A: count ready again: 5. New snapshot per statement. (selected); A: COMMIT: Nothing failed. (context). Relationships: A: BEGIN; count ready → B: claim and commit: then; B: claim and commit → A: count ready again: then; A: count ready again → A: COMMIT: then.\n\nRepeatable Read: the snapshot holds, the write fails: A keeps its first snapshot, so the count stays 5, and updating the row B changed raises a serialization failure. Nodes: A: BEGIN REPEATABLE READ; count: 5. Snapshot fixed here. (selected); B: claim and commit: Claims QR-0002. (context); A: count again: 5. Same snapshot. (selected); A: update QR-0002: 40001. could not serialize access due to concurrent update. (warning); A: ROLLBACK and retry: The whole transaction starts again. (pending). Relationships: A: BEGIN REPEATABLE READ; count → B: claim and commit: then; B: claim and commit → A: count again: then; A: count again → A: update QR-0002: then; A: update QR-0002 → A: ROLLBACK and retry: then.",
+   "provenance": "Original SpicyBrain authored visual; the values are outputs of lab L23 run on a local PostgreSQL 16.13 server with synthetic records; no Lakebase, Databricks or cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgiso",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "s-rc",
+     "title": "Read Committed: the second read moves",
+     "explanation": "Each statement takes a new snapshot, so A's second count includes B's commit.",
+     "nodes": [
+      {
+       "id": "n-a1",
+       "label": "A: BEGIN; count ready",
+       "detail": "First statement snapshot.",
+       "status": "selected",
+       "value": "6"
+      },
+      {
+       "id": "n-b1",
+       "label": "B: claim and commit",
+       "detail": "Claims QR-0001.",
+       "status": "context"
+      },
+      {
+       "id": "n-a2",
+       "label": "A: count ready again",
+       "detail": "New snapshot per statement.",
+       "status": "selected",
+       "value": "5"
+      },
+      {
+       "id": "n-a3",
+       "label": "A: COMMIT",
+       "detail": "Nothing failed.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-a1",
+       "to": "n-b1",
+       "label": "then"
+      },
+      {
+       "from": "n-b1",
+       "to": "n-a2",
+       "label": "then"
+      },
+      {
+       "from": "n-a2",
+       "to": "n-a3",
+       "label": "then"
+      }
+     ]
+    },
+    {
+     "id": "s-rr",
+     "title": "Repeatable Read: the snapshot holds, the write fails",
+     "explanation": "A keeps its first snapshot, so the count stays 5, and updating the row B changed raises a serialization failure.",
+     "nodes": [
+      {
+       "id": "n-a1",
+       "label": "A: BEGIN REPEATABLE READ; count",
+       "detail": "Snapshot fixed here.",
+       "status": "selected",
+       "value": "5"
+      },
+      {
+       "id": "n-b1",
+       "label": "B: claim and commit",
+       "detail": "Claims QR-0002.",
+       "status": "context"
+      },
+      {
+       "id": "n-a2",
+       "label": "A: count again",
+       "detail": "Same snapshot.",
+       "status": "selected",
+       "value": "5"
+      },
+      {
+       "id": "n-a3",
+       "label": "A: update QR-0002",
+       "detail": "could not serialize access due to concurrent update.",
+       "status": "warning",
+       "value": "40001"
+      },
+      {
+       "id": "n-a4",
+       "label": "A: ROLLBACK and retry",
+       "detail": "The whole transaction starts again.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-a1",
+       "to": "n-b1",
+       "label": "then"
+      },
+      {
+       "from": "n-b1",
+       "to": "n-a2",
+       "label": "then"
+      },
+      {
+       "from": "n-a2",
+       "to": "n-a3",
+       "label": "then"
+      },
+      {
+       "from": "n-a3",
+       "to": "n-a4",
+       "label": "then"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-locks-visual",
+   "kind": "nodes",
+   "title": "Two workers, one queue",
+   "alt": "Worker A holds QR-0001 in an open transaction; worker B's claim skips it, waits for it, or fails on it depending on the locking clause.",
+   "caption": "Same queue, three locking clauses: SKIP LOCKED, plain FOR UPDATE and NOWAIT. Values are lab L23 outputs on synthetic rows.",
+   "textEquivalent": "SKIP LOCKED: B takes the next row: B passes over the locked row and claims the next ready one without waiting. Nodes: Worker A: Open transaction; claimed QR-0001. (selected); Worker B: Runs the same claim with SKIP LOCKED. (selected); QR-0001: severity 4. Locked by A; skipped by B. (excluded); QR-0002: severity 4. Claimed by B at once. (selected); QR-0005: severity 4. Next in line. (pending). Relationships: Worker A → QR-0001: locks; Worker B → QR-0001: skips; Worker B → QR-0002: claims.\n\nPlain FOR UPDATE: B waits: B queues behind A's lock; only after A commits does B re-check QR-0001, drop it and take QR-0002. Nodes: Worker A: Open transaction; holds QR-0001. (selected); Worker B: wait_event_type Lock until A commits. (warning); QR-0001: severity 4. Locked by A; B queues behind it. (warning); QR-0002: severity 4. Taken by B after A commits. (pending); QR-0005: severity 4. Next in line. (pending). Relationships: Worker A → QR-0001: locks; Worker B → QR-0001: waits for; Worker B → QR-0002: then claims.\n\nNOWAIT: B fails fast: B asks for QR-0001's lock without waiting and gets an error instead of a row. Nodes: Worker A: Open transaction; holds QR-0001. (selected); Worker B: 55P03. could not obtain lock on row. (warning); QR-0001: severity 4. Locked by A. (excluded). Relationships: Worker A → QR-0001: locks; Worker B → QR-0001: fails on.",
+   "provenance": "Original SpicyBrain authored visual; the values are outputs of lab L23 run on a local PostgreSQL 16.13 server with synthetic records; no Lakebase, Databricks or cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-pglock",
+    "dbxfe-lakebase-claim-pgselect",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "skip",
+     "title": "SKIP LOCKED: B takes the next row",
+     "explanation": "B passes over the locked row and claims the next ready one without waiting.",
+     "nodes": [
+      {
+       "id": "n-wa",
+       "label": "Worker A",
+       "detail": "Open transaction; claimed QR-0001.",
+       "status": "selected"
+      },
+      {
+       "id": "n-wb",
+       "label": "Worker B",
+       "detail": "Runs the same claim with SKIP LOCKED.",
+       "status": "selected"
+      },
+      {
+       "id": "n-q1",
+       "label": "QR-0001",
+       "detail": "Locked by A; skipped by B.",
+       "status": "excluded",
+       "value": "severity 4"
+      },
+      {
+       "id": "n-q2",
+       "label": "QR-0002",
+       "detail": "Claimed by B at once.",
+       "status": "selected",
+       "value": "severity 4"
+      },
+      {
+       "id": "n-q3",
+       "label": "QR-0005",
+       "detail": "Next in line.",
+       "status": "pending",
+       "value": "severity 4"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-wa",
+       "to": "n-q1",
+       "label": "locks"
+      },
+      {
+       "from": "n-wb",
+       "to": "n-q1",
+       "label": "skips"
+      },
+      {
+       "from": "n-wb",
+       "to": "n-q2",
+       "label": "claims"
+      }
+     ]
+    },
+    {
+     "id": "wait",
+     "title": "Plain FOR UPDATE: B waits",
+     "explanation": "B queues behind A's lock; only after A commits does B re-check QR-0001, drop it and take QR-0002.",
+     "nodes": [
+      {
+       "id": "n-wa",
+       "label": "Worker A",
+       "detail": "Open transaction; holds QR-0001.",
+       "status": "selected"
+      },
+      {
+       "id": "n-wb",
+       "label": "Worker B",
+       "detail": "wait_event_type Lock until A commits.",
+       "status": "warning"
+      },
+      {
+       "id": "n-q1",
+       "label": "QR-0001",
+       "detail": "Locked by A; B queues behind it.",
+       "status": "warning",
+       "value": "severity 4"
+      },
+      {
+       "id": "n-q2",
+       "label": "QR-0002",
+       "detail": "Taken by B after A commits.",
+       "status": "pending",
+       "value": "severity 4"
+      },
+      {
+       "id": "n-q3",
+       "label": "QR-0005",
+       "detail": "Next in line.",
+       "status": "pending",
+       "value": "severity 4"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-wa",
+       "to": "n-q1",
+       "label": "locks"
+      },
+      {
+       "from": "n-wb",
+       "to": "n-q1",
+       "label": "waits for"
+      },
+      {
+       "from": "n-wb",
+       "to": "n-q2",
+       "label": "then claims"
+      }
+     ]
+    },
+    {
+     "id": "nowait",
+     "title": "NOWAIT: B fails fast",
+     "explanation": "B asks for QR-0001's lock without waiting and gets an error instead of a row.",
+     "nodes": [
+      {
+       "id": "n-wa",
+       "label": "Worker A",
+       "detail": "Open transaction; holds QR-0001.",
+       "status": "selected"
+      },
+      {
+       "id": "n-wb",
+       "label": "Worker B",
+       "detail": "could not obtain lock on row.",
+       "status": "warning",
+       "value": "55P03"
+      },
+      {
+       "id": "n-q1",
+       "label": "QR-0001",
+       "detail": "Locked by A.",
+       "status": "excluded",
+       "value": "severity 4"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-wa",
+       "to": "n-q1",
+       "label": "locks"
+      },
+      {
+       "from": "n-wb",
+       "to": "n-q1",
+       "label": "fails on"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-optimistic-visual",
+   "kind": "table",
+   "title": "One row, four writes (lab L23)",
+   "alt": "A table of writes to QR-0001 that grows by one row per state: claim, reassignment, a refused stale submit, and the accepted decision.",
+   "caption": "The stale submit updates no row instead of overwriting. Values are lab L23 outputs on synthetic rows.",
+   "textEquivalent": "The form loads version 3: R-101's claim leaves QR-0001 at version 3, the version the form holds. Table columns: Write, WHERE version =, Rows updated, Row after. Rows: Write R-101 claims; WHERE version = claim; Rows updated 1; Row after claimed by R-101, v3.\n\nA supervisor reassigns the item: The supervisor's own version-checked write moves the row to version 4. Table columns: Write, WHERE version =, Rows updated, Row after. Rows: Write R-101 claims; WHERE version = claim; Rows updated 1; Row after claimed by R-101, v3 | Write Supervisor reassigns; WHERE version = 3; Rows updated 1; Row after claimed by R-103, v4.\n\nThe stale submit matches nothing: R-101 still sends version 3, so the WHERE clause matches no row. Table columns: Write, WHERE version =, Rows updated, Row after. Rows: Write R-101 claims; WHERE version = claim; Rows updated 1; Row after claimed by R-101, v3 | Write Supervisor reassigns; WHERE version = 3; Rows updated 1; Row after claimed by R-103, v4 | Write R-101 submits accept; WHERE version = 3; Rows updated 0; Row after unchanged, v4.\n\nReload, then decide: R-103 loads version 4 and the decision lands at version 5. Table columns: Write, WHERE version =, Rows updated, Row after. Rows: Write R-101 claims; WHERE version = claim; Rows updated 1; Row after claimed by R-101, v3 | Write Supervisor reassigns; WHERE version = 3; Rows updated 1; Row after claimed by R-103, v4 | Write R-101 submits accept; WHERE version = 3; Rows updated 0; Row after unchanged, v4 | Write R-103 submits rework; WHERE version = 4; Rows updated 1; Row after decided rework, v5.",
+   "provenance": "Original SpicyBrain authored visual; the values are outputs of lab L23 run on a local PostgreSQL 16.13 server with synthetic records; no Lakebase, Databricks or cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "loaded",
+     "title": "The form loads version 3",
+     "explanation": "R-101's claim leaves QR-0001 at version 3, the version the form holds.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Write",
+       "WHERE version =",
+       "Rows updated",
+       "Row after"
+      ],
+      "rows": [
+       [
+        "R-101 claims",
+        "claim",
+        "1",
+        "claimed by R-101, v3"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "moved",
+     "title": "A supervisor reassigns the item",
+     "explanation": "The supervisor's own version-checked write moves the row to version 4.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Write",
+       "WHERE version =",
+       "Rows updated",
+       "Row after"
+      ],
+      "rows": [
+       [
+        "R-101 claims",
+        "claim",
+        "1",
+        "claimed by R-101, v3"
+       ],
+       [
+        "Supervisor reassigns",
+        "3",
+        "1",
+        "claimed by R-103, v4"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "stale",
+     "title": "The stale submit matches nothing",
+     "explanation": "R-101 still sends version 3, so the WHERE clause matches no row.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Write",
+       "WHERE version =",
+       "Rows updated",
+       "Row after"
+      ],
+      "rows": [
+       [
+        "R-101 claims",
+        "claim",
+        "1",
+        "claimed by R-101, v3"
+       ],
+       [
+        "Supervisor reassigns",
+        "3",
+        "1",
+        "claimed by R-103, v4"
+       ],
+       [
+        "R-101 submits accept",
+        "3",
+        "0",
+        "unchanged, v4"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "reload",
+     "title": "Reload, then decide",
+     "explanation": "R-103 loads version 4 and the decision lands at version 5.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Write",
+       "WHERE version =",
+       "Rows updated",
+       "Row after"
+      ],
+      "rows": [
+       [
+        "R-101 claims",
+        "claim",
+        "1",
+        "claimed by R-101, v3"
+       ],
+       [
+        "Supervisor reassigns",
+        "3",
+        "1",
+        "claimed by R-103, v4"
+       ],
+       [
+        "R-101 submits accept",
+        "3",
+        "0",
+        "unchanged, v4"
+       ],
+       [
+        "R-103 submits rework",
+        "4",
+        "1",
+        "decided rework, v5"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-idempotent-visual",
+   "kind": "table",
+   "title": "Ten deliveries, eight messages, six items (lab L23)",
+   "alt": "A table of ten deliveries with each outcome, then the six final items, then the regressed items a last-write-wins upsert leaves.",
+   "caption": "Redeliveries and a late older message change nothing; the naive upsert lets them overwrite newer state. Values are lab L23 outputs on synthetic messages.",
+   "textEquivalent": "Each delivery's outcome: Repeated message IDs and the older M-0005 are skipped; M-0008 upgrades QR-0001. Table columns: #, message, item, seq, outcome. Rows: # 1; message M-0001; item QR-0001; seq 1; outcome applied | # 2; message M-0002; item QR-0002; seq 1; outcome applied | # 3; message M-0003; item QR-0003; seq 1; outcome applied | # 4; message M-0002; item QR-0002; seq 1; outcome skipped | # 5; message M-0004; item QR-0004; seq 1; outcome applied | # 6; message M-0006; item QR-0006; seq 2; outcome applied | # 7; message M-0005; item QR-0006; seq 1; outcome skipped | # 8; message M-0007; item QR-0005; seq 1; outcome applied | # 9; message M-0008; item QR-0001; seq 2; outcome applied | # 10; message M-0001; item QR-0001; seq 1; outcome skipped.\n\nFinal items, after one pass or two: The state is the same after replaying all ten deliveries. Table columns: item, defect, severity, seq, version. Rows: item QR-0001; defect CRACK; severity 4; seq 2; version 2 | item QR-0002; defect CRACK; severity 4; seq 1; version 1 | item QR-0003; defect DIMENSION; severity 2; seq 1; version 1 | item QR-0004; defect SURFACE; severity 1; seq 1; version 1 | item QR-0005; defect CRACK; severity 4; seq 1; version 1 | item QR-0006; defect POROSITY; severity 2; seq 2; version 1.\n\nLast write wins instead: Without the message log and the sequence guard, the late and repeated messages overwrite newer state. Table columns: item, defect, severity, seq, version. Rows: item QR-0001; defect POROSITY; severity 3; seq 1; version 3 | item QR-0002; defect CRACK; severity 4; seq 1; version 2 | item QR-0006; defect CRACK; severity 3; seq 1; version 2.",
+   "provenance": "Original SpicyBrain authored visual; the values are outputs of lab L23 run on a local PostgreSQL 16.13 server with synthetic records; no Lakebase, Databricks or cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-pginsert",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "stream",
+     "title": "Each delivery's outcome",
+     "explanation": "Repeated message IDs and the older M-0005 are skipped; M-0008 upgrades QR-0001.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "#",
+       "message",
+       "item",
+       "seq",
+       "outcome"
+      ],
+      "rows": [
+       [
+        "1",
+        "M-0001",
+        "QR-0001",
+        "1",
+        "applied"
+       ],
+       [
+        "2",
+        "M-0002",
+        "QR-0002",
+        "1",
+        "applied"
+       ],
+       [
+        "3",
+        "M-0003",
+        "QR-0003",
+        "1",
+        "applied"
+       ],
+       [
+        "4",
+        "M-0002",
+        "QR-0002",
+        "1",
+        "skipped"
+       ],
+       [
+        "5",
+        "M-0004",
+        "QR-0004",
+        "1",
+        "applied"
+       ],
+       [
+        "6",
+        "M-0006",
+        "QR-0006",
+        "2",
+        "applied"
+       ],
+       [
+        "7",
+        "M-0005",
+        "QR-0006",
+        "1",
+        "skipped"
+       ],
+       [
+        "8",
+        "M-0007",
+        "QR-0005",
+        "1",
+        "applied"
+       ],
+       [
+        "9",
+        "M-0008",
+        "QR-0001",
+        "2",
+        "applied"
+       ],
+       [
+        "10",
+        "M-0001",
+        "QR-0001",
+        "1",
+        "skipped"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "final",
+     "title": "Final items, after one pass or two",
+     "explanation": "The state is the same after replaying all ten deliveries.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "item",
+       "defect",
+       "severity",
+       "seq",
+       "version"
+      ],
+      "rows": [
+       [
+        "QR-0001",
+        "CRACK",
+        "4",
+        "2",
+        "2"
+       ],
+       [
+        "QR-0002",
+        "CRACK",
+        "4",
+        "1",
+        "1"
+       ],
+       [
+        "QR-0003",
+        "DIMENSION",
+        "2",
+        "1",
+        "1"
+       ],
+       [
+        "QR-0004",
+        "SURFACE",
+        "1",
+        "1",
+        "1"
+       ],
+       [
+        "QR-0005",
+        "CRACK",
+        "4",
+        "1",
+        "1"
+       ],
+       [
+        "QR-0006",
+        "POROSITY",
+        "2",
+        "2",
+        "1"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "naive",
+     "title": "Last write wins instead",
+     "explanation": "Without the message log and the sequence guard, the late and repeated messages overwrite newer state.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "item",
+       "defect",
+       "severity",
+       "seq",
+       "version"
+      ],
+      "rows": [
+       [
+        "QR-0001",
+        "POROSITY",
+        "3",
+        "1",
+        "3"
+       ],
+       [
+        "QR-0002",
+        "CRACK",
+        "4",
+        "1",
+        "2"
+       ],
+       [
+        "QR-0006",
+        "CRACK",
+        "3",
+        "1",
+        "2"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-connections-visual",
+   "kind": "nodes",
+   "title": "What a transaction-mode pooler shares",
+   "alt": "Many app workers connect to a pooler that lends a few server connections per transaction; then session state set in one transaction is missing from the next.",
+   "caption": "Pooling shares server connections between transactions, and session state stays behind. Synthetic teaching example; the 42P01 result was reproduced in lab L23 with two direct connections, not with PgBouncer.",
+   "textEquivalent": "Many clients, few server connections: Each transaction borrows whichever server connection is free and returns it at COMMIT. Nodes: App workers: hundreds. Open a connection per request. (selected); PgBouncer: Transaction mode: one server connection per transaction. (selected); Server connection 1: Runs whichever transaction comes next. (selected); Server connection 2: Runs whichever transaction comes next. (selected); Postgres: Direct connection limit depends on compute size. (context). Relationships: App workers → PgBouncer: connect; PgBouncer → Server connection 1: transaction 1; PgBouncer → Server connection 2: transaction 2; Server connection 1 → Postgres: backend; Server connection 2 → Postgres: backend.\n\nSession state left behind: A SET and a temp table from transaction 1 stay on server connection 1; transaction 2 runs elsewhere and fails. Nodes: Transaction 1: SET search_path = qr; create temp table draft_note. (selected); Server connection 1: Keeps the setting and the temp table. (warning); Transaction 2: SELECT from review_item, unqualified. (selected); Server connection 2: 42P01. No search_path, no draft_note. (warning). Relationships: Transaction 1 → Server connection 1: ran on; Transaction 2 → Server connection 2: ran on.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-claim-scalezero",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "pool",
+     "title": "Many clients, few server connections",
+     "explanation": "Each transaction borrows whichever server connection is free and returns it at COMMIT.",
+     "nodes": [
+      {
+       "id": "workers",
+       "label": "App workers",
+       "detail": "Open a connection per request.",
+       "status": "selected",
+       "value": "hundreds"
+      },
+      {
+       "id": "pooler",
+       "label": "PgBouncer",
+       "detail": "Transaction mode: one server connection per transaction.",
+       "status": "selected"
+      },
+      {
+       "id": "n-s1",
+       "label": "Server connection 1",
+       "detail": "Runs whichever transaction comes next.",
+       "status": "selected"
+      },
+      {
+       "id": "n-s2",
+       "label": "Server connection 2",
+       "detail": "Runs whichever transaction comes next.",
+       "status": "selected"
+      },
+      {
+       "id": "n-pg",
+       "label": "Postgres",
+       "detail": "Direct connection limit depends on compute size.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "workers",
+       "to": "pooler",
+       "label": "connect"
+      },
+      {
+       "from": "pooler",
+       "to": "n-s1",
+       "label": "transaction 1"
+      },
+      {
+       "from": "pooler",
+       "to": "n-s2",
+       "label": "transaction 2"
+      },
+      {
+       "from": "n-s1",
+       "to": "n-pg",
+       "label": "backend"
+      },
+      {
+       "from": "n-s2",
+       "to": "n-pg",
+       "label": "backend"
+      }
+     ]
+    },
+    {
+     "id": "state",
+     "title": "Session state left behind",
+     "explanation": "A SET and a temp table from transaction 1 stay on server connection 1; transaction 2 runs elsewhere and fails.",
+     "nodes": [
+      {
+       "id": "tx1",
+       "label": "Transaction 1",
+       "detail": "SET search_path = qr; create temp table draft_note.",
+       "status": "selected"
+      },
+      {
+       "id": "n-s1",
+       "label": "Server connection 1",
+       "detail": "Keeps the setting and the temp table.",
+       "status": "warning"
+      },
+      {
+       "id": "tx2",
+       "label": "Transaction 2",
+       "detail": "SELECT from review_item, unqualified.",
+       "status": "selected"
+      },
+      {
+       "id": "n-s2",
+       "label": "Server connection 2",
+       "detail": "No search_path, no draft_note.",
+       "status": "warning",
+       "value": "42P01"
+      }
+     ],
+     "connections": [
+      {
+       "from": "tx1",
+       "to": "n-s1",
+       "label": "ran on"
+      },
+      {
+       "from": "tx2",
+       "to": "n-s2",
+       "label": "ran on"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-auth-visual",
+   "kind": "nodes",
+   "title": "From a Databricks identity to a table",
+   "alt": "A Databricks identity obtains a one-hour token and logs in as its OAuth role, whose grants reach the tables; then an expired token, then the pooled path with a password role.",
+   "caption": "Authentication at login, authorization by GRANT, and the pooler's role requirement. Synthetic teaching example based on the documented behaviour.",
+   "textEquivalent": "OAuth login: The token proves the identity at login; the role's grants decide what it can touch. Nodes: Databricks identity: User, service principal or group. (selected); OAuth token: 1 h. Expires after one hour; checked at login. (selected); Postgres OAuth role: Linked to the identity. (selected); GRANTs: SELECT, INSERT, UPDATE on qr tables only. (selected); qr.review_item: Reached only through the grants. (selected). Relationships: Databricks identity → OAuth token: requests; OAuth token → Postgres OAuth role: logs in as; Postgres OAuth role → GRANTs: holds; GRANTs → qr.review_item: allow.\n\nToken expired mid-shift: The connection opened earlier keeps working; a new login with the old token is refused. Nodes: Open connection: Keeps working; expiry is checked at login. (selected); New connection: Refused until a fresh token arrives. (warning); OAuth token: expired. Expired ten minutes ago. (warning); Postgres OAuth role: Unchanged. (selected). Relationships: Open connection → Postgres OAuth role: still logged in; New connection → OAuth token: presents.\n\nPooled access needs a password role: The pooling documentation requires native password authentication, so the pooled path uses a password role. Nodes: Review app: Chooses its access path deliberately. (selected); PgBouncer: Transaction mode. (selected); Password role: Native Postgres role; secret stored and rotated. (selected); OAuth role: Documented as unavailable through the pooler. (excluded). Relationships: Review app → PgBouncer: connects; PgBouncer → Password role: authenticates as.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-auth",
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-claim-apps",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "login",
+     "title": "OAuth login",
+     "explanation": "The token proves the identity at login; the role's grants decide what it can touch.",
+     "nodes": [
+      {
+       "id": "identity",
+       "label": "Databricks identity",
+       "detail": "User, service principal or group.",
+       "status": "selected"
+      },
+      {
+       "id": "token",
+       "label": "OAuth token",
+       "detail": "Expires after one hour; checked at login.",
+       "status": "selected",
+       "value": "1 h"
+      },
+      {
+       "id": "role",
+       "label": "Postgres OAuth role",
+       "detail": "Linked to the identity.",
+       "status": "selected"
+      },
+      {
+       "id": "grants",
+       "label": "GRANTs",
+       "detail": "SELECT, INSERT, UPDATE on qr tables only.",
+       "status": "selected"
+      },
+      {
+       "id": "tables",
+       "label": "qr.review_item",
+       "detail": "Reached only through the grants.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "identity",
+       "to": "token",
+       "label": "requests"
+      },
+      {
+       "from": "token",
+       "to": "role",
+       "label": "logs in as"
+      },
+      {
+       "from": "role",
+       "to": "grants",
+       "label": "holds"
+      },
+      {
+       "from": "grants",
+       "to": "tables",
+       "label": "allow"
+      }
+     ]
+    },
+    {
+     "id": "expired",
+     "title": "Token expired mid-shift",
+     "explanation": "The connection opened earlier keeps working; a new login with the old token is refused.",
+     "nodes": [
+      {
+       "id": "open",
+       "label": "Open connection",
+       "detail": "Keeps working; expiry is checked at login.",
+       "status": "selected"
+      },
+      {
+       "id": "fresh",
+       "label": "New connection",
+       "detail": "Refused until a fresh token arrives.",
+       "status": "warning"
+      },
+      {
+       "id": "token",
+       "label": "OAuth token",
+       "detail": "Expired ten minutes ago.",
+       "status": "warning",
+       "value": "expired"
+      },
+      {
+       "id": "role",
+       "label": "Postgres OAuth role",
+       "detail": "Unchanged.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "open",
+       "to": "role",
+       "label": "still logged in"
+      },
+      {
+       "from": "fresh",
+       "to": "token",
+       "label": "presents"
+      }
+     ]
+    },
+    {
+     "id": "pooled",
+     "title": "Pooled access needs a password role",
+     "explanation": "The pooling documentation requires native password authentication, so the pooled path uses a password role.",
+     "nodes": [
+      {
+       "id": "app",
+       "label": "Review app",
+       "detail": "Chooses its access path deliberately.",
+       "status": "selected"
+      },
+      {
+       "id": "pooler",
+       "label": "PgBouncer",
+       "detail": "Transaction mode.",
+       "status": "selected"
+      },
+      {
+       "id": "pwrole",
+       "label": "Password role",
+       "detail": "Native Postgres role; secret stored and rotated.",
+       "status": "selected"
+      },
+      {
+       "id": "oauthrole",
+       "label": "OAuth role",
+       "detail": "Documented as unavailable through the pooler.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "app",
+       "to": "pooler",
+       "label": "connects"
+      },
+      {
+       "from": "pooler",
+       "to": "pwrole",
+       "label": "authenticates as"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-branches-visual",
+   "kind": "timeline",
+   "title": "Recover historical state, then choose how to use it",
+   "alt": "An incident, selective row recovery from a historical branch, and restore into a separate root branch with production connections preserved.",
+   "caption": "Creating recovered state and adopting it are separate decisions. Synthetic incident; no platform execution.",
+   "textEquivalent": "The incident on production: A faulty migration deletes decided rows and reviewers keep working until someone notices. Nodes: 06:00 Normal work: Claims and decisions all morning. (context); 10:14 Last good moment: 40 decided items still present. (selected); 10:15 Faulty migration: Deletes the 40 decided items. (warning); 10:40 Discovered: 25 minutes of new claims and decisions since. (warning). Relationships: 06:00 Normal work → 10:14 Last good moment: then; 10:14 Last good moment → 10:15 Faulty migration: then; 10:15 Faulty migration → 10:40 Discovered: then.\n\nPoint-in-time branch, copy back: A branch at 10:14 supplies the 40 rows; production keeps everything written after 10:15. Nodes: Branch at 10:14: New branch; production untouched. (selected); Select the 40 rows: Query the past on the branch. (selected); Insert into production: One transaction; counts checked. (selected); Later work kept: The 25 minutes of claims and decisions stay. (selected). Relationships: Branch at 10:14 → Select the 40 rows: then; Select the 40 rows → Insert into production: then; Insert into production → Later work kept: then.\n\nRestore creates a separate root branch: The recovered branch has the 10:14 state. The original still has later work; redirecting applications requires an explicit connection change. Nodes: New root branch: Historical rows at 10:14. (selected); Original branch: Later claims and decisions still present. (selected); Connection choice: Existing sessions stay on the original. Plan any cutover separately. (warning). Relationships: New root branch → Original branch: separate from; Original branch → Connection choice: still serves.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-restore",
+    "dbxfe-lakebase-claim-branches",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "incident",
+     "title": "The incident on production",
+     "explanation": "A faulty migration deletes decided rows and reviewers keep working until someone notices.",
+     "nodes": [
+      {
+       "id": "n-t0",
+       "label": "06:00 Normal work",
+       "detail": "Claims and decisions all morning.",
+       "status": "context"
+      },
+      {
+       "id": "n-t1",
+       "label": "10:14 Last good moment",
+       "detail": "40 decided items still present.",
+       "status": "selected"
+      },
+      {
+       "id": "n-t2",
+       "label": "10:15 Faulty migration",
+       "detail": "Deletes the 40 decided items.",
+       "status": "warning"
+      },
+      {
+       "id": "n-t3",
+       "label": "10:40 Discovered",
+       "detail": "25 minutes of new claims and decisions since.",
+       "status": "warning"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-t0",
+       "to": "n-t1",
+       "label": "then"
+      },
+      {
+       "from": "n-t1",
+       "to": "n-t2",
+       "label": "then"
+      },
+      {
+       "from": "n-t2",
+       "to": "n-t3",
+       "label": "then"
+      }
+     ]
+    },
+    {
+     "id": "branch",
+     "title": "Point-in-time branch, copy back",
+     "explanation": "A branch at 10:14 supplies the 40 rows; production keeps everything written after 10:15.",
+     "nodes": [
+      {
+       "id": "n-b1",
+       "label": "Branch at 10:14",
+       "detail": "New branch; production untouched.",
+       "status": "selected"
+      },
+      {
+       "id": "n-b2",
+       "label": "Select the 40 rows",
+       "detail": "Query the past on the branch.",
+       "status": "selected"
+      },
+      {
+       "id": "n-b3",
+       "label": "Insert into production",
+       "detail": "One transaction; counts checked.",
+       "status": "selected"
+      },
+      {
+       "id": "n-b4",
+       "label": "Later work kept",
+       "detail": "The 25 minutes of claims and decisions stay.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-b1",
+       "to": "n-b2",
+       "label": "then"
+      },
+      {
+       "from": "n-b2",
+       "to": "n-b3",
+       "label": "then"
+      },
+      {
+       "from": "n-b3",
+       "to": "n-b4",
+       "label": "then"
+      }
+     ]
+    },
+    {
+     "id": "restore",
+     "title": "Restore creates a separate root branch",
+     "explanation": "The recovered branch has the 10:14 state. The original still has later work; redirecting applications requires an explicit connection change.",
+     "nodes": [
+      {
+       "id": "n-r1",
+       "label": "New root branch",
+       "detail": "Historical rows at 10:14.",
+       "status": "selected"
+      },
+      {
+       "id": "n-r2",
+       "label": "Original branch",
+       "detail": "Later claims and decisions still present.",
+       "status": "selected"
+      },
+      {
+       "id": "n-r3",
+       "label": "Connection choice",
+       "detail": "Existing sessions stay on the original. Plan any cutover separately.",
+       "status": "warning"
+      }
+     ],
+     "connections": [
+      {
+       "from": "n-r1",
+       "to": "n-r2",
+       "label": "separate from"
+      },
+      {
+       "from": "n-r2",
+       "to": "n-r3",
+       "label": "still serves"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-sync-visual",
+   "kind": "table",
+   "title": "What each copy can promise",
+   "alt": "A freshness table for each synchronization path, then one screen whose fields come from sources with different as-of times.",
+   "caption": "Freshness and consistency by path, from the documented sync modes; the screen and times are a synthetic teaching example.",
+   "textEquivalent": "Freshness and consistency by path: Only the app's own tables read inside a transaction are current; every copy is asynchronous. Table columns: Path, Refresh, Needs, Freshness to state, Consistency. Rows: Path Synced table, snapshot; Refresh full copy per run; Needs primary key; Freshness to state as of last run; Consistency async read-only copy | Path Synced table, triggered; Refresh changes per run; Needs Change Data Feed; Freshness to state as of last run; Consistency async read-only copy | Path Synced table, continuous; Refresh changes streamed; Needs Change Data Feed; Freshness to state seconds behind; Consistency async read-only copy | Path Lakebase CDF to Delta; Refresh changes captured; Needs Public Preview; Freshness to state behind the source; Consistency history rows | Path review_item in a transaction; Refresh none; Needs nothing; Freshness to state current; Consistency transactional.\n\nOne screen, two moments: A single screen mixes a live claim with a roster copied at 06:40, so it prints each as-of time. Table columns: Field shown, Source, As of. Rows: Field shown QR-0005 claimed by R-104; Source review_item; As of now | Field shown R-104 active at P1; Source synced roster, triggered daily; As of 06:40 | Field shown Decisions this week; Source Delta history via Lakebase CDF; As of behind by the sync lag.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-synced",
+    "dbxfe-lakebase-claim-lakehousesync",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "modes",
+     "title": "Freshness and consistency by path",
+     "explanation": "Only the app's own tables read inside a transaction are current; every copy is asynchronous.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Path",
+       "Refresh",
+       "Needs",
+       "Freshness to state",
+       "Consistency"
+      ],
+      "rows": [
+       [
+        "Synced table, snapshot",
+        "full copy per run",
+        "primary key",
+        "as of last run",
+        "async read-only copy"
+       ],
+       [
+        "Synced table, triggered",
+        "changes per run",
+        "Change Data Feed",
+        "as of last run",
+        "async read-only copy"
+       ],
+       [
+        "Synced table, continuous",
+        "changes streamed",
+        "Change Data Feed",
+        "seconds behind",
+        "async read-only copy"
+       ],
+       [
+        "Lakebase CDF to Delta",
+        "changes captured",
+        "Public Preview",
+        "behind the source",
+        "history rows"
+       ],
+       [
+        "review_item in a transaction",
+        "none",
+        "nothing",
+        "current",
+        "transactional"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "join",
+     "title": "One screen, two moments",
+     "explanation": "A single screen mixes a live claim with a roster copied at 06:40, so it prints each as-of time.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Field shown",
+       "Source",
+       "As of"
+      ],
+      "rows": [
+       [
+        "QR-0005 claimed by R-104",
+        "review_item",
+        "now"
+       ],
+       [
+        "R-104 active at P1",
+        "synced roster, triggered daily",
+        "06:40"
+       ],
+       [
+        "Decisions this week",
+        "Delta history via Lakebase CDF",
+        "behind by the sync lag"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-checklist-visual",
+   "kind": "table",
+   "title": "Compatibility checklist before moving to Lakebase",
+   "alt": "A checklist comparing the local lab with documented Lakebase behaviour and an action per row, then the evidence label for each kind of claim.",
+   "caption": "What the local run proved, what the documentation says, and what is still unknown.",
+   "textEquivalent": "Local lab versus Lakebase: Each row names what to verify on a branch before the design moves. Table columns: Area, Local lab, Lakebase (documented), Action. Rows: Area Version; Local lab PostgreSQL 16.13; Lakebase (documented) Postgres 16, 17 or 18 on AWS; Action SHOW server_version on the branch | Area Superuser; Local lab lab_admin is superuser; Lakebase (documented) none; databricks_superuser; Action run DDL as a non-superuser owner | Area Authentication; Local lab SCRAM password; Lakebase (documented) OAuth role or password role; Action choose per access path | Area Pooling; Local lab none; Lakebase (documented) PgBouncer, transaction mode; Action one transaction per unit of work | Area Idle connections; Local lab kept open; Lakebase (documented) closed by scale to zero; Action reconnect; no session state | Area Tablespaces, logical replication; Local lab available; Lakebase (documented) not supported; Action remove from scripts | Area Recovery; Local lab none; Lakebase (documented) restore window 2 to 30 days; Action set it; rehearse on a branch | Area Synchronization; Local lab none; Lakebase (documented) synced tables; Lakebase CDF preview; Action state freshness per copy.\n\nWhich evidence supports which claim: Keep local results, documentation and unknowns apart in every design note. Table columns: Claim, Evidence. Rows: Claim Constraints, locks, isolation and upserts behave as tested; Evidence local PostgreSQL 16.13, lab L23 | Claim Tokens, pooler, branches and sync behave as described; Evidence documentation, search-level; not executed | Claim Resume time, failover time, performance at load; Evidence unknown until measured on a project.",
+   "provenance": "Original SpicyBrain authored checklist from lab L23's local PostgreSQL 16.13 run and search-level documentation review; nothing ran on Lakebase.",
+   "claimIds": [
+    "dbxfe-lakebase-claim-compat",
+    "dbxfe-lakebase-claim-status",
+    "dbxfe-lakebase-claim-auth",
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-claim-restore",
+    "dbxfe-lakebase-claim-synced",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "states": [
+    {
+     "id": "checklist",
+     "title": "Local lab versus Lakebase",
+     "explanation": "Each row names what to verify on a branch before the design moves.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Area",
+       "Local lab",
+       "Lakebase (documented)",
+       "Action"
+      ],
+      "rows": [
+       [
+        "Version",
+        "PostgreSQL 16.13",
+        "Postgres 16, 17 or 18 on AWS",
+        "SHOW server_version on the branch"
+       ],
+       [
+        "Superuser",
+        "lab_admin is superuser",
+        "none; databricks_superuser",
+        "run DDL as a non-superuser owner"
+       ],
+       [
+        "Authentication",
+        "SCRAM password",
+        "OAuth role or password role",
+        "choose per access path"
+       ],
+       [
+        "Pooling",
+        "none",
+        "PgBouncer, transaction mode",
+        "one transaction per unit of work"
+       ],
+       [
+        "Idle connections",
+        "kept open",
+        "closed by scale to zero",
+        "reconnect; no session state"
+       ],
+       [
+        "Tablespaces, logical replication",
+        "available",
+        "not supported",
+        "remove from scripts"
+       ],
+       [
+        "Recovery",
+        "none",
+        "restore window 2 to 30 days",
+        "set it; rehearse on a branch"
+       ],
+       [
+        "Synchronization",
+        "none",
+        "synced tables; Lakebase CDF preview",
+        "state freshness per copy"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "evidence",
+     "title": "Which evidence supports which claim",
+     "explanation": "Keep local results, documentation and unknowns apart in every design note.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Claim",
+       "Evidence"
+      ],
+      "rows": [
+       [
+        "Constraints, locks, isolation and upserts behave as tested",
+        "local PostgreSQL 16.13, lab L23"
+       ],
+       [
+        "Tokens, pooler, branches and sync behave as described",
+        "documentation, search-level; not executed"
+       ],
+       [
+        "Resume time, failover time, performance at load",
+        "unknown until measured on a project"
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-lakebase-workloads-question",
+   "revision": "1",
+   "prompt": "Cinderline's maintenance team lists four needs for a new tool. Which one belongs on the transactional (Lakebase) side rather than the analytical side?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-workloads-question-a",
+     "text": "Mean time between failures per machine over the last two years.",
+     "rationale": "A scan and aggregate over history that tolerates old data belongs on Delta tables and a warehouse."
+    },
+    {
+     "id": "dbxfe-lakebase-workloads-question-b",
+     "text": "A table of vibration statistics computed from a year of sensor history for a model.",
+     "rationale": "Batch computation over history is analytical; serving a finished value by key could come later, but building it is a pipeline."
+    },
+    {
+     "id": "dbxfe-lakebase-workloads-question-c",
+     "text": "A technician reserves the last spare gasket for a work order, and no other technician may reserve the same unit.",
+     "rationale": "Correct: one row by key, concurrent writers and a rule that must hold at the moment of the write make it operational work."
+    },
+    {
+     "id": "dbxfe-lakebase-workloads-question-d",
+     "text": "A nightly comparison of spare-part stock against the ERP export.",
+     "rationale": "A scheduled comparison of whole datasets is a pipeline job, not a per-request transaction."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-workloads-question-c",
+   "conceptIds": [
+    "dbxfe-lakebase-oltp-concept",
+    "dbxfe-lakebase-olap-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-overview",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-platform-question",
+   "revision": "1",
+   "prompt": "Cinderline's review app sat idle overnight and its Lakebase compute scaled to zero. What should the app expect at the first claim in the morning?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-platform-question-a",
+     "text": "Committed rows are intact, but it needs a new connection, and yesterday's temporary tables and advisory locks are gone.",
+     "rationale": "Correct: scale to zero closes idle connections and their session context, while storage keeps committed data."
+    },
+    {
+     "id": "dbxfe-lakebase-platform-question-b",
+     "text": "Yesterday's connections resume where they stopped, with their temporary tables.",
+     "rationale": "The documentation says idle connections are closed and session context such as temporary tables is lost."
+    },
+    {
+     "id": "dbxfe-lakebase-platform-question-c",
+     "text": "Rows committed yesterday must first be restored from the restore window.",
+     "rationale": "Suspending compute does not touch storage; nothing needs restoring."
+    },
+    {
+     "id": "dbxfe-lakebase-platform-question-d",
+     "text": "The claim fails because branches are deleted when their compute stops.",
+     "rationale": "Branches and storage belong to the project, not to a running compute."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-platform-question-a",
+   "conceptIds": [
+    "dbxfe-lakebase-scalezero-concept",
+    "dbxfe-lakebase-project-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-scalezero",
+    "dbxfe-lakebase-claim-concepts",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-model-question",
+   "revision": "1",
+   "prompt": "A handler inserts a review item with status 'decided', claimed_by 'R-102' and no decision. With the lab's schema, what does PostgreSQL return?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-model-question-a",
+     "text": "SQLSTATE 23502, a not-null violation on decision.",
+     "rationale": "decision is nullable on purpose; only the state constraint makes it required for decided rows."
+    },
+    {
+     "id": "dbxfe-lakebase-model-question-b",
+     "text": "The row is stored and the dashboard shows an empty decision.",
+     "rationale": "Each column passes its own CHECK, but the table constraint rejects the combination."
+    },
+    {
+     "id": "dbxfe-lakebase-model-question-c",
+     "text": "SQLSTATE 23503, because R-102 holds no open claim.",
+     "rationale": "R-102 exists in reviewer, so the foreign key is satisfied; foreign keys know nothing about claims."
+    },
+    {
+     "id": "dbxfe-lakebase-model-question-d",
+     "text": "SQLSTATE 23514 naming review_item_state_consistent, and no row is stored.",
+     "rationale": "Correct: the table CHECK requires a decision whenever the status is decided, and a check violation is 23514."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-model-question-d",
+   "conceptIds": [
+    "dbxfe-lakebase-constraint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgtx",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-isolation-question",
+   "revision": "1",
+   "prompt": "Under PostgreSQL's default isolation level, session A runs the same SELECT count(*) twice in one transaction, and session B commits a claim between the two. What does A see?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-isolation-question-a",
+     "text": "Both counts are equal, because the transaction keeps its first snapshot.",
+     "rationale": "That describes Repeatable Read, which is not the default."
+    },
+    {
+     "id": "dbxfe-lakebase-isolation-question-b",
+     "text": "The second count reflects B's commit, because each statement takes a new snapshot.",
+     "rationale": "Correct: Read Committed is the default and gives every statement a fresh snapshot of committed data."
+    },
+    {
+     "id": "dbxfe-lakebase-isolation-question-c",
+     "text": "The second SELECT waits until B's transaction ends.",
+     "rationale": "Plain reads never wait for writers; each reads a snapshot."
+    },
+    {
+     "id": "dbxfe-lakebase-isolation-question-d",
+     "text": "A sees B's change even before B commits.",
+     "rationale": "PostgreSQL never shows uncommitted data; dirty reads are impossible at every level."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-isolation-question-b",
+   "conceptIds": [
+    "dbxfe-lakebase-isolation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgiso",
+    "dbxfe-lakebase-guidance"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-timeline-question",
+   "revision": "1",
+   "prompt": "In the lab's Repeatable Read timeline, A counts 5 ready items, B claims QR-0002 and commits, and A then updates QR-0002. What happens to A?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-timeline-question-a",
+     "text": "The update silently overwrites B's claim.",
+     "rationale": "That is what the lab saw under Read Committed on QR-0005; Repeatable Read refuses instead."
+    },
+    {
+     "id": "dbxfe-lakebase-timeline-question-b",
+     "text": "The update waits for B's transaction, then succeeds.",
+     "rationale": "B had already committed, so there is nothing to wait for, and the snapshot rule still refuses the write."
+    },
+    {
+     "id": "dbxfe-lakebase-timeline-question-c",
+     "text": "The update fails with SQLSTATE 40001, and A must roll back and retry the whole transaction.",
+     "rationale": "Correct: the row changed after A's snapshot, so Repeatable Read refuses the write with a serialization failure."
+    },
+    {
+     "id": "dbxfe-lakebase-timeline-question-d",
+     "text": "A's second count returns 4, and the update succeeds.",
+     "rationale": "The first snapshot holds, so the count stays 5, and the write fails."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-timeline-question-c",
+   "conceptIds": [
+    "dbxfe-lakebase-serialization-concept",
+    "dbxfe-lakebase-isolation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgiso",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-locks-question",
+   "revision": "1",
+   "prompt": "Worker A has claimed QR-0001 in a transaction it has not committed. Worker B runs the claim with plain FOR UPDATE instead of SKIP LOCKED, and A then commits. The ready queue was QR-0001, QR-0002, QR-0005. What does B's claim return?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-locks-question-a",
+     "text": "QR-0001, because B chose it before A committed.",
+     "rationale": "B's re-check after the wait sees QR-0001 claimed, so it no longer satisfies status = 'ready'."
+    },
+    {
+     "id": "dbxfe-lakebase-locks-question-b",
+     "text": "QR-0002, but only after A commits: B waits on A's lock, re-checks QR-0001, finds it claimed and moves on.",
+     "rationale": "Correct: this is what lab L23 recorded; the locking step re-checks the row after the wait and skips it once it no longer qualifies."
+    },
+    {
+     "id": "dbxfe-lakebase-locks-question-c",
+     "text": "No row, because the row B chose is no longer ready.",
+     "rationale": "The locking step does not stop at the failed row; it continues to the next row that qualifies."
+    },
+    {
+     "id": "dbxfe-lakebase-locks-question-d",
+     "text": "SQLSTATE 55P03 at once.",
+     "rationale": "That is NOWAIT's behaviour; plain FOR UPDATE waits instead of failing."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-locks-question-b",
+   "conceptIds": [
+    "dbxfe-lakebase-rowlock-concept",
+    "dbxfe-lakebase-skiplocked-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pglock",
+    "dbxfe-lakebase-claim-pgselect",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-optimistic-question",
+   "revision": "1",
+   "prompt": "R-101's form loaded QR-0001 at version 3. A supervisor then reassigned the item (now version 4). R-101 submits UPDATE ... WHERE item_id = 'QR-0001' AND version = 3. What should the app do with the result?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-optimistic-question-a",
+     "text": "It updated zero rows; treat that as a conflict, reload the row and show R-101 what changed.",
+     "rationale": "Correct: the version no longer matches, so the WHERE clause matches nothing, and a reload is the only useful next step."
+    },
+    {
+     "id": "dbxfe-lakebase-optimistic-question-b",
+     "text": "It updated one row, so the decision is stored.",
+     "rationale": "Version 3 no longer exists, so the predicate cannot match the current row."
+    },
+    {
+     "id": "dbxfe-lakebase-optimistic-question-c",
+     "text": "It raised SQLSTATE 40001, so retry the same statement until it succeeds.",
+     "rationale": "Under Read Committed no error is raised, and retrying a stale version can never succeed."
+    },
+    {
+     "id": "dbxfe-lakebase-optimistic-question-d",
+     "text": "It waited until the supervisor's transaction ended.",
+     "rationale": "The supervisor had already committed; nothing waits, and the predicate simply fails."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-optimistic-question-a",
+   "conceptIds": [
+    "dbxfe-lakebase-version-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-idempotent-question",
+   "revision": "1",
+   "prompt": "QR-0006 receives M-0006 (source_seq 2) and later, late, M-0005 (source_seq 1). With the lab's intake statement, what is QR-0006's final state?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-idempotent-question-a",
+     "text": "CRACK, severity 3, source_seq 1: the last message wins.",
+     "rationale": "That is the naive upsert the lab shows failing; the sequence guard exists to prevent it."
+    },
+    {
+     "id": "dbxfe-lakebase-idempotent-question-b",
+     "text": "M-0005 fails with a unique-key error and the batch stops.",
+     "rationale": "ON CONFLICT turns the conflict into a skipped update, not an error."
+    },
+    {
+     "id": "dbxfe-lakebase-idempotent-question-c",
+     "text": "Two QR-0006 rows exist, one per message.",
+     "rationale": "item_id is the primary key and the conflict target, so there is only ever one row."
+    },
+    {
+     "id": "dbxfe-lakebase-idempotent-question-d",
+     "text": "POROSITY, severity 2, source_seq 2: M-0005 is logged but does not change the item.",
+     "rationale": "Correct: M-0005 is a new message, so it is logged, but the DO UPDATE's WHERE refuses an older sequence."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-idempotent-question-d",
+   "conceptIds": [
+    "dbxfe-lakebase-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pginsert",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-connections-question",
+   "revision": "1",
+   "prompt": "After the review app moves behind a transaction-mode pooler, some requests fail with SQLSTATE 42P01, relation \"review_item\" does not exist, although the table is there. What is the most likely cause?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-connections-question-a",
+     "text": "The app role has lost its SELECT privilege on review_item.",
+     "rationale": "A missing privilege raises 42501, permission denied, not 42P01, undefined table."
+    },
+    {
+     "id": "dbxfe-lakebase-connections-question-b",
+     "text": "Scale to zero deleted the table while the compute was idle.",
+     "rationale": "Scale to zero closes connections; tables and committed rows stay in storage."
+    },
+    {
+     "id": "dbxfe-lakebase-connections-question-c",
+     "text": "The app sets search_path once per connection and uses unqualified names, and the failing transaction ran on a server connection without that setting.",
+     "rationale": "Correct: session settings stay on the server connection that received them, and the pooler lends a different one for the next transaction."
+    },
+    {
+     "id": "dbxfe-lakebase-connections-question-d",
+     "text": "The pooler rewrites table names in transaction mode.",
+     "rationale": "A pooler forwards SQL unchanged; what it changes is which server connection runs each transaction."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-connections-question-c",
+   "conceptIds": [
+    "dbxfe-lakebase-pooler-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-auth-question",
+   "revision": "1",
+   "prompt": "The review app's OAuth token expired ten minutes ago. A connection opened before expiry is still open, and the app now opens a second connection with the same token. What happens?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-auth-question-a",
+     "text": "Both connections are terminated at the moment of expiry.",
+     "rationale": "Expiry is checked at login, not continuously on open connections."
+    },
+    {
+     "id": "dbxfe-lakebase-auth-question-b",
+     "text": "The open connection keeps working; the new connection is refused until the app presents a fresh token.",
+     "rationale": "Correct: the documentation says expiry is enforced only at login, so only the new login checks the token."
+    },
+    {
+     "id": "dbxfe-lakebase-auth-question-c",
+     "text": "Both work, because the Postgres role itself has not changed.",
+     "rationale": "A new login must present a valid token; the role alone authenticates nothing."
+    },
+    {
+     "id": "dbxfe-lakebase-auth-question-d",
+     "text": "The new connection succeeds through the pooler, because pooling ignores tokens.",
+     "rationale": "The pooling documentation says pooling needs password roles and is not available for OAuth roles."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-auth-question-b",
+   "conceptIds": [
+    "dbxfe-lakebase-oauth-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-auth",
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-sync-question",
+   "revision": "1",
+   "prompt": "The app checks a reviewer's status in a synced roster table in continuous mode, and records claims in its own review_item table. A reviewer is deactivated in the lakehouse at 09:00:00. What can the app honestly promise?",
+   "options": [
+    {
+     "id": "dbxfe-lakebase-sync-question-a",
+     "text": "The change appears in the same transaction as the lakehouse update.",
+     "rationale": "Synchronization is asynchronous; the two stores never share a transaction."
+    },
+    {
+     "id": "dbxfe-lakebase-sync-question-b",
+     "text": "Nothing changes until someone runs the sync, because continuous mode needs a trigger.",
+     "rationale": "That describes triggered mode; continuous mode streams changes."
+    },
+    {
+     "id": "dbxfe-lakebase-sync-question-c",
+     "text": "The app can correct the synced roster itself to make it faster.",
+     "rationale": "A synced table is treated as read-only; corrections go to the source table."
+    },
+    {
+     "id": "dbxfe-lakebase-sync-question-d",
+     "text": "The roster reflects the change within seconds, not instantly, so a claim check at 09:00:05 may still see the reviewer as active.",
+     "rationale": "Correct: continuous sync is asynchronous with a documented minimum interval of about 15 seconds."
+    }
+   ],
+   "correctOptionId": "dbxfe-lakebase-sync-question-d",
+   "conceptIds": [
+    "dbxfe-lakebase-synced-concept",
+    "dbxfe-lakebase-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-synced",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-lakebase-state-self",
+   "revision": "1",
+   "prompt": "A developer proposes opening a transaction when a reviewer clicks Claim and committing it when they click Decide, 'so the row stays locked while they work'. Explain what goes wrong and what you would store instead.",
+   "modelAnswer": "The reviewer may take minutes, so the transaction would hold QR-0001's row lock, pin a server connection, block anything else that needs the row, and roll the claim back on any disconnect, idle timeout, pooler hand-back, scale to zero or app restart. Instead commit the claim at once as data (status claimed, claimed_by, claimed_at, a new version) and let Decide be a second short transaction that checks owner, status and version.",
+   "reasoning": "The open transaction was standing in for state; making the claim a committed row survives restarts and pooling while the version still catches conflicts. Adding a lease rule on claimed_at is an acceptable extension.",
+   "conceptIds": [
+    "dbxfe-lakebase-state-concept",
+    "dbxfe-lakebase-version-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgtx",
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-branches-self",
+   "revision": "2",
+   "prompt": "At 10:15 a faulty migration deleted 40 decided review items; reviewers kept claiming and deciding until 10:40. Describe the recovery you would run with Lakebase's documented features and explain why.",
+   "modelAnswer": "Inspect a branch at 10:14 and identify the 40 missing rows. Compare their keys and versions with production, repair only the verified loss in a transaction, and validate the result. A restore also leaves the original running; choose any application cutover separately, after reconciling later decisions. Rehearse the corrected migration before retrying it.",
+   "reasoning": "Historical state is evidence for a recovery plan. Selective repair or deliberate cutover changes what users see; creating the restored branch alone does not.",
+   "conceptIds": [
+    "dbxfe-lakebase-restore-concept",
+    "dbxfe-lakebase-branch-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-restore",
+    "dbxfe-lakebase-claim-branches",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-lakebase-checklist-self",
+   "revision": "1",
+   "prompt": "Before moving the lab's schema and statements to a Lakebase branch, which three checklist rows would you verify first, and what result would change the design?",
+   "modelAnswer": "First, authentication together with pooling: whether the app connects as an OAuth role or a password role decides whether it can use the pooler, and pooled access forbids session state, so confirm that claim, decision and intake each run as one transaction with schema-qualified names. Second, the Postgres version and the extensions the schema uses: run SHOW server_version on the branch. Third, how the reviewer roster arrives: which sync mode and freshness. If pooling needs a password role, the design adds secret rotation; if the roster lags, the claim adds a check against the operational table.",
+   "reasoning": "These rows touch every request, and each is cheap to verify on a child branch. Starting with the restore window or high availability is acceptable when recovery objectives are the main risk.",
+   "conceptIds": [
+    "dbxfe-lakebase-compat-concept",
+    "dbxfe-lakebase-pooler-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-compat",
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-lakebase-workloads",
+   "version": "1.0.0",
+   "title": "A reviewer's click and a trend report ask different things of data",
+   "outcome": "Classify a request as transactional or analytical from the rows it touches, its concurrency and the staleness it tolerates.",
+   "explanation": "A reviewer's Claim changes one row, must answer in milliseconds and races other reviewers: a [[dbxfe-lakebase-oltp-concept|transactional workload]]. The defect trend scans a day of inspections and accepts minutes-old data: an [[dbxfe-lakebase-olap-concept|analytical workload]]. In the first state, notice two paths: clicks go to Postgres, trends go from Delta tables through a warehouse, and copies move between them. In the second, one engine serves both and every node turns into a warning: clicks wait on scans, scans compete with claims.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-workloads",
+   "conceptIds": [
+    "dbxfe-lakebase-oltp-concept",
+    "dbxfe-lakebase-olap-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-overview",
+    "dbxfe-lakebase-claim-synced",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-workloads-visual",
+   "questionIds": [
+    "dbxfe-lakebase-workloads-question"
+   ],
+   "handbook": {
+    "markdown": "**What it is.** Transactional (OLTP, online transaction processing) access reads or changes a handful of rows by key, many times a second, from many users at once; each change must be atomic and visible to the very next request. Analytical (OLAP, online analytical processing) access scans, joins and aggregates many rows, usually from columnar files, and tolerates data that is minutes or hours old.\n\n**Why keep them apart.** A claim needs a row lock, a unique index and a millisecond answer. A warehouse over Delta tables is built for throughput on scans, not for thousands of single-row updates guarded by locks. The reverse also hurts: a dashboard scanning a day of rows in the operational database competes with claims for CPU, memory and I/O.\n\n**How Cinderline splits it.** Reviewer browser → review app → Lakebase Postgres for claims, decisions and intake; Delta tables in Unity Catalog → SQL warehouse → dashboard for trends. Two asynchronous links join them: the reviewer roster syncs from Unity Catalog into Postgres, and decisions flow back to Delta for reporting.\n\n**When not.** If an app only reads a small, slowly changing result, a synced table or a cached warehouse query may be enough. If nothing is written concurrently, a transactional store may be unnecessary.\n\n**What to inspect.** For each request, write down rows touched, whether it writes, how many users do it at once, its latency target and the staleness it tolerates. Requests that write under concurrency go to the transactional side; the rest usually do not.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-workloads"
+    ]
+   },
+   "recap": "Clicks that write under concurrency go to Postgres; scans that tolerate age go to the lakehouse.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-platform",
+   "version": "1.1.0",
+   "title": "Lakebase is managed Postgres arranged as projects, branches and computes",
+   "outcome": "Name the objects in a Lakebase project and predict what survives when its compute scales to zero.",
+   "explanation": "[[dbxfe-lakebase-product-concept|Lakebase]] is Databricks' managed Postgres. A [[dbxfe-lakebase-project-concept|project]] holds branches, a compute per branch, and the databases and roles on each branch. In the first state, notice that the app reaches data only through the production branch's compute, while the dev branch is a copy-on-write child. In the second, [[dbxfe-lakebase-scalezero-concept|scale to zero]] has suspended the idle compute: committed rows stay, but old sessions and their temporary tables and locks are excluded, so the next request reconnects.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-workloads",
+   "conceptIds": [
+    "dbxfe-lakebase-product-concept",
+    "dbxfe-lakebase-project-concept",
+    "dbxfe-lakebase-scalezero-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-overview",
+    "dbxfe-lakebase-claim-concepts",
+    "dbxfe-lakebase-claim-scalezero",
+    "dbxfe-lakebase-claim-status",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-platform-visual",
+   "questionIds": [
+    "dbxfe-lakebase-platform-question"
+   ],
+   "handbook": {
+    "markdown": "**The objects.** In the current version, documented as Lakebase Autoscaling, a **project** is the top-level container with settings such as compute defaults and the restore window. It holds **branches**, isolated database environments; the first one serves production. Each branch is served by a **compute** that runs Postgres and autoscales within a configured range, and holds the **databases** (default `databricks_postgres`) and **roles** you connect with. The earlier version, Lakebase Provisioned, used fixed-size database instances and has its own pages, including one on upgrading to Autoscaling; check which version a project runs before applying anything here.\n\n**Scale to zero.** An idle compute can be suspended. Storage and committed rows stay. Idle connections are closed, and their session context (temporary tables, prepared statements, advisory locks, LISTEN and NOTIFY) is lost. Expect the first connection afterwards to take longer while the compute resumes; measure it on your own project rather than assuming a figure. Disabling scale to zero keeps the compute, and its cost, running continuously.\n\n**Status and scope.** The release notes describe Lakebase as generally available and list some capabilities, such as Lakebase CDF, as Public Preview. The compatibility page lists Postgres 16, 17 and 18 for Autoscaling on AWS. Regions, compliance profiles and prices are checked for the account; this module quotes no price.\n\n**What to inspect.** On a branch, run `SHOW server_version;`. In the project, read the restore window, the compute's autoscaling range and whether scale to zero is on, and design the app to reconnect cleanly.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-workloads"
+    ]
+   },
+   "recap": "A project holds branches, computes, databases and roles; scale to zero keeps rows and drops sessions.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-model",
+   "version": "1.0.0",
+   "title": "Constraints turn the app's rules into rows that cannot exist",
+   "outcome": "Write constraints for an operational state machine and predict the SQLSTATE a bad write returns.",
+   "explanation": "Cinderline's operational state is relational: plant, reviewer, review_item and intake_message tables joined by keys. Instead of trusting every handler, the schema states the rules as [[dbxfe-lakebase-constraint-concept|integrity constraints]]: CHECKs on values, foreign keys to plant and reviewer, one table constraint tying status to owner and decision, and a partial unique index allowing one open claim per reviewer. In the first state, notice that every accepted row agrees with its status. In the second, each refused write from lab L23 names its own code and rule.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-model",
+   "conceptIds": [
+    "dbxfe-lakebase-constraint-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgtx",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-model-visual",
+   "questionIds": [
+    "dbxfe-lakebase-model-question"
+   ],
+   "handbook": {
+    "markdown": "**Relational first.** Model the entities the app acts on as tables with keys. plant and reviewer are reference tables; review_item is one row per flagged part and references both by foreign key; intake_message is an append-only log keyed by the producer's message ID. Each fact lives in one place, so moving a reviewer to another plant changes one row, not every item they touched.\n\nThen write the rules the app relies on as constraints, so the database refuses an impossible row whichever handler, script or admin tool wrote it.\n\n```sql\nCREATE TABLE qr.review_item (\n  item_id    text PRIMARY KEY CHECK (item_id ~ '^QR-[0-9]{4}$'),\n  plant_id   text NOT NULL REFERENCES qr.plant (plant_id),\n  severity   smallint NOT NULL CHECK (severity BETWEEN 1 AND 4),\n  status     text NOT NULL DEFAULT 'ready'\n             CHECK (status IN ('ready', 'claimed', 'decided')),\n  claimed_by text REFERENCES qr.reviewer (reviewer_id),\n  decision   text CHECK (decision IN ('accept', 'rework', 'scrap')),\n  version    integer NOT NULL DEFAULT 1,\n  CONSTRAINT review_item_state_consistent CHECK (\n    (status = 'ready'   AND claimed_by IS NULL     AND decision IS NULL) OR\n    (status = 'claimed' AND claimed_by IS NOT NULL AND decision IS NULL) OR\n    (status = 'decided' AND claimed_by IS NOT NULL AND decision IS NOT NULL)));\nCREATE UNIQUE INDEX review_item_one_open_claim\n  ON qr.review_item (claimed_by) WHERE status = 'claimed';\n```\n\nThe table is abridged; the lab's schema has every column. Each violation has its own SQLSTATE, and the app branches on it: `23514` check, `23502` not null, `23503` foreign key, `23505` unique. In lab L23 ten bad writes were each refused with the expected code and constraint name, and a three-row INSERT whose third row had severity 9 stored none of the three.\n\n**Limits.** A CHECK sees one row. Rules across rows need a unique index (one open claim), a foreign key or a trigger. 'Only the claimant may decide' is not a constraint; the decision's WHERE clause enforces it.\n\n**What to inspect.** `\\d qr.review_item` in psql lists every constraint, and an error's SQLSTATE plus the constraint name in its message say exactly which rule fired.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-model"
+    ]
+   },
+   "recap": "Put the state machine in the schema and branch on the SQLSTATE a refused write returns.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-state",
+   "version": "1.0.0",
+   "title": "Application state lives in committed rows, not in an open transaction",
+   "outcome": "Design a human-in-the-loop workflow as two short transactions with the claim stored as data.",
+   "explanation": "A reviewer may inspect a part for minutes. The claim is [[dbxfe-lakebase-state-concept|operational state]], so it must survive that gap as a committed row: status claimed, owner, time and version. In the first state, notice that the 09:02 app restart loses nothing because nothing was open. In the second, the same workflow holds one transaction from claim to decision: the lock is held for minutes, a server connection is pinned, and the restart silently rolls the claim back.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-model",
+   "conceptIds": [
+    "dbxfe-lakebase-state-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgtx",
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-state-visual",
+   "questionIds": [
+    "dbxfe-lakebase-state-self"
+   ],
+   "hint": "Ask what happens to an uncommitted claim when the connection disappears.",
+   "handbook": {
+    "markdown": "Operational state is the set of facts the app acts on: which items are ready, who holds which claim and since when, what was decided. Keep it in committed rows and keep every transaction short.\n\n**The two-transaction design.** Claim: one statement that locks, updates and commits in milliseconds, leaving `status = 'claimed'`, `claimed_by`, `claimed_at` and a new `version`. Work: the reviewer inspects the part; no transaction is open, the app server may restart, the connection may go back to a pool or be closed by scale to zero. Decide: a second short transaction that checks owner, status and version.\n\n**Why not one long transaction.** It holds the row lock for minutes, pins a server connection, blocks anything else that needs the row, and rolls the claim back on any disconnect, which is exactly when you most need to know who had the item.\n\n**What production adds.** A lease: `claimed_at` plus a rule such as 'a supervisor may reclaim items held longer than 30 minutes', applied by an UPDATE that also checks the version. An append-only audit table for decisions instead of overwriting them. Both are ordinary rows.\n\n**What is not operational state.** A reviewer's filters or scroll position (browser or session storage) and derived counts for the dashboard (analytical tables). Classifying state first tells you which data needs transactions at all; the other classes can live elsewhere.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-model"
+    ]
+   },
+   "recap": "Commit the claim as data; never keep a transaction open while a person thinks.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-isolation",
+   "version": "1.0.0",
+   "title": "Isolation decides which committed changes a statement can see",
+   "outcome": "Choose an isolation level for a request and state what your code must do at that level.",
+   "explanation": "Every PostgreSQL transaction works from a snapshot of committed data, and its [[dbxfe-lakebase-isolation-concept|isolation level]] decides when that snapshot is taken. In the first state, notice that Read Committed, the default, allows a second read to differ from the first, while Repeatable Read stops that but still allows serialization anomalies. In the second, see the price of stronger levels: the app must retry a transaction that fails with SQLSTATE 40001, and under Read Committed it must put its conditions inside the UPDATE.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-transactions",
+   "conceptIds": [
+    "dbxfe-lakebase-isolation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgiso",
+    "dbxfe-lakebase-claim-pgtx",
+    "dbxfe-lakebase-guidance"
+   ],
+   "visualId": "dbxfe-lakebase-isolation-visual",
+   "questionIds": [
+    "dbxfe-lakebase-isolation-question"
+   ],
+   "handbook": {
+    "markdown": "PostgreSQL implements isolation with snapshots (multi-version concurrency control): readers never wait for writers, and each statement or transaction sees a consistent picture of committed data.\n\n| Level | Snapshot taken | Nonrepeatable read | Phantom read | Serialization anomaly |\n|---|---|---|---|---|\n| Read Committed (default) | each statement | possible | possible | possible |\n| Repeatable Read | first statement | not possible | not possible in PostgreSQL | possible |\n| Serializable | first statement, plus conflict tracking | not possible | not possible | not possible |\n\nDirty reads are impossible at every level; asking for Read Uncommitted gives Read Committed.\n\n**What each level asks of your code.** Under Read Committed an UPDATE that waited for a lock re-checks its WHERE clause against the newest committed version of the row, so the condition you depend on (`status = 'ready'`, `version = 3`) belongs in the UPDATE itself, not only in an earlier SELECT. Under Repeatable Read and Serializable a transaction that would act on a changed row fails with SQLSTATE `40001`; wrap the whole transaction in a bounded retry loop.\n\n**Choosing.** Single-statement requests such as the claim and the decision are safe under Read Committed because their conditions live in the statement. A report whose several queries must agree uses Repeatable Read. A rule across many rows that no constraint expresses, such as 'at most three open rework items per plant', is a case for Serializable with retries.\n\n```sql\nBEGIN ISOLATION LEVEL REPEATABLE READ;\n-- several reads that must agree with each other\nCOMMIT;\n```",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-transactions"
+    ]
+   },
+   "recap": "Read Committed: fresh snapshot per statement; stronger levels keep one snapshot and ask you to retry.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-timeline",
+   "version": "1.0.0",
+   "title": "Two sessions on one timeline show what each level promises",
+   "outcome": "Predict each read and write in a two-session timeline under Read Committed and Repeatable Read.",
+   "explanation": "Lab L23 ran two psql sessions against one local PostgreSQL 16 database in a fixed order. In the first state, notice that A's count drops from 6 to 5 because B committed a claim between A's two statements. In the second, A's Repeatable Read snapshot keeps the count at 5 even after B claims QR-0002, and when A then updates QR-0002 it receives a [[dbxfe-lakebase-serialization-concept|serialization failure]], SQLSTATE 40001, and must retry the whole transaction.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-transactions",
+   "conceptIds": [
+    "dbxfe-lakebase-serialization-concept",
+    "dbxfe-lakebase-isolation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgiso",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-timeline-visual",
+   "questionIds": [
+    "dbxfe-lakebase-timeline-question"
+   ],
+   "handbook": {
+    "markdown": "Lab L23 drove two psql sessions against one local PostgreSQL 16.13 database, in a fixed order, and recorded every result.\n\n**Read Committed.** A runs `BEGIN` and counts ready items: 6. B claims (QR-0001) and commits. A counts again: 5. Nothing failed; A simply saw B's commit at its next statement.\n\n**Repeatable Read.** A runs `BEGIN ISOLATION LEVEL REPEATABLE READ` and counts: 5. B claims QR-0002 and commits. A counts again: still 5. A then runs `UPDATE qr.review_item SET severity = 3 WHERE item_id = 'QR-0002'` and receives `could not serialize access due to concurrent update`, SQLSTATE `40001`. A rolls back; real code retries from `BEGIN`.\n\n**Read Committed, with a write.** A reads QR-0005's severity (4). B claims QR-0005. A's update to severity 3 succeeds: the row now belongs to R-104 with a severity A chose from stale knowledge, and its version did not move. This is the lost update that the version check, or Repeatable Read with a retry, exists to stop.\n\n**Reproduce it.** Open two psql sessions (or two driver connections), run the statements alternately and write down the order. Order decides the outcome, not timing: a plain read never waits.\n\n**Troubleshoot.** If B seems to hang, it is waiting for a row lock A holds: `pg_stat_activity.wait_event_type` reads `Lock`. Commit or roll back A. If a retry loop never succeeds, the transaction is too long or too hot; shorten it.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-transactions"
+    ]
+   },
+   "recap": "Order decides isolation outcomes; under Repeatable Read a stale write fails with 40001 and is retried.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-locks",
+   "version": "1.0.0",
+   "title": "SKIP LOCKED lets two workers claim different rows without waiting",
+   "outcome": "Predict what a second worker receives under SKIP LOCKED, plain FOR UPDATE and NOWAIT.",
+   "explanation": "The claim's subquery picks the most urgent ready row and locks it with a [[dbxfe-lakebase-rowlock-concept|row-level lock]]. In the first state, notice that worker A holds QR-0001 in an open transaction and B, using [[dbxfe-lakebase-skiplocked-concept|SKIP LOCKED]], passes over it and claims QR-0002 at once. In the second, plain FOR UPDATE makes B wait on A's lock until A commits. In the third, NOWAIT makes B fail immediately with SQLSTATE 55P03.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-concurrency",
+   "conceptIds": [
+    "dbxfe-lakebase-rowlock-concept",
+    "dbxfe-lakebase-skiplocked-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pglock",
+    "dbxfe-lakebase-claim-pgselect",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-locks-visual",
+   "samajh": {
+    "text": "Socho courier office mein parcels ki slips ek hook pe lagi hain, sabse urgent upar. Har delivery boy sabse upar wali slip uthata hai. Agar Ramesh ne pehli slip haath mein pakdi hai aur address padh raha hai, toh Suresh uske haath se slip chhodne ka intezaar nahi karta; woh agli slip utha leta hai. Na do log ek hi parcel lekar nikalte hain, na koi bekaar khada rehta hai.",
+    "mapping": "The hook of slips is the ready queue in priority order, a slip in someone's hand is a row locked by an open transaction, and taking the next slip is SKIP LOCKED.",
+    "boundary": "A courier can see who holds a slip, but SKIP LOCKED reports nothing about the holder, and a skipped row may be released a moment later, so the view is deliberately inconsistent."
+   },
+   "questionIds": [
+    "dbxfe-lakebase-locks-question"
+   ],
+   "handbook": {
+    "markdown": "Row-level locks are taken by UPDATE, DELETE and SELECT ... FOR UPDATE and held until the transaction ends. They block other writers and lockers of the same row, never plain readers. The locking clause decides what a second locker does:\n\n| Clause | The row is locked by another transaction |\n|---|---|\n| FOR UPDATE | wait for it to end, then re-check the row |\n| FOR UPDATE NOWAIT | fail at once, SQLSTATE 55P03 |\n| FOR UPDATE SKIP LOCKED | skip it and take the next row that qualifies |\n\n```sql\nUPDATE qr.review_item AS r\n   SET status = 'claimed', claimed_by = :'reviewer_id',\n       claimed_at = now(), version = r.version + 1\n WHERE r.item_id = (SELECT q.item_id FROM qr.review_item q\n                     WHERE q.status = 'ready'\n                     ORDER BY q.severity DESC, q.flagged_at, q.item_id\n                     LIMIT 1 FOR UPDATE SKIP LOCKED)\n   AND r.status = 'ready'\nRETURNING r.item_id;\n```\n\nIn lab L23, A held QR-0001 in an open transaction and B's claim returned QR-0002 immediately. With plain FOR UPDATE, B's `wait_event_type` read `Lock` until A committed; B then re-checked QR-0001, found it claimed and took QR-0002. With NOWAIT, B failed with 55P03.\n\n**Limits.** The PostgreSQL documentation calls the skip-locked view inconsistent: right for a queue, wrong for a report. Priority is best effort, because a skipped urgent row goes to the next worker. A worker that crashes after committing its claim leaves the item claimed, which is why claims carry `claimed_at` for a lease rule. A partial index on ready rows in claim order keeps the subquery cheap as the table grows. The same claim serves a pick list in retail fulfilment or a specimen queue in a clinical laboratory.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-concurrency"
+    ]
+   },
+   "recap": "SKIP LOCKED: two workers, two different rows, no waiting.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-optimistic",
+   "version": "1.0.0",
+   "title": "A version number turns a silent overwrite into a visible conflict",
+   "outcome": "Write a version-checked update and handle the zero-row result as a conflict.",
+   "explanation": "While R-101 inspects QR-0001, nothing is locked, so someone else can change the row. [[dbxfe-lakebase-version-concept|Optimistic concurrency]] catches that at write time: every change adds one to version, and the decision only matches the version the form loaded. Follow the table as it grows: the claim leaves version 3, a supervisor's reassignment makes it 4, R-101's submit with version 3 updates zero rows, and R-103, who reloaded version 4, decides at version 5.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-concurrency",
+   "conceptIds": [
+    "dbxfe-lakebase-version-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-optimistic-visual",
+   "samajh": {
+    "text": "Aapne society ke notice board ka draft ghar le jaake edit kiya; draft pe page number 3 likha tha. Wapas aake secretary ko do, toh woh pehle dekhta hai ki board pe abhi bhi page 3 hi laga hai ya nahi. Agar beech mein kisi aur ne naya page 4 laga diya, toh aapka edit wapas: pehle naya wala padho, phir badlo. Kisi ka kaam chupke se mitta nahi.",
+    "mapping": "The page number is the version column, the secretary's look at the board is WHERE version = 3, and being handed the draft back is an UPDATE that matched zero rows.",
+    "boundary": "The database does not tell you what changed; the app must reload the row and show the difference, and only writes that include the version are protected."
+   },
+   "questionIds": [
+    "dbxfe-lakebase-optimistic-question"
+   ],
+   "handbook": {
+    "markdown": "Optimistic concurrency assumes conflicts are rare, holds no lock while a person thinks, and detects a conflict when the write arrives. Every change increments `version`, and every write that depends on what the writer saw includes the version it saw.\n\n```sql\nUPDATE qr.review_item\n   SET status = 'decided', decision = :'decision',\n       decided_at = now(), version = version + 1\n WHERE item_id = :'item_id'\n   AND claimed_by = :'reviewer_id'\n   AND status = 'claimed'\n   AND version = :expected_version\nRETURNING version;\n```\n\n**Reading the result.** One row returned: the decision is stored and the new version goes back to the form. No row: something changed, whether the version moved, the item was reassigned or it was already decided. Reload and show the person the difference. Never retry the same statement blindly: the stale version will never match.\n\n**Lab L23.** R-101 claimed QR-0001 (version 3). A supervisor reassigned it to R-103 with `WHERE version = 3` (now 4). R-101's submit with version 3 returned no row; a submit by R-101 with the current version 4 also returned no row, because R-103 owned the item; R-103's submit at version 4 stored *rework* at version 5. Without a version, two supervisors editing QR-0003 both saw one row updated and the first edit vanished.\n\n**When not.** Where conflicts are frequent, such as a hot stock counter, optimistic retries waste work; use one atomic statement (`SET on_hand = on_hand - 1 WHERE on_hand > 0`) or a short row lock. A timestamp can stand in for a version only if every writer updates it; an integer is harder to get wrong.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-concurrency"
+    ]
+   },
+   "recap": "Include the version you read; zero rows updated means reload, not retry.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-idempotent",
+   "version": "1.0.0",
+   "title": "An idempotency key makes a redelivered message change nothing",
+   "outcome": "Apply an at-least-once message stream with a message key and a sequence guard and predict each outcome.",
+   "explanation": "The quality pipeline delivers review requests at least once, so duplicates and late, older messages arrive. An [[dbxfe-lakebase-idempotency-concept|idempotent upsert]] logs each message_id once and updates an item only for a newer source_seq while it is ready. In the first state, notice deliveries 4 and 10 skipped as repeats and delivery 7 skipped as older. The second state is the same after replaying all ten. The third shows last-write-wins letting stale messages win.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-concurrency",
+   "conceptIds": [
+    "dbxfe-lakebase-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pginsert",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-idempotent-visual",
+   "questionIds": [
+    "dbxfe-lakebase-idempotent-question"
+   ],
+   "handbook": {
+    "markdown": "Pipelines and message brokers deliver at least once, so the same message can arrive twice and an older one can arrive after a newer one. An idempotent write leaves the same state however often it is applied. Two keys do the work: the producer's `message_id` answers 'have I seen this message?', and the item's `source_seq` answers 'is this newer than what I hold?'.\n\n```sql\nWITH logged AS (\n  INSERT INTO qr.intake_message (message_id, item_id, source_seq)\n  VALUES (:'message_id', :'item_id', :source_seq)\n  ON CONFLICT (message_id) DO NOTHING\n  RETURNING message_id)\nINSERT INTO qr.review_item AS r\n       (item_id, plant_id, part_serial, defect_code, severity, flagged_at, source_seq)\nSELECT :'item_id', :'plant_id', :'part_serial', :'defect_code',\n       CAST(:severity AS smallint), CAST(:'flagged_at' AS timestamptz), :source_seq\n  FROM logged\nON CONFLICT (item_id) DO UPDATE\n   SET defect_code = EXCLUDED.defect_code, severity = EXCLUDED.severity,\n       source_seq = EXCLUDED.source_seq, version = r.version + 1\n WHERE r.source_seq < EXCLUDED.source_seq AND r.status = 'ready';\n```\n\nA repeated message inserts nothing into `logged`, so the item insert has no input row. A new but older message is logged, and the WHERE on DO UPDATE refuses it. A newer message for an item a reviewer holds is refused too, because intake never edits work in progress.\n\n**Lab L23.** Ten deliveries gave applied, applied, applied, skipped, applied, applied, skipped, applied, applied, skipped; eight messages were logged; replaying all ten changed nothing. The last-write-wins upsert let the late M-0005 turn QR-0006 back into CRACK severity 3 and the redelivered M-0001 undo QR-0001's upgrade.\n\n**Limits.** The log grows: keep it for the producer's redelivery horizon, then archive. Two producers need separate key spaces. ON CONFLICT needs a unique index matching its target. Compare `intake_message` counts with the producer's sent count to find gaps.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-concurrency"
+    ]
+   },
+   "recap": "Log the message key once and let only newer sequences update a ready item.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-connections",
+   "version": "1.1.0",
+   "title": "A transaction-mode pooler lends connections per transaction, not per session",
+   "outcome": "Decide which parts of an app survive a transaction-mode pooler and restructure the rest.",
+   "explanation": "Each Postgres connection is a server process, so hundreds of short-lived app workers share a few server connections through a [[dbxfe-lakebase-pooler-concept|transaction-mode pooler]], the PgBouncer mode Lakebase documents. In the first state, notice each transaction borrowing whichever server connection is free. In the second, a SET search_path and a temp table from transaction 1 stay on server connection 1, so transaction 2, running on connection 2, fails with 42P01. Lab L23 reproduced that failure with two direct connections.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-connections",
+   "conceptIds": [
+    "dbxfe-lakebase-pooler-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-claim-scalezero",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-connections-visual",
+   "questionIds": [
+    "dbxfe-lakebase-connections-question"
+   ],
+   "handbook": {
+    "markdown": "A Postgres connection is a server process with its own memory, so connection count is a capacity limit; the documentation says the direct-connection limit depends on the compute size. Apps with many short-lived workers, such as web handlers or serverless functions, put a pooler in front.\n\nLakebase documents a built-in PgBouncer pooler in **transaction mode**: a client holds a server connection for one transaction, and at COMMIT or ROLLBACK the connection returns to the pool.\n\n| Works through the pooler | Breaks or changes |\n|---|---|\n| One transaction per unit of work (claim, decision, intake) | SET carried to the next transaction |\n| Driver-level prepared statements | SQL-level PREPARE and DEALLOCATE |\n| Requests without pub/sub | LISTEN and NOTIFY are both unsupported by the managed pooler |\n| Schema-qualified names | Temp tables and session advisory locks across transactions |\n\nLab L23 shows the mechanism with two direct connections (PgBouncer itself was not run): a temp table and a search_path set in session A were invisible to session B (SQLSTATE 42P01), and a session advisory lock held by A kept B out until A's connection closed.\n\n**Design rules.** Use a direct connection for pub/sub. One request, one transaction. Qualify names (`qr.review_item`). Keep no state in the session; if a setting is needed, use `SET LOCAL` inside the transaction. Scale to zero closes idle connections anyway, so the same rules protect you there.\n\n**Authentication decides access here.** The pooling page states that pooling needs native Postgres password authentication and is not available for OAuth roles, so pooled access means a password role and a secret to rotate.\n\n**Inspect.** `SELECT state, count(*) FROM pg_stat_activity GROUP BY state;` shows connections by state; many `idle in transaction` rows mean the app holds transactions open.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-connections"
+    ]
+   },
+   "recap": "Behind a transaction-mode pooler, keep every unit of work inside one transaction and nothing in the session.",
+   "changeNote": "Corrected managed-pooler LISTEN/NOTIFY support from the Lakebase Transaction mode section.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-auth",
+   "version": "1.1.0",
+   "title": "A Databricks identity reaches Postgres through a role and a short-lived token",
+   "outcome": "Trace how an app authenticates to Lakebase and predict what an expired token affects.",
+   "explanation": "Authentication and authorization are separate steps. An [[dbxfe-lakebase-oauth-concept|OAuth role]] links a Postgres role to a Databricks user, service principal or group, which logs in with a token that expires after one hour; the role's GRANTs then decide what it touches. In the second state, notice the expired token: the connection opened earlier keeps working because expiry is checked at login, while a new login fails. The third state shows the pooled path requiring a native password role.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-connections",
+   "conceptIds": [
+    "dbxfe-lakebase-oauth-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-auth",
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-claim-apps",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-auth-visual",
+   "samajh": {
+    "text": "Factory ke gate pe visitor pass milta hai jo ek ghante tak valid hai, aur guard use sirf andar aate waqt check karta hai. Andar ho, toh pass expire hone ke baad bhi apna kaam khatam kar sakte ho. Par bahar nikal ke dobara aana hai toh naya pass chahiye. Aur andar kis kamre mein ja sakte ho, woh pass nahi, gate ki list pe aapke naam ke saamne likha hua decide karta hai.",
+    "mapping": "The visitor pass is the one-hour OAuth token checked at login, staying inside is an open connection, and the list beside your name is the Postgres role's grants.",
+    "boundary": "A connection can still be closed for other reasons, such as scale to zero or a pooler hand-back, and then a fresh token is needed straight away."
+   },
+   "questionIds": [
+    "dbxfe-lakebase-auth-question"
+   ],
+   "handbook": {
+    "markdown": "Two questions stay separate: who you are (authentication) and what your role may do (authorization through Postgres privileges).\n\n**OAuth roles.** A Postgres role is linked to a Databricks identity, a user, service principal or group, and logs in with an OAuth token instead of a password. Tokens expire after one hour and expiry is checked only at login: an open connection keeps working, while a new connection needs a fresh token. An app therefore fetches a fresh token before opening connections, not on a timer tied to connections already open. Roles can be created in the Lakebase UI, with SQL through the `databricks_auth` extension, or through the SDK and REST API.\n\n**Native password roles.** Ordinary Postgres roles with a password. The pooling documentation requires them for pooled connections, so the password belongs in a secret store with rotation. New projects disable password connections by default; explicitly enable this access path before testing it.\n\n**Databricks Apps.** Adding Lakebase as an app resource creates or reuses a Postgres role matching the existing app service principal, grants it CONNECT and CREATE on the chosen database and passes connection details to the app as environment variables. Table privileges for anything the app did not create are yours to grant.\n\n**Least privilege, proven locally.** Lab L23's `qr_app` role could read, insert and update what it needed and append to the intake log; DELETE, UPDATE of the log, TRUNCATE and DROP each failed with SQLSTATE 42501, and a wrong password failed at login. That run used local SCRAM password authentication, not Lakebase tokens.\n\n```sql\nGRANT USAGE ON SCHEMA qr TO qr_app;\nGRANT SELECT, INSERT, UPDATE ON qr.review_item TO qr_app;\nGRANT SELECT, INSERT ON qr.intake_message TO qr_app;\n```",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-connections"
+    ]
+   },
+   "recap": "A token proves identity at login; GRANTs decide the rest; pooled access needs a password role.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-branches",
+   "version": "1.1.0",
+   "title": "Restore creates recovered state; using it is a separate decision",
+   "outcome": "Separate historical recovery from application cutover and preserve legitimate work when repairing an incident.",
+   "explanation": "A [[dbxfe-lakebase-branch-concept|historical branch]] lets you inspect the past, and [[dbxfe-lakebase-restore-concept|restore]] creates a new root branch. Neither automatically redirects production. In the synthetic incident, 40 items disappear at 10:15 while reviewers continue working. Compare selective copy-back with a deliberate cutover: inspect missing rows, reconcile intervening decisions and verify the result before changing what users see. The final visual keeps the original branch and its connections visible.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-recovery",
+   "conceptIds": [
+    "dbxfe-lakebase-branch-concept",
+    "dbxfe-lakebase-restore-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-branches",
+    "dbxfe-lakebase-claim-restore",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-branches-visual",
+   "questionIds": [
+    "dbxfe-lakebase-branches-self"
+   ],
+   "handbook": {
+    "markdown": "A **branch** provides an isolated environment for testing and historical inspection. Rehearse the corrected migration there before touching production.\n\n**Restore behaviour.** Lakebase restores historical state into a new root branch. The original branch and existing connections keep running. The project restore window is documented as 2–30 days, default 7; check the configured value before an incident.\n\n**Worked recovery decision (synthetic guidance).** At 10:15 a migration deletes 40 decided items; reviewers continue until 10:40. Query the 10:14 state, identify exactly which rows are missing, compare keys and versions against current production, and repair only the verified loss in a transaction. Validate decisions and counts before closing the incident.\n\n**Cutover is another operation.** Redirecting the application to historical state without reconciling the intervening work would present stale decisions to users. Pause or coordinate writes, reconcile those changes, validate the candidate and decide whether to change connection configuration. Merely creating restored state does not erase later writes from the original.\n\n**Boundaries.** This recovery plan is authored guidance, not an executed Lakebase drill. Check dependent consumers, permissions and synchronized copies separately; a recovered Postgres branch is not evidence that those systems have been reconciled.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-recovery"
+    ]
+   },
+   "recap": "Recover, validate and reconcile first; choose selective repair or explicit cutover separately.",
+   "changeNote": "Corrected restore semantics after direct primary-source inspection; earlier teaching conflated branch creation with production cutover.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-sync",
+   "version": "1.1.0",
+   "title": "Synchronization trades freshness for effort and never joins two transactions",
+   "outcome": "Pick a sync mode for a copy and state the freshness and consistency a screen can promise.",
+   "explanation": "Copies move both ways, asynchronously. A [[dbxfe-lakebase-synced-concept|synced table]] brings a Unity Catalog table into Postgres; [[dbxfe-lakebase-lakehousesync-concept|Lakebase CDF]], in Public Preview, sends Postgres changes to Delta. In the first state, notice that only review_item read inside a transaction is current; every copy states a [[dbxfe-lakebase-freshness-concept|freshness bound]] instead. In the second, one screen mixes a live claim with a roster copied at 06:40, so it prints each as-of time.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-sync",
+   "conceptIds": [
+    "dbxfe-lakebase-synced-concept",
+    "dbxfe-lakebase-lakehousesync-concept",
+    "dbxfe-lakebase-freshness-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-synced",
+    "dbxfe-lakebase-claim-lakehousesync",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-sync-visual",
+   "samajh": {
+    "text": "Mandi mein sabzi ke bhav ka board teen tarah se update ho sakta hai: subah ek baar poori list naye sire se likhi jaaye; jab munshi ji ko bola jaaye tab sirf badle hue bhav; ya ek screen jo har kuch second mein naye bhav dikhati rahe. Teeno mein board asli sauda nahi hai; asli bhav wahi hai jo abhi dukaan pe tay hua.",
+    "mapping": "The board is the synced table in Postgres, the three ways of updating it are the snapshot, triggered and continuous modes, and the deal struck at the shop is the Unity Catalog source table.",
+    "boundary": "Even the continuous screen lags by seconds, and nobody may chalk corrections onto the board: changes go to the source table and flow back through the sync."
+   },
+   "questionIds": [
+    "dbxfe-lakebase-sync-question"
+   ],
+   "handbook": {
+    "markdown": "Synchronization moves copies between the lakehouse and Postgres. In both directions it is asynchronous: a copy is always some time behind its source and never part of the source's transaction.\n\n**Unity Catalog to Lakebase: synced tables.** A synced table is a Postgres copy of a Unity Catalog table for low-latency lookups (reverse ETL). An initial snapshot runs at creation, and then:\n\n| Mode | Refresh | Needs | Freshness you can state |\n|---|---|---|---|\n| Snapshot | full copy when run | a primary key | as of the last run |\n| Triggered | changed rows when run or scheduled | write-time or automatic Change Data Feed | as of the last run |\n| Continuous | changes streamed | write-time or automatic Change Data Feed | seconds behind (minimum interval about 15 s) |\n\nThe app treats the copy as read-only; corrections go to the source.\n\n**Lakebase to Unity Catalog: Lakebase CDF.** The former Lakehouse Sync URL now opens the Lakebase Change Data Feed documentation. Documented as Public Preview, it captures row changes from Lakebase tables into Unity Catalog managed Delta tables as history, so pipelines and dashboards read decisions without querying the operational database.\n\n**Consistency.** A screen joining `review_item` (current) with a synced roster (seconds or hours old) mixes two moments. Say so: 'Roster as of 06:40'. Do not enforce a hard rule against a lagging copy; enforce it where the data is authoritative, or keep the fact the rule needs in the operational table.\n\n**Choosing.** Hours of lag are acceptable and much of the table changes: snapshot. Minutes, steady changes: triggered on a schedule. Seconds: continuous, with an always-on sync to pay for. Read the synced table's last sync time before promising freshness.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-sync"
+    ]
+   },
+   "recap": "Every copy lags its source: state an as-of time and never enforce a hard rule on a copy.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-lakebase-checklist",
+   "version": "1.1.0",
+   "title": "A compatibility checklist separates what ran locally from what the platform must confirm",
+   "outcome": "Build a platform compatibility checklist that labels each claim with its evidence.",
+   "explanation": "Lab L23 proved PostgreSQL behaviour on a local 16.13 server; it proved nothing about tokens, the pooler, branches or sync. Before the design moves, a checklist of [[dbxfe-lakebase-compat-concept|Postgres compatibility]] items compares the two. In the first state, notice that every row pairs a documented Lakebase difference with an action on a branch. In the second, see three evidence labels kept apart: local execution, documentation reviewed at search level, and unknowns only a project can measure.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-mistakes",
+   "conceptIds": [
+    "dbxfe-lakebase-compat-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-compat",
+    "dbxfe-lakebase-claim-status",
+    "dbxfe-lakebase-claim-pooling",
+    "dbxfe-lakebase-guidance",
+    "dbxfe-lakebase-fiction"
+   ],
+   "visualId": "dbxfe-lakebase-checklist-visual",
+   "questionIds": [
+    "dbxfe-lakebase-checklist-self"
+   ],
+   "handbook": {
+    "markdown": "A local PostgreSQL run proves semantics (constraints, locks, isolation, upserts), not the platform. Before moving the lab's design to Lakebase, walk a checklist and mark each row verified locally, documented but still to verify on your project, or unknown.\n\n| Area | Local lab (PostgreSQL 16.13) | Lakebase, as documented | Action |\n|---|---|---|---|\n| Version | 16.13 | Postgres 16, 17 or 18 on AWS | `SHOW server_version;` on the branch |\n| Superuser | lab_admin is superuser | none; databricks_superuser | run DDL as a non-superuser owner |\n| Authentication | SCRAM password | OAuth role or password role | choose per access path |\n| Pooling | none | PgBouncer, transaction mode | one transaction per unit of work |\n| Idle connections | kept | closed by scale to zero | reconnect; keep no session state |\n| Tablespaces, logical replication | available | not supported | remove from scripts |\n| Recovery | none | restore window 2 to 30 days | set it; rehearse on a branch |\n| Synchronization | none | synced tables; Lakebase CDF (Public Preview) | state freshness per copy |\n\n**How to use it.** Apply the lab's SQL files to a child branch with psql, in the order ADAPTATION.md gives, connected as a non-superuser role; a statement that fails there is a platform difference to design around. Keep the evidence labels apart: 'ran on local PostgreSQL 16' and 'ran on a Lakebase branch in a named region on a named date' are different claims.\n\n**Still unknown until measured on a project.** Regional availability, pricing, performance at your load, failover time and the reconnect delay after scale to zero. None of them can be inferred from a local run or from documentation alone.",
+    "sourceSectionIds": [
+     "dbxfe-lakebase-l01-mistakes",
+     "dbxfe-lakebase-l01-connections",
+     "dbxfe-lakebase-l01-recovery",
+     "dbxfe-lakebase-l01-sync"
+    ]
+   },
+   "recap": "Label every claim by its evidence: local run, documentation, or still unknown.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-lakebase-l01-card1",
+   "beatId": "dbxfe-lakebase-workloads"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card2",
+   "beatId": "dbxfe-lakebase-platform"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card3",
+   "beatId": "dbxfe-lakebase-model"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card4",
+   "beatId": "dbxfe-lakebase-state"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card5",
+   "beatId": "dbxfe-lakebase-isolation"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card6",
+   "beatId": "dbxfe-lakebase-timeline"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card7",
+   "beatId": "dbxfe-lakebase-locks"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card8",
+   "beatId": "dbxfe-lakebase-optimistic"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card9",
+   "beatId": "dbxfe-lakebase-idempotent"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card10",
+   "beatId": "dbxfe-lakebase-connections"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card11",
+   "beatId": "dbxfe-lakebase-auth"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card12",
+   "beatId": "dbxfe-lakebase-branches"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card13",
+   "beatId": "dbxfe-lakebase-sync"
+  },
+  {
+   "cardId": "dbxfe-lakebase-l01-card14",
+   "beatId": "dbxfe-lakebase-checklist"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-lakebase-extension-dataapi",
+   "revision": "1",
+   "prompt": "When might a client use the Lakebase Data API instead of opening Postgres connections?",
+   "answer": "When plain HTTP requests suit it better than a driver, since the Data API is a PostgREST-compatible REST interface to the database.",
+   "explanation": "A PostgREST-style interface exposes the database through standard HTTP methods, which can suit a thin client that should not hold drivers or long-lived connections. It removes no design work: constraints, version checks and idempotency keys still guard the writes. Read the current page for its authentication and for which objects it exposes before choosing it.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-connections",
+   "conceptIds": [
+    "dbxfe-lakebase-extension-dataapi-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-dataapi",
+    "dbxfe-lakebase-guidance"
+   ],
+   "beatId": "dbxfe-lakebase-connections",
+   "whyItMatters": "Shows a documented alternative to driver connections and pooling for simple clients without changing the data rules."
+  },
+  {
+   "id": "dbxfe-lakebase-extension-secondaries",
+   "revision": "1",
+   "prompt": "What happens to reads on a Lakebase readable secondary when the primary fails?",
+   "answer": "The promoted secondary becomes the primary and stops serving reads, so capacity on the read-only connection shrinks or pauses until a replacement is ready.",
+   "explanation": "High availability pairs a primary with secondaries in other availability zones and promotes one from the last committed transaction. Reads sent through the -ro connection string continue at reduced capacity when two or more readable secondaries exist, and stop until a replacement arrives when there is only one, so a dashboard reading from secondaries needs a fallback.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-connections",
+   "conceptIds": [
+    "dbxfe-lakebase-extension-secondaries-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-ha",
+    "dbxfe-lakebase-guidance"
+   ],
+   "beatId": "dbxfe-lakebase-connections",
+   "whyItMatters": "Separates failover protection for writes from read scaling, which behaves differently during an incident."
+  },
+  {
+   "id": "dbxfe-lakebase-extension-retry",
+   "revision": "1",
+   "prompt": "How should an application's retry loop for serialization failures be written?",
+   "answer": "Retry the whole transaction from BEGIN, only on SQLSTATE 40001, a small bounded number of times, with its reads inside the loop.",
+   "explanation": "PostgreSQL's documentation says applications using Repeatable Read or Serializable must be prepared to retry transactions that fail with serialization failures. Re-running only the failed statement keeps the old snapshot; re-reading inside the loop lets the retry see the change that caused the failure. Other errors, such as constraint violations, are not retried because they fail again.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-transactions",
+   "conceptIds": [
+    "dbxfe-lakebase-extension-retry-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pgiso",
+    "dbxfe-lakebase-guidance"
+   ],
+   "beatId": "dbxfe-lakebase-timeline",
+   "whyItMatters": "Turns the 40001 result from the two-session timeline into working application code."
+  },
+  {
+   "id": "dbxfe-lakebase-extension-deadlock",
+   "revision": "1",
+   "prompt": "How can two transactions deadlock on row locks, and how does lock ordering prevent it?",
+   "answer": "If each locks two rows in opposite orders, each waits for the other; PostgreSQL detects the cycle and aborts one, and a fixed lock order prevents it.",
+   "explanation": "Row locks are held until the transaction ends. A transaction that locks QR-0003 then QR-0004 while another locks QR-0004 then QR-0003 would wait forever, so PostgreSQL detects the cycle and aborts one of them. Locking rows in one consistent order, for example by item_id, removes the cycle; single-row claims like the lab's cannot deadlock this way.",
+   "lessonId": "dbxfe-lakebase-l01",
+   "sectionId": "dbxfe-lakebase-l01-concurrency",
+   "conceptIds": [
+    "dbxfe-lakebase-extension-deadlock-concept"
+   ],
+   "claimIds": [
+    "dbxfe-lakebase-claim-pglock",
+    "dbxfe-lakebase-guidance"
+   ],
+   "beatId": "dbxfe-lakebase-locks",
+   "whyItMatters": "Explains the failure that appears as soon as one transaction locks more than one row."
+  }
+ ],
+ "recap": {
+  "title": "Operational state in one store, copies everywhere else",
+  "markdown": "**Put the facts an application acts on in committed Postgres rows, guarded by constraints, and keep every change to one short transaction.** Claim with FOR UPDATE SKIP LOCKED, decide with a version check, take intake with a message key and a sequence guard, and retry 40001 when a stronger isolation level refuses a stale write. On Lakebase, connect as an OAuth role or, for the pooler, a password role; expect pooling and scale to zero to drop session state; branch to rehearse and to look back; and give every synced copy an as-of time. **Transfer challenge:** redesign the queue for Cinderline's maintenance work orders, where two technicians must never reserve the last unit of a spare part, and label each part of the design as locally tested, documented or still unknown.",
+  "visualId": "dbxfe-lakebase-workloads-visual"
+ },
+ "appliedTask": {
+  "title": "Reserve the last spare part exactly once",
+  "prompt": "Cinderline's maintenance team wants technicians to claim repair work orders and reserve spare parts for them. Stock counts arrive nightly from the ERP through the lakehouse, two technicians must never reserve the last unit of the same part, reservations are redelivered when the handheld app reconnects, and a maintenance dashboard shows open orders. Classify the state, name the constraint and the concurrency pattern for each write, say where stock lives and how fresh the dashboard is, and name one thing you would verify on a Lakebase branch.",
+  "modelAnswer": "Work orders, stock levels and reservations are operational state in Postgres; the dashboard's counts are analytical. work_order gets the same state CHECK, one-open-order-per-technician index and version column as review_item, and is claimed with FOR UPDATE SKIP LOCKED. part_stock keeps two facts with one writer each: erp_on_hand and its erp_as_of time, written only by the nightly load, and available, with CHECK (available >= 0). A reservation is one transaction that runs UPDATE part_stock SET available = available - :qty WHERE part_id = :p AND available >= :qty RETURNING available and inserts the reservation row, so zero rows means 'not enough stock' and two technicians can never take the last unit. Handheld reconnects replay reservations, so the reservation table is keyed by a client-generated reservation_id with ON CONFLICT DO NOTHING. Stock cannot be a synced table, because the app writes it and a copy lags. The nightly ERP figure is applied idempotently, keyed by part and snapshot date, and composes rather than overwrites: in one transaction the load locks the part row (SELECT ... FOR UPDATE), then sets available to erp_on_hand minus the reservations made after erp_as_of, which that snapshot has not seen (confirm with the ERP owner that it sees every earlier one). A 23:30 reservation against a 22:00 snapshot therefore survives the 02:00 load instead of being handed out again. The dashboard reads Delta history (Lakebase CDF, a Public Preview feature, or a scheduled export) and prints its as-of time. Verify on a branch whether the handheld path uses the pooler, which decides the role type, and that every step stays one transaction.",
+  "reasoning": "The answer applies each module pattern where it fits: SKIP LOCKED for claiming work, an atomic conditional update for a hot counter instead of optimistic retries, idempotency keys for replays, one writer per stored fact with a stated rule for combining the ERP baseline with reservations, and freshness labels for copies, while keeping platform features as items to verify.",
+  "beatIds": [
+   "dbxfe-lakebase-model",
+   "dbxfe-lakebase-locks",
+   "dbxfe-lakebase-optimistic",
+   "dbxfe-lakebase-idempotent",
+   "dbxfe-lakebase-sync",
+   "dbxfe-lakebase-connections"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-lakebase-scenario"
+ ]
+}

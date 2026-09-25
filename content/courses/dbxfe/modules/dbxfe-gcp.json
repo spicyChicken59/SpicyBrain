@@ -1,0 +1,671 @@
+{
+  "module": {
+    "id": "dbxfe-gcp",
+    "title": "Google Cloud deployment and network boundaries",
+    "summary": "Place the Databricks account and both compute planes against Cinderline's organization, folders and projects, trace one query with a named identity at every hop, and diagnose a denied and an unreachable request in order while unverified Google Cloud capabilities stay unknown.",
+    "objectives": [
+      "Draw Cinderline's Google Cloud deployment with every resource and service account in the project or account that owns it, and name what differs from AWS and Azure.",
+      "Trace author, control, execution and storage paths for one query on classic and on serverless compute, with bucket bindings and private connectivity at each boundary.",
+      "Run ordered diagnoses for a denied and an unreachable request and assemble an evidence matrix whose unknown cells stay unknown until verified."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m03",
+      "dbxfe-m06"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-gcp-l01.json"
+    ],
+    "scenarioId": "dbxfe-gcp-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-gcp-scenario",
+      "title": "Write Cinderline's Google Cloud deployment note for security review",
+      "context": "Fictional Cinderline Components runs classic workspace cinderline-gcp-prod in project cl-dbx-prod, with its customer-managed VPC cl-vpc-dbx in network project cl-net-host, and is adding serverless workspace cinderline-gcp-sls in the same region. Sources: bucket gs://cl-quality-raw in project cl-data-lake, supplier Ardent Castings' bucket gs://ardent-parts-feed in Ardent's own organization, and a Cloud SQL instance on a private address in cl-vpc-dbx. Security requires no public egress from compute, private user access and named evidence for every boundary. Region, tier, release status and feature entitlement are unconfirmed.",
+      "task": "Produce a one-page deployment note for the security specialist: where every resource sits in Cinderline's organization and the Databricks account, one query's request path per plane with the identity at each hop, the storage identity and bucket binding for each source, the private connectivity required and its DNS, the two diagnostic sequences the operations team will follow, the unknowns with their owners, and what must not be copied from the AWS or Azure notes.",
+      "requirements": [
+        "Place every resource in the project or account that owns it, including each service account read from its email.",
+        "Give each source its identity chain: principal, catalog grants, credential service account and the bucket binding with its owner, including the supplier's.",
+        "Separate the denied-request sequence from the unreachable-request sequence, with evidence rows for each.",
+        "Mark serverless private connectivity, required firewall rules, the default VM service account, tier and region as unknown until verified; provision nothing and copy no AWS or Azure answer."
+      ],
+      "model": "### Placement\nDatabricks account: workspace objects for cinderline-gcp-prod (classic) and cinderline-gcp-sls (serverless), the control plane and the Unity Catalog metastore. Cinderline's organization: folder manufacturing holds cl-dbx-prod (cluster VMs, two workspace buckets) and cl-data-lake (gs://cl-quality-raw); folder shared-network holds cl-net-host (cl-vpc-dbx, node subnet dbx-nodes-use4, endpoint subnet). Service accounts, read from their emails: dbx-provisioner@cl-admin-tools (Cinderline, account admin); db-<workspace-id>@prod-gcp-us-east4 (a Databricks project; its roles in cl-dbx-prod to be captured); cred_quality's Databricks-managed account.\n\n### Request paths\nClassic: Ana signs in → the job runs as sp-quality-nightly → Unity Catalog checks its grants → a VM in cl-dbx-prod reaches the relay through relay-pe → it reads gs://cl-quality-raw as cred_quality's account. Serverless: the same principal, grants and credential; no Cinderline VM, subnet or NAT.\n\n### Storage identity\ngs://cl-quality-raw: bindings for cred_quality's email, made by the data platform team. gs://ardent-parts-feed: the same binding, made by Ardent's administrator; pending.\n\n### Private connectivity\nBack-end PSC: relay-pe and workspace-pe registered and listed as dataplane_relay and rest_api; a private gcp.databricks.com zone visible to cl-vpc-dbx with workspace, dp- and tunnel records; no Cloud NAT, so a package mirror must exist first. Front-end PSC from the transit VPC under ENDPOINT-level private access settings.\n\n### Diagnoses\nDenied: read the named layer → principal → grants or credential binding → Policy Troubleshooter → smallest grant → rerun → evidence row. Unreachable: resolve from the subnet → zone visibility → endpoint status → egress rules by priority → retest → evidence row.\n\n### Unknown until verified\nServerless private access to the Cloud SQL lookup (kept on a classic job meanwhile); the firewall rules Databricks requires; the default VM service account; the workspace account's roles; PSC service attachments for the region; tier requirements for PSC and keys; whether Ardent's organization admits the binding. Nothing in this note is copied from the AWS or Azure notes.",
+      "reasoning": "The note keeps Google's hierarchy and the Databricks account apart, reads every service account's owner from its email, gives each source a complete chain that ends with a named binding owner, separates the two failure shapes so a permission fix is never applied to a network fault, and turns every unsettled capability into an owned verification item instead of a promise.",
+      "rubric": [
+        {
+          "id": "dbxfe-gcp-scenario-rubric-1",
+          "criterion": "Placement and ownership",
+          "weak": "One Databricks box; projects, folders and accounts merged.",
+          "partial": "Projects named, but service accounts' owners guessed or AWS terms used.",
+          "strong": "Every resource and service account placed in its owning project or account, read from emails and documented fields."
+        },
+        {
+          "id": "dbxfe-gcp-scenario-rubric-2",
+          "criterion": "Identity chain per source",
+          "weak": "Says 'grant access to the bucket' without naming who or what.",
+          "partial": "Names the credential but not who makes the binding, or where.",
+          "strong": "Principal, grants, credential account and binding owner for each source, including Ardent's administrator."
+        },
+        {
+          "id": "dbxfe-gcp-scenario-rubric-3",
+          "criterion": "Two diagnoses kept apart",
+          "weak": "One troubleshooting list mixing IAM and network checks.",
+          "partial": "Separate lists, but in no defensible order or without evidence rows.",
+          "strong": "A refusal read from its named layer; a timeout walked from name to endpoint to rule, each with evidence rows."
+        },
+        {
+          "id": "dbxfe-gcp-scenario-rubric-4",
+          "criterion": "Honest unknowns",
+          "weak": "Serverless PSC claimed from an SDK field or an Azure note.",
+          "partial": "Unknowns listed without sources, owners or a fallback.",
+          "strong": "Each unknown names its source, owner and fallback; nothing provisioned or borrowed from another cloud."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Will Ardent bind our credential's service account on their bucket?",
+          "response": "Unknown. Ardent's security contact has not answered, and their organization may restrict which outside identities can be granted roles. Until they answer, the supplier source is marked unreadable in the design."
+        },
+        {
+          "question": "Can serverless compute reach the Cloud SQL instance privately?",
+          "response": "The account team has not confirmed Google Cloud availability, region or release status in writing. The lookup stays on a classic job until they do."
+        },
+        {
+          "question": "May the network team remove Cloud NAT when back-end PSC goes live?",
+          "response": "For control-plane traffic, yes. But three notebooks install packages from the public index today, so the platform team must provide a mirror before the NAT goes."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-gcp-l01"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-gcp-course-claim-hierarchy",
+        "dbxfe-gcp-course-claim-workspace",
+        "dbxfe-gcp-course-claim-serverless",
+        "dbxfe-gcp-course-claim-accounts",
+        "dbxfe-gcp-course-claim-storage",
+        "dbxfe-gcp-course-claim-vpc",
+        "dbxfe-gcp-course-claim-egress",
+        "dbxfe-gcp-course-claim-firewall",
+        "dbxfe-gcp-course-claim-psc",
+        "dbxfe-gcp-course-claim-frontend",
+        "dbxfe-gcp-course-claim-ncc",
+        "dbxfe-gcp-course-claim-contrast"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-gcp-course-source-architecture",
+      "title": "High-level architecture",
+      "url": "https://docs.databricks.com/gcp/en/getting-started/high-level-architecture",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on Google Cloud; overview of the account, the control plane and the classic and serverless compute planes.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Listed for verification only: nothing in this module rests on this page alone, and region, workspace type and feature availability must be read from it before any real design. Not confirmed by search and not fetched in this build (web-search allowance used up; documentation host blocked by the sandbox egress proxy); listed for verification."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-vpc",
+      "title": "Configure a customer-managed VPC",
+      "url": "https://docs.databricks.com/gcp/en/security/network/classic/customer-managed-vpc",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on Google Cloud; classic compute in a VPC the customer provides.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Holds the current subnet, firewall, Private Google Access and shared-network requirements, none of which this build could read; every such requirement is marked unknown until verified. Not confirmed by search and not fetched in this build (web-search allowance used up; documentation host blocked by the sandbox egress proxy); listed for verification."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-psc",
+      "title": "Enable Private Service Connect for your workspace",
+      "url": "https://docs.databricks.com/gcp/en/security/network/classic/private-service-connect",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on Google Cloud; front-end and back-end Private Service Connect for classic workspaces.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Regional service attachments, DNS steps, tier and release status are on this page and were not read; treat every such detail as a verification item. Not confirmed by search and not fetched in this build (web-search allowance used up; documentation host blocked by the sandbox egress proxy); listed for verification."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-serverless",
+      "title": "Serverless compute plane networking",
+      "url": "https://docs.databricks.com/gcp/en/security/network/serverless-network-security/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on Google Cloud; connectivity from serverless compute to customer resources.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The page that should settle whether network connectivity configurations, private endpoint rules and network policies are available on Google Cloud; it was not read, so those cells stay unknown until verified. Not confirmed by search and not fetched in this build (web-search allowance used up; documentation host blocked by the sandbox egress proxy); listed for verification."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-storage",
+      "title": "Connect to cloud object storage using Unity Catalog",
+      "url": "https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on Google Cloud; storage credentials and external locations for Cloud Storage.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Holds the current role list and any narrower read-only option for the credential's service account; this build read the provider's Unity Catalog guide instead, so minimum roles are marked for verification. Not confirmed by search and not fetched in this build (web-search allowance used up; documentation host blocked by the sandbox egress proxy); listed for verification."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-workspace",
+      "title": "Databricks Terraform provider v1.133.0: Provisioning Databricks workspaces on GCP (guide)",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/guides/gcp-workspace.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Databricks on Google Cloud; account-level provisioning with a Google service account, a customer-managed VPC with Cloud NAT, and classic workspace creation.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A provider guide provided as-is, not the product documentation; its examples pin old provider versions and example regions and defer networking detail to the customer-managed VPC page. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on. Its statement that account-level APIs can only be authenticated using Google-issued OIDC tokens is not relied on: the provider's own index documents service-principal authentication at the account level in all supported clouds, and its resource pages scope the Google-issued OIDC requirement to creating or updating those resources (dbxfe-gcp-course-source-tf-index, dbxfe-gcp-course-source-tf-oidc-workspaces, dbxfe-gcp-course-source-tf-oidc-networks, dbxfe-gcp-course-source-tf-oidc-vpce)."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-psc",
+      "title": "Databricks Terraform provider v1.133.0: Provisioning Databricks workspaces on GCP with Private Service Connect (guide)",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/guides/gcp-private-service-connect-workspace.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Databricks on Google Cloud; back-end and front-end Private Service Connect, VPC endpoint registration and private access settings.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The guide's workspace example still carries a gke_config block that the workspace resource page marks deprecated; its examples are shapes to read, not configurations to copy. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-workspaces",
+      "title": "Databricks Terraform provider v1.133.0: databricks_mws_workspaces and databricks_mws_networks resources",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/mws_workspaces.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Databricks account API for AWS and Google Cloud workspaces: classic and serverless workspaces, network configurations and the workspace service account.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Resource documentation describes API fields and examples; it is not a statement of regional availability, and some examples still show deprecated GKE fields. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-uc",
+      "title": "Databricks Terraform provider v1.133.0: Unity Catalog set up on Google Cloud (guide)",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/guides/unity-catalog-gcp.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Unity Catalog on Google Cloud: metastore, storage credentials backed by Databricks-managed service accounts, external locations and cluster identities.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Provided as-is: the guide's code has inconsistent resource names and grants roles broader than read-only; take the mechanism from it and the minimum roles from the current Databricks page. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-ncc",
+      "title": "Databricks Terraform provider v1.133.0: network connectivity configuration and network policy resources",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/mws_ncc_binding.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Serverless connectivity objects in the Databricks account: NCCs, their binding to workspaces, private endpoint rules and network policies.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Provider documentation can lag the product; a statement that a feature is AWS and Azure only is evidence for an unknown on Google Cloud, not proof of absence. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-azure",
+      "title": "Databricks Terraform provider v1.133.0: Provisioning Azure Databricks with Private Link, standard deployment (guide)",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/guides/azure-private-link-workspace-standard.md",
+      "publisher": "Databricks (terraform-provider-databricks, provider documentation in the open-source repository)",
+      "type": "primary reference",
+      "context": "Azure Databricks; used here only as a contrast with Google Cloud.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Contrast evidence only: the Azure module owns Azure answers, and this module never uses them to fill a Google Cloud cell. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-sdk-provisioning",
+      "title": "Databricks SDK for Python v0.141.0: service/provisioning.py (workspaces, networks, private access and keys)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/provisioning.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Generated client for the Databricks account provisioning API, including Google Cloud network, endpoint, workspace and key objects; service/catalog.py at the same tag for storage credential classes.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API docstrings, some worded for AWS; they describe fields, not regional or tier availability. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-sdk-settings",
+      "title": "Databricks SDK for Python v0.141.0: service/settings.py (network connectivity configurations and network policies)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/settings.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "type": "primary reference",
+      "context": "Generated client for account settings: NCC egress rules, private endpoint rules and network policies.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A schema field shows what the API can describe; it does not show availability for an account, region or release stage. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-sra",
+      "title": "Databricks Security Reference Architecture templates: Google Cloud README",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-databricks-sra/main/gcp/README.md",
+      "publisher": "Databricks (terraform-databricks-sra, open-source security reference architecture templates)",
+      "type": "primary reference",
+      "context": "Databricks' security reference architecture for Google Cloud: customer-managed VPC, back-end PSC, Cloud KMS keys and private DNS.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Reference templates on a moving main branch, not product documentation; the file was read at the SHA-256 recorded here and may change. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-sra-psc",
+      "title": "Databricks Security Reference Architecture templates: Google Cloud workspace module (psc.tf, vpc.tf, workspace.tf)",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-databricks-sra/main/gcp/modules/workspace_deployment/psc.tf",
+      "publisher": "Databricks (terraform-databricks-sra, open-source security reference architecture templates)",
+      "type": "primary reference",
+      "context": "Terraform that implements back-end PSC, the VPC, private access settings and the workspace for Databricks on Google Cloud.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Template code on the main branch; its names, defaults and hardening choices are the template's, not requirements, and the firewall rule definitions it depends on were not readable. That was on 2026-09-23; the firewall definitions were read on 2026-09-25 at commit a3403d9 and are recorded as dbxfe-gcp-course-source-sra-firewall. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-compute",
+      "title": "Compute Engine API v1 discovery document (revision 20260910)",
+      "url": "https://www.googleapis.com/discovery/v1/apis/compute/v1/rest",
+      "publisher": "Google",
+      "type": "primary reference",
+      "context": "Google Cloud Compute Engine: subnetworks, Cloud Router NAT, VPC firewall rules, forwarding rules, service attachments and instance service accounts.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Machine-readable API reference: field descriptions, not the conceptual guides on docs.cloud.google.com, which this build cannot reach. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on. For the hierarchy claim, also read in this build on 2026-09-25 from https://www.googleapis.com/discovery/v1/apis/compute/v1/rest (revision 20260910), instances.insert: 'Creates an instance resource in the specified project using the data' ... path 'projects/{project}/zones/{zone}/instances'. Scope: API reference (interface only)."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-resourcemanager",
+      "title": "Cloud Resource Manager API v3 discovery document (revision 20260909)",
+      "url": "https://www.googleapis.com/discovery/v1/apis/cloudresourcemanager/v3/rest",
+      "publisher": "Google",
+      "type": "primary reference",
+      "context": "Google Cloud resource hierarchy: organizations, folders and projects.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API descriptions only; the hierarchy guides on docs.cloud.google.com were not reachable. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-iam",
+      "title": "Identity and Access Management (IAM) API v1 discovery document (revision 20260911)",
+      "url": "https://www.googleapis.com/discovery/v1/apis/iam/v1/rest",
+      "publisher": "Google",
+      "type": "primary reference",
+      "context": "Google Cloud service accounts and IAM policy bindings.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API descriptions only; role catalogues and best-practice guides were not reachable. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-storage-api",
+      "title": "Cloud Storage JSON API v1 discovery document (revision 20260918)",
+      "url": "https://www.googleapis.com/discovery/v1/apis/storage/v1/rest",
+      "publisher": "Google",
+      "type": "primary reference",
+      "context": "Google Cloud Storage bucket IAM configuration and permission testing.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API descriptions only; predefined role definitions such as Storage Object Admin were not read here. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on. For the hierarchy claim, also read in this build on 2026-09-25 from https://www.googleapis.com/discovery/v1/apis/storage/v1/rest (revision 20260918), Bucket.projectNumber: 'The project number of the project the bucket belongs to.' Scope: API reference (interface only)."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-orgpolicy",
+      "title": "Organization Policy API v2 discovery document (revision 20260917)",
+      "url": "https://orgpolicy.googleapis.com/$discovery/rest?version=v2",
+      "publisher": "Google",
+      "type": "primary reference",
+      "context": "Google Cloud organization policy constraints and their inheritance.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API descriptions only; constraint catalogues and guides were not reachable, so no constraint name is quoted as fact. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-troubleshooter",
+      "title": "Policy Troubleshooter API v1 discovery document (revision 20260913)",
+      "url": "https://www.googleapis.com/discovery/v1/apis/policytroubleshooter/v1/rest",
+      "publisher": "Google",
+      "type": "primary reference",
+      "context": "Google Cloud IAM troubleshooting for one principal, permission and resource.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API description only; command syntax shown in the handbooks is illustrative and must be checked against the current gcloud reference. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-dns",
+      "title": "Cloud DNS API v1 discovery document (revision 20260915)",
+      "url": "https://www.googleapis.com/discovery/v1/apis/dns/v1/rest",
+      "publisher": "Google",
+      "type": "primary reference",
+      "context": "Google Cloud DNS managed zones and private visibility.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API descriptions only; response policies and forwarding options were not read. Read on 2026-09-23 through a host this build can reach; the teaching module's source record carries the passages relied on."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-oidc-workspaces",
+      "title": "Databricks Terraform provider v1.133.0: databricks_mws_workspaces resource (GCP authentication note)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_workspaces.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks-published Terraform provider documentation at the v1.133.0 release commit; its Google Cloud note on how the account-level provider must authenticate to create or update this resource.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Interface documentation read at a pinned commit, not the current Databricks authentication page. Relied on only to narrow the account-API authentication sentence to the resources the note names. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_workspaces.md: 'On GCP, the provider must be authenticated with a Google-issued OIDC token (not a Databricks OAuth token), because creating or updating this resource triggers operations against your GCP project.' Scope: Terraform interface documentation of the authentication the provider needs for this resource on Google Cloud; it does not describe every account-level API."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-oidc-networks",
+      "title": "Databricks Terraform provider v1.133.0: databricks_mws_networks resource (GCP authentication note)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_networks.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks-published Terraform provider documentation at the v1.133.0 release commit; its Google Cloud note on how the account-level provider must authenticate to create or update this resource.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Interface documentation read at a pinned commit, not the current Databricks authentication page. Relied on only to narrow the account-API authentication sentence to the resources the note names. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_networks.md: 'On GCP, the provider must be authenticated with a Google-issued OIDC token (not a Databricks OAuth token), because creating or updating this resource triggers operations against your GCP project.' Scope: Terraform interface documentation of the authentication the provider needs for this resource on Google Cloud; it does not describe every account-level API."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-oidc-vpce",
+      "title": "Databricks Terraform provider v1.133.0: databricks_mws_vpc_endpoint resource (GCP authentication note)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_vpc_endpoint.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks-published Terraform provider documentation at the v1.133.0 release commit; its Google Cloud note on how the account-level provider must authenticate to create or update this resource.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Interface documentation read at a pinned commit, not the current Databricks authentication page. Relied on only to narrow the account-API authentication sentence to the resources the note names. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_vpc_endpoint.md: 'On GCP, the provider must be authenticated with a Google-issued OIDC token (not a Databricks OAuth token), because creating or updating this resource triggers operations against your GCP project (such as validating the PSC endpoint).' Scope: Terraform interface documentation of the authentication the provider needs for this resource on Google Cloud; it does not describe every account-level API."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-tf-index",
+      "title": "Databricks Terraform provider v1.133.0: provider documentation index (authentication)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/index.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks-published Terraform provider documentation index at the v1.133.0 release commit; authentication options for account-level and workspace-level providers.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Interface documentation read at a pinned commit, not the current Databricks authentication page. Relied on only to show that account-level calls are not limited to Google-issued OIDC tokens on every cloud. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/index.md: 'You can use the `client_id` + `client_secret` attributes to authenticate with a Databricks-managed service principal at both the account and workspace levels in all supported clouds.' Scope: Terraform provider authentication interface; it establishes no region, entitlement or account setting."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-troubleshooter-inheritance",
+      "title": "Policy Troubleshooter API v1 discovery document (revision 20260920): explained policies",
+      "url": "https://www.googleapis.com/discovery/v1/apis/policytroubleshooter/v1/rest",
+      "publisher": "Google",
+      "type": "primary reference",
+      "context": "Google Cloud IAM troubleshooting response: which policies are evaluated for a principal's permission on a resource.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "API description only, read live (revision 20260920); relied on to correct a rationale about how far a project-level grant reaches. Read in this build on 2026-09-25 from https://www.googleapis.com/discovery/v1/apis/policytroubleshooter/v1/rest: 'The list of policies can include the policy for the resource itself. It can also include policies that are inherited from higher levels of the resource hierarchy, including the organization, the folder, and the project.' Scope: Google's API reference for the troubleshooting response. It names policies inherited from higher levels of the resource's own hierarchy, including the organization, the folder and the project; the rationale reads a grant on a different project as not among them."
+    },
+    {
+      "id": "dbxfe-gcp-course-source-sra-firewall",
+      "title": "Databricks Security Reference Architecture templates: Google Cloud workspace module firewall rules (vpc-firewall.tf, workspace.tf, variables.tf)",
+      "url": "https://github.com/databricks/terraform-databricks-sra/blob/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/vpc-firewall.tf",
+      "publisher": "Databricks (terraform-databricks-sra, open-source security reference architecture templates)",
+      "type": "primary reference",
+      "context": "Terraform in Databricks' reference architecture that creates the VPC firewall rules for a classic Google Cloud workspace: the Databricks subnet's ingress rule before the workspace when the template builds the VPC and, when the network is hardened, egress rules. The url is the module's firewall file; workspace.tf and variables.tf are in the same directory at the same commit.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Databricks-authored template code (companion material), not product documentation: its names, priorities and hardening choices are the template's and it is not a complete list of the rules Databricks requires. Relied on only for what the template says of the subnet ingress rule Databricks requires (pre-created in a VPC the template builds, left to the caller in a VPC the caller brings) and for the hardened egress rule to the region's control-plane IP addresses when PSC is not used. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/vpc-firewall.tf: '# Pre-create the intra-subnet ingress rule that Databricks would otherwise # auto-create on the workspace's VPC.' ... '# Skipped when use_existing_vpc = true — in bring-your-own-VPC mode the # caller is responsible for all GCP-side networking, including the subnet # ingress rule Databricks requires.' ... 'count = (var.use_existing_vpc || var.serverless_workspace_deployment) ? 0 : 1' ... 'count = (var.harden_network && !var.use_psc && !var.serverless_workspace_deployment) ? 1 : 0' ... 'destination_ranges = var.databricks_control_plane_ips'; from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/workspace.tf: 'depends_on = [ google_compute_firewall.db_subnet_ingress, ]'; and from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/variables.tf: 'Databricks control-plane IPs for your region. Required when harden_network = true and use_psc = false.' Scope: a Databricks-authored reference template (open-source companion code), not the product's documented requirements."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-gcp-course-claim-hierarchy",
+      "description": "In Google Cloud's resource hierarchy the organization is the root node, folders organize an organization's resources and a project's parent is an organization or a folder; the IAM policies evaluated for a permission can include policies inherited from the organization, folder and project; organization policy constraints restrict resource configuration and are inherited down the hierarchy, where they can be overridden.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-resourcemanager",
+        "dbxfe-gcp-course-source-troubleshooter",
+        "dbxfe-gcp-course-source-orgpolicy",
+        "dbxfe-gcp-course-source-troubleshooter-inheritance",
+        "dbxfe-gcp-course-source-storage-api",
+        "dbxfe-gcp-course-source-compute"
+      ],
+      "context": "Google Cloud resource hierarchy and policy inheritance, from Google's published API descriptions."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-workspace",
+      "description": "A classic Databricks workspace on Google Cloud names, as its cloud resource container, the project it uses to instantiate the workspace's cloud resources, plus a region; its network configuration records the project that holds the VPC and subnet; by default Databricks creates a VPC in that project for each workspace, a customer-managed VPC is recommended and an existing workspace cannot be migrated to one; account-level APIs at accounts.gcp.databricks.com are called by account admins, and creating or updating workspaces, network configurations and VPC endpoints through them requires a Google-issued OIDC token rather than a Databricks OAuth token.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-tf-workspaces",
+        "dbxfe-gcp-course-source-tf-workspace",
+        "dbxfe-gcp-course-source-sdk-provisioning",
+        "dbxfe-gcp-course-source-architecture",
+        "dbxfe-gcp-course-source-tf-oidc-workspaces",
+        "dbxfe-gcp-course-source-tf-oidc-networks",
+        "dbxfe-gcp-course-source-tf-oidc-vpce",
+        "dbxfe-gcp-course-source-tf-index"
+      ],
+      "context": "Databricks on Google Cloud classic workspaces; region, tier and entitlement must be verified."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-serverless",
+      "description": "A serverless workspace on Google Cloud is created with compute mode SERVERLESS and a region and needs no prerequisite resources; Databricks' reference template gives it no project container and no network configuration; the account API's storage modes are CUSTOMER_HOSTED and DEFAULT_STORAGE; classic workspaces report the effective compute mode HYBRID.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-tf-workspaces",
+        "dbxfe-gcp-course-source-sra-psc",
+        "dbxfe-gcp-course-source-sdk-provisioning",
+        "dbxfe-gcp-course-source-architecture"
+      ],
+      "context": "Databricks on Google Cloud serverless workspaces; availability by region and account must be verified."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-accounts",
+      "description": "A Google service account is owned by the project named when it is created, which forms part of its email; the workspace service account has the form db-<workspace-id>@prod-gcp-<region>.iam.gserviceaccount.com; provisioning uses a customer service account added to the Databricks account console as an account admin and granted a custom Workspace Creator role; a cluster can carry a Google service account used for Cloud Storage and BigQuery; the service account with access to a customer-managed key exists within the Databricks control-plane project; a Compute Engine VM supports one attached service account whose tokens code on the VM reads through the metadata server.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-iam",
+        "dbxfe-gcp-course-source-tf-workspaces",
+        "dbxfe-gcp-course-source-tf-workspace",
+        "dbxfe-gcp-course-source-tf-uc",
+        "dbxfe-gcp-course-source-sdk-provisioning",
+        "dbxfe-gcp-course-source-compute"
+      ],
+      "context": "Identities in a Databricks on Google Cloud deployment; the default classic VM account is not settled by these sources."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-storage",
+      "description": "On Google Cloud a Unity Catalog storage credential creates a Databricks-managed service account whose email is granted access to buckets, and Databricks' Unity Catalog guide binds roles/storage.objectAdmin and roles/storage.legacyBucketReader on the bucket; an external location combines a gs:// path with a storage credential; with uniform bucket-level access only bucket-level or higher IAM policies control access; testIamPermissions reports the permissions the caller itself holds on a bucket.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-tf-uc",
+        "dbxfe-gcp-course-source-sdk-provisioning",
+        "dbxfe-gcp-course-source-storage-api",
+        "dbxfe-gcp-course-source-storage"
+      ],
+      "context": "Unity Catalog storage access on Google Cloud; minimum roles must be read from the current Databricks page."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-vpc",
+      "description": "A customer-managed VPC for a classic workspace on Google Cloud supplies a subnet in the workspace's region, with a netmask between /29 and /9, from whose range Compute Engine cluster nodes are allocated, and outbound access to the public network through Cloud NAT or a similar customer-managed appliance; one VPC can serve several workspaces but a subnet cannot be reused by other workspaces or resources; secondary pod and service ranges and the GKE configuration are deprecated and no longer supported.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-tf-workspaces",
+        "dbxfe-gcp-course-source-tf-workspace",
+        "dbxfe-gcp-course-source-vpc"
+      ],
+      "context": "Classic compute networking on Google Cloud; firewall and Private Google Access requirements are not settled by these sources."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-egress",
+      "description": "Private Google Access lets VMs in a subnet reach Google services without external IP addresses; a Cloud NAT gateway lets VMs in the chosen subnets reach the internet without external IP addresses; a VM without an access configuration has no external internet access; Databricks' examples enable Private Google Access on the node subnet, and Databricks' reference template creates no Cloud Router or Cloud NAT when back-end Private Service Connect is used.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-compute",
+        "dbxfe-gcp-course-source-tf-workspace",
+        "dbxfe-gcp-course-source-sra-psc"
+      ],
+      "context": "Outbound paths from classic compute on Google Cloud."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-firewall",
+      "description": "Google Cloud firewall rules allow or deny ingress or egress for instances in a VPC network; direction defaults to ingress; priority runs from 0 to 65535 with 1000 as default, lower numbers take precedence and a deny beats an allow at equal priority; implied rules sit at priority 65535; target tags or target service accounts narrow a rule, and without them it applies to every instance in the network; the Databricks Workspace Creator role includes permission to read and create firewall rules, and Databricks' reference template creates an ingress rule for the Databricks subnet before the workspace and, when hardened without PSC, an egress rule using the region's control-plane IP addresses.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-compute",
+        "dbxfe-gcp-course-source-tf-workspace",
+        "dbxfe-gcp-course-source-sra-psc",
+        "dbxfe-gcp-course-source-sra-firewall"
+      ],
+      "context": "VPC firewall rules; the rules Databricks requires must be read from the current customer-managed VPC page."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-psc",
+      "description": "Back-end Private Service Connect for Databricks on Google Cloud uses two endpoints, one for the secure cluster connectivity relay and one for REST APIs; each is a forwarding rule in the customer's VPC whose target is a Databricks service attachment, registered in the Databricks account with its project, endpoint name and region and listed in the network configuration as dataplane_relay or rest_api; a workspace must be created with private access settings to support PSC scenarios; Databricks' reference template requires a customer-managed VPC and adds a private Cloud DNS zone for gcp.databricks.com, visible to the VPC, with records for the workspace URL, its dp- variant and tunnel.<region>.gcp.databricks.com; a PSC connection's status can be ACCEPTED, PENDING, REJECTED, CLOSED or NEEDS_ATTENTION.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-tf-psc",
+        "dbxfe-gcp-course-source-sra",
+        "dbxfe-gcp-course-source-sra-psc",
+        "dbxfe-gcp-course-source-compute",
+        "dbxfe-gcp-course-source-dns",
+        "dbxfe-gcp-course-source-psc"
+      ],
+      "context": "Classic private connectivity on Google Cloud; regional service attachments, tier and release status must be verified."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-frontend",
+      "description": "A front-end PSC endpoint, placed in a transit VPC, carries user connections to the Databricks web application, REST API and Databricks Connect API; private access settings choose ACCOUNT level, which admits VPC endpoints registered in the Databricks account, or ENDPOINT level, which admits only listed endpoint IDs; public_access_enabled defaults to true on Google Cloud and false on AWS, and with public access enabled an IP access list restricts public sources; the API description allows disabling public access only with both front-end and back-end private connections.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-tf-psc",
+        "dbxfe-gcp-course-source-sdk-provisioning"
+      ],
+      "context": "Front-end private connectivity and private access settings; the API description is partly worded for AWS."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-ncc",
+      "description": "The Databricks Terraform provider documentation at v1.133.0 states that NCC binding is available for AWS and Azure only and in Public Preview on AWS, that NCC private endpoint rules are available on Azure and in Public Preview on AWS, and documents only AWS and Azure default and target rule types; the Databricks SDK for Python v0.141.0 models a gcp_endpoint on NCC private endpoint rules with a target service attachment, Google API hostnames or all APIs that support VPC Service Controls; network policies list GOOGLE_CLOUD_STORAGE as a storage destination type.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-tf-ncc",
+        "dbxfe-gcp-course-source-sdk-settings",
+        "dbxfe-gcp-course-source-serverless"
+      ],
+      "context": "Serverless connectivity on Google Cloud: the read sources conflict, so availability is unknown until verified."
+    },
+    {
+      "id": "dbxfe-gcp-course-claim-contrast",
+      "description": "On AWS the Databricks network configuration takes at least two subnets in different availability zones with netmasks between /17 and /25 plus security groups, and a storage credential's IAM role requires a trust policy; Azure Databricks workspaces are Azure resources whose injected virtual network uses two subnets delegated to Microsoft.Databricks/workspaces with network security groups, with Private Link private endpoints for back-end, front-end and browser authentication, and storage credentials can use an Azure Databricks access connector's managed identity.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-gcp-course-source-tf-workspaces",
+        "dbxfe-gcp-course-source-tf-uc",
+        "dbxfe-gcp-course-source-tf-azure"
+      ],
+      "context": "Contrast only; the AWS and Azure modules own their clouds' answers."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-gcp-l01-hierarchy-concept",
+      "term": "resource hierarchy (Google Cloud)",
+      "aliases": [
+        "organization",
+        "folder",
+        "project"
+      ],
+      "definition": "The organization, folders and projects that contain Google Cloud resources and pass IAM and organization policies downward.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-placement"
+    },
+    {
+      "id": "dbxfe-gcp-l01-plane-concept",
+      "term": "compute plane (Google Cloud)",
+      "aliases": [
+        "classic compute plane",
+        "serverless compute plane"
+      ],
+      "definition": "Compute Engine VMs in the customer's project for classic workspaces; Databricks-managed compute for serverless.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-placement"
+    },
+    {
+      "id": "dbxfe-gcp-l01-account-concept",
+      "term": "service account (Google Cloud)",
+      "aliases": [
+        "Google service account",
+        "workspace service account"
+      ],
+      "definition": "A Google Cloud identity for software, owned by the project whose ID appears in its email.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-identities"
+    },
+    {
+      "id": "dbxfe-gcp-l01-credential-concept",
+      "term": "storage credential (Google Cloud)",
+      "aliases": [
+        "Databricks-managed service account",
+        "bucket IAM binding"
+      ],
+      "definition": "A Unity Catalog object backed by a Databricks-managed service account that must be granted roles on each bucket it reads.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-identities"
+    },
+    {
+      "id": "dbxfe-gcp-l01-vpc-concept",
+      "term": "customer-managed VPC (Google Cloud)",
+      "aliases": [
+        "Cloud NAT",
+        "Private Google Access"
+      ],
+      "definition": "A customer VPC registered with its project, VPC and one regional subnet, with an outbound path for classic nodes.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-network"
+    },
+    {
+      "id": "dbxfe-gcp-l01-firewall-concept",
+      "term": "VPC firewall rule",
+      "aliases": [
+        "firewall priority"
+      ],
+      "definition": "A network-wide allow or deny rule for ingress or egress, where the lowest priority number decides and a deny wins a tie.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-network"
+    },
+    {
+      "id": "dbxfe-gcp-l01-psc-concept",
+      "term": "Private Service Connect (Databricks on Google Cloud)",
+      "aliases": [
+        "back-end PSC",
+        "front-end PSC",
+        "private access settings"
+      ],
+      "definition": "Forwarding rules in the customer's VPC that target Databricks service attachments, registered in the account and resolved through private DNS.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-private"
+    },
+    {
+      "id": "dbxfe-gcp-l01-ncc-concept",
+      "term": "network connectivity configuration",
+      "aliases": [
+        "NCC",
+        "serverless private connectivity"
+      ],
+      "definition": "The account object that governs serverless connections to customer resources on AWS and Azure; its Google Cloud availability is unknown until verified.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-serverless"
+    },
+    {
+      "id": "dbxfe-gcp-l01-unknown-concept",
+      "term": "unknown until verified",
+      "aliases": [
+        "verification item"
+      ],
+      "definition": "A status kept on a design cell until a named source or test settles the capability for the account, region and release.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-serverless"
+    },
+    {
+      "id": "dbxfe-gcp-l01-diagnosis-concept",
+      "term": "ordered diagnosis (Google Cloud)",
+      "aliases": [
+        "denied versus unreachable"
+      ],
+      "definition": "Checks ordered by failure shape: follow the layer a refusal names, or walk the network path outward for a timeout.",
+      "lessonId": "dbxfe-gcp-l01",
+      "sectionId": "dbxfe-gcp-l01-example"
+    }
+  ]
+}

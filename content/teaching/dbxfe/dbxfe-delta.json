@@ -17,7 +17,7 @@
     "dbxfe-m03-l02"
   ],
   "optionalBridgeLessonIds": [],
-  "editorialRationale": "One connected file example establishes the mechanism before schema, concurrency and compatibility deepen it.",
+  "editorialRationale": "One connected file example establishes the mechanism first; schema, concurrency and compatibility then deepen that same example.",
   "sources": [
     {
       "id": "dbxfe-delta-source-delta",
@@ -888,7 +888,7 @@
       "title": "Validate before accepting a second writer",
       "alt": "Validate before accepting a second writer. W1 and W2 each read the same old state. W2 must validate against the intervening commit; stale assumptions are not automatically accepted.",
       "caption": "Concurrency is validated against actual overlapping changes and feature context. Synthetic teaching example.",
-      "textEquivalent": "Both read v0: W1 and W2 each read the same old state. Nodes: v0: A0+C. Shared starting snapshot. (context); Writer 1: A1=12. Prepares replacement. (pending); Writer 2: A2=14. Also prepares replacement. (pending). Relationships: v0 → Writer 1: read; v0 → Writer 2: read.\n\nW1 commits first: W2 must validate against the intervening commit; stale assumptions are not automatically accepted. Nodes: v1: A1+C. W1 committed. (selected); Writer 1: complete. Its change is current. (selected); Writer 2: validate / conflict. Overlapping replacement needs review. (warning). Relationships: Writer 2 → v1: validate before commit.",
+      "textEquivalent": "Both read v0: W1 and W2 each read the same old state. Nodes: v0: A0+C. Shared starting snapshot. (context); Writer 1: A1=12. Prepares replacement. (pending); Writer 2: A1b=14. Also prepares a replacement of A0. (pending). Relationships: v0 → Writer 1: read; v0 → Writer 2: read.\n\nW1 commits first: W2 must validate against the intervening commit; stale assumptions are not automatically accepted. Nodes: v1: A1+C. W1 committed. (selected); Writer 1: complete. Its change is current. (selected); Writer 2: validate / conflict. Overlapping replacement needs review. (warning). Relationships: Writer 2 → v1: validate before commit.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-delta-claim-concurrency",
@@ -918,8 +918,8 @@
             {
               "id": "w-two",
               "label": "Writer 2",
-              "value": "A2=14",
-              "detail": "Also prepares replacement.",
+              "value": "A1b=14",
+              "detail": "Also prepares a replacement of A0.",
               "status": "pending"
             }
           ],
@@ -1466,7 +1466,7 @@
     },
     {
       "id": "dbxfe-delta-meaning",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "A correct transaction can contain a wrong answer",
       "outcome": "Separate table atomicity, source order and metric meaning.",
       "explanation": "Atomic table behavior cannot decide whether A1 replaces A0 or represents a separate event. That is [[dbxfe-delta-meaning-concept|business correctness]]. If a writer submits the wrong business population, a successful transaction can preserve the mistake consistently. Keep source revision, table version and the metric definition separate when explaining what a commit proves.",
@@ -1485,18 +1485,18 @@
         "dbxfe-delta-meaning-question"
       ],
       "handbook": {
-        "markdown": "Start a correctness discussion by naming the grain: one current accepted inspection per inspection ID. Under that contract, an older representation of A cannot contribute alongside its replacement. If the source instead represented additive events, the rule would differ. The table format does not know which business contract the customer intended.\n\nUse a small reconciliation ledger before blaming storage. Raw evidence may contain repeated deliveries, older revisions and invalid records. The resolver identifies the intended current population. A subsequent table transaction makes the selected update visible. Finally, the metric uses its agreed numerator and denominator. Failures at any layer can produce a plausible number.\n\nFor Cinderline, A2 has 12 inspected and 1 defective; C1 has 8 and 0. Accepted totals are 20 and 1, hence 5%. A successful commit containing 30 inspected units should be investigated as a population error, even if the log is internally consistent. Preserve the wrong run as diagnostic evidence rather than describing ACID as broken. The ingestion module teaches the corrected conservative publication gate explicitly.",
+        "markdown": "Start a correctness discussion by naming the grain: one current accepted inspection per inspection ID. Under that contract, an older representation of A cannot contribute alongside its replacement. If the source instead represented additive events, the rule would differ. The table format does not know which business contract the customer intended.\n\nUse a small reconciliation ledger before blaming storage. Raw evidence may contain repeated deliveries, older revisions and invalid records. The resolver identifies the intended current population. A subsequent table transaction makes the selected update visible. Finally, the metric uses its agreed numerator and denominator. Failures at any layer can produce a plausible number.\n\nFor Cinderline, A revision 2 (file A1) has 12 inspected and 1 defective; C revision 1 (file C) has 8 and 0. Accepted totals are 20 and 1, hence 5%. A successful commit containing 30 inspected units should be investigated as a population error, even if the log is internally consistent. Preserve the wrong run as diagnostic evidence rather than describing ACID as broken. The ingestion module teaches the corrected conservative publication gate explicitly.",
         "sourceSectionIds": [
           "dbxfe-m03-l02-understand"
         ]
       },
       "recap": "Transactions protect a boundary; business rules define what should cross it.",
-      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "changeNote": "1.1.0: handbook names source revisions and file names explicitly (A revision 2 is file A1), so revision numbers and file suffixes are no longer mixed. The explanation and check are unchanged; earlier answers and notes are retained and a completed beat is marked revised.",
       "mediaIds": []
     },
     {
       "id": "dbxfe-delta-schema",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "A type check is one part of a contract",
       "outcome": "Distinguish structural schema checks from domain and cross-record checks.",
       "explanation": "[[dbxfe-delta-schema-concept|schema enforcement]] checks structural compatibility. It does not make every accepted integer meaningful. A quantity of -3 may fit an integer column but violate our nonnegative rule; two individually valid records may still conflict about the same revision. Teach each check at the layer where it has the needed evidence.",
@@ -1515,13 +1515,13 @@
         "dbxfe-delta-schema-question"
       ],
       "handbook": {
-        "markdown": "A schema makes a useful promise about representation: column names, data types and relevant nullability. Domain rules make a different promise, such as inspected being nonnegative and defective not exceeding inspected. Cross-record rules need relationships: one event ID should not describe two payloads under our source contract. Do not collapse these into a single green quality icon.\n\nFor the row A2=(12, 1), structural and quantity checks pass. For B1=(-3, 1), the numeric representation can still be well-formed, but the domain check fails. For two A2 rows with quantities 12 and 13, each can be structurally valid; their disagreement requires retained evidence. The resolution policy then determines whether publication can proceed.\n\nSchema evolution is a deliberate change in the representation contract, not a cure for invalid data. Before allowing a new field or changed type, ask how existing producers, readers and transformations behave. A tolerant cast may convert a bad string into NULL, moving the failure into a later stage. Preserve that distinction and reconcile counts so a structurally convenient conversion does not silently change the metric population.",
+        "markdown": "A schema makes a useful promise about representation: column names, data types and relevant nullability. Domain rules make a different promise, such as inspected being nonnegative and defective not exceeding inspected. Cross-record rules need relationships: one event ID should not describe two payloads under our source contract. Do not collapse these into a single green quality icon.\n\nFor the row A revision 2 = (12, 1), structural and quantity checks pass. For B revision 1 = (-3, 1), the numeric representation can still be well-formed, but the domain check fails. For two A revision 2 rows with quantities 12 and 13, each can be structurally valid; their disagreement requires retained evidence. The resolution policy then determines whether publication can proceed.\n\nSchema evolution is a deliberate change in the representation contract, not a cure for invalid data. Before allowing a new field or changed type, ask how existing producers, readers and transformations behave. A tolerant cast may convert a bad string into NULL, moving the failure into a later stage. Preserve that distinction and reconcile counts so a structurally convenient conversion does not silently change the metric population.",
         "sourceSectionIds": [
           "dbxfe-m03-l02-understand"
         ]
       },
       "recap": "Structure, domain validity and identity agreement require different evidence.",
-      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "changeNote": "1.1.0: handbook writes source revisions in words (A revision 2) instead of labels that read like the module's file names. The explanation and check are unchanged; earlier answers and notes are retained and a completed beat is marked revised.",
       "mediaIds": []
     },
     {
@@ -1556,7 +1556,7 @@
     },
     {
       "id": "dbxfe-delta-concurrent",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "Validate before accepting a second writer",
       "outcome": "Explain conflict detection without claiming all writes conflict.",
       "explanation": "With [[dbxfe-delta-concurrent-concept|optimistic concurrency]], two writers can prepare work from the same starting state. Acceptance depends on what changed before each commit. An overlapping replacement may fail validation instead of silently corrupting state. Ordinary append pairs have different conflict behavior; “concurrent” alone does not tell you whether a particular pair will succeed.",
@@ -1581,7 +1581,7 @@
         ]
       },
       "recap": "Concurrency is validated against actual overlapping changes and feature context.",
-      "changeNote": "New teacher-first explanation and worked visual; earlier lesson completion does not complete this beat.",
+      "changeNote": "1.1.0: visual renames the second writer's file A1b (it was A2, which elsewhere means a source revision). The explanation and check are unchanged; earlier answers and notes are retained and a completed beat is marked revised.",
       "mediaIds": []
     },
     {
@@ -1640,6 +1640,22 @@
     {
       "cardId": "dbxfe-m03-l02-foundation-card3",
       "beatId": "dbxfe-delta-stage"
+    },
+    {
+      "cardId": "dbxfe-m03-l02-card4",
+      "beatId": "dbxfe-delta-commit"
+    },
+    {
+      "cardId": "dbxfe-m03-l02-card5",
+      "beatId": "dbxfe-delta-history"
+    },
+    {
+      "cardId": "dbxfe-m03-l02-card6",
+      "beatId": "dbxfe-delta-schema"
+    },
+    {
+      "cardId": "dbxfe-m03-l02-card7",
+      "beatId": "dbxfe-delta-concurrent"
     }
   ],
   "extensionCards": [
@@ -1705,7 +1721,7 @@
       "revision": "1",
       "prompt": "Does a Delta transaction-log checkpoint mean the same thing as a streaming-query checkpoint?",
       "answer": "No. A table-log checkpoint compacts table metadata state; a streaming checkpoint tracks a particular query’s progress and state.",
-      "explanation": "The table-history documentation describes aggregated metadata checkpoints that avoid replaying all JSON history. That mechanism is distinct from the per-query recovery state taught in orchestration. Neither name alone promises archived data remains available.",
+      "explanation": "The table-history documentation describes aggregated metadata checkpoints that avoid replaying all JSON history. That mechanism is distinct from the per-query recovery state taught in the streaming module's checkpoint beat and recapped in orchestration. Neither name alone promises archived data remains available.",
       "lessonId": "dbxfe-m03-l02",
       "sectionId": "dbxfe-m03-l02-foundation-limits",
       "conceptIds": [
@@ -1720,7 +1736,7 @@
   ],
   "recap": {
     "title": "One table, four boundaries",
-    "markdown": "**Files → selected snapshot → successful commit → retained historical dependencies.** Compute calculates; business rules select the intended population; compatibility determines which clients can interpret it. Review the canonical cards, or choose the researched extension cards deliberately.",
+    "markdown": "**Files → selected snapshot → successful commit → retained historical dependencies.** Compute calculates; business rules select the intended population; compatibility determines which clients can interpret it. Review the canonical cards, or choose the researched extension cards deliberately.\n\n**Next learning action:** continue with B2 Delta writes, evolution and table maintenance (`#/module/dbxfe-delta-writes`), which applies this snapshot model to MERGE, schema evolution and retention decisions.",
     "visualId": "dbxfe-delta-transfer-visual"
   },
   "appliedTask": {
@@ -1736,5 +1752,7 @@
       "dbxfe-delta-transfer"
     ]
   },
-  "scenarioIds": []
+  "scenarioIds": [
+    "dbxfe-m03-scenario"
+  ]
 }

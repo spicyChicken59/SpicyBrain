@@ -27,7 +27,7 @@ A mismatch across rows is a concrete defect to fix before adding more detail.
 
 <!-- section:deeper -->
 
-Use an educational rubric to inspect discovery, technical correctness, tradeoffs, communication, measurable evidence, and uncertainty. Self-assessment is a reflection, not independent validation. If a specialist has not reviewed security or a real workload has not run, say so. A polished document should make those limitations easier to find, not harder. The capstone's full model response is one defensible submission, not the only acceptable architecture.
+Use the capstone's educational rubric to inspect discovery, technical correctness, tradeoffs, communication, measurable evidence, and uncertainty; the revised capstone adds source semantics and the metric contract, the ingestion, publication and recovery policy, operational fit, and stale versus current evidence. Self-assessment is a reflection, not independent validation. If a specialist has not reviewed security or a real workload has not run, say so. A polished document should make those limitations easier to find, not harder. The capstone's full model response is one defensible submission, not the only acceptable architecture.
 
 <!-- section:customer -->
 
@@ -35,7 +35,7 @@ For the closing discussion: “Our recommendation connects the agreed quality de
 
 <!-- section:try -->
 
-Before opening the capstone model, write your own six-part outline: discovery, architecture/alternative, demo/fallback, proof of value, cost/value, and follow-up. Identify the weakest evidence link and the person who can help validate it.
+Before opening the capstone model, outline the six core parts: discovery, architecture/alternative, demo/fallback, proof of value, cost/value, and follow-up. Then check the capstone's own requirement list and add what it asks for beyond them: in its revised version, a source inventory and semantics note, a metric contract, an ingestion, publication and recovery policy, a second governed path compared on the same criteria, the business impact of stale versus current evidence, and a presentation sequence with a technical appendix. Identify the weakest evidence link and the person who can help validate it.
 
 <!-- section:revisit -->
 

@@ -1,0 +1,355 @@
+{
+  "module": {
+    "id": "dbxfe-sqlserver",
+    "title": "SQL Server and on-premises modernization",
+    "summary": "Inventory a small SQL Server pipeline, decompose its stored procedure and SSIS-style package into tested target steps, prove where a line-by-line translation changes meaning, and plan coexistence and cutover on reconciliation evidence.",
+    "objectives": [
+      "Inventory a stored procedure and an SSIS-style package into dependencies, source semantics, incremental state and schedules before translating anything.",
+      "Translate the procedure into target steps whose keys, NULL handling, business day, arithmetic and money types reproduce the legacy meaning, and show which check catches each non-equivalent choice.",
+      "Reconcile the old and new paths on one basis and plan coexistence, cutover and rollback against stated criteria."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m08",
+      "dbxfe-m04"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-sqlserver-l01.json"
+    ],
+    "scenarioId": "dbxfe-sqlserver-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-sqlserver-scenario",
+      "title": "Write Cinderline's pilot note for moving the quality report",
+      "context": "Fictional Cinderline Components builds its morning quality report on an on-premises SQL Server: a SQL Server Agent job at 06:30 runs an SSIS-style package that loads correction files, applies them and calls sp_daily_inspections. Plant P1 is in New York; plant P2 is in Chicago but its rows are stamped on the New York server. The morning report must not break, the ERP team has not said whether change tracking may be enabled, and a line-by-line translation already exists and 'looks right'.",
+      "task": "Write a two-page pilot note for the data platform lead and the quality lead: the dependency inventory, the decomposition and job mapping, the semantic decisions with their tests, the reconciliation plan and the coexistence and cutover plan with rollback.",
+      "requirements": [
+        "An inventory that records the server clock, collation, watermark, temporary objects, transaction scope and schedule, not only object names.",
+        "A decomposition of sp_daily_inspections into tested steps and a mapping of the package's precedence constraints and schedule to job tasks.",
+        "For keys, the outer join, the business day, the rate and money: the legacy behaviour, the target choice and the check that proves it.",
+        "A reconciliation basis and check order, an owned register for expected differences, and a cutover gate with a rehearsed rollback."
+      ],
+      "model": "### Inventory\nsp_daily_inspections reads erp.inspection, erp.inspector, etl.watermark and dbo.rpt_quality_detail; writes dbo.rpt_quality_detail, dbo.rpt_quality_daily and etl.watermark inside one transaction with XACT_ABORT ON; uses #affected_days, GETDATE() on the New York server clock, a 06:00 DATEADD cutoff, INT / INT for defect_pct and seven string-key comparisons under CI_AS. The package loops over correction files, applies them, builds the report and mails on any failure; the Agent schedule is 06:30 server time.\n\n### Decomposition and mapping\nSelect rows updated in (since, until] and return affected days; rebuild whole days of detail; aggregate with div and DECIMAL; move the watermark after both writes. Loop plus data flow become one ingestion task; Success constraints become dependencies; the OR-joined Failure constraints become one task that runs when at least one dependency failed; the schedule names America/New_York.\n\n### Semantic decisions\nKeys: upper(rtrim()), tested by the key profile and the keyed comparison. Plant filter stays in ON, tested by null counts. Business day on the server clock as TIMESTAMP_NTZ, tested under two session zones. Rate with div, money DECIMAL(12,2), tested by types and exact totals.\n\n### Reconciliation and cutover\nBasis: P1, as of 06:30, 06:00 server clock, NULL equals NULL. Order: counts, keys, totals, nulls, types. The P2 plant-local rule is a registered difference owned by the quality lead. Gate: five clean days after the last change, owned exceptions, rehearsed rollback; the Agent job stays scheduled through the rollback window. Change tracking stays an open item; until approved, deletes are a known gap.",
+      "reasoning": "The note carries every setting that decides results into the plan, gives each semantic choice a test, reconciles keys before totals so moved rows cannot hide, treats the plant-local cutoff as an owned change rather than a defect, and ties cutover to evidence with the old path kept as the rollback.",
+      "rubric": [
+        {
+          "id": "dbxfe-sqlserver-scenario-rubric-1",
+          "criterion": "Inventory depth",
+          "weak": "Lists procedures, packages and tables only.",
+          "partial": "Adds schedules and owners but omits the clock, collation or watermark.",
+          "strong": "Records objects, clock, collation, watermark, temporary objects, transaction scope and schedule with owners and unknowns."
+        },
+        {
+          "id": "dbxfe-sqlserver-scenario-rubric-2",
+          "criterion": "Semantic decisions",
+          "weak": "Treats the existing translation as correct because it runs.",
+          "partial": "Names some differences but gives no test or picks trim, WHERE or UTC defaults.",
+          "strong": "States legacy behaviour, target choice and proving check for keys, outer join, business day, rate and money."
+        },
+        {
+          "id": "dbxfe-sqlserver-scenario-rubric-3",
+          "criterion": "Reconciliation",
+          "weak": "Compares row counts or totals only.",
+          "partial": "Compares keys but without a stated basis, null rule or type check.",
+          "strong": "States the basis, checks counts, keys, totals, nulls and types in order, and registers owned expected differences."
+        },
+        {
+          "id": "dbxfe-sqlserver-scenario-rubric-4",
+          "criterion": "Coexistence and cutover",
+          "weak": "Picks a cutover date.",
+          "partial": "Runs in parallel but without criteria or a rollback path.",
+          "strong": "Parallel run with a gate of clean days after the last change, owned exceptions and a rehearsed rollback, legacy job kept through the window."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "May we enable change tracking on erp.inspection?",
+          "response": "Unknown. The DBA and the security lead have not agreed; until they do, the pilot uses the updated_at watermark and records deletes as a known gap."
+        },
+        {
+          "question": "Is the 06:00 cutoff meant to be New York time for every plant?",
+          "response": "No, according to the quality lead: the intended rule is 06:00 plant local time. P2's difference is registered and owned rather than fixed silently."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-sqlserver-l01"
+      ],
+      "claimIds": [
+        "dbxfe-sqlserver-course-claim-ssis",
+        "dbxfe-sqlserver-course-claim-strings",
+        "dbxfe-sqlserver-course-claim-types",
+        "dbxfe-sqlserver-course-claim-incremental",
+        "dbxfe-sqlserver-course-claim-jobs",
+        "dbxfe-sqlserver-course-claim-nulls",
+        "dbxfe-sqlserver-course-claim-migration",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-sqlserver-course-source-tsql",
+      "title": "Transact-SQL reference (Database Engine)",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/language-reference",
+      "publisher": "Microsoft",
+      "type": "official documentation",
+      "context": "SQL Server and Azure SQL T-SQL reference landing page.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A landing page; individual behaviours are cited to their own pages. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-source-ssis",
+      "title": "SQL Server Integration Services",
+      "url": "https://learn.microsoft.com/en-us/sql/integration-services/sql-server-integration-services",
+      "publisher": "Microsoft",
+      "type": "official documentation",
+      "context": "SSIS packages, control flow, data flow and the SSIS catalog.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The package in this lesson is an original outline, not a .dtsx file; nothing was executed. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-source-strings",
+      "title": "= (String comparison or assignment)",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/language-elements/string-comparison-assignment",
+      "publisher": "Microsoft",
+      "type": "official documentation",
+      "context": "SQL Server string equality and trailing-space padding.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Comparisons also depend on the collation of each column. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-source-datetime",
+      "title": "datetime (Transact-SQL)",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/data-types/datetime-transact-sql",
+      "publisher": "Microsoft",
+      "type": "official documentation",
+      "context": "SQL Server DATETIME data type.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Rounding examples are derived from the documented increments by a local emulation. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-source-division",
+      "title": "/ (Division) (Transact-SQL)",
+      "url": "https://learn.microsoft.com/en-us/sql/t-sql/language-elements/divide-transact-sql",
+      "publisher": "Microsoft",
+      "type": "official documentation",
+      "context": "SQL Server division operator.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Division-by-zero behaviour depends on session settings. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-source-tracking",
+      "title": "Track data changes (SQL Server)",
+      "url": "https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/track-data-changes-sql-server",
+      "publisher": "Microsoft",
+      "type": "official documentation",
+      "context": "SQL Server change tracking and change data capture.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Enabling either feature needs source permissions and retention settings. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-source-connector",
+      "title": "Configure Microsoft SQL Server for ingestion into Databricks",
+      "url": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sql-server",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Lakeflow Connect SQL Server connector; Databricks on AWS.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Supported sources, networking and feature status change; verify for the region and workspace. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-source-jobs",
+      "title": "Lakeflow Jobs",
+      "url": "https://docs.databricks.com/aws/en/jobs/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks orchestration: jobs, tasks, dependencies and triggers; formerly Databricks Workflows.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Task and trigger options change; nothing was deployed. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-source-nulls",
+      "title": "NULL Semantics",
+      "url": "https://spark.apache.org/docs/latest/sql-ref-null-semantics.html",
+      "publisher": "Apache Software Foundation",
+      "type": "primary reference",
+      "context": "Apache Spark SQL NULL handling (current release page; Lab L24 ran Spark 4.0.4).",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Behaviours relied on were also executed locally in Lab L24. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-source-migration",
+      "title": "Migrate data applications to Databricks",
+      "url": "https://docs.databricks.com/aws/en/migration",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks migration documentation for warehouses, ETL and data applications.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Vendor guidance does not prove equivalence of any translated workload. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-sqlserver-course-claim-ssis",
+      "description": "An SSIS package orders tasks and containers with precedence constraints that can require success, failure or completion; a Data Flow Task extracts, transforms and loads rows.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sqlserver-course-source-ssis"
+      ],
+      "context": "SQL Server Integration Services."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-claim-strings",
+      "description": "SQL Server pads the shorter string with spaces before an equality comparison, so trailing spaces do not count, except in LIKE; case sensitivity comes from the collation.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sqlserver-course-source-strings"
+      ],
+      "context": "SQL Server string comparison."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-claim-types",
+      "description": "SQL Server DATETIME rounds to .000, .003 or .007 seconds and stores no offset, and integer divided by integer truncates the fractional part.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sqlserver-course-source-datetime",
+        "dbxfe-sqlserver-course-source-division"
+      ],
+      "context": "SQL Server data types and operators."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-claim-incremental",
+      "description": "SQL Server change tracking records which rows changed, deletes included, and change data capture captures the changed data; the Lakeflow Connect SQL Server connector ingests with either and recommends change tracking for tables with a primary key.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sqlserver-course-source-tracking",
+        "dbxfe-sqlserver-course-source-connector"
+      ],
+      "context": "Source features and managed connector; availability must be verified."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-claim-jobs",
+      "description": "Lakeflow Jobs run tasks with dependencies and conditions based on their dependencies' results, started by schedule or event triggers.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sqlserver-course-source-jobs"
+      ],
+      "context": "Databricks orchestration."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-claim-nulls",
+      "description": "In Spark SQL comparisons with NULL return NULL and NOT IN over a list containing NULL is not true for any row; <=> is the null-safe equality.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sqlserver-course-source-nulls"
+      ],
+      "context": "Apache Spark SQL; also executed in Lab L24."
+    },
+    {
+      "id": "dbxfe-sqlserver-course-claim-migration",
+      "description": "Databricks documents migrating ETL pipelines, data warehouses and other data applications, and T-SQL is the language SQL Server applications use.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sqlserver-course-source-migration",
+        "dbxfe-sqlserver-course-source-tsql"
+      ],
+      "context": "Vendor documentation; equivalence is proven per workload."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-sqlserver-l01-inventory-concept",
+      "term": "migration inventory",
+      "aliases": [
+        "dependency inventory"
+      ],
+      "definition": "A record of every object, dependency, setting, owner and schedule a workload relies on, written before translation.",
+      "lessonId": "dbxfe-sqlserver-l01",
+      "sectionId": "dbxfe-sqlserver-l01-pipeline"
+    },
+    {
+      "id": "dbxfe-sqlserver-l01-decomposition-concept",
+      "term": "stored-procedure decomposition",
+      "aliases": [
+        "procedure decomposition"
+      ],
+      "definition": "Splitting a stored procedure into target steps that each have one input, one output and one test.",
+      "lessonId": "dbxfe-sqlserver-l01",
+      "sectionId": "dbxfe-sqlserver-l01-decompose"
+    },
+    {
+      "id": "dbxfe-sqlserver-l01-semantics-concept",
+      "term": "source semantics",
+      "aliases": [
+        "hidden behaviour"
+      ],
+      "definition": "Behaviour that lives in source tables and settings, such as identity columns, triggers, transactions and temporary objects.",
+      "lessonId": "dbxfe-sqlserver-l01",
+      "sectionId": "dbxfe-sqlserver-l01-semantics"
+    },
+    {
+      "id": "dbxfe-sqlserver-l01-types-concept",
+      "term": "type and comparison rules",
+      "aliases": [
+        "data type semantics",
+        "collation rules"
+      ],
+      "definition": "The rules a data type, operator, collation or NULL setting applies, which the target must reproduce or change deliberately.",
+      "lessonId": "dbxfe-sqlserver-l01",
+      "sectionId": "dbxfe-sqlserver-l01-types"
+    },
+    {
+      "id": "dbxfe-sqlserver-l01-watermark-concept",
+      "term": "watermark",
+      "aliases": [
+        "incremental state"
+      ],
+      "definition": "A stored position, such as the last loaded moment, that decides which changed rows the next run selects.",
+      "lessonId": "dbxfe-sqlserver-l01",
+      "sectionId": "dbxfe-sqlserver-l01-incremental"
+    },
+    {
+      "id": "dbxfe-sqlserver-l01-equivalence-concept",
+      "term": "semantic equivalence",
+      "aliases": [
+        "behavioural equivalence"
+      ],
+      "definition": "Two paths are equivalent when they produce the same rows and values on the same basis, not when their code looks alike.",
+      "lessonId": "dbxfe-sqlserver-l01",
+      "sectionId": "dbxfe-sqlserver-l01-example"
+    },
+    {
+      "id": "dbxfe-sqlserver-l01-reconciliation-concept",
+      "term": "reconciliation",
+      "aliases": [
+        "source-to-target check"
+      ],
+      "definition": "A comparison of two paths on one basis: counts, keys, totals, nulls and types, with every difference explained or failed.",
+      "lessonId": "dbxfe-sqlserver-l01",
+      "sectionId": "dbxfe-sqlserver-l01-example"
+    },
+    {
+      "id": "dbxfe-sqlserver-l01-cutover-concept",
+      "term": "coexistence and cutover",
+      "aliases": [
+        "parallel run",
+        "rollback window"
+      ],
+      "definition": "Running both paths until stated evidence opens the gate, then switching consumers with a rehearsed rollback.",
+      "lessonId": "dbxfe-sqlserver-l01",
+      "sectionId": "dbxfe-sqlserver-l01-cutover"
+    }
+  ]
+}

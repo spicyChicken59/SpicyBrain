@@ -12,6 +12,14 @@ import { Practice, Review } from "./practice-review";
 import { Reader } from "./reader";
 import { PageTitle, StorageNotice, baseAsset, useStudy } from "./ui";
 
+/** Tab titles for a course's own collection pages, read by own key only. */
+const collectionTitles = {
+  labs: "Labs",
+  guides: "Field guides",
+  cases: "Case analyses",
+  crosswalk: "Learning crosswalk",
+};
+
 export default function App() {
   const [hash, setHash] = useState(location.hash || "#/"),
     { data, status } = useStudy();
@@ -29,7 +37,21 @@ export default function App() {
     parts = route.slice(2).split("/"),
     page = parts[0] || "start",
     id = parts[1],
-    section = parts[2];
+    section = parts[2],
+    item = parts[3],
+    // A course's own pages (labs, guides, cases, crosswalk) and a handbook's
+    // track scope are separate routes for focus and scrolling; other pages
+    // keep their existing keys.
+    pageView =
+      page === "course"
+        ? [section, item].join("/")
+        : page === "handbook"
+          ? (params.get("track") ?? "")
+          : "",
+    collectionTitle =
+      page === "course" && section && Object.hasOwn(collectionTitles, section)
+        ? collectionTitles[section as keyof typeof collectionTitles]
+        : undefined;
   useEffect(() => {
     const handler = () => setHash(location.hash || "#/");
     window.addEventListener("hashchange", handler);
@@ -45,8 +67,8 @@ export default function App() {
       window.scrollTo(0, 0);
       document.querySelector<HTMLElement>("main h1")?.focus();
     }
-    document.title = `${page === "lesson" ? (findLesson(id)?.lesson.title ?? "Lesson") : page[0].toUpperCase() + page.slice(1)} · SpicyBrain`;
-  }, [page, id]);
+    document.title = `${page === "lesson" ? (findLesson(id)?.lesson.title ?? "Lesson") : (collectionTitle ?? page[0].toUpperCase() + page.slice(1))} · SpicyBrain`;
+  }, [page, id, pageView, collectionTitle]);
   const nav = [
     ["start", "Today"],
     ["courses", "Courses"],
@@ -141,7 +163,11 @@ export default function App() {
         ) : page === "path" ? (
           <Roadmap id={id} />
         ) : page === "courses" || page === "course" ? (
-          <TeacherCourses id={id} />
+          <TeacherCourses
+            id={id}
+            section={page === "course" ? section : undefined}
+            item={page === "course" ? item : undefined}
+          />
         ) : page === "module" ? (
           <ModuleWorkspace
             id={id}
@@ -151,7 +177,7 @@ export default function App() {
             detour={params.get("detour") === "1" || !!from}
           />
         ) : page === "handbook" ? (
-          <CourseHandbook id={id} />
+          <CourseHandbook id={id} track={params.get("track") ?? undefined} />
         ) : page === "lesson" ? (
           <Reader
             key={`${id}-${pathId ?? "direct"}`}

@@ -1,0 +1,394 @@
+{
+  "module": {
+    "id": "dbxfe-finops",
+    "title": "Compute choices, cost and FinOps reasoning",
+    "summary": "Answer a cost question with drivers in their own units, choose compute from each workload's pattern, read idle, startup, queue and quota evidence, attribute usage from the billable usage table, and report unit costs and a sensitivity range with labelled hypothetical rates.",
+    "objectives": [
+      "Separate a cost question into drivers with units, currency and period, and choose compute for each workload from its pattern.",
+      "Read idle, startup, queue and quota evidence and attribute usage from tags and the billable usage system table.",
+      "Compute unit costs with a zero-count guard, build a low, base and high sensitivity table, and place budgets and policies in their governance roles."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m03",
+      "dbxfe-m05"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-finops-l01.json"
+    ],
+    "scenarioId": "dbxfe-finops-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-finops-scenario",
+      "title": "Write Cinderline's pilot cost note for the sponsor",
+      "context": "Fictional Cinderline Components runs a one-plant quality pilot: a nightly resolution job, a morning report for eleven users, and ad hoc analyst exploration. September's usage rows show an untagged exploration cluster that ran overnight twice, a budget alert that fired at 80 percent, and one nightly launch refused by a cloud quota. The sponsor wants to know what the pilot costs, whether it can cost less, and what changes when a second plant joins. No real rate is available, and finance asks that every figure be labelled.",
+      "task": "Write a one-page cost note for the sponsor: the drivers and the base month with its range, the compute choice for each workload with the evidence behind it, what September's usage rows do and do not show, the governance changes, the nightly job's unit cost, and the measurements that would narrow the estimate.",
+      "requirements": [
+        "State every figure with its unit, currency and period, label every rate as hypothetical, and keep the one-off apart from the monthly figure.",
+        "Choose compute for each workload from its pattern, naming the idle, startup, queue and quota evidence.",
+        "Separate what budgets inform from what policies and auto-termination enforce, and make usage attributable with tags from now on.",
+        "Compute the nightly job's cost per run with the right numerator and say what a month with no runs returns.",
+        "Promise no saving, discount or price; name the inputs to measure and their owners."
+      ],
+      "model": "### Drivers and the base month\nIn hypothetical USD per month, with every rate a hypothetical rate, not a price: compute time 48.00, platform usage 150.00, storage 10.00, data movement 12.00 and operations effort 780.00, for a base month of 1,000.00 within a range of 536.00 to 1,936.00. The migration one-off, 15,000.00 in the base case, is reported apart. Operations effort swings the month by 1,170.00 and is the input to measure first; its owner is the operations director.\n\n### Compute for each workload\nNightly job: job compute created for each run. The refused launch was AWS_RESOURCE_QUOTA_EXCEEDED while the exploration cluster held 48 vCPU, so the fix is the overnight cluster or the quota, not a larger job. Morning report: one small SQL warehouse; the busiest minute shows no at-capacity waiting at four overlapping queries, so no resize, and auto-stop is shortened from the API default of 120 minutes so the warehouse stops soon after 08:15. Exploration: all-purpose compute under an analysts' policy with auto-termination and a required team tag.\n\n### What September's rows show\nOn 14 September 20.0 of 31.2 DBU carried no tag. Those rows stay untagged; they are allocated to the analytics team by cluster identifier and labelled as an allocation. Correction rows are included in every sum.\n\n### Governance\nThe budget keeps its email alert to a named owner as a signal; the policy, not the budget, ends idle compute. Any blocking action is verified before anyone relies on it.\n\n### Unit cost\n77.40 over 30 runs is 2.58 per run for the job's own usage; 28.58 fully loaded with effort, reported separately; a month with no runs reports unknown.\n\n### To measure next\nTwo weeks of logged operations hours, three repeated runs per candidate configuration, and the second plant's concurrency. No saving is claimed until usage rows show it.",
+      "reasoning": "The note answers with drivers and a range instead of one figure, ties each compute choice to its evidence, keeps budgets and policies in their roles, fixes attribution where compute is created and makes every figure recomputable and labelled, which is what a sponsor can act on without a price or a promise.",
+      "rubric": [
+        {
+          "id": "dbxfe-finops-scenario-rubric-1",
+          "criterion": "Units, currency and period",
+          "weak": "One total with no unit, period or label.",
+          "partial": "Monthly amounts given, but the one-off is merged in or rates are unlabelled.",
+          "strong": "Every driver in its unit and period with a labelled hypothetical rate, a base month with its range, and the one-off apart."
+        },
+        {
+          "id": "dbxfe-finops-scenario-rubric-2",
+          "criterion": "Compute choice with evidence",
+          "weak": "One cluster for everything, or sizes chosen from headcount.",
+          "partial": "Reasonable classes, but no idle, queue or quota evidence behind them.",
+          "strong": "A class per workload from its pattern, with idle, startup, queue and quota evidence named and the quota failure routed to the cloud account."
+        },
+        {
+          "id": "dbxfe-finops-scenario-rubric-3",
+          "criterion": "Governance and attribution",
+          "weak": "Relies on the budget to stop spend.",
+          "partial": "Adds tags but leaves idle compute unconstrained.",
+          "strong": "A policy with auto-termination and required tags, a usage policy for serverless work, the budget as a signal with an owner, and old rows allocated by a documented rule."
+        },
+        {
+          "id": "dbxfe-finops-scenario-rubric-4",
+          "criterion": "Unit economics and honesty",
+          "weak": "Promises a saving or quotes a remembered price.",
+          "partial": "Cost per run computed, but fixed costs mixed in unlabelled or zero runs reported as 0.00.",
+          "strong": "Variable and fully loaded per-run figures labelled apart, a zero-count guard, no saving promised, and the next measurements named with owners."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can you promise the pilot will stay under 1,000 a month?",
+          "response": "No. The base case is 1,000.00 hypothetical USD a month and the range runs from 536.00 to 1,936.00, mostly on operations effort. Real rates have not been read yet; actual usage will be reported from the usage rows each month."
+        },
+        {
+          "question": "Can the budget simply stop the cluster when we hit the limit?",
+          "response": "The current budget API lists a block-usage action, but what it covers for our compute has not been verified. Until it is, the analysts' policy with auto-termination is what stops idle compute, and the budget alert stays as the signal."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-finops-l01"
+      ],
+      "claimIds": [
+        "dbxfe-finops-course-claim-compute",
+        "dbxfe-finops-course-claim-idle",
+        "dbxfe-finops-course-claim-pools",
+        "dbxfe-finops-course-claim-queue",
+        "dbxfe-finops-course-claim-quota",
+        "dbxfe-finops-course-claim-tags",
+        "dbxfe-finops-course-claim-billing",
+        "dbxfe-finops-course-claim-budgets",
+        "dbxfe-finops-course-claim-pricing",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-fact-cost",
+        "dbxfe-fact-warehouse"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-finops-course-source-compute",
+      "title": "Compute",
+      "url": "https://docs.databricks.com/aws/en/compute/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; serverless compute, classic all-purpose and jobs compute, and SQL warehouses.",
+      "accessDate": "2026-09-20",
+      "reviewDate": "2026-09-20",
+      "caveat": "Names and serverless availability vary by workspace and region. Reuses the record reviewed on 2026-09-20 for the retained platform module (dbxfe-m03-source-compute); not re-confirmed on 2026-09-23 (search allowance used up; documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-finops-course-source-billing",
+      "title": "Billable usage system table reference",
+      "url": "https://docs.databricks.com/aws/en/admin/system-tables/billing",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; system.billing.usage schema and correction records.",
+      "accessDate": "2026-09-19",
+      "reviewDate": "2026-09-19",
+      "caveat": "Usage quantities are not an invoice or a negotiated rate. Reuses the record reviewed on 2026-09-19 for the retained modules (dbxfe-m10-source-billing, dbxfe-m11-source-billing); not re-confirmed on 2026-09-23 (search allowance used up; documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-finops-course-source-budgets",
+      "title": "Create and monitor budgets",
+      "url": "https://docs.databricks.com/aws/en/admin/account-settings/budgets",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; account budgets and budget alerts.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "URL and title not confirmed in this build session (search allowance used up; documentation host blocked); the URL is from this build's assignment list and is corroborated by the databricks-sdk 0.141.0 BudgetsAPI docstring. The scope of any blocking action is verified before use."
+    },
+    {
+      "id": "dbxfe-finops-course-source-pricing",
+      "title": "Databricks pricing",
+      "url": "https://www.databricks.com/product/pricing",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks commercial pricing across clouds; the DBU definition.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "No figure is quoted; every rate in this module is a hypothetical rate, not a price. URL and title not confirmed in this build session; the URL is the project's source-index entry for pricing."
+    },
+    {
+      "id": "dbxfe-finops-course-source-sdk",
+      "title": "databricks-sdk 0.141.0 (Databricks SDK for Python)",
+      "url": "https://pypi.org/project/databricks-sdk/0.141.0/",
+      "publisher": "Databricks (package published on the Python Package Index)",
+      "type": "primary reference",
+      "context": "Databricks SDK for Python 0.141.0 (Beta); API docstrings for clusters, pools, policies, SQL warehouses, query metrics, jobs and budgets.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The wheel was downloaded from PyPI and its hash checked on 2026-09-23 and the cited docstrings were read locally; API text names fields and defaults, not recommendations, and behaviour is confirmed in the current documentation."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-finops-course-claim-compute",
+      "description": "Serverless compute is provisioned on demand; classic all-purpose compute serves interactive, shareable, restartable work, job compute is created for a run and terminated afterwards, and SQL warehouses serve SQL in serverless, pro or classic form.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-finops-course-source-compute",
+        "dbxfe-finops-course-source-sdk"
+      ],
+      "context": "Databricks on AWS compute types; availability varies."
+    },
+    {
+      "id": "dbxfe-finops-course-claim-idle",
+      "description": "All-purpose clusters auto-terminate only when autotermination_minutes is set; SQL warehouses stop after auto_stop_mins idle minutes, which the API defaults to 120.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-finops-course-source-sdk"
+      ],
+      "context": "API field docstrings in databricks-sdk 0.141.0."
+    },
+    {
+      "id": "dbxfe-finops-course-claim-pools",
+      "description": "Pools reduce cluster start and autoscaling times with idle instances; Databricks charges no DBUs for idle pool instances while cloud instance billing applies.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-finops-course-source-sdk"
+      ],
+      "context": "Instance pools API docstring."
+    },
+    {
+      "id": "dbxfe-finops-course-claim-queue",
+      "description": "Warehouse size lets larger queries run while the maximum cluster count serves concurrent queries; query metrics record provisioning waits and at-capacity waits apart from execution.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-finops-course-source-sdk",
+        "dbxfe-src-warehouse"
+      ],
+      "context": "SQL warehouse behaviour and query metrics."
+    },
+    {
+      "id": "dbxfe-finops-course-claim-quota",
+      "description": "Classic compute launches can fail with cloud-side reasons such as AWS_RESOURCE_QUOTA_EXCEEDED or AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE; flexible node types list fallback node types.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-finops-course-source-sdk"
+      ],
+      "context": "Clusters API termination reasons on AWS."
+    },
+    {
+      "id": "dbxfe-finops-course-claim-tags",
+      "description": "Custom tags on clusters and warehouses reach their cloud resources and the billable usage rows; serverless usage takes tags from usage policies, formerly budget policies.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-finops-course-source-sdk",
+        "dbxfe-finops-course-source-billing"
+      ],
+      "context": "Attribution on AWS; tags apply to usage recorded after they are set."
+    },
+    {
+      "id": "dbxfe-finops-course-claim-billing",
+      "description": "system.billing.usage records SKU, date, quantity, unit, custom tags and usage metadata per usage record, with retraction and restatement records for corrections, arriving after the usage.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-finops-course-source-billing"
+      ],
+      "context": "Billable usage system table."
+    },
+    {
+      "id": "dbxfe-finops-course-claim-budgets",
+      "description": "Budgets monitor account-wide or filtered spend and alert recipients at thresholds measured in list-price US dollars per month; the API also lists a block-usage action type.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-finops-course-source-budgets",
+        "dbxfe-finops-course-source-sdk"
+      ],
+      "context": "Account budgets; any blocking action is verified before use."
+    },
+    {
+      "id": "dbxfe-finops-course-claim-pricing",
+      "description": "Databricks prices usage pay-as-you-go and defines the DBU as a normalized unit of processing power used for measurement and pricing; no rate is quoted here.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-finops-course-source-pricing",
+        "dbxfe-finops-course-source-sdk"
+      ],
+      "context": "Commercial pricing definitions."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-finops-l01-driver-concept",
+      "term": "cost driver",
+      "aliases": [
+        "cost category"
+      ],
+      "definition": "One thing a workload is paid for, counted in its own unit and period.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-drivers"
+    },
+    {
+      "id": "dbxfe-finops-l01-dbu-concept",
+      "term": "DBU",
+      "aliases": [
+        "Databricks Unit"
+      ],
+      "definition": "A normalized unit of processing power used to measure and price platform usage.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-drivers"
+    },
+    {
+      "id": "dbxfe-finops-l01-class-concept",
+      "term": "compute class",
+      "aliases": [
+        "job compute",
+        "all-purpose compute",
+        "interactive compute",
+        "SQL warehouse",
+        "serverless compute"
+      ],
+      "definition": "A kind of Databricks compute chosen by the workload's pattern of arrival, duration and idle time.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-choose"
+    },
+    {
+      "id": "dbxfe-finops-l01-utilization-concept",
+      "term": "utilization",
+      "aliases": [
+        "paid idle"
+      ],
+      "definition": "Useful work time divided by running time for one resource over one stated period.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-time"
+    },
+    {
+      "id": "dbxfe-finops-l01-startup-concept",
+      "term": "startup overhead",
+      "aliases": [
+        "cold start"
+      ],
+      "definition": "Time between asking for compute and its first useful work, paid once per start.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-time"
+    },
+    {
+      "id": "dbxfe-finops-l01-queue-concept",
+      "term": "queue",
+      "aliases": [
+        "waiting at capacity",
+        "concurrency"
+      ],
+      "definition": "Work that has arrived but waits for free capacity, recorded apart from execution time.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-time"
+    },
+    {
+      "id": "dbxfe-finops-l01-quota-concept",
+      "term": "cloud quota",
+      "aliases": [
+        "capacity failure"
+      ],
+      "definition": "A cloud account's limit on the instances or cores a region may run, enforced at launch.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-limits"
+    },
+    {
+      "id": "dbxfe-finops-l01-tag-concept",
+      "term": "tag",
+      "aliases": [
+        "custom tag",
+        "usage policy"
+      ],
+      "definition": "A key and value written into each usage row so usage can be assigned to an owner.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-attribution"
+    },
+    {
+      "id": "dbxfe-finops-l01-systemtable-concept",
+      "term": "billable usage system table",
+      "aliases": [
+        "system.billing.usage",
+        "system table"
+      ],
+      "definition": "The account-wide table of billable usage rows with SKU, quantity, unit, tags and metadata.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-attribution"
+    },
+    {
+      "id": "dbxfe-finops-l01-unit-concept",
+      "term": "unit economics",
+      "aliases": [
+        "cost per run",
+        "cost per query"
+      ],
+      "definition": "Cost divided by a counted unit of work in the same period, with a zero-count guard.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-units"
+    },
+    {
+      "id": "dbxfe-finops-l01-comparability-concept",
+      "term": "comparable units",
+      "aliases": [
+        "currency",
+        "period"
+      ],
+      "definition": "Quantities add only in one unit, one currency and one period, after pricing each with its own rate.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-units"
+    },
+    {
+      "id": "dbxfe-finops-l01-sensitivity-concept",
+      "term": "sensitivity table",
+      "aliases": [
+        "low base high",
+        "swing"
+      ],
+      "definition": "Low, base and high values per driver in one currency and period, showing which input moves the total.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-sensitivity"
+    },
+    {
+      "id": "dbxfe-finops-l01-budget-concept",
+      "term": "budget",
+      "aliases": [
+        "budget alert",
+        "spend threshold"
+      ],
+      "definition": "A spend monitor that alerts people at thresholds, distinct from policies that constrain what can run.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-governance"
+    },
+    {
+      "id": "dbxfe-finops-l01-experiment-concept",
+      "term": "controlled cost experiment",
+      "aliases": [
+        "repeated runs"
+      ],
+      "definition": "Repeated runs of the same work per configuration, reported as cost per unit of work with its spread.",
+      "lessonId": "dbxfe-finops-l01",
+      "sectionId": "dbxfe-finops-l01-experiment"
+    }
+  ]
+}

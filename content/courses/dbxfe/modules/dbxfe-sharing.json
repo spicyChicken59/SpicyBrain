@@ -1,0 +1,391 @@
+{
+  "module": {
+    "id": "dbxfe-sharing",
+    "title": "Sharing, federation and interoperability",
+    "summary": "Choose between a copy, a governed share, federation and a clean room on six questions, trace OpenSharing's request path from recipient credential to file download, and explain ingestion versus access-in-place, UniForm and catalog interoperability.",
+    "objectives": [
+      "Compare copy, governed share, federation and clean room on movement, enforcement, cost in kind, revocation, freshness and failure, and decide per direction.",
+      "Trace an OpenSharing read from recipient credential to direct file download, and plan credentials and a revocation rehearsal.",
+      "Choose ingestion or access-in-place, read pushdown evidence, and explain UniForm, Iceberg catalogs and clean rooms as interoperability boundaries."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m06"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-sharing-l01.json"
+    ],
+    "scenarioId": "dbxfe-sharing-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-sharing-scenario",
+      "title": "Choose and defend the sharing pattern for Orvane Castings",
+      "context": "Fictional Orvane Castings supplies cast aluminium housings to Cinderline's line 3. Orvane's analysts run Apache Spark on their own cloud account in a different region and have no Databricks workspace. Orvane wants 12 months of Cinderline's daily defect rates by casting lot, then daily updates, for its own root-cause work. Cinderline's quality lead wants Orvane's furnace temperature summaries per lot, held in Orvane's PostgreSQL database; Orvane offers a read replica. Cinderline's security lead requires that inspector identities never leave, that Orvane's access can be withdrawn without Orvane's cooperation, and that reads can be evidenced. Finance asks who carries which costs; no prices are known.",
+      "task": "Write a one-page decision note: the pattern for each direction compared on the six questions, the recipient and credential design, freshness in plain words, the revocation steps with a rehearsal plan and what Orvane keeps, the failure behaviour each side will see, whether a clean room applies, and a list of unknowns to verify.",
+      "requirements": [
+        "Compare copy, governed share and federation, and a clean room if applicable, on the same six questions for each direction.",
+        "Specify the shared object, the owner of the share, and the recipient's authentication, expiry and network restriction.",
+        "State the revocation steps, the error Orvane should see, the tail of already-issued file URLs, and retention terms for what Orvane keeps.",
+        "Mark feature support, Orvane's client capabilities and cross-region transfer cost as unknown until verified; provision nothing."
+      ],
+      "model": "### Cinderline to Orvane: governed share by open sharing\nShare one purpose-built table, `quality.share.line3_lot_defect_rates` (lot, day, inspected, defective, rate; no inspector columns), in share `orvane_line3_quality`, owned by the group `quality-sharing-owners` so reads survive staff changes. Recipient `orvane_castings`: token authentication with an expiry set by Cinderline's policy, an IP access list for Orvane's job egress range, and the activation link sent to one named contact; move to OIDC federation once Orvane's identity provider is ready. History sharing stays off, because Orvane asked for daily rates, not time travel.\n\nSix questions: nothing is copied by Cinderline and each read fetches files from Cinderline's storage; the sharing server checks every request; Cinderline's storage serves the reads and the cross-region transfer (price unknown) while Orvane pays its own compute; revocation is removing the grant and rotating with zero seconds, after which issued URLs run out and Orvane keeps saved results under the agreement's retention clause; each read is fresh; failures are visible errors (expired token, lost owner privilege, or a table feature Orvane's connector cannot read).\n\n### Orvane to Cinderline: federation on the replica\nA connection `orvane_replica` with a database user Orvane can disable, and a foreign catalog `orvane_furnace` granted to quality analysts only. Live per query; load falls on the replica, not the primary; Cinderline's compute; Orvane revokes by disabling the user. `EXPLAIN FORMATTED` must show the lot filter pushed. If the monthly report needs history, ingest a daily summary instead and record its retention.\n\n### Clean room\nNot applicable: both sides may see these rows, and Orvane has no Unity Catalog metastore to join one.\n\n### Rehearsal and unknowns\nBefore real rows: grant on a synthetic table, Orvane reads it from its own Spark, Cinderline revokes, and both record the minutes until Orvane's next read fails and the last file download succeeds. Unknown: table and view support for open recipients in Cinderline's workspace, Orvane's connector version and response-format support, transfer charges, and the replica's network path.",
+      "reasoning": "The note decides each direction by its own constraint: Orvane may see the rows and Cinderline must be able to cut access, so a governed share; Orvane accepts load on a replica and the question is occasional, so federation with an ingestion fallback. It answers the same six questions for both, makes the revocation tail and retention explicit, rejects a clean room for a stated reason, and turns every capability and cost into a verification item.",
+      "rubric": [
+        {
+          "id": "dbxfe-sharing-scenario-rubric-1",
+          "criterion": "Pattern per direction on the six questions",
+          "weak": "One pattern for both directions, or a product name offered instead of a pattern.",
+          "partial": "A pattern per direction, compared on fewer than the six questions.",
+          "strong": "Each direction compared on all six questions with a reasoned choice and a stated fallback."
+        },
+        {
+          "id": "dbxfe-sharing-scenario-rubric-2",
+          "criterion": "Recipient and credential design",
+          "weak": "A credential file with no expiry sent by email; the share owned by a person.",
+          "partial": "Token expiry set, but no network restriction or named contact, or an individual owner.",
+          "strong": "Group owner, purpose-built object without identities, expiry, IP list, named contact and an OIDC path."
+        },
+        {
+          "id": "dbxfe-sharing-scenario-rubric-3",
+          "criterion": "Revocation, freshness and retention",
+          "weak": "Assumes revocation deletes Orvane's copies, or calls saved results live.",
+          "partial": "Revocation steps listed without the URL tail, a rehearsal or retention terms.",
+          "strong": "Steps, expected error, URL expiry tail, retention terms, fresh-per-read wording and a timed rehearsal on synthetic rows."
+        },
+        {
+          "id": "dbxfe-sharing-scenario-rubric-4",
+          "criterion": "Honest unknowns and failure behaviour",
+          "weak": "Asserts support and costs; failure behaviour missing.",
+          "partial": "Some unknowns listed; failures named for one direction only.",
+          "strong": "Feature support, connector capability, transfer charges and network path marked unverified, with visible failures named for both directions; nothing provisioned."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can Orvane's Spark connector read tables that need the delta response format?",
+          "response": "Unknown. Orvane's platform team uses the open-source Spark connector but has not confirmed its version. Cinderline will not enable deletion vectors or column mapping on the shared table until a synthetic read succeeds."
+        },
+        {
+          "question": "Will Orvane's database administrator accept federated queries?",
+          "response": "Yes on the read replica during business hours, with a database user Orvane can disable at any time; no on the primary."
+        },
+        {
+          "question": "Can Orvane use OIDC federation instead of a token?",
+          "response": "Orvane runs an identity provider, but its security team will not configure a federation policy this quarter; a token with an expiry is accepted meanwhile."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-sharing-l01"
+      ],
+      "claimIds": [
+        "dbxfe-sharing-course-claim-naming",
+        "dbxfe-sharing-course-claim-protocol",
+        "dbxfe-sharing-course-claim-recipients",
+        "dbxfe-sharing-course-claim-federation",
+        "dbxfe-sharing-course-claim-ingestion",
+        "dbxfe-sharing-course-claim-cleanroom",
+        "dbxfe-fact-unity",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-sharing-course-source-opensharing",
+      "title": "What is OpenSharing?",
+      "url": "https://docs.databricks.com/aws/en/opensharing",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; sharing product family formerly documented as Delta Sharing.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Support by asset type, recipient client, cloud and region changes; revoking access does not erase copies already obtained. Title and URL from this repository's reviewed record (page-level review 2026-09-19/20, HTTP 200 probe 2026-09-20); not re-searched or re-read in this build (search allowance exhausted; documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sharing-course-source-federation",
+      "title": "Connect to external databases and catalogs",
+      "url": "https://docs.databricks.com/aws/en/query-federation/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; query federation and catalog federation.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Connector support and requirements vary by source; no workload was run. Title and URL from this repository's reviewed record (page-level review 2026-09-19/20, HTTP 200 probe 2026-09-20); not re-searched or re-read in this build (search allowance exhausted; documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sharing-course-source-pushdown",
+      "title": "Lakehouse Federation performance recommendations",
+      "url": "https://docs.databricks.com/aws/en/query-federation/performance-recommendations",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; pushdown evidence and fetch size.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Pushdown differs by connector and version; confirm with EXPLAIN FORMATTED. Title and URL from this repository's reviewed record (page-level review 2026-09-19/20, HTTP 200 probe 2026-09-20); not re-searched or re-read in this build (search allowance exhausted; documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sharing-course-source-lakeflow",
+      "title": "What is Lakeflow Connect?",
+      "url": "https://docs.databricks.com/aws/en/ingestion/overview",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; managed ingestion connectors.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Connector availability and preview status vary; categories only. Title and URL from this repository's reviewed record (page-level review 2026-09-19/20, HTTP 200 probe 2026-09-20); not re-searched or re-read in this build (search allowance exhausted; documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-sharing-course-source-protocol",
+      "title": "Delta Sharing Protocol",
+      "url": "https://github.com/delta-io/delta-sharing/blob/main/PROTOCOL.md",
+      "publisher": "Delta Lake project (delta-io)",
+      "type": "primary reference",
+      "context": "Open protocol specification, main branch.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A server may implement optional fields such as URL expiry differently; pin a commit for exact behaviour. Read in this build on 2026-09-23 from the project repository's raw file (the sections this lesson relies on)."
+    },
+    {
+      "id": "dbxfe-sharing-course-source-connector",
+      "title": "Delta Sharing: An Open Protocol for Secure Data Sharing",
+      "url": "https://github.com/delta-io/delta-sharing/blob/main/README.md",
+      "publisher": "Delta Lake project (delta-io)",
+      "type": "primary reference",
+      "context": "Reference connectors README; Python connector 1.4.2 on PyPI at review.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The reference server is for development purposes; connector options change by release. Read in this build on 2026-09-23 from the project repository's raw file (the sections this lesson relies on)."
+    },
+    {
+      "id": "dbxfe-sharing-course-source-sdk",
+      "title": "Databricks SDK for Python (databricks-sdk 0.141.0)",
+      "url": "https://pypi.org/project/databricks-sdk/",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "API reference docstrings in the SDK's sharing, catalog and cleanrooms modules, release 0.141.0.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Labelled Beta by its publisher; an API enum is not proof of availability in a workspace, cloud or region. Read in this build on 2026-09-23 from the PyPI wheel, hash-checked against the PyPI digest."
+    },
+    {
+      "id": "dbxfe-sharing-course-source-uniform",
+      "title": "Universal Format (UniForm)",
+      "url": "https://github.com/delta-io/delta/blob/master/docs/src/content/docs/delta-uniform.mdx",
+      "publisher": "Delta Lake project (delta-io)",
+      "type": "primary reference",
+      "context": "Open-source Delta Lake documentation source for UniForm.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Open-source requirements can differ from Databricks-managed tables; confirm the Databricks page before enabling. Read in this build on 2026-09-23 from the project repository's raw file (the sections this lesson relies on)."
+    },
+    {
+      "id": "dbxfe-sharing-course-source-iceberg",
+      "title": "Apache Iceberg REST Catalog API",
+      "url": "https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml",
+      "publisher": "Apache Software Foundation (Apache Iceberg)",
+      "type": "primary reference",
+      "context": "OpenAPI specification of the Iceberg REST catalog.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Implementations support subsets with their own authentication; check the catalog's own documentation. Read in this build on 2026-09-23 from the project repository's raw file (the sections this lesson relies on)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-sharing-course-claim-naming",
+      "description": "Databricks' current documentation calls its sharing product family OpenSharing and the historical delta-sharing URL leads to the OpenSharing overview; the open protocol is specified as the Delta Sharing Protocol, and connectors and APIs keep identifiers such as deltaSharing, delta_sharing, shares and recipients.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sharing-course-source-opensharing",
+        "dbxfe-sharing-course-source-protocol",
+        "dbxfe-sharing-course-source-connector",
+        "dbxfe-sharing-course-source-sdk"
+      ],
+      "context": "Naming across documentation, protocol, connectors and API."
+    },
+    {
+      "id": "dbxfe-sharing-course-claim-protocol",
+      "description": "Delta Sharing reads are bearer-token REST calls answered with short-lived file URLs or temporary credentials that the client uses to download from the provider's storage; hints are best effort; history sharing gates older versions; a profile file without expirationTime has a token that never expires.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sharing-course-source-protocol",
+        "dbxfe-sharing-course-source-connector"
+      ],
+      "context": "Open protocol specification and connector README read 2026-09-23."
+    },
+    {
+      "id": "dbxfe-sharing-course-claim-recipients",
+      "description": "Databricks-to-Databricks recipients use a sharing identifier and no token; open recipients use a credential file downloaded once or OIDC federation; rotate_token only shortens the old token and 0 ends it at once; the share owner must keep SELECT on shared tables; recipient revocation needs no extra privilege.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sharing-course-source-sdk",
+        "dbxfe-sharing-course-source-opensharing"
+      ],
+      "context": "Databricks API reference in SDK 0.141.0."
+    },
+    {
+      "id": "dbxfe-sharing-course-claim-federation",
+      "description": "Lakehouse Federation queries external sources in place through a connection and a foreign catalog, described as read-only; pushdown is partial and shown by EXPLAIN FORMATTED; fetchSize sets rows per batch, not parallelism.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sharing-course-source-federation",
+        "dbxfe-sharing-course-source-pushdown",
+        "dbxfe-sharing-course-source-sdk"
+      ],
+      "context": "Federation pages as reviewed 2026-09-19/20 and API enums read 2026-09-23."
+    },
+    {
+      "id": "dbxfe-sharing-course-claim-ingestion",
+      "description": "Lakeflow Connect ingests sources into Databricks through connector categories including change-data-capture database ingestion, files, streaming and query-based ingestion.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sharing-course-source-lakeflow"
+      ],
+      "context": "Lakeflow Connect overview as reviewed 2026-09-20."
+    },
+    {
+      "id": "dbxfe-sharing-course-claim-formats",
+      "description": "UniForm generates Iceberg metadata asynchronously for a Delta table's Parquet files, records converted_delta_version, requires column mapping and is read-only for Iceberg clients; Iceberg REST catalogs can vend short-lived storage credentials, and Unity Catalog issues them only with external access enabled and EXTERNAL USE SCHEMA granted.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sharing-course-source-uniform",
+        "dbxfe-sharing-course-source-iceberg",
+        "dbxfe-sharing-course-source-sdk"
+      ],
+      "context": "Delta Lake UniForm documentation, Iceberg REST specification and API reference read 2026-09-23."
+    },
+    {
+      "id": "dbxfe-sharing-course-claim-cleanroom",
+      "description": "A Databricks clean room uses Delta Sharing and serverless compute so parties work together without direct access to each other's data; notebooks are reviewed and run by named collaborators and results go to an output catalog; collaborators are identified by Unity Catalog metastore identifiers.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-sharing-course-source-sdk"
+      ],
+      "context": "Databricks API reference in SDK 0.141.0; availability to be verified."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-sharing-l01-pattern-concept",
+      "term": "sharing pattern",
+      "aliases": [
+        "copy",
+        "governed share",
+        "federation",
+        "clean room"
+      ],
+      "definition": "One of the ways another party reaches your tables (copy, governed share, federation or clean room), compared on six questions.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-patterns"
+    },
+    {
+      "id": "dbxfe-sharing-l01-opensharing-concept",
+      "term": "OpenSharing",
+      "aliases": [
+        "Delta Sharing",
+        "Delta Sharing protocol"
+      ],
+      "definition": "Databricks' current name for its sharing product family, built on the open Delta Sharing protocol whose identifiers are unchanged.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-sharing"
+    },
+    {
+      "id": "dbxfe-sharing-l01-recipient-concept",
+      "term": "recipient",
+      "aliases": [
+        "data recipient",
+        "share recipient"
+      ],
+      "definition": "The provider-side object representing another organization that may read a share, with its authentication and restrictions.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-sharing"
+    },
+    {
+      "id": "dbxfe-sharing-l01-credential-concept",
+      "term": "recipient credential file",
+      "aliases": [
+        "profile file",
+        "bearer token"
+      ],
+      "definition": "A JSON profile with the sharing endpoint, a bearer token and an optional expiry, used by open-sharing clients.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-sharing"
+    },
+    {
+      "id": "dbxfe-sharing-l01-freshness-concept",
+      "term": "freshness",
+      "aliases": [
+        "stale",
+        "fresh"
+      ],
+      "definition": "How far the version a reader works from trails the source's latest committed version when it is used.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-lifecycle"
+    },
+    {
+      "id": "dbxfe-sharing-l01-revocation-concept",
+      "term": "revocation",
+      "aliases": [
+        "revoke access"
+      ],
+      "definition": "Stopping a recipient's future reads by removing its grant, deleting it or expiring its token; delivered bytes stay.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-lifecycle"
+    },
+    {
+      "id": "dbxfe-sharing-l01-federation-concept",
+      "term": "Lakehouse Federation",
+      "aliases": [
+        "query federation",
+        "foreign catalog"
+      ],
+      "definition": "Querying an external source in place through a Unity Catalog connection and foreign catalog.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-federation"
+    },
+    {
+      "id": "dbxfe-sharing-l01-access-in-place-concept",
+      "term": "access-in-place",
+      "aliases": [
+        "ingestion versus access-in-place"
+      ],
+      "definition": "Reading data where it lives at query time instead of ingesting a copy into your own tables.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-federation"
+    },
+    {
+      "id": "dbxfe-sharing-l01-uniform-concept",
+      "term": "UniForm",
+      "aliases": [
+        "Delta Universal Format",
+        "Iceberg reads"
+      ],
+      "definition": "A Delta table setting that also writes Iceberg metadata for the same Parquet files so Iceberg engines can read them.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-formats"
+    },
+    {
+      "id": "dbxfe-sharing-l01-catalog-concept",
+      "term": "catalog interoperability",
+      "aliases": [
+        "Iceberg REST catalog",
+        "credential vending"
+      ],
+      "definition": "Letting engines outside a platform find and read governed tables through an open catalog API with vended short-lived credentials.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-formats"
+    },
+    {
+      "id": "dbxfe-sharing-l01-cleanroom-concept",
+      "term": "clean room",
+      "aliases": [
+        "Databricks Clean Rooms"
+      ],
+      "definition": "A shared environment where collaborators run reviewed code on each other's data and take away only outputs.",
+      "lessonId": "dbxfe-sharing-l01",
+      "sectionId": "dbxfe-sharing-l01-cleanrooms"
+    }
+  ]
+}

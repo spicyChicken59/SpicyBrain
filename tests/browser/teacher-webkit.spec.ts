@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import { ready, nav, stored, noOverflow } from "./helpers";
 
@@ -136,18 +137,25 @@ test("WebKit narrow module cards: optional browse, exact explanation detour and 
   page,
 }) => {
   const cardsRoute = "#/module/dbxfe-m09/dbxfe-m09-beat-audience?view=cards";
+  const m09 = JSON.parse(
+    await readFile("content/teaching/dbxfe/dbxfe-m09.json", "utf8"),
+  ) as { cardLinks: unknown[]; extensionCards: unknown[] };
   await ready(page, `/SpicyBrain/${cardsRoute}`);
   await expect(
     page.getByRole("heading", { name: "Keep the useful ideas", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("9 cards in this selection.", { exact: true }),
+    page.getByText(`${m09.cardLinks.length} cards in this selection.`, {
+      exact: true,
+    }),
   ).toBeVisible();
   await page
     .getByRole("combobox", { name: "Card set", exact: true })
     .selectOption("extension");
   await expect(
-    page.getByText("4 cards in this selection.", { exact: true }),
+    page.getByText(`${m09.extensionCards.length} cards in this selection.`, {
+      exact: true,
+    }),
   ).toBeVisible();
   await page
     .getByText(

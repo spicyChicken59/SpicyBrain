@@ -1,0 +1,645 @@
+{
+ "id": "dbxfe-spark-execution-l01",
+ "title": "Distributed execution: partitions, shuffles and what actually ran",
+ "summary": "Read a Spark plan, predict its shuffle boundaries and stages, then compare the prediction with measured tasks, shuffle records, skew and adaptive changes from a recorded local run.",
+ "contentVersion": "1.0.1",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 20,
+ "objectives": [
+  "Predict Exchange nodes, stages and task counts from a physical plan and check them against a recorded local run.",
+  "Explain with numbers why one hot key defeats extra workers and extra partitions, and what a broadcast, a salt, adaptive execution or a cache changes.",
+  "Separate what a toy local run proves from what only a measurement at real size can show."
+ ],
+ "prerequisiteIds": [
+  "dbxfe-dataframes",
+  "dbxfe-grain-joins"
+ ],
+ "tags": [
+  "Platform and working fluency",
+  "Apache Spark",
+  "execution plans",
+  "shuffle",
+  "data skew",
+  "adaptive query execution",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-spark-execution-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-spark-execution-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-execution-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-start",
+   "kind": "prerequisites",
+   "title": "From a plan to the processes that run it",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-execution-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-model",
+   "kind": "mechanism",
+   "title": "Driver, executors, partitions, tasks and actions",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-execution-concept",
+    "dbxfe-spark-execution-l01-boundary-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-boundaries",
+   "kind": "mechanism",
+   "title": "Read the plan, then read what ran",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-boundary-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-runtime-metrics",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-guidance"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-worked",
+   "kind": "example",
+   "title": "One grouped sum and one join, planned and measured",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-boundary-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-skew",
+   "kind": "mechanism",
+   "title": "The hot key, the wrong fix and the salt",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-skew-concept",
+    "dbxfe-spark-execution-l01-boundary-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-adaptive",
+   "kind": "mechanism",
+   "title": "What adaptive execution changes at runtime",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-adaptive-concept",
+    "dbxfe-spark-execution-l01-skew-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-memory",
+   "kind": "mechanism",
+   "title": "Cache and collect: where rows are kept",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-collect-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-memory",
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-task",
+   "kind": "exercise",
+   "title": "Predict the fourth plant",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-boundary-concept",
+    "dbxfe-spark-execution-l01-skew-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-solution",
+   "kind": "solution",
+   "title": "What the plan gives and what needs a run",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-boundary-concept",
+    "dbxfe-spark-execution-l01-skew-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-limits",
+   "kind": "mistakes",
+   "title": "What a toy run cannot prove",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-evidence-concept",
+    "dbxfe-spark-execution-l01-adaptive-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-guidance"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-links",
+   "kind": "related",
+   "title": "Where correctness and warehouse diagnosis continue",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-sources",
+   "kind": "sources",
+   "title": "Sources and execution scope",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-runtime-metrics",
+    "dbxfe-spark-execution-course-claim-memory",
+    "dbxfe-spark-execution-course-claim-local-run"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-revisit",
+   "kind": "revisit",
+   "title": "Check and revisit",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-spark-execution-l01-q1",
+   "revision": "1",
+   "prompt": "The grouped sum by plant is run again over a feed with 840 rows in four input partitions, still with four shuffle partitions and adaptive execution off. How many Exchange nodes and executed stages does its plan have?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-l01-q1-a",
+     "text": "One Exchange and two stages: the plan depends on the operators and settings, not on the row count.",
+     "rationale": "The exchange comes from the grouped operator; stage counts follow shuffle boundaries and the partition settings, so 840 rows change nothing here."
+    },
+    {
+     "id": "dbxfe-spark-execution-l01-q1-b",
+     "text": "Two Exchanges, because more rows need a second redistribution.",
+     "rationale": "Row volume does not add operators; Spark plans one hash-partitioned exchange for one grouped aggregation regardless of size."
+    },
+    {
+     "id": "dbxfe-spark-execution-l01-q1-c",
+     "text": "Zero Exchanges, because a sum is computed inside each partition.",
+     "rationale": "The partial sums do run inside partitions, but the final sum per plant still needs every plant's partials in one place, which is the exchange."
+    },
+    {
+     "id": "dbxfe-spark-execution-l01-q1-d",
+     "text": "It cannot be predicted without running, because plans are only known at runtime.",
+     "rationale": "Adaptive execution can revise a plan at runtime, but it was off here and the exchange count is visible before any action."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-l01-q1-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-boundary-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-q2",
+   "revision": "1",
+   "prompt": "After repartition(16, \"plant\") on the skewed feed the largest partition still holds 180 rows. A colleague proposes repartition(64, \"plant\") to fix the slow task. What will the measurement show?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-l01-q2-b",
+     "text": "About 45 rows in the largest partition, because four times more partitions means a quarter of the work each.",
+     "rationale": "That arithmetic holds for many evenly spread keys; the rows of a single key never divide across hash partitions."
+    },
+    {
+     "id": "dbxfe-spark-execution-l01-q2-a",
+     "text": "The largest partition still holds at least the 180 North rows; hash partitioning by plant cannot split one key.",
+     "rationale": "Every row with the same key hashes to the same partition, so the hot key sets a floor that no partition count moves."
+    },
+    {
+     "id": "dbxfe-spark-execution-l01-q2-c",
+     "text": "The rows spread evenly because Spark balances partitions automatically when a count is given.",
+     "rationale": "A partition count sets how many hash buckets exist, not how keys are assigned to them; balancing happens only with a round-robin repartition and no key."
+    },
+    {
+     "id": "dbxfe-spark-execution-l01-q2-d",
+     "text": "Most partitions are empty and the job fails with an out of memory error.",
+     "rationale": "Empty partitions are normal and harmless; nothing about a larger partition count causes a failure on 240 rows."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-l01-q2-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-skew-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-q3",
+   "revision": "1",
+   "prompt": "A notebook calls collect() on the 240-row fact frame to sum inspected units in Python. Which statement about that choice is correct?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-l01-q3-c",
+     "text": "It fails immediately for any DataFrame because collect() is only allowed on aggregates.",
+     "rationale": "collect() is allowed on any DataFrame; the risk is the size of what arrives, not a rule that forbids it."
+    },
+    {
+     "id": "dbxfe-spark-execution-l01-q3-b",
+     "text": "It is the recommended way because the driver is the fastest process in the application.",
+     "rationale": "The driver coordinates work; it is one process with one heap and is the place a large collection exhausts memory."
+    },
+    {
+     "id": "dbxfe-spark-execution-l01-q3-a",
+     "text": "It works for 240 rows but would move every row into the driver's memory for a large feed; sum the column in Spark and collect the one-row result instead.",
+     "rationale": "collect() serializes all rows to one process; an aggregate computed by the executors and then collected moves a bounded result."
+    },
+    {
+     "id": "dbxfe-spark-execution-l01-q3-d",
+     "text": "It is safe because count() ran first and counted the rows without moving them.",
+     "rationale": "count() moving nothing to the driver says nothing about the cost of a later collect() of the same rows."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-l01-q3-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-collect-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-memory",
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-spark-execution-l01-card1",
+   "revision": "1",
+   "prompt": "What does the driver do that an executor never does?",
+   "answer": "It holds the session, builds the plan, splits it into stages and tasks, and schedules those tasks on executors.",
+   "explanation": "Executors run tasks and hold partitions; the driver coordinates. In local[2] both roles live in one JVM with two task slots, which is why a local run can show every mechanism but no realistic speed.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-model",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-execution-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card2",
+   "revision": "1",
+   "prompt": "Why can explain() print a plan before any row is computed?",
+   "answer": "Transformations only extend a lazy plan; execution starts when an action such as collect, count or a write asks for output.",
+   "explanation": "Because nothing runs until an action, you can read the proposed operators, count the exchanges and predict the stages before paying for a task. The lab wrapped explain() in its own job group and counted zero jobs.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-model",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-execution-concept",
+    "dbxfe-spark-execution-l01-boundary-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card3",
+   "revision": "1",
+   "prompt": "How are partitions and tasks related within one stage?",
+   "answer": "A stage runs exactly one task per partition of its input, so 240 rows in four partitions means four tasks for a filter.",
+   "explanation": "The partition count decides parallelism: four partitions cannot use more than four task slots at once, and one oversized partition becomes one long task however many slots exist.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-model",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-execution-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card4",
+   "revision": "1",
+   "prompt": "Predict the plan of a filter followed by a select over a partitioned frame.",
+   "answer": "Project over Filter over Scan with no Exchange: each output partition depends on one input partition, so the chain runs in one stage.",
+   "explanation": "That is a narrow dependency. The lab measured one job, one stage and four tasks for it; rows kept per partition were 47, 48, 45 and 47, exactly each input slice's defective rows, because nothing moved.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-boundaries",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-boundary-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card5",
+   "revision": "1",
+   "prompt": "Which operator marks a shuffle in a physical plan, and what crossed it in the grouped sum?",
+   "answer": "Exchange; for the grouped sum it carried twelve partial rows, one per plant from each of four input partitions, not the 240 raw rows.",
+   "explanation": "The partial HashAggregate below the Exchange sums inside each task first, so only partials cross hashpartitioning(plant#1, 4). The reduce tasks then read 8, 0, 4 and 0 of those records. Every Exchange ends a stage.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-boundaries",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-boundary-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-runtime-metrics",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card6",
+   "revision": "1",
+   "prompt": "Why did the second stage of the grouped sum run four tasks when two of them read nothing?",
+   "answer": "Because spark.sql.shuffle.partitions was 4 and adaptive execution was off; a stage reading a shuffle has that many tasks whatever the data.",
+   "explanation": "The setting, not the data, fixed the task count: three plants hashed into two of the four shuffle partitions. With adaptive execution on, the same shuffle was read as one coalesced partition by a single task.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-worked",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-boundary-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card7",
+   "revision": "1",
+   "prompt": "What changed in the plan and in the shuffled records when the plant dimension was broadcast?",
+   "answer": "SortMergeJoin with three Exchanges became BroadcastHashJoin with one Exchange and one BroadcastExchange; shuffled records fell from 243 plus 3 partials to 8 partials.",
+   "explanation": "A separate one-task job computed the three-row dimension; the driver collected it and shipped one copy to every executor, where the fact tasks shared it, so the 240 fact rows never crossed a shuffle and the join ran inside the scanning task. Measured stages went from 1, 4, 4, 4 to 1, 4, 4.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-worked",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-boundary-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-runtime-metrics",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card8",
+   "revision": "1",
+   "prompt": "Give a concrete counterexample to the claim that more workers are always faster.",
+   "answer": "A stage whose partitions hold 204, 36, 0 and 0 rows: the second slot idles after 36 rows while the first works to 204, and extra slots idle from the start.",
+   "explanation": "The lab measured that distribution after repartition(4, \"plant\") on the skewed feed. A stage ends when its longest task ends, and hash partitioning kept all 180 North rows in one task at 8 and 16 partitions too.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-skew",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-skew-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card9",
+   "revision": "1",
+   "prompt": "Why does a round-robin repartition(16) before a window by plant not fix the slow task?",
+   "answer": "The window needs every row of one plant together, so its own hashpartitioning(plant) exchange follows the round-robin one and re-collects the hot key.",
+   "explanation": "The plan kept both exchanges, the job shuffled 480 records instead of 240, and the busiest window task still read 204 rows. The extra shuffle cost a full pass over the data and changed nothing about the key.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-skew",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-skew-concept",
+    "dbxfe-spark-execution-l01-boundary-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-runtime-metrics",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card10",
+   "revision": "1",
+   "prompt": "How does salting a join key split a hot key without changing the answer?",
+   "answer": "Add salt = crc32(event_id) % 4 to the facts, replicate the small side once per salt, and join on (plant, salt): each fact row still meets exactly one replica.",
+   "explanation": "The largest partition fell from 204 to 122 rows while the join still returned 240 rows and the same regional totals. The cost is a twelve-row dimension, two exchanges on the new key and a plan the next reader must understand.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-skew",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-skew-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card11",
+   "revision": "1",
+   "prompt": "What does isFinalPlan=false tell you about an adaptive plan you just printed?",
+   "answer": "That no action has run yet: adaptive execution finalizes the plan only after it measures shuffle output, so the printed exchanges and partition counts may still change.",
+   "explanation": "After its action the grouped plan read isFinalPlan=true with AQEShuffleRead coalesced, and one task read all twelve partial records instead of four tasks. Print the plan again after the action to see what actually ran.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-adaptive",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-adaptive-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card12",
+   "revision": "1",
+   "prompt": "State one thing the recorded local run proves and one thing it cannot.",
+   "answer": "It proves exchange counts, executed stages and tasks, shuffle records and where rows landed for Spark 4.0.4 in local[2]; it cannot prove any duration, memory use, spill or cluster behaviour.",
+   "explanation": "Each experiment changed one setting on 240 rows in one configuration. A statement such as broadcast is always faster or raise shuffle partitions needs measurements at the real size, on the real runtime, with the real key distribution.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-limits",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card13",
+   "revision": "1",
+   "prompt": "Interpret this: six identical adaptive runs built BuildLeft twice and BuildRight four times.",
+   "answer": "Which side adaptive execution broadcasts is a runtime outcome of that run, not a property of the query, so a single run's side is not evidence about sizes.",
+   "explanation": "Spark converts a sort-merge join when the runtime statistics of any join side qualify; with both input shuffles running at once, the order they finish is the likely reason the side varied. The lab records the sides and asserts only that the strategy switched.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-adaptive",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-adaptive-concept",
+    "dbxfe-spark-execution-l01-evidence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card14",
+   "revision": "1",
+   "prompt": "Why did adaptive skew handling leave the 204-row join partition alone at its defaults?",
+   "answer": "A partition counts as skewed only when it exceeds five times the median partition size and 256 MB; a few kilobytes of shuffle is nowhere near that.",
+   "explanation": "With the threshold and advisory size scaled to 1 KB on the record, the plan read SortMergeJoin(skew=true) and three tasks read 102, 106 and 37 records instead of one reading 206. That demonstrates the mechanism; it is not a setting to copy.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-adaptive",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-adaptive-concept",
+    "dbxfe-spark-execution-l01-skew-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card15",
+   "revision": "1",
+   "prompt": "After cache() and one count(), what does the next grouped plan change and what does it keep?",
+   "answer": "Its input becomes InMemoryTableScan over InMemoryRelation; the Exchange for the grouping key and every count stay exactly as before.",
+   "explanation": "Caching changes where rows come from, not how they must move: grouping by line still needs hashpartitioning(line#2, 4). Counts stayed L1 64, L2 63, L3 53, and unpersist() returned the plan to a scan and filter.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-memory",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-collect-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-memory",
+    "dbxfe-spark-execution-course-claim-tuning",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-l01-card16",
+   "revision": "1",
+   "prompt": "Why can count() not exhaust driver memory while collect() on the same frame can?",
+   "answer": "count() returns one number from partial counts computed by the tasks; collect() serializes every row and sends all of them to the one driver process.",
+   "explanation": "The driver is one process with one heap. The lab's guard counted limit(51) first and refused the raw frame at a bound of 50 rows, while count() reported 240 without moving a row to the driver.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-memory",
+   "conceptIds": [
+    "dbxfe-spark-execution-l01-collect-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-course-claim-memory",
+    "dbxfe-spark-execution-course-claim-execution",
+    "dbxfe-spark-execution-course-claim-local-run",
+    "dbxfe-fiction"
+   ]
+  }
+ ]
+}

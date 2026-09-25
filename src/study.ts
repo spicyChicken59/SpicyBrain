@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { openDB, type IDBPDatabase } from "idb";
-import { idSchema, type Card } from "./content-schema";
+import { idSchema } from "./content-schema";
 
 export const DAY = 86_400_000;
 export const ALGORITHM = "spicybrain-simple-v1";
@@ -233,9 +233,11 @@ export function scheduleRating(previous: number, rating: Rating, at: string) {
     dueAt: new Date(Date.parse(at) + delay).toISOString(),
   };
 }
+/** The identity a review needs; a full card or a catalog reference both satisfy it. */
+export type CardIdentity = { id: string; revision: string; lessonId: string };
 export function applyReview(
   state: StudyState,
-  card: Card,
+  card: CardIdentity,
   courseId: string,
   rating: Rating,
   eventId: string,
@@ -276,12 +278,12 @@ export function applyReview(
     },
   };
 }
-export function reviewQueue(
-  cards: Card[],
+export function reviewQueue<T extends { id: string; revision: string }>(
+  cards: T[],
   state: StudyState,
   at: string,
   limit = state.settings.sessionSize,
-) {
+): T[] {
   return cards
     .filter((c) => {
       const s = state.schedules[c.id];

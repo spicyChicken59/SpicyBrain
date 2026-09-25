@@ -1,0 +1,648 @@
+{
+ "id": "dbxfe-forecasting-l01",
+ "title": "Forecasting, anomalies and practical model selection",
+ "summary": "Fix a forecast's origin and horizon, beat naive and seasonal naive baselines on rolling origins without leakage, state uncertainty with measured coverage, choose an anomaly threshold by inspection load and cost, and judge a ranked queue at its capacity.",
+ "contentVersion": "1.1.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 18,
+ "objectives": [
+  "Fix a forecast's origin and horizon, compute naive and seasonal naive baselines and build rolling-origin folds free of temporal leakage.",
+  "Compare a lag regression with its baselines fold by fold with MAE and MASE, explain MAPE's failure on zero actuals and state an interval with its coverage.",
+  "Choose an anomaly threshold from inspection load, false positives, misses and costs, and evaluate a ranked lot queue with precision at its capacity."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Machine learning",
+  "Forecasting",
+  "Time series",
+  "Anomaly detection",
+  "Ranking",
+  "scikit-learn",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-forecasting-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-forecasting-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-horizon-concept",
+    "dbxfe-forecasting-l01-backtest-concept",
+    "dbxfe-forecasting-l01-anomaly-concept",
+    "dbxfe-forecasting-l01-ranking-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-start",
+   "kind": "prerequisites",
+   "title": "Before the forecast",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-horizon-concept",
+    "dbxfe-forecasting-l01-baseline-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-horizon",
+   "kind": "mechanism",
+   "title": "Origin, horizon and the two baselines",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-horizon-concept",
+    "dbxfe-forecasting-l01-baseline-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-baselines",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-backtest",
+   "kind": "mechanism",
+   "title": "Rolling origins and the leaks they catch",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-backtest-concept",
+    "dbxfe-forecasting-l01-leakage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-tscv",
+    "dbxfe-fact-leakage",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-metrics",
+   "kind": "mechanism",
+   "title": "Comparing a model with its baselines",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-backtest-concept",
+    "dbxfe-forecasting-l01-metric-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-tscv",
+    "dbxfe-forecasting-course-claim-percentage",
+    "dbxfe-forecasting-course-claim-mase",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-uncertainty",
+   "kind": "mechanism",
+   "title": "A range with its coverage",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-interval-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-intervals",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-anomaly",
+   "kind": "mechanism",
+   "title": "Scores, thresholds and inspection load",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-anomaly-concept",
+    "dbxfe-forecasting-l01-cost-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-threshold",
+    "dbxfe-fact-leakage",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-ranking",
+   "kind": "mechanism",
+   "title": "Ranked queues and recommendations",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-ranking-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-threshold",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-platform",
+   "kind": "mechanism",
+   "title": "Managed forecasting after the mechanism",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-automl-concept",
+    "dbxfe-forecasting-l01-backtest-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-automl",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-example",
+   "kind": "example",
+   "title": "Worked example: one week in August",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-interval-concept",
+    "dbxfe-forecasting-l01-anomaly-concept",
+    "dbxfe-forecasting-l01-baseline-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-intervals",
+    "dbxfe-forecasting-course-claim-baselines",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-exercise",
+   "kind": "exercise",
+   "title": "Exercise: a longer horizon and a costlier review",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-horizon-concept",
+    "dbxfe-forecasting-l01-cost-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-baselines",
+    "dbxfe-forecasting-course-claim-threshold",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-solution",
+   "kind": "solution",
+   "title": "Solution",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-horizon-concept",
+    "dbxfe-forecasting-l01-cost-concept",
+    "dbxfe-forecasting-l01-interval-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-baselines",
+    "dbxfe-forecasting-course-claim-threshold",
+    "dbxfe-forecasting-course-claim-intervals",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-mistakes",
+   "kind": "mistakes",
+   "title": "Mistakes to avoid",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-leakage-concept",
+    "dbxfe-forecasting-l01-metric-concept",
+    "dbxfe-forecasting-l01-anomaly-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-percentage",
+    "dbxfe-fact-leakage",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-sources",
+   "kind": "sources",
+   "title": "Sources and what they support",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-backtest-concept",
+    "dbxfe-forecasting-l01-metric-concept",
+    "dbxfe-forecasting-l01-automl-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-tscv",
+    "dbxfe-forecasting-course-claim-percentage",
+    "dbxfe-forecasting-course-claim-automl",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-related",
+   "kind": "related",
+   "title": "Related material",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-backtest-concept",
+    "dbxfe-forecasting-l01-leakage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-forecasting-l01-revisit",
+   "kind": "revisit",
+   "title": "Check and revisit",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-horizon-concept",
+    "dbxfe-forecasting-l01-backtest-concept",
+    "dbxfe-forecasting-l01-anomaly-concept",
+    "dbxfe-forecasting-l01-ranking-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-forecasting-l01-q1",
+   "revision": "1",
+   "prompt": "Why does Cinderline backtest the lag regression with TimeSeriesSplit instead of KFold(shuffle=True)?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-l01-q1-a",
+     "text": "KFold cannot split an 82-row array into four folds.",
+     "rationale": "KFold splits any array of at least n_splits rows; the problem is which rows land in training, not whether it runs."
+    },
+    {
+     "id": "dbxfe-forecasting-l01-q1-b",
+     "text": "Every TimeSeriesSplit fold trains only on days before its test week, as the Friday forecast will; shuffled folds train on later days and flatter the model.",
+     "rationale": "Matching the real information boundary is the point; shuffling breaks it in every fold."
+    },
+    {
+     "id": "dbxfe-forecasting-l01-q1-c",
+     "text": "TimeSeriesSplit gives every fold more training rows than KFold.",
+     "rationale": "The first TimeSeriesSplit fold trains on 54 rows, fewer than a four-fold KFold's roughly 61."
+    },
+    {
+     "id": "dbxfe-forecasting-l01-q1-d",
+     "text": "Shuffling changes the regression's formula but not its error.",
+     "rationale": "Training on later days changes the error too, and always in the flattering direction."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-l01-q1-b",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-backtest-concept",
+    "dbxfe-forecasting-l01-leakage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-tscv",
+    "dbxfe-fact-leakage",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-q2",
+   "revision": "1",
+   "prompt": "A scored week includes a closed Sunday on which a model without the calendar forecasts 7 units. Which summary still gives a meaningful error for that week?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-l01-q2-a",
+     "text": "MAPE, because scikit-learn returns a finite number.",
+     "rationale": "The finite number comes from dividing by machine epsilon; it is about 10^15, not an error rate."
+    },
+    {
+     "id": "dbxfe-forecasting-l01-q2-b",
+     "text": "Symmetric MAPE, because it averages actual and forecast in the denominator.",
+     "rationale": "On a zero-actual day it scores 200% for any non-zero forecast, so it cannot tell small errors from large ones."
+    },
+    {
+     "id": "dbxfe-forecasting-l01-q2-c",
+     "text": "MAE in units, or MASE, because neither divides by the actual.",
+     "rationale": "Both stay defined when an actual is zero; the Sunday error is simply 7 units."
+    },
+    {
+     "id": "dbxfe-forecasting-l01-q2-d",
+     "text": "None: a week with a closed day cannot be scored at all.",
+     "rationale": "Scheduled closures are excluded or scored in units; the working days remain perfectly scoreable."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-l01-q2-c",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-metric-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-percentage",
+    "dbxfe-forecasting-course-claim-mase",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-q3",
+   "revision": "1",
+   "prompt": "If the incoming-goods team could inspect eight lots per shift instead of four, which model should order the queue?",
+   "options": [
+    {
+     "id": "dbxfe-forecasting-l01-q3-a",
+     "text": "Model A: its precision at 8 is 0.625 against 0.500, and its first eight lots contain all five bad lots.",
+     "rationale": "At the new capacity A's list is better, even though B's first four were perfect."
+    },
+    {
+     "id": "dbxfe-forecasting-l01-q3-b",
+     "text": "Model B, because its precision at 4 is 1.00.",
+     "rationale": "Precision at 4 answers the old capacity; at eight inspections B finds four bad lots and A five."
+    },
+    {
+     "id": "dbxfe-forecasting-l01-q3-c",
+     "text": "Model B, because it scores all five bad lots above 0.5.",
+     "rationale": "Scores above 0.5 describe the accuracy cut, not the order; B's first eight lots hold only four bad lots."
+    },
+    {
+     "id": "dbxfe-forecasting-l01-q3-d",
+     "text": "Neither can be judged until the accuracy threshold is tuned.",
+     "rationale": "The queue is used by rank, so the capacity, not an accuracy threshold, defines the evaluation."
+    }
+   ],
+   "correctOptionId": "dbxfe-forecasting-l01-q3-a",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-ranking-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-threshold",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-forecasting-l01-card1",
+   "revision": "1",
+   "prompt": "What two things must a forecast name before any model is chosen?",
+   "answer": "Its origin, the last day whose data may be used, and its horizon, the number of steps it must cover.",
+   "explanation": "Cinderline's roster is set on Friday for Saturday to Friday, so the origin is Friday and the horizon is seven steps. Those two facts decide which inputs are legitimate (only values observed by Friday), how the backtest is split (Friday origins, seven-day test weeks) and which errors matter (steps 1 to 7).",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-horizon",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-horizon-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-baselines",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card2",
+   "revision": "1",
+   "prompt": "Why is the naive forecast 240 units wrong on Saturday 2026-07-25?",
+   "answer": "It repeats Friday's 409 two-shift units for a one-shift Saturday that made 169.",
+   "explanation": "The naive method sets every step to the last observed value, so it cannot follow a weekly calendar. On L4 its Saturday error is between 215 and 249 units at all four Friday origins, which is why its six-day MAE never falls below 41 units.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-horizon",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-baseline-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-baselines",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card3",
+   "revision": "1",
+   "prompt": "What does a seasonal naive forecast for next Wednesday copy, and when does that go wrong?",
+   "answer": "Last Wednesday's value; it goes wrong when last Wednesday was an anomaly, such as the 156-unit breakdown, which it copies forward.",
+   "explanation": "Seasonal naive repeats the last observed value from the same point in the season, so it follows the weekly calendar for free and gets closed days right. It has no idea which values were events, so from the 2026-08-21 origin it forecasts Wednesday 2026-08-26 at 156 units unless the breakdown is recorded and replaced.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-horizon",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-baseline-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-baselines",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card4",
+   "revision": "1",
+   "prompt": "Predict the first fold of TimeSeriesSplit(n_splits=4, test_size=7) on 82 daily rows.",
+   "answer": "Training rows 0 to 53 and test rows 54 to 60; each later fold adds one week to training.",
+   "explanation": "The test blocks are the last 4 x 7 = 28 rows, taken in time order, and each fold trains on every earlier row. On L4 that makes fold 1 train on 2026-06-01 to Friday 2026-07-24 and test the following Saturday to Friday, so every origin is a Friday, like the roster meeting.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-backtest",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-backtest-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-tscv",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card5",
+   "revision": "1",
+   "prompt": "Why can a model on the same day's run hours not be used for a Friday roster forecast?",
+   "answer": "Run hours are recorded when each target day ends, so none of next week's values exist at the Friday origin.",
+   "explanation": "The run-hours regression scores 12.06 units of error against the honest 21.17 because it reads each day's own outcome driver, and it even reproduces the breakdown from its 5.5 run hours. That score cannot be achieved when the forecast is actually made; only inputs known at the origin, such as lags and the calendar, are legitimate.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-backtest",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-leakage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-leakage",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card6",
+   "revision": "1",
+   "prompt": "What does the fitted formula 7.32 + 0.477 x last week + 0.498 x two weeks ago tell you about the model?",
+   "answer": "It is roughly the average of the same weekday one and two weeks back: a smoothed seasonal naive with a small intercept.",
+   "explanation": "Reading coefficients is part of model selection. Weights near one half explain why the model beats seasonal naive (averaging two weeks cancels some noise), why the gain is small (21.17 against 23.67 units) and what it cannot foresee: breakdowns, new shifts or holidays.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-metrics",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-backtest-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-tscv",
+    "dbxfe-forecasting-course-claim-baselines",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card7",
+   "revision": "1",
+   "prompt": "What does scikit-learn's MAPE return when an actual is zero and the forecast is not?",
+   "answer": "A huge finite number, because it divides by machine epsilon instead of zero; it is not an error rate.",
+   "explanation": "mean_absolute_percentage_error divides each absolute error by the larger of the actual's magnitude and a tiny epsilon. For a week of naive forecasts that includes a closed Sunday it returns about 2.6 x 10^17, while numpy's plain division returns infinity. Score working days in units, or use MASE, instead.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-metrics",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-metric-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-percentage",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card8",
+   "revision": "1",
+   "prompt": "An 80% band covered 20 of 24 held-out days. What may you claim?",
+   "answer": "That on those days it behaved roughly as stated; not that 80% of future days will fall inside it.",
+   "explanation": "Coverage is measured evidence about specific days. The band came from in-sample residuals of ordinary weeks, which tend to understate new errors, and it did not contain the breakdown. Publish the range with its coverage, the days outside and the events it cannot represent, never as a guarantee.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-uncertainty",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-interval-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-intervals",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card9",
+   "revision": "1",
+   "prompt": "Why is a closed Sunday marked as not scored rather than scored as normal?",
+   "answer": "With zero units there is no expected defect count, so the score is undefined; calling the day normal would hide a gap.",
+   "explanation": "The score divides the excess by the square root of the expected defects, which is zero on a closed day. Recording 'not scored' keeps the count honest (47 scored days, 7 not scored) and prevents a silent zero from later reading as evidence that nothing was wrong.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-anomaly",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-anomaly-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-threshold",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card10",
+   "revision": "1",
+   "prompt": "What does lowering L4's threshold from 2.5 to 2.0 cost and buy?",
+   "answer": "Two more reviews, six inspector-hours, both false positives, and no additional bad lot caught.",
+   "explanation": "The two new flags fall on Monday 08-03 and Thursday 08-13, which had no event, while the missed bad lot on Tuesday 07-07 scores 1.99 and still sits below 2.0. A threshold change should be read in reviews, catches, false positives and misses, not as 'safer'.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-anomaly",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-anomaly-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-threshold",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card11",
+   "revision": "1",
+   "prompt": "Why does the preferred threshold move from 2.5 to 1.5 during the customer audit?",
+   "answer": "The estimated cost of a missed bad lot rises from 12 to 40 hours, which makes catching every bad lot worth seven false alarms.",
+   "explanation": "Total hours are 3 per review plus the miss cost per missed bad lot. At 12 hours 2.5 costs 27 and 1.5 costs 36; at 40 hours 2.5 costs 55 and 1.5 costs 36. The break-even is a 21-hour miss, the number to show the people who own the cost estimates.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-anomaly",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-cost-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-threshold",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card12",
+   "revision": "1",
+   "prompt": "Why does accuracy pick the wrong inspection queue for four inspectors?",
+   "answer": "Accuracy counts all 20 lots at a 0.5 cut, but the team opens only four, where precision at 4 is 1.00 for model B and 0.50 for model A.",
+   "explanation": "With 15 conforming lots, a rule that calls everything conforming already scores 0.75, the same as model A. A ranked queue is consumed from the top, so it must be judged at the capacity k that consumes it; with eight inspections the preference flips to model A.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-ranking",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-ranking-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-threshold",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  },
+  {
+   "id": "dbxfe-forecasting-l01-card13",
+   "revision": "1",
+   "prompt": "What does a managed forecasting tool not know about Cinderline's roster decision?",
+   "answer": "The Friday origin, which inputs exist then, the closed Sundays, the baselines to beat and the cost of a missed bad lot.",
+   "explanation": "Databricks documents AutoML as preparing data, fitting and tuning candidate models and writing a notebook per trial. None of the decision facts above is in the data, so the team reads each trial's notebook, reruns it on the same rolling origins as the baselines and keeps those decisions.",
+   "lessonId": "dbxfe-forecasting-l01",
+   "sectionId": "dbxfe-forecasting-l01-platform",
+   "conceptIds": [
+    "dbxfe-forecasting-l01-automl-concept"
+   ],
+   "claimIds": [
+    "dbxfe-forecasting-course-claim-automl",
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-forecasting-course-claim-lab"
+   ]
+  }
+ ]
+}

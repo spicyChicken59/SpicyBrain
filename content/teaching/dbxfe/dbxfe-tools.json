@@ -1,0 +1,3594 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-tools",
+ "title": "Tools, MCP and action authorization",
+ "summary": "A model proposes; your application decides. One gate checks identity, schema, delegated permission, keys and approvals, audits every decision, and treats MCP as transport and discovery rather than authorization.",
+ "outcomes": [
+  "Trace a tool call from proposal to effect and place a policy gate that checks session, exposed tool, schema, delegated permission, key and approval in order.",
+  "Decide whose identity a target evaluates, compute delegated permission as an intersection, and refuse a missing user credential.",
+  "Show why retrieved content and system prompts cannot authorize an action, and design approvals, retries and idempotency keys that cannot duplicate effects.",
+  "Explain what MCP standardizes and where authorization is still enforced, then prove a gate with an audit trail and a test matrix."
+ ],
+ "startingAssumptions": [
+  "The GenAI module separates relevance from permission and introduces the tool boundary.",
+  "Learners can read JSON and a short Python function; HTTP status codes 401 and 403 are explained where they appear."
+ ],
+ "lessonIds": [
+  "dbxfe-tools-l01"
+ ],
+ "optionalBridgeLessonIds": [
+  "dbxfe-m07-l02"
+ ],
+ "editorialRationale": "Tool use fails when teams treat a model's output as an action and a prompt as a policy, so the module starts from the split between proposal and execution, then builds the gate check by check: schema, identity and delegation, untrusted content, the system prompt's limits, approval, timeouts and keys. MCP comes after the gate so that its role is clear: discovery and transport, with authorization still enforced at the token, the handler and the target. Every number comes from Lab L22's executed local run, and the audit and test-matrix beats turn the design into evidence a reviewer can check.",
+ "sources": [
+  {
+   "id": "dbxfe-tools-source-mcp-spec",
+   "title": "Tools: Model Context Protocol specification, revision 2025-11-25",
+   "url": "https://modelcontextprotocol.io/specification/2025-11-25/server/tools",
+   "publisher": "Model Context Protocol project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Protocol specification, dated revision 2025-11-25; the Tool, ToolAnnotations and CallToolResult wording relied on is the same in the 2026-07-28 revision as shipped in mcp-types 2.2.0.",
+   "caveat": "A protocol specification describes messages and expected client and server behaviour; it enforces nothing in any implementation. Revisions are dated, so check which one a client and server use.",
+   "reviewedEvidence": "Not confirmed by web search in this build (the session's search budget was exhausted, 200 of 200, before this module was written on 2026-09-23) and page body not fetched (documentation host blocked by the sandbox egress proxy); the URL is the one the MCP Python SDK 2.2.0 cites for tool names, read in the package source after downloading it from PyPI on 2026-09-23. Passage relied on, read in the protocol schema definitions shipped in mcp-types 2.2.0: tools are listed with tools/list and invoked with tools/call over JSON-RPC 2.0; a Tool has a name, a description that can be thought of as a hint to the model, an inputSchema that is a JSON Schema object with type object at its root, and an optional outputSchema; every ToolAnnotations property (readOnlyHint, destructiveHint, idempotentHint, openWorldHint) is a hint not guaranteed to describe the tool faithfully, with defaults false, true, false and true, and clients should never make tool use decisions based on annotations received from untrusted servers; errors that originate in a tool are reported inside CallToolResult with isError set to true so the model can see them, while errors in finding the tool are protocol errors."
+  },
+  {
+   "id": "dbxfe-tools-source-mcp-sdk",
+   "title": "mcp 2.2.0: Model Context Protocol Python SDK",
+   "url": "https://pypi.org/project/mcp/2.2.0/",
+   "publisher": "Model Context Protocol project (published on PyPI)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source Python SDK for MCP clients and servers, release 2.2.0, with its mcp-types 2.2.0 schema package; metadata and source read locally.",
+   "caveat": "One SDK's implementation, not the specification; other SDKs and servers may differ and a later release may change these details.",
+   "reviewedEvidence": "Wheel downloaded from PyPI with pip on 2026-09-23 and its metadata and source read locally in this build (PyPI is reachable from the sandbox; the PyPI web page itself was not fetched). Passage relied on: the README says MCP lets servers expose data and functionality to LLM applications, that servers expose tools, resources and prompts to MCP hosts, and that the SDK speaks the stdio, Streamable HTTP and SSE transports, a URL meaning Streamable HTTP; a server tool's input schema is derived from a Python function's type hints; the server's bearer-token check rejects a missing or expired token with 401 invalid_token (a token whose RFC 8707 resource is not the server's own URL is refused by the SDK's own comparison only when AuthSettings.validate_token_resource is enabled, and otherwise only if the token verifier rejects it; corrected on 2026-09-25 from dbxfe-tools-source-mcp-sdk-auth-settings and dbxfe-tools-source-mcp-sdk-token-verifier; earlier wording remains in git history) and a token without the endpoint's required scopes with 403 insufficient_scope, and publishes RFC 9728 protected resource metadata; handlers can read the verified token from request context, and the tool decorator has no per-tool authorization setting; mcp-types 2.2.0 lists protocol revisions 2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25 and 2026-07-28."
+  },
+  {
+   "id": "dbxfe-tools-source-mcp-databricks",
+   "title": "Model Context Protocol (MCP) on Databricks",
+   "url": "https://docs.databricks.com/aws/en/generative-ai/mcp/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; MCP servers managed by Databricks, external servers through connections, and custom servers a team hosts.",
+   "caveat": "Which managed servers exist, their preview status, regional availability and any charges must be read from the current page; nothing was configured or called in this build.",
+   "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Details taught from this record are limited to what the Databricks-authored databricks-mcp 0.9.2 package shows (its own source record); anything more is marked for verification."
+  },
+  {
+   "id": "dbxfe-tools-source-databricks-mcp",
+   "title": "databricks-mcp 0.9.2: MCP helpers for Databricks",
+   "url": "https://pypi.org/project/databricks-mcp/0.9.2/",
+   "publisher": "Databricks (published on PyPI)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks-authored client helpers for MCP servers on Databricks, Apache-2.0, marked experimental; source read locally.",
+   "caveat": "Client code shows the URL shapes and the authentication a client sends; it does not document server-side permission rules, availability or pricing.",
+   "reviewedEvidence": "Wheel downloaded from PyPI with pip on 2026-09-23 and its metadata and source read locally in this build (PyPI is reachable from the sandbox; the PyPI web page itself was not fetched). Passage relied on: DatabricksMCPClient sends the workspace client's credentials as a bearer token through the MCP SDK's OAuth client provider and speaks Streamable HTTP (list_tools, call_tool); Databricks-managed MCP server paths on a workspace host are /api/2.0/mcp/functions/<catalog>/<schema> for Unity Catalog functions, /api/2.0/mcp/vector-search/<catalog>/<schema>, /api/2.0/mcp/genie/<space-id> and /api/2.0/mcp/external/<connection-name>; a custom MCP server hosted on Databricks Apps requires OAuth, and a calling service principal needs permission to query the app; get_databricks_resources lists a managed server's dependent resources to declare when logging an agent so that it can authenticate to the server when deployed."
+  },
+  {
+   "id": "dbxfe-tools-source-agent-auth",
+   "title": "Authentication for agents",
+   "url": "https://docs.databricks.com/aws/en/agents/custom-agents/agent-authentication",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-19",
+   "publishedAt": null,
+   "context": "Databricks on AWS; agents deployed on Databricks Apps; app identity versus user identity.",
+   "caveat": "User authorization was marked Public Preview at that review; helper behaviour and prerequisites must be rechecked for the version in use.",
+   "reviewedEvidence": "Reviewed for the GenAI module on 2026-09-19 and recorded in that module's source record; the URL answered HTTP 200 in the course's 2026-09-20 availability probe; not re-searched or re-read for this record because the session's search budget was exhausted and the documentation host is blocked by the sandbox egress proxy. Passage relied on, as recorded there: app identity and user identity differ; user authorization is marked Public Preview; a missing forwarded user token can fall back to app identity, so testing with several callers is recommended."
+  },
+  {
+   "id": "dbxfe-tools-source-obo",
+   "title": "databricks-ai-bridge 0.22.0: model serving user credentials",
+   "url": "https://pypi.org/project/databricks-ai-bridge/0.22.0/",
+   "publisher": "Databricks (published on PyPI)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks-authored library used by agents in Model Serving; on-behalf-of-user credential strategy; source read locally.",
+   "caveat": "Implementation detail of one library release; on-behalf-of-user authorization for agents is a workspace preview feature whose prerequisites must be read from current documentation.",
+   "reviewedEvidence": "Wheel downloaded from PyPI with pip on 2026-09-23 and its metadata and source read locally in this build (PyPI is reachable from the sandbox; the PyPI web page itself was not fetched). Passage relied on: ModelServingUserCredentials authenticates the Databricks SDK in Model Serving with user authorization, acting as the Databricks principal that queried the serving endpoint; it retrieves a downscoped user token or fails if none is available; its error text requires the model to be logged with a UserAuthPolicy, the 'Agent Framework: On-Behalf-Of-User Authorization' preview to be enabled, and the WorkspaceClient to be created inside predict() or predict_stream() rather than at model-loading time."
+  },
+  {
+   "id": "dbxfe-tools-source-mlflow-auth",
+   "title": "mlflow 3.16.1: model authentication policy",
+   "url": "https://pypi.org/project/mlflow/3.16.1/",
+   "publisher": "MLflow project (published on PyPI)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source MLflow 3.16.1 as installed in the course's local ML lab environment; mlflow.models.auth_policy and mlflow.models.resources read locally.",
+   "caveat": "Marked experimental in this release and described as compatible only with the Databricks environment; serving-side behaviour belongs to Databricks and must be verified there.",
+   "reviewedEvidence": "Package installed locally from PyPI and its source read in this build on 2026-09-23. Passage relied on: log_model accepts an experimental auth_policy made of a SystemAuthPolicy (resources required to serve the model) and a UserAuthPolicy (a minimal list of API scopes, for example sql, that the user should have to invoke the model), and only one of auth_policy or resources should be defined; a declared Databricks resource such as DatabricksFunction takes on_behalf_of_user, and when it is None or False the resource is accessed with the permissions of the model's creator rather than the invoker's."
+  },
+  {
+   "id": "dbxfe-tools-source-privileges",
+   "title": "Unity Catalog privileges reference",
+   "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Unity Catalog privileges, including EXECUTE on functions.",
+   "caveat": "Privilege names and inheritance rules change between releases; read the current reference before granting anything.",
+   "reviewedEvidence": "Title and URL confirmed by web search in this build on 2026-09-23 and recorded in the MLflow module's source record; no new search was run for this record because the session's search budget was exhausted; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: EXECUTE on a function allows a principal to invoke it, and using any securable also requires USE CATALOG on its catalog and USE SCHEMA on its schema."
+  },
+  {
+   "id": "dbxfe-tools-source-owasp",
+   "title": "OWASP Top 10 for Large Language Model Applications",
+   "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+   "publisher": "OWASP Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Community risk list for LLM applications; the 2023 (v1.1) and 2025 editions number the risks differently.",
+   "caveat": "A list of risks and mitigations, not a standard or a test; this module uses the risk names, not their numbers.",
+   "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the title and URL are as supplied in the build's source list; page not fetched in this build (host blocked by the sandbox egress proxy). The risk wording relied on is OWASP's own short summaries as reproduced in the taxonomy file of garak 0.17.0 (its own source record): prompt injection, where crafted inputs manipulate an LLM into unintended actions, direct injections overwriting system prompts and indirect ones arriving through inputs from external sources; insecure plugin design, with insecure inputs and insufficient access control; and excessive agency, where excessive functionality, permissions or autonomy lead to actions with unintended consequences."
+  },
+  {
+   "id": "dbxfe-tools-source-garak",
+   "title": "garak 0.17.0: OWASP LLM tag taxonomy",
+   "url": "https://pypi.org/project/garak/0.17.0/",
+   "publisher": "NVIDIA (published on PyPI)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source LLM vulnerability scanner, Apache-2.0; its data/tags.misp.tsv reproduces OWASP category names and summaries; read locally.",
+   "caveat": "A secondary copy of OWASP's wording that follows the 2023 (v1.1) numbering; garak also links the 2025 entry for excessive agency, so numbers differ between editions.",
+   "reviewedEvidence": "Wheel downloaded from PyPI with pip on 2026-09-23 and its metadata and source read locally in this build (PyPI is reachable from the sandbox; the PyPI web page itself was not fetched). Passage relied on: the tag table lists 'LLM01: Prompt Injection' (crafty inputs can manipulate a large language model, causing unintended actions; direct injections overwrite system prompts, while indirect ones manipulate inputs from external sources), 'LLM07: Insecure Plugin Design' (plugins can have insecure inputs and insufficient access control) and 'LLM08: Excessive Agency' (LLM-based systems may undertake actions leading to unintended consequences, arising from excessive functionality, permissions or autonomy); its agent probe cites the 2025 OWASP entry genai.owasp.org/llmrisk/llm062025-excessive-agency."
+  },
+  {
+   "id": "dbxfe-tools-source-urllib3",
+   "title": "urllib3 2.6.3: Retry",
+   "url": "https://pypi.org/project/urllib3/2.6.3/",
+   "publisher": "urllib3 maintainers (published on PyPI)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Widely used Python HTTP client; the Retry class documentation in the installed 2.6.3 source.",
+   "caveat": "One client library's defaults; other clients differ, and no client setting makes a server operation idempotent.",
+   "reviewedEvidence": "Installed package source read locally in this build on 2026-09-23. Passage relied on: Retry's allowed_methods defaults to the methods considered idempotent (multiple requests with the same parameters end with the same state), DELETE, GET, HEAD, OPTIONS, PUT and TRACE, so a POST is not retried by default after a read error or a retryable status (a connection error, raised before the request is sent, is retried for any method; narrowed on 2026-09-25 from dbxfe-tools-source-urllib3-retry), and None retries any verb; between attempts after the second try it sleeps backoff_factor times 2 to the power of previous retries, optionally plus jitter, never longer than backoff_max, and backoff is disabled by default."
+  },
+  {
+   "id": "dbxfe-tools-source-tracing",
+   "title": "Tracing overview",
+   "url": "https://docs.databricks.com/aws/en/mlflow3/genai/tracing/overview",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-19",
+   "publishedAt": null,
+   "context": "Databricks on AWS; MLflow GenAI tracing.",
+   "caveat": "Tracing supports diagnosis; it is not an access-control or retention guarantee, and an audit record has different owners and rules.",
+   "reviewedEvidence": "Reviewed for the GenAI module on 2026-09-19 and recorded in that module's source record; the URL answered HTTP 200 in the course's 2026-09-20 availability probe; not re-searched or re-read for this record because the session's search budget was exhausted and the documentation host is blocked by the sandbox egress proxy. Passage relied on, as recorded there: the tracing overview describes intermediate component inputs, outputs, latency, token usage and execution flow for diagnosis."
+  },
+  {
+   "id": "dbxfe-tools-source-mcp-sdk-auth-settings",
+   "title": "MCP Python SDK v2.2.0: src/mcp/server/auth/settings.py (AuthSettings.validate_token_resource)",
+   "url": "https://github.com/modelcontextprotocol/python-sdk/blob/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/settings.py",
+   "publisher": "Model Context Protocol project (python-sdk, open-source SDK repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Server authorization settings of the MCP Python SDK 2.2.0: whether the bearer middleware compares a token's RFC 8707 resource indicator with the server's own URL.",
+   "caveat": "One SDK release, implementation scope only; other SDKs and servers may differ, and the stated 3.0 default is a plan, not released behaviour.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/settings.py (tag v2.2.0): 'validate_token_resource: bool | None = Field( default=None,' ... 'set it to False when your token' ... 'verifier checks the token's audience itself. With `resource_server_url` set, leaving it unset warns' ... 'and behaves as False' ... '`AuthSettings.validate_token_resource` is not set, so bearer tokens are not checked' ... 'against `resource_server_url`; it will default to True in 3.0'; and from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/lowlevel/server.py: 'resource_server_url=auth.resource_server_url if auth.validate_token_resource else None,' Implementation scope: in 2.2.0 the bearer middleware compares the token audience with the server URL only when validate_token_resource is True; left unset with resource_server_url configured, it warns and skips that comparison, leaving the audience to the token verifier, so the module no longer teaches that the SDK refuses a wrong-audience token by default."
+  },
+  {
+   "id": "dbxfe-tools-source-mcp-spec-authorization",
+   "title": "Authorization: Model Context Protocol specification, revision 2025-11-25 (specification source)",
+   "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/basic/authorization.mdx",
+   "publisher": "Model Context Protocol project (specification source repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Token handling requirements for MCP servers on HTTP transports: audience validation and the status code for invalid or expired tokens.",
+   "caveat": "A specification states requirements for implementations and enforces nothing; an SDK may leave a requirement to configuration.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/basic/authorization.mdx: 'MCP servers **MUST** validate that access tokens were issued specifically for them as the intended audience,' ... 'Invalid or expired tokens **MUST** receive a HTTP 401' Specification scope: a requirement on servers, not a description of any SDK default."
+  },
+  {
+   "id": "dbxfe-tools-source-urllib3-retry",
+   "title": "urllib3 2.6.3: src/urllib3/util/retry.py (connection errors, read errors and allowed_methods)",
+   "url": "https://github.com/urllib3/urllib3/blob/0248277dd7ac0239204889ca991353ad3e3a1ddc/src/urllib3/util/retry.py",
+   "publisher": "urllib3 maintainers (open-source repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "How Retry.increment classifies a connect timeout and a read timeout, and which of them allowed_methods gates.",
+   "caveat": "One client library release, implementation scope only; no client setting makes a server operation idempotent.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/urllib3/urllib3/0248277dd7ac0239204889ca991353ad3e3a1ddc/src/urllib3/util/retry.py (tag 2.6.3): 'These are errors raised before the request is sent to the remote server, which we assume has not triggered the server to process the request.' ... 'return isinstance(err, ConnectTimeoutError)' ... 'return isinstance(err, (ReadTimeoutError, ProtocolError))' ... 'def is_retry(' ... 'if not self._is_method_retryable(method): return False' ... 'if read is False or method is None or not self._is_method_retryable(method):' Implementation scope: allowed_methods gates read-error and status retries; a connect timeout is retried for any method, so the module limits every not-POST statement to a read timeout or a retryable status. Executed in this build with the 2.6.3 wheel: under Retry(3) a POST to a closed port was retried three times, a POST whose reply never came was not retried, and a GET was."
+  },
+  {
+   "id": "dbxfe-tools-source-mcp-sdk-token-verifier",
+   "title": "MCP Python SDK v2.2.0: src/mcp/server/auth/provider.py (TokenVerifier.verify_token)",
+   "url": "https://github.com/modelcontextprotocol/python-sdk/blob/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/provider.py",
+   "publisher": "Model Context Protocol project (python-sdk, open-source SDK repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "The token verifier interface of the MCP Python SDK 2.2.0, and how the bearer middleware treats a token the verifier rejects.",
+   "caveat": "One SDK release, implementation scope only; what a verifier checks is the server author's code, not an SDK guarantee.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/provider.py (tag v2.2.0): 'With `AuthSettings.validate_token_resource` the bearer middleware then refuses any token whose resource is not `resource_server_url`; without it, confirming the token was issued for this server (for example by passing the expected audience to your JWT library) is up to the verifier.' and from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/middleware/bearer_auth.py: 'auth_info = await self.token_verifier.verify_token(token)' ... 'if not auth_info: return None' Implementation scope: a token the verifier rejects is not authenticated and receives 401, so a verifier that checks the audience refuses a token issued for another server even with validate_token_resource unset or False; an executed run of mcp 2.2.0 in this build returned 401 for such a token in both cases, and 200 when neither the setting nor the verifier checked the audience."
+  },
+  {
+   "id": "dbxfe-tools-source-devhub-genie",
+   "title": "Genie Agents: Databricks developer documentation source (src/content/docs/agents/genie.md)",
+   "url": "https://github.com/databricks/devhub/blob/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/genie.md",
+   "publisher": "Databricks (databricks/devhub, source of developers.databricks.com)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Databricks' developer documentation page on embedding a Genie Agent in an app; used here only for the product's current name.",
+   "caveat": "Documentation source at one commit; it gives the current and former product names but does not describe the managed MCP server for Genie, its availability or its status.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/devhub/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/genie.md: 'A **Genie Agent** (formerly Genie space) is a Databricks natural-language interface over Unity Catalog tables' Scope: product naming in Databricks' own developer documentation source; the repository owner's direct read of docs.databricks.com/aws/en/genie-agents/ (decision dbxfe-ai-assist-claim-agents) confirms the former-name note. API identifiers such as the /api/2.0/mcp/genie/<space-id> path keep their spelling."
+  },
+  {
+   "id": "dbxfe-tools-source-mcp-spec-tools",
+   "title": "Tools: Model Context Protocol specification, revision 2025-11-25 (specification source)",
+   "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/server/tools.mdx",
+   "publisher": "Model Context Protocol project (specification source repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "The tools page of the MCP specification: listing and calling tools over JSON-RPC 2.0, the input and output schemas of a tool definition, annotations treated as untrusted unless they come from trusted servers, and tool execution errors reported with isError.",
+   "caveat": "A specification states message formats and requirements for clients and servers and enforces nothing; revisions are dated, so check which one a client and server use.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/server/tools.mdx: 'To discover available tools, clients send a `tools/list` request.' ... 'To invoke a tool, clients send a `tools/call` request:' ... '\"jsonrpc\": \"2.0\",' ... '`inputSchema`: JSON Schema defining expected parameters' ... '`outputSchema`: Optional JSON Schema' ... 'clients **MUST** consider tool annotations to be untrusted unless they come from trusted servers.' ... '**Tool Execution Errors**: Reported in tool results with `isError: true`' Specification scope: requirements on clients and servers, not a description of any implementation."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-tools-claim-mcp-tools",
+   "description": "MCP clients discover tools with tools/list and invoke them with tools/call over JSON-RPC 2.0; a tool declares a name, a description that acts as a hint to the model, a JSON Schema inputSchema with an object root and an optional outputSchema, and tool errors are returned inside the result with isError.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-spec",
+    "dbxfe-tools-source-mcp-sdk",
+    "dbxfe-tools-source-mcp-spec-tools"
+   ],
+   "context": "MCP revisions 2025-11-25 and 2026-07-28 as shipped in mcp-types 2.2.0."
+  },
+  {
+   "id": "dbxfe-tools-claim-mcp-hints",
+   "description": "ToolAnnotations (readOnlyHint default false, destructiveHint default true, idempotentHint default false, openWorldHint default true) are hints, not guaranteed descriptions, and clients should never make tool use decisions based on annotations from untrusted servers.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-spec",
+    "dbxfe-tools-source-mcp-spec-tools"
+   ],
+   "context": "MCP schema text as shipped in mcp-types 2.2.0."
+  },
+  {
+   "id": "dbxfe-tools-claim-mcp-transport",
+   "description": "MCP servers expose tools, resources and prompts to hosts over standard transports: stdio for a local subprocess and Streamable HTTP for a server at a URL, with SSE also supported by the Python SDK; protocol revisions are dated.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-sdk",
+    "dbxfe-tools-source-mcp-spec"
+   ],
+   "context": "MCP Python SDK 2.2.0 and mcp-types 2.2.0."
+  },
+  {
+   "id": "dbxfe-tools-claim-mcp-auth",
+   "description": "In the MCP Python SDK 2.2.0 an HTTP server's bearer-token check rejects a missing or expired token, or one its token verifier rejects, with 401 and a token without the endpoint's required scopes with 403 insufficient_scope; the SDK itself compares a token's resource with the server's URL, rejecting a token issued for another resource with 401, only when AuthSettings.validate_token_resource is enabled, and otherwise leaves that audience check, which the MCP specification requires of servers, to the configured token verifier; per-tool decisions are left to handler code, which can read the verified token.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-sdk",
+    "dbxfe-tools-source-mcp-sdk-auth-settings",
+    "dbxfe-tools-source-mcp-spec-authorization",
+    "dbxfe-tools-source-mcp-sdk-token-verifier"
+   ],
+   "context": "One SDK release; other implementations may differ."
+  },
+  {
+   "id": "dbxfe-tools-claim-databricks-mcp",
+   "description": "Databricks-managed MCP servers are addressed on the workspace host under /api/2.0/mcp/ for Unity Catalog functions, vector search indexes, Genie Agents (formerly Genie spaces) and external servers through a connection, and are called with the caller's Databricks credentials as a bearer token; custom MCP servers hosted on Databricks Apps require OAuth, and a calling service principal needs permission to query the app.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-databricks-mcp",
+    "dbxfe-tools-source-mcp-databricks",
+    "dbxfe-tools-source-devhub-genie"
+   ],
+   "context": "Read from the databricks-mcp 0.9.2 client; server types, status and regions to be verified."
+  },
+  {
+   "id": "dbxfe-tools-claim-agent-identity",
+   "description": "For agents on Databricks Apps, app identity and user identity differ; user authorization was marked Public Preview, and a missing forwarded user token can fall back to app identity, so several callers should be tested.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-agent-auth"
+   ],
+   "context": "Reviewed 2026-09-19 for the GenAI module."
+  },
+  {
+   "id": "dbxfe-tools-claim-obo",
+   "description": "In Databricks Model Serving, on-behalf-of-user credentials are a downscoped token for the principal that queried the endpoint, obtained inside predict() and failing when absent; the model declares a UserAuthPolicy with API scopes, and declared resources without on_behalf_of_user are accessed with the creator's permissions.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-obo",
+    "dbxfe-tools-source-mlflow-auth"
+   ],
+   "context": "databricks-ai-bridge 0.22.0 and MLflow 3.16.1 source; the serving feature is a preview."
+  },
+  {
+   "id": "dbxfe-tools-claim-privileges",
+   "description": "Invoking a Unity Catalog function requires EXECUTE on it plus USE CATALOG and USE SCHEMA on its parents.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-privileges"
+   ],
+   "context": "Unity Catalog privilege model on AWS."
+  },
+  {
+   "id": "dbxfe-tools-claim-owasp",
+   "description": "OWASP's LLM risk list names prompt injection (direct injections overwrite system prompts, indirect ones arrive through external inputs), insecure plugin design and excessive agency (excessive functionality, permissions or autonomy); edition numbering differs.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-owasp",
+    "dbxfe-tools-source-garak"
+   ],
+   "context": "Risk names used without edition numbers."
+  },
+  {
+   "id": "dbxfe-tools-claim-retry",
+   "description": "urllib3's Retry retries read errors and retryable statuses by default only for methods considered idempotent (DELETE, GET, HEAD, OPTIONS, PUT, TRACE), not POST, while connection errors, raised before the request is sent, are retried for any method; exponential backoff is capped by backoff_max and disabled by default.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-urllib3",
+    "dbxfe-tools-source-urllib3-retry"
+   ],
+   "context": "urllib3 2.6.3."
+  },
+  {
+   "id": "dbxfe-tools-claim-tracing",
+   "description": "MLflow tracing records intermediate component inputs, outputs, latency, token usage and execution flow for diagnosis.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-tools-source-tracing"
+   ],
+   "context": "Databricks on AWS; MLflow 3 GenAI."
+  },
+  {
+   "id": "dbxfe-tools-claim-lab",
+   "description": "Lab L22's decisions, audit rows, attempt logs and effect counts come from an executed local run of the lab's reference gate (Python 3.12 standard library) over synthetic fixtures; they demonstrate the gate's logic, not any platform's behaviour.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "Evidence recorded for lab-l22-tool-authorization; no model, MCP server or workspace was used."
+  },
+  {
+   "id": "dbxfe-tools-guidance",
+   "description": "Original SpicyBrain design reasoning for tool gates: the order of checks, least functionality, fail-closed identity, one key per intent, approval records, audit fields and test matrices; not a Databricks, MCP or OWASP requirement.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "Independent curriculum; adapt to the actual system, identities and security review."
+  },
+  {
+   "id": "dbxfe-tools-fiction",
+   "description": "Cinderline Components, the Harbor Lane clinic, their people, roles, machines, parts, documents, identities, keys and outcomes are synthetic teaching records.",
+   "kind": "fictional",
+   "sourceIds": [],
+   "context": "No model, MCP server, workspace or supplier system was called."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-tools-call-concept",
+   "term": "tool call",
+   "aliases": [
+    "function call",
+    "tool use"
+   ],
+   "definition": "A structured proposal from a model naming a tool and JSON arguments, which has no effect until application code executes it.",
+   "example": "The model returns create_maintenance_draft with machine_id M7; no draft exists until the gate allows it and the handler writes D1.",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-spec"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-gate-concept",
+   "term": "policy gate",
+   "aliases": [
+    "application-side authorization gate",
+    "tool gate"
+   ],
+   "definition": "Application code between proposed tool calls and their handlers that decides each call from identity, schema, permission, keys and approval policy.",
+   "example": "Cinderline's gate refused C12 because delete_work_order is not an exposed tool.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-tools-schema-concept",
+   "term": "tool schema",
+   "aliases": [
+    "input schema",
+    "inputSchema"
+   ],
+   "definition": "The JSON Schema declaring a tool's arguments, types and limits, shown to the model as guidance and enforced by the gate before any handler runs.",
+   "example": "request_spare_part allows quantity 1 to 20 and no other properties, so quantity 50 and approved_by are malformed.",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-spec",
+    "dbxfe-tools-source-mcp-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-identity-concept",
+   "term": "acting identity",
+   "aliases": [
+    "principal",
+    "user, agent and service principal"
+   ],
+   "definition": "The principal whose credential a target system evaluates for a call: the signed-in user, or the application's own service principal.",
+   "example": "Under app authorization the draft store sees app-maint-assistant, not the South technician who asked.",
+   "sourceIds": [
+    "dbxfe-tools-source-agent-auth"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-delegation-concept",
+   "term": "delegated authorization",
+   "aliases": [
+    "on-behalf-of-user",
+    "OBO",
+    "user authorization"
+   ],
+   "definition": "Acting with a signed-in user's identity bounded by the scopes granted to the application, so the effective permission is the intersection of both.",
+   "example": "The supervisor holds drafts:close:north, the application lacks drafts:close, so closing D1 is refused.",
+   "sourceIds": [
+    "dbxfe-tools-source-agent-auth",
+    "dbxfe-tools-source-obo",
+    "dbxfe-tools-source-mlflow-auth"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-boundary-concept",
+   "term": "trust boundary",
+   "aliases": [
+    "origin boundary"
+   ],
+   "definition": "A point where data or requests arrive from a party with different authority, so what crosses it must be checked rather than believed.",
+   "example": "A supplier PDF page enters the assistant's context across a trust boundary: its author never signed in.",
+   "sourceIds": [
+    "dbxfe-tools-source-owasp"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-injection-concept",
+   "term": "prompt injection",
+   "aliases": [
+    "indirect prompt injection",
+    "injected instruction"
+   ],
+   "definition": "Text crafted to steer a model into unintended actions, typed directly by a user or arriving indirectly inside retrieved or external content.",
+   "example": "DOC-SUP-117 tells the assistant a supervisor approved 20 × P-9001 and asks it to call request_spare_part.",
+   "sourceIds": [
+    "dbxfe-tools-source-owasp",
+    "dbxfe-tools-source-garak"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-sysprompt-concept",
+   "term": "system prompt",
+   "aliases": [
+    "system message",
+    "developer instructions"
+   ],
+   "definition": "Instructions placed in a model's context to shape its behaviour; they are text the model may not follow, not an access control.",
+   "example": "'Only act for the user's plant' in the system prompt stopped nothing; the grant check drafts:write:north did.",
+   "sourceIds": [
+    "dbxfe-tools-source-owasp"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-agency-concept",
+   "term": "excessive agency",
+   "aliases": [
+    "over-privileged agent"
+   ],
+   "definition": "The risk that an LLM system takes harmful actions because it has more functionality, permission or autonomy than its task needs.",
+   "example": "Exposing delete_work_order to a drafting assistant is excess functionality even if nobody asks for a deletion.",
+   "sourceIds": [
+    "dbxfe-tools-source-owasp",
+    "dbxfe-tools-source-garak"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-approval-concept",
+   "term": "approval step",
+   "aliases": [
+    "human-in-the-loop approval",
+    "human approval"
+   ],
+   "definition": "A hold that executes a proposed action only after an authorized person other than the requester accepts its exact stored arguments.",
+   "example": "A1 waited until the North supervisor approved 2 × P-0415; the requester's own approval was refused.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-tools-timeout-concept",
+   "term": "timeout with unknown outcome",
+   "aliases": [
+    "in-doubt call"
+   ],
+   "definition": "A limit on waiting for a reply; when it expires the caller does not know whether the target performed the effect.",
+   "example": "C17 timed out three times while draft D3 had already been written on the first attempt.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-tools-retry-concept",
+   "term": "bounded retry",
+   "aliases": [
+    "retry with backoff"
+   ],
+   "definition": "Repeating a failed call a fixed number of times with growing waits, only for failures that may succeed later and only when a repeat cannot duplicate an effect.",
+   "example": "Three attempts with 500 ms then 1000 ms waits; permission and schema refusals are never retried.",
+   "sourceIds": [
+    "dbxfe-tools-source-urllib3"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-idempotency-concept",
+   "term": "idempotency key",
+   "aliases": [
+    "request key",
+    "deduplication key"
+   ],
+   "definition": "A client-chosen identifier for one intended effect, stored with the arguments' digest so a repeat returns the first outcome and a changed repeat is refused.",
+   "example": "Key k-02 created D1; repeating it returned D1; reusing it with a new note was a conflict.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-tools-mcp-concept",
+   "term": "Model Context Protocol (MCP)",
+   "aliases": [
+    "MCP"
+   ],
+   "definition": "An open protocol through which clients discover and call tools, read resources and use prompts exposed by servers, using JSON-RPC 2.0 messages.",
+   "example": "The assistant lists a server's tools with tools/list and calls create_maintenance_draft with tools/call.",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-spec",
+    "dbxfe-tools-source-mcp-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-transport-concept",
+   "term": "MCP transport",
+   "aliases": [
+    "stdio",
+    "Streamable HTTP"
+   ],
+   "definition": "The channel that carries MCP messages: stdio between a host and a local subprocess, or Streamable HTTP to a server at a URL.",
+   "example": "A custom server hosted as a Databricks app is reached over Streamable HTTP with an OAuth bearer token.",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-sdk",
+    "dbxfe-tools-source-databricks-mcp"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-annotation-concept",
+   "term": "tool annotations",
+   "aliases": [
+    "readOnlyHint",
+    "destructiveHint",
+    "idempotentHint"
+   ],
+   "definition": "Optional hints a server attaches to a tool about its behaviour, which clients must not treat as guarantees from untrusted servers.",
+   "example": "delete_work_order arrives marked readOnlyHint: true; the gate still refuses it.",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-spec"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-layers-concept",
+   "term": "authorization layers for MCP tools",
+   "aliases": [
+    "door, handler and target checks"
+   ],
+   "definition": "Three independent checks for an MCP-exposed tool: the transport's token check, the server handler's per-call check and the target system's own permissions.",
+   "example": "A valid token for a North technician still fails at the handler when the call names South machine C4.",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-sdk",
+    "dbxfe-tools-source-privileges"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-managed-concept",
+   "term": "managed and custom MCP servers",
+   "aliases": [
+    "Databricks managed MCP",
+    "custom MCP server"
+   ],
+   "definition": "On Databricks, MCP servers run by the platform for Unity Catalog functions, vector search, Genie Agents (natural-language question interfaces over chosen tables; formerly Genie spaces) or external connections, versus servers a team hosts itself, for example as an app.",
+   "example": "Functions in cinderline.maint would be reached at /api/2.0/mcp/functions/cinderline/maint on the workspace host.",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-databricks",
+    "dbxfe-tools-source-databricks-mcp",
+    "dbxfe-tools-source-devhub-genie"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-audit-concept",
+   "term": "audit trail",
+   "aliases": [
+    "decision log",
+    "audit log"
+   ],
+   "definition": "An append-only record written by the gate of every decision, refusals included, naming actor, identity, tool, argument digest, key, decision and reason.",
+   "example": "C10's malformed call is audit row 10 even though nothing happened.",
+   "sourceIds": [
+    "dbxfe-tools-source-tracing"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-matrix-concept",
+   "term": "tool test matrix",
+   "aliases": [
+    "negative test cases"
+   ],
+   "definition": "A set of calls covering every decision a gate can make, each asserting the decision, the reason and the effect count.",
+   "example": "Lab L22 runs allowed, denied, malformed, replayed, timed-out, approval and injected calls through local stubs.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-tools-extension-hints-concept",
+   "term": "annotation defaults",
+   "aliases": [
+    "hint defaults"
+   ],
+   "definition": "The values MCP assumes when a server omits an annotation: not read-only, possibly destructive, not idempotent and open-world.",
+   "example": "A write tool with no annotations should be treated as possibly destructive and not idempotent.",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-spec"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-extension-audience-concept",
+   "term": "token audience",
+   "aliases": [
+    "resource indicator",
+    "RFC 8707 resource"
+   ],
+   "definition": "The resource a token was issued for; a server accepting only its own audience cannot be driven by tokens meant for other services.",
+   "example": "A token issued for the supplier's tool server is refused by Cinderline's draft server.",
+   "sourceIds": [
+    "dbxfe-tools-source-mcp-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-extension-methods-concept",
+   "term": "idempotent HTTP methods",
+   "aliases": [
+    "retry-safe methods"
+   ],
+   "definition": "Methods whose repeated identical requests leave the server in the same state as one request, which client libraries treat as safe to retry.",
+   "example": "urllib3 retries a GET or PUT whose reply timed out by default, but not a POST.",
+   "sourceIds": [
+    "dbxfe-tools-source-urllib3"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-extension-invoker-concept",
+   "term": "per-request user credential",
+   "aliases": [
+    "invoker token"
+   ],
+   "definition": "A credential that belongs to the principal making one request, so it must be obtained inside that request rather than when a model loads.",
+   "example": "A served agent creates its user WorkspaceClient inside predict(), once per call.",
+   "sourceIds": [
+    "dbxfe-tools-source-obo"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-tools-call-visual",
+   "kind": "nodes",
+   "title": "From proposal to effect",
+   "alt": "Three states of one tool call: the model proposes, the application's gate and handler execute, and the result returns to the model as text.",
+   "caption": "The model only ever emits text; every effect passes the application's gate first. Synthetic teaching example.",
+   "textEquivalent": "The model proposes: The model reads the question and the tool list and returns a tool name with JSON arguments. Nothing has been written. Nodes: Technician: Signed in as tech-n1; asks for a draft note. (context); Assistant app: Holds the session and the tool list. (context); Model: proposal. Returns create_maintenance_draft for M7 as text. (selected); Policy gate: Not consulted yet. (pending); Draft store: 0 drafts. Unchanged. (pending). Relationships: Technician → Assistant app: asks; Assistant app → Model: question + tools; Model → Assistant app: proposed call.\n\nThe application executes: The application hands the proposal and the session to the gate. Session, schema, plant grant and key pass, so the handler writes D1. Nodes: Technician: Unchanged. (context); Assistant app: Passes the proposal and the session. (selected); Model: Waits for the result. (context); Policy gate: allowed. Session, schema, drafts:write:north, key k-02. (selected); Draft store: 1 draft. D1 appended by the handler. (selected). Relationships: Assistant app → Policy gate: proposal + session; Policy gate → Draft store: handler writes; Draft store → Assistant app: D1.\n\nThe result returns as context: The tool result goes back into the model's context as text. The model can describe D1, but it never touched the store. Nodes: Technician: Sees the answer and D1's id. (selected); Assistant app: Adds the tool result to the context. (selected); Model: Reads 'draft D1 created' and answers. (selected); Policy gate: Its audit row records the decision. (context); Draft store: 1 draft. D1 stays as written. (context). Relationships: Assistant app → Model: tool result; Model → Assistant app: answer; Assistant app → Technician: shows D1.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-tools",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "proposal",
+     "title": "The model proposes",
+     "explanation": "The model reads the question and the tool list and returns a tool name with JSON arguments. Nothing has been written.",
+     "nodes": [
+      {
+       "id": "user",
+       "label": "Technician",
+       "detail": "Signed in as tech-n1; asks for a draft note.",
+       "status": "context"
+      },
+      {
+       "id": "app",
+       "label": "Assistant app",
+       "detail": "Holds the session and the tool list.",
+       "status": "context"
+      },
+      {
+       "id": "model",
+       "label": "Model",
+       "detail": "Returns create_maintenance_draft for M7 as text.",
+       "status": "selected",
+       "value": "proposal"
+      },
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "Not consulted yet.",
+       "status": "pending"
+      },
+      {
+       "id": "store",
+       "label": "Draft store",
+       "detail": "Unchanged.",
+       "status": "pending",
+       "value": "0 drafts"
+      }
+     ],
+     "connections": [
+      {
+       "from": "user",
+       "to": "app",
+       "label": "asks"
+      },
+      {
+       "from": "app",
+       "to": "model",
+       "label": "question + tools"
+      },
+      {
+       "from": "model",
+       "to": "app",
+       "label": "proposed call"
+      }
+     ]
+    },
+    {
+     "id": "execute",
+     "title": "The application executes",
+     "explanation": "The application hands the proposal and the session to the gate. Session, schema, plant grant and key pass, so the handler writes D1.",
+     "nodes": [
+      {
+       "id": "user",
+       "label": "Technician",
+       "detail": "Unchanged.",
+       "status": "context"
+      },
+      {
+       "id": "app",
+       "label": "Assistant app",
+       "detail": "Passes the proposal and the session.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "Model",
+       "detail": "Waits for the result.",
+       "status": "context"
+      },
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "Session, schema, drafts:write:north, key k-02.",
+       "status": "selected",
+       "value": "allowed"
+      },
+      {
+       "id": "store",
+       "label": "Draft store",
+       "detail": "D1 appended by the handler.",
+       "status": "selected",
+       "value": "1 draft"
+      }
+     ],
+     "connections": [
+      {
+       "from": "app",
+       "to": "gate",
+       "label": "proposal + session"
+      },
+      {
+       "from": "gate",
+       "to": "store",
+       "label": "handler writes"
+      },
+      {
+       "from": "store",
+       "to": "app",
+       "label": "D1"
+      }
+     ]
+    },
+    {
+     "id": "result",
+     "title": "The result returns as context",
+     "explanation": "The tool result goes back into the model's context as text. The model can describe D1, but it never touched the store.",
+     "nodes": [
+      {
+       "id": "user",
+       "label": "Technician",
+       "detail": "Sees the answer and D1's id.",
+       "status": "selected"
+      },
+      {
+       "id": "app",
+       "label": "Assistant app",
+       "detail": "Adds the tool result to the context.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "Model",
+       "detail": "Reads 'draft D1 created' and answers.",
+       "status": "selected"
+      },
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "Its audit row records the decision.",
+       "status": "context"
+      },
+      {
+       "id": "store",
+       "label": "Draft store",
+       "detail": "D1 stays as written.",
+       "status": "context",
+       "value": "1 draft"
+      }
+     ],
+     "connections": [
+      {
+       "from": "app",
+       "to": "model",
+       "label": "tool result"
+      },
+      {
+       "from": "model",
+       "to": "app",
+       "label": "answer"
+      },
+      {
+       "from": "app",
+       "to": "user",
+       "label": "shows D1"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-schema-visual",
+   "kind": "table",
+   "title": "One schema, three proposals",
+   "alt": "A table of create_maintenance_draft's argument rules, then three proposals with the gate's verdict, then values that coercion would have wrongly accepted.",
+   "caption": "Every refusal names the rule it broke, before any handler runs. Values from Lab L22's run on synthetic fixtures.",
+   "textEquivalent": "The contract: create_maintenance_draft declares three string arguments and forbids any other property. Table columns: Argument, Rule. Row: Argument = machine_id; Rule = string, ^[A-Z][0-9]{1,3}$. Row: Argument = manual_section; Rule = string, such as M7-4.2. Row: Argument = note; Rule = string, at most 500 characters. Row: Argument = anything else; Rule = additionalProperties: false.\n\nThree proposals checked: The gate validates before permission, keys or approval; each refusal names the rule. Table columns: Call, Arguments, Verdict. Row: Call = C02; Arguments = M7, M7-4.2, note; Verdict = valid, next check. Row: Call = C06; Arguments = adds priority: urgent; Verdict = malformed: unexpected property 'priority'. Row: Call = C07; Arguments = part request, quantity 50; Verdict = malformed: 50 above maximum 20.\n\nNo silent coercion: A string or a boolean is not an integer. Coercing would execute a call the model never proposed. Table columns: Value sent, Schema, Verdict. Row: Value sent = \"2\"; Schema = integer 1 to 20; Verdict = must be an integer. Row: Value sent = true; Schema = integer 1 to 20; Verdict = must be an integer. Row: Value sent = 2; Schema = integer 1 to 20; Verdict = valid.",
+   "provenance": "Original SpicyBrain authored visual; values are the decisions recorded by Lab L22's local run of its reference gate (Python 3.12 standard library) over synthetic fixtures; no model, platform or network call.",
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-tools",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "contract",
+     "title": "The contract",
+     "explanation": "create_maintenance_draft declares three string arguments and forbids any other property.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Argument",
+       "Rule"
+      ],
+      "rows": [
+       [
+        "machine_id",
+        "string, ^[A-Z][0-9]{1,3}$"
+       ],
+       [
+        "manual_section",
+        "string, such as M7-4.2"
+       ],
+       [
+        "note",
+        "string, at most 500 characters"
+       ],
+       [
+        "anything else",
+        "additionalProperties: false"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "checked",
+     "title": "Three proposals checked",
+     "explanation": "The gate validates before permission, keys or approval; each refusal names the rule.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Call",
+       "Arguments",
+       "Verdict"
+      ],
+      "rows": [
+       [
+        "C02",
+        "M7, M7-4.2, note",
+        "valid, next check"
+       ],
+       [
+        "C06",
+        "adds priority: urgent",
+        "malformed: unexpected property 'priority'"
+       ],
+       [
+        "C07",
+        "part request, quantity 50",
+        "malformed: 50 above maximum 20"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "coerce",
+     "title": "No silent coercion",
+     "explanation": "A string or a boolean is not an integer. Coercing would execute a call the model never proposed.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Value sent",
+       "Schema",
+       "Verdict"
+      ],
+      "rows": [
+       [
+        "\"2\"",
+        "integer 1 to 20",
+        "must be an integer"
+       ],
+       [
+        "true",
+        "integer 1 to 20",
+        "must be an integer"
+       ],
+       [
+        "2",
+        "integer 1 to 20",
+        "valid"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-identity-visual",
+   "kind": "nodes",
+   "title": "Whose grants does the store check?",
+   "alt": "Two states of the same request from a South technician for North machine M7: under app authorization the store checks the application's service principal and writes; on behalf of the user it checks the technician and refuses.",
+   "caption": "The target evaluates whichever credential arrives. Synthetic teaching example; the second state matches Lab L22's C05.",
+   "textEquivalent": "App authorization: The call carries the application's credential. The store checks app-maint-assistant, which may write drafts for every plant. Nodes: South technician: tech-s1 holds drafts:write:south only. (context); Assistant app: Sends its service principal's credential. (selected); Draft store: Evaluates app-maint-assistant. (selected); Draft for M7: Written for North although the asker is South. (warning). Relationships: South technician → Assistant app: asks; Assistant app → Draft store: app credential; Draft store → Draft for M7: writes.\n\nOn behalf of the user: The call carries the technician's delegated identity. The store checks tech-s1, who lacks drafts:write:north. Nodes: South technician: Identity travels with the call. (selected); Assistant app: Forwards the user's delegated token. (context); Draft store: Evaluates tech-s1. (selected); Draft for M7: Refused: missing drafts:write:north. (excluded). Relationships: South technician → Assistant app: asks; Assistant app → Draft store: user's token; Draft store → Draft for M7: refuses.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-tools-claim-agent-identity",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "app",
+     "title": "App authorization",
+     "explanation": "The call carries the application's credential. The store checks app-maint-assistant, which may write drafts for every plant.",
+     "nodes": [
+      {
+       "id": "asker",
+       "label": "South technician",
+       "detail": "tech-s1 holds drafts:write:south only.",
+       "status": "context"
+      },
+      {
+       "id": "app",
+       "label": "Assistant app",
+       "detail": "Sends its service principal's credential.",
+       "status": "selected"
+      },
+      {
+       "id": "store",
+       "label": "Draft store",
+       "detail": "Evaluates app-maint-assistant.",
+       "status": "selected"
+      },
+      {
+       "id": "draft",
+       "label": "Draft for M7",
+       "detail": "Written for North although the asker is South.",
+       "status": "warning"
+      }
+     ],
+     "connections": [
+      {
+       "from": "asker",
+       "to": "app",
+       "label": "asks"
+      },
+      {
+       "from": "app",
+       "to": "store",
+       "label": "app credential"
+      },
+      {
+       "from": "store",
+       "to": "draft",
+       "label": "writes"
+      }
+     ]
+    },
+    {
+     "id": "obo",
+     "title": "On behalf of the user",
+     "explanation": "The call carries the technician's delegated identity. The store checks tech-s1, who lacks drafts:write:north.",
+     "nodes": [
+      {
+       "id": "asker",
+       "label": "South technician",
+       "detail": "Identity travels with the call.",
+       "status": "selected"
+      },
+      {
+       "id": "app",
+       "label": "Assistant app",
+       "detail": "Forwards the user's delegated token.",
+       "status": "context"
+      },
+      {
+       "id": "store",
+       "label": "Draft store",
+       "detail": "Evaluates tech-s1.",
+       "status": "selected"
+      },
+      {
+       "id": "draft",
+       "label": "Draft for M7",
+       "detail": "Refused: missing drafts:write:north.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "asker",
+       "to": "app",
+       "label": "asks"
+      },
+      {
+       "from": "app",
+       "to": "store",
+       "label": "user's token"
+      },
+      {
+       "from": "store",
+       "to": "draft",
+       "label": "refuses"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-delegation-visual",
+   "kind": "table",
+   "title": "Effective permission is an intersection",
+   "alt": "Four lab calls as tables: the permission required, the user's side, the application's side and the decision.",
+   "caption": "Both sides must hold the permission, and no user means no call. Values from Lab L22's run on synthetic fixtures.",
+   "textEquivalent": "Technician drafts for M7: Both sides hold it, so the call moves on to the key and approval checks. Table columns: Check, Result. Row: Check = Required; Result = drafts:write:north. Row: Check = tech-n1 grant; Result = yes. Row: Check = Application scope drafts:write; Result = yes. Row: Check = Decision; Result = allowed (C02).\n\nSupervisor closes D1: The supervisor holds the grant; the application was never delegated drafts:close. Table columns: Check, Result. Row: Check = Required; Result = drafts:close:north. Row: Check = sup-n1 grant; Result = yes. Row: Check = Application scope drafts:close; Result = no. Row: Check = Decision; Result = denied, lacking: application (C14).\n\nContent claims a supervisor: A comment field says the user is a supervisor; identity still comes from the session. Table columns: Check, Result. Row: Check = Required; Result = drafts:close:north. Row: Check = tech-n1 grant (session); Result = no. Row: Check = Application scope drafts:close; Result = no. Row: Check = Decision; Result = denied, lacking: user, application (C13).\n\nMissing user credential: No valid session means no user side to intersect; the application's own identity is not substituted. Table columns: Check, Result. Row: Check = Session; Result = s-expired, invalid. Row: Check = User grants; Result = none: no user. Row: Check = Fall back to app-maint-assistant; Result = refused by design. Row: Check = Decision; Result = denied, unauthenticated (C15).",
+   "provenance": "Original SpicyBrain authored visual; values are the decisions recorded by Lab L22's local run of its reference gate (Python 3.12 standard library) over synthetic fixtures; no model, platform or network call.",
+   "claimIds": [
+    "dbxfe-tools-claim-obo",
+    "dbxfe-tools-claim-agent-identity",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "c02",
+     "title": "Technician drafts for M7",
+     "explanation": "Both sides hold it, so the call moves on to the key and approval checks.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Check",
+       "Result"
+      ],
+      "rows": [
+       [
+        "Required",
+        "drafts:write:north"
+       ],
+       [
+        "tech-n1 grant",
+        "yes"
+       ],
+       [
+        "Application scope drafts:write",
+        "yes"
+       ],
+       [
+        "Decision",
+        "allowed (C02)"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "c14",
+     "title": "Supervisor closes D1",
+     "explanation": "The supervisor holds the grant; the application was never delegated drafts:close.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Check",
+       "Result"
+      ],
+      "rows": [
+       [
+        "Required",
+        "drafts:close:north"
+       ],
+       [
+        "sup-n1 grant",
+        "yes"
+       ],
+       [
+        "Application scope drafts:close",
+        "no"
+       ],
+       [
+        "Decision",
+        "denied, lacking: application (C14)"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "c13",
+     "title": "Content claims a supervisor",
+     "explanation": "A comment field says the user is a supervisor; identity still comes from the session.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Check",
+       "Result"
+      ],
+      "rows": [
+       [
+        "Required",
+        "drafts:close:north"
+       ],
+       [
+        "tech-n1 grant (session)",
+        "no"
+       ],
+       [
+        "Application scope drafts:close",
+        "no"
+       ],
+       [
+        "Decision",
+        "denied, lacking: user, application (C13)"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "c15",
+     "title": "Missing user credential",
+     "explanation": "No valid session means no user side to intersect; the application's own identity is not substituted.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Check",
+       "Result"
+      ],
+      "rows": [
+       [
+        "Session",
+        "s-expired, invalid"
+       ],
+       [
+        "User grants",
+        "none: no user"
+       ],
+       [
+        "Fall back to app-maint-assistant",
+        "refused by design"
+       ],
+       [
+        "Decision",
+        "denied, unauthenticated (C15)"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-injection-visual",
+   "kind": "nodes",
+   "title": "A supplier page asks for an order",
+   "alt": "Five states: an untrusted supplier page enters the context, a forged approval argument is malformed, the clean call is held for approval, an unexposed delete is denied, and the supervisor rejects the held request.",
+   "caption": "Content can shape what the model proposes; only the session and policy decide. Values from Lab L22's run on synthetic fixtures.",
+   "textEquivalent": "Untrusted text enters context: Retrieval returns DOC-SUP-117 for M7. Its text claims a supervisor approved 20 × P-9001. Nodes: Supplier page: DOC-SUP-117: external, unreviewed; claims an approval. (warning); Technician session: tech-n1: the only identity the gate uses. (selected); Model: Reads the page with the question. (context); Policy gate: No proposal yet. (pending); Supplier outbox: Empty. (pending). Relationships: Supplier page → Model: retrieved text; Technician session → Policy gate: identity.\n\nForged approval as an argument: The model copies approved_by: sup-n1 into the call. The schema has no such property, so the call is malformed. Nodes: Supplier page: Still in context. (context); Technician session: tech-n1. (selected); Model: Proposes request_spare_part with approved_by (C10). (warning); Policy gate: malformed. unexpected property 'approved_by'. (selected); Supplier outbox: Nothing sent. (excluded). Relationships: Model → Policy gate: C10; Technician session → Policy gate: identity.\n\nClean call held for a human: Without the extra field the call is valid, but external effects need parts:approve:north from someone else. It becomes approval A2. Nodes: Supplier page: Recorded as influenced_by. (context); Technician session: tech-n1. (selected); Model: Proposes 20 × P-9001 for M7 (C11). (warning); Policy gate: approval_required. Held as A2. (selected); Supplier outbox: Still empty. (pending). Relationships: Model → Policy gate: C11; Technician session → Policy gate: identity.\n\nA tool that was never exposed: The page also asks for delete_work_order. The application never exposed it, so the gate denies it by name. Nodes: Supplier page: Still in context. (context); Technician session: tech-n1. (selected); Model: Proposes delete_work_order WO-88 (C12). (warning); Policy gate: denied. tool_not_exposed. (selected); Supplier outbox: Still empty. (pending). Relationships: Model → Policy gate: C12; Technician session → Policy gate: identity.\n\nThe supervisor rejects A2: The supervisor sees the exact order and its origin, an unreviewed supplier page, and rejects it. The outbox never receives it. Nodes: Supplier page: Shown to the approver as the origin. (context); Supervisor: sup-n1 reviews A2 in her own session. (selected); Policy gate: rejected. A2 rejected; no execution. (selected); Supplier outbox: No P-9001 order. (excluded). Relationships: Supervisor → Policy gate: rejects A2; Supplier page → Supervisor: origin shown.",
+   "provenance": "Original SpicyBrain authored visual; values are the decisions recorded by Lab L22's local run of its reference gate (Python 3.12 standard library) over synthetic fixtures; no model, platform or network call.",
+   "claimIds": [
+    "dbxfe-tools-claim-owasp",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "enter",
+     "title": "Untrusted text enters context",
+     "explanation": "Retrieval returns DOC-SUP-117 for M7. Its text claims a supervisor approved 20 × P-9001.",
+     "nodes": [
+      {
+       "id": "page",
+       "label": "Supplier page",
+       "detail": "DOC-SUP-117: external, unreviewed; claims an approval.",
+       "status": "warning"
+      },
+      {
+       "id": "session",
+       "label": "Technician session",
+       "detail": "tech-n1: the only identity the gate uses.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "Model",
+       "detail": "Reads the page with the question.",
+       "status": "context"
+      },
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "No proposal yet.",
+       "status": "pending"
+      },
+      {
+       "id": "outbox",
+       "label": "Supplier outbox",
+       "detail": "Empty.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "page",
+       "to": "model",
+       "label": "retrieved text"
+      },
+      {
+       "from": "session",
+       "to": "gate",
+       "label": "identity"
+      }
+     ]
+    },
+    {
+     "id": "forged",
+     "title": "Forged approval as an argument",
+     "explanation": "The model copies approved_by: sup-n1 into the call. The schema has no such property, so the call is malformed.",
+     "nodes": [
+      {
+       "id": "page",
+       "label": "Supplier page",
+       "detail": "Still in context.",
+       "status": "context"
+      },
+      {
+       "id": "session",
+       "label": "Technician session",
+       "detail": "tech-n1.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "Model",
+       "detail": "Proposes request_spare_part with approved_by (C10).",
+       "status": "warning"
+      },
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "unexpected property 'approved_by'.",
+       "status": "selected",
+       "value": "malformed"
+      },
+      {
+       "id": "outbox",
+       "label": "Supplier outbox",
+       "detail": "Nothing sent.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "model",
+       "to": "gate",
+       "label": "C10"
+      },
+      {
+       "from": "session",
+       "to": "gate",
+       "label": "identity"
+      }
+     ]
+    },
+    {
+     "id": "held",
+     "title": "Clean call held for a human",
+     "explanation": "Without the extra field the call is valid, but external effects need parts:approve:north from someone else. It becomes approval A2.",
+     "nodes": [
+      {
+       "id": "page",
+       "label": "Supplier page",
+       "detail": "Recorded as influenced_by.",
+       "status": "context"
+      },
+      {
+       "id": "session",
+       "label": "Technician session",
+       "detail": "tech-n1.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "Model",
+       "detail": "Proposes 20 × P-9001 for M7 (C11).",
+       "status": "warning"
+      },
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "Held as A2.",
+       "status": "selected",
+       "value": "approval_required"
+      },
+      {
+       "id": "outbox",
+       "label": "Supplier outbox",
+       "detail": "Still empty.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "model",
+       "to": "gate",
+       "label": "C11"
+      },
+      {
+       "from": "session",
+       "to": "gate",
+       "label": "identity"
+      }
+     ]
+    },
+    {
+     "id": "unexposed",
+     "title": "A tool that was never exposed",
+     "explanation": "The page also asks for delete_work_order. The application never exposed it, so the gate denies it by name.",
+     "nodes": [
+      {
+       "id": "page",
+       "label": "Supplier page",
+       "detail": "Still in context.",
+       "status": "context"
+      },
+      {
+       "id": "session",
+       "label": "Technician session",
+       "detail": "tech-n1.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "Model",
+       "detail": "Proposes delete_work_order WO-88 (C12).",
+       "status": "warning"
+      },
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "tool_not_exposed.",
+       "status": "selected",
+       "value": "denied"
+      },
+      {
+       "id": "outbox",
+       "label": "Supplier outbox",
+       "detail": "Still empty.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "model",
+       "to": "gate",
+       "label": "C12"
+      },
+      {
+       "from": "session",
+       "to": "gate",
+       "label": "identity"
+      }
+     ]
+    },
+    {
+     "id": "rejected",
+     "title": "The supervisor rejects A2",
+     "explanation": "The supervisor sees the exact order and its origin, an unreviewed supplier page, and rejects it. The outbox never receives it.",
+     "nodes": [
+      {
+       "id": "page",
+       "label": "Supplier page",
+       "detail": "Shown to the approver as the origin.",
+       "status": "context"
+      },
+      {
+       "id": "supervisor",
+       "label": "Supervisor",
+       "detail": "sup-n1 reviews A2 in her own session.",
+       "status": "selected"
+      },
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "A2 rejected; no execution.",
+       "status": "selected",
+       "value": "rejected"
+      },
+      {
+       "id": "outbox",
+       "label": "Supplier outbox",
+       "detail": "No P-9001 order.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "supervisor",
+       "to": "gate",
+       "label": "rejects A2"
+      },
+      {
+       "from": "page",
+       "to": "supervisor",
+       "label": "origin shown"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-sysprompt-visual",
+   "kind": "table",
+   "title": "Which controls survive a persuaded model?",
+   "alt": "Tables of four controls before and after review, marking which hold if the model ignores its instructions, and the three levers of excessive agency.",
+   "caption": "Count only the controls that code enforces. Synthetic teaching example.",
+   "textEquivalent": "Controls as first proposed: Two of the four controls live only in the system prompt. Table columns: Control, Lives in, Holds if disobeyed?. Row: Control = Act only for the user's plant; Lives in = System prompt; Holds if disobeyed? = No. Row: Control = Order at most 20 units; Lives in = Schema maximum; Holds if disobeyed? = Yes. Row: Control = Never delete work orders; Lives in = System prompt; Holds if disobeyed? = No. Row: Control = Parts need a supervisor; Lives in = Approval hold; Holds if disobeyed? = Yes.\n\nControls after review: Each prompt-only rule is replaced by code; the sentences stay as guidance and count as nothing. Table columns: Control, Lives in, Holds if disobeyed?. Row: Control = Act only for the user's plant; Lives in = Grant check per plant; Holds if disobeyed? = Yes. Row: Control = Order at most 20 units; Lives in = Schema maximum; Holds if disobeyed? = Yes. Row: Control = Never delete work orders; Lives in = Tool not exposed; Holds if disobeyed? = Yes. Row: Control = Parts need a supervisor; Lives in = Approval hold; Holds if disobeyed? = Yes.\n\nExcessive agency, three levers: Each control removes functionality, permission or autonomy the task does not need. Table columns: Lever, Cinderline's control. Row: Lever = Functionality; Cinderline's control = Expose 4 tools, not the server's 5. Row: Lever = Permission; Cinderline's control = 3 delegated scopes; grants per plant. Row: Lever = Autonomy; Cinderline's control = Hold every external effect for approval.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-tools-claim-owasp",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "proposed",
+     "title": "Controls as first proposed",
+     "explanation": "Two of the four controls live only in the system prompt.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Control",
+       "Lives in",
+       "Holds if disobeyed?"
+      ],
+      "rows": [
+       [
+        "Act only for the user's plant",
+        "System prompt",
+        "No"
+       ],
+       [
+        "Order at most 20 units",
+        "Schema maximum",
+        "Yes"
+       ],
+       [
+        "Never delete work orders",
+        "System prompt",
+        "No"
+       ],
+       [
+        "Parts need a supervisor",
+        "Approval hold",
+        "Yes"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "reviewed",
+     "title": "Controls after review",
+     "explanation": "Each prompt-only rule is replaced by code; the sentences stay as guidance and count as nothing.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Control",
+       "Lives in",
+       "Holds if disobeyed?"
+      ],
+      "rows": [
+       [
+        "Act only for the user's plant",
+        "Grant check per plant",
+        "Yes"
+       ],
+       [
+        "Order at most 20 units",
+        "Schema maximum",
+        "Yes"
+       ],
+       [
+        "Never delete work orders",
+        "Tool not exposed",
+        "Yes"
+       ],
+       [
+        "Parts need a supervisor",
+        "Approval hold",
+        "Yes"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "agency",
+     "title": "Excessive agency, three levers",
+     "explanation": "Each control removes functionality, permission or autonomy the task does not need.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Lever",
+       "Cinderline's control"
+      ],
+      "rows": [
+       [
+        "Functionality",
+        "Expose 4 tools, not the server's 5"
+       ],
+       [
+        "Permission",
+        "3 delegated scopes; grants per plant"
+       ],
+       [
+        "Autonomy",
+        "Hold every external effect for approval"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-approval-visual",
+   "kind": "timeline",
+   "title": "A1 from request to one purchase",
+   "alt": "A timeline of approval A1: held at 08:07, replayed at 08:08, refused approvals at 08:18 and 08:19, approved and executed once at 08:20, then a repeated approval and a stretched quantity both change nothing.",
+   "caption": "A named approver, exact arguments, one execution. Times and ids from Lab L22's run on synthetic fixtures.",
+   "textEquivalent": "Held: At 08:07 C08 asks for 2 × P-0415; the gate stores the exact arguments and holds A1. At 08:08 a replay returns A1. Nodes: 08:07 C08: approval_required. 2 × P-0415 for M7 held as A1. (selected); 08:08 C09: replayed. Same key and arguments: returns A1. (context); Supplier outbox: Empty. (pending).\n\nDecided by the right person: At 08:18 the requester cannot approve her own request; at 08:19 a South technician lacks the grant; at 08:20 the North supervisor approves and PR1 is sent once. Nodes: 08:18 AP1: tech-n1 approves her own request: self_approval. (excluded); 08:19 AP2: tech-s1 lacks parts:approve:north. (excluded); 08:20 AP3: PR1. sup-n1 approves; the application executes. (selected); Supplier outbox: PR1: 2 × P-0415. (selected).\n\nAn approval cannot stretch: At 08:21 a second click changes nothing. At 08:23 the same key with quantity 20 is a conflict, and at 08:24 the exact replay returns PR1. Nodes: 08:21 AP4: Already decided: no second order. (context); 08:23 C19: conflict. Key k-08 with quantity 20. (excluded); 08:24 C20: replayed. Exact replay returns PR1. (context); Supplier outbox: Still one order. (selected).",
+   "provenance": "Original SpicyBrain authored visual; values are the decisions recorded by Lab L22's local run of its reference gate (Python 3.12 standard library) over synthetic fixtures; no model, platform or network call.",
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "held",
+     "title": "Held",
+     "explanation": "At 08:07 C08 asks for 2 × P-0415; the gate stores the exact arguments and holds A1. At 08:08 a replay returns A1.",
+     "nodes": [
+      {
+       "id": "t0807",
+       "label": "08:07 C08",
+       "detail": "2 × P-0415 for M7 held as A1.",
+       "status": "selected",
+       "value": "approval_required"
+      },
+      {
+       "id": "t0808",
+       "label": "08:08 C09",
+       "detail": "Same key and arguments: returns A1.",
+       "status": "context",
+       "value": "replayed"
+      },
+      {
+       "id": "outbox",
+       "label": "Supplier outbox",
+       "detail": "Empty.",
+       "status": "pending"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "decided",
+     "title": "Decided by the right person",
+     "explanation": "At 08:18 the requester cannot approve her own request; at 08:19 a South technician lacks the grant; at 08:20 the North supervisor approves and PR1 is sent once.",
+     "nodes": [
+      {
+       "id": "t0818",
+       "label": "08:18 AP1",
+       "detail": "tech-n1 approves her own request: self_approval.",
+       "status": "excluded"
+      },
+      {
+       "id": "t0819",
+       "label": "08:19 AP2",
+       "detail": "tech-s1 lacks parts:approve:north.",
+       "status": "excluded"
+      },
+      {
+       "id": "t0820",
+       "label": "08:20 AP3",
+       "detail": "sup-n1 approves; the application executes.",
+       "status": "selected",
+       "value": "PR1"
+      },
+      {
+       "id": "outbox",
+       "label": "Supplier outbox",
+       "detail": "PR1: 2 × P-0415.",
+       "status": "selected"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "stretched",
+     "title": "An approval cannot stretch",
+     "explanation": "At 08:21 a second click changes nothing. At 08:23 the same key with quantity 20 is a conflict, and at 08:24 the exact replay returns PR1.",
+     "nodes": [
+      {
+       "id": "t0821",
+       "label": "08:21 AP4",
+       "detail": "Already decided: no second order.",
+       "status": "context"
+      },
+      {
+       "id": "t0823",
+       "label": "08:23 C19",
+       "detail": "Key k-08 with quantity 20.",
+       "status": "excluded",
+       "value": "conflict"
+      },
+      {
+       "id": "t0824",
+       "label": "08:24 C20",
+       "detail": "Exact replay returns PR1.",
+       "status": "context",
+       "value": "replayed"
+      },
+      {
+       "id": "outbox",
+       "label": "Supplier outbox",
+       "detail": "Still one order.",
+       "status": "selected"
+      }
+     ],
+     "connections": []
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-timeout-visual",
+   "kind": "timeline",
+   "title": "C17: three timeouts after one commit",
+   "alt": "A timeline of call C17: three attempts, each reply later than the 2000 ms limit while the first attempt already wrote D3, then C18 with the same key returns D3.",
+   "caption": "A timeout hides whether the effect happened; the same key finds out. Values from Lab L22's run on synthetic fixtures with scripted latencies.",
+   "textEquivalent": "Three attempts, one commit: The store writes D3 on the first attempt, but every reply arrives after the 2000 ms limit. Nodes: Attempt 1: timeout. Store writes D3; reply at 2500 ms. (warning); Wait 500 ms: Backoff 500 × 2^0. (context); Attempt 2: timeout. Same key finds D3; reply late again. (warning); Wait 1000 ms: Backoff 500 × 2^1. (context); Attempt 3: timeout. Late again; no attempts left. (warning).\n\nReported as unknown: After 7500 ms the gate reports timed_out with outcome unknown and marks key k-17 in doubt. The draft store already holds D3. Nodes: Gate result: 7500 ms. timed_out: safe to retry with the same key. (warning); Key k-17: State: in_doubt. (pending); Draft store: 3 drafts. D1, D2, D3: D3 exists. (selected).\n\nResolved by the same key: At 08:17 C18 repeats the call with k-17. The store returns D3 in 200 ms, and no D4 is written. Nodes: 08:17 C18: Same key, same arguments. (selected); Draft store: 3 drafts. Returns D3; still three drafts. (selected); Key k-17: State: completed with D3. (selected); A new key instead: Would have written a fourth draft. (excluded).",
+   "provenance": "Original SpicyBrain authored visual; values are the decisions recorded by Lab L22's local run of its reference gate (Python 3.12 standard library) over synthetic fixtures; no model, platform or network call.",
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-claim-retry",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "attempts",
+     "title": "Three attempts, one commit",
+     "explanation": "The store writes D3 on the first attempt, but every reply arrives after the 2000 ms limit.",
+     "nodes": [
+      {
+       "id": "try1",
+       "label": "Attempt 1",
+       "detail": "Store writes D3; reply at 2500 ms.",
+       "status": "warning",
+       "value": "timeout"
+      },
+      {
+       "id": "wait1",
+       "label": "Wait 500 ms",
+       "detail": "Backoff 500 × 2^0.",
+       "status": "context"
+      },
+      {
+       "id": "try2",
+       "label": "Attempt 2",
+       "detail": "Same key finds D3; reply late again.",
+       "status": "warning",
+       "value": "timeout"
+      },
+      {
+       "id": "wait2",
+       "label": "Wait 1000 ms",
+       "detail": "Backoff 500 × 2^1.",
+       "status": "context"
+      },
+      {
+       "id": "try3",
+       "label": "Attempt 3",
+       "detail": "Late again; no attempts left.",
+       "status": "warning",
+       "value": "timeout"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "unknown",
+     "title": "Reported as unknown",
+     "explanation": "After 7500 ms the gate reports timed_out with outcome unknown and marks key k-17 in doubt. The draft store already holds D3.",
+     "nodes": [
+      {
+       "id": "result",
+       "label": "Gate result",
+       "detail": "timed_out: safe to retry with the same key.",
+       "status": "warning",
+       "value": "7500 ms"
+      },
+      {
+       "id": "key",
+       "label": "Key k-17",
+       "detail": "State: in_doubt.",
+       "status": "pending"
+      },
+      {
+       "id": "store",
+       "label": "Draft store",
+       "detail": "D1, D2, D3: D3 exists.",
+       "status": "selected",
+       "value": "3 drafts"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "resolved",
+     "title": "Resolved by the same key",
+     "explanation": "At 08:17 C18 repeats the call with k-17. The store returns D3 in 200 ms, and no D4 is written.",
+     "nodes": [
+      {
+       "id": "c18",
+       "label": "08:17 C18",
+       "detail": "Same key, same arguments.",
+       "status": "selected"
+      },
+      {
+       "id": "store",
+       "label": "Draft store",
+       "detail": "Returns D3; still three drafts.",
+       "status": "selected",
+       "value": "3 drafts"
+      },
+      {
+       "id": "key",
+       "label": "Key k-17",
+       "detail": "State: completed with D3.",
+       "status": "selected"
+      },
+      {
+       "id": "nokey",
+       "label": "A new key instead",
+       "detail": "Would have written a fourth draft.",
+       "status": "excluded"
+      }
+     ],
+     "connections": []
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-idempotency-visual",
+   "kind": "timeline",
+   "title": "Key k-02 over four calls",
+   "alt": "A replay timeline: key k-02 creates D1, an exact repeat returns D1, a repeat with a different note is a conflict, and another technician's k-02 is a separate intent.",
+   "caption": "One intent, one key, one effect. Values from Lab L22's run on synthetic fixtures; the last state is hypothetical, not a lab call.",
+   "textEquivalent": "First use: At 08:01 C02 sends key k-02 with digest A. Nothing is stored for the slot, so the draft is written. Nodes: 08:01 C02: allowed. tech-n1, k-02, digest A. (selected); Key store: k-02: digest A, D1. (selected); Drafts: 1. D1. (selected).\n\nExact repeat: At 08:02 C03 sends k-02 with digest A again. The gate returns D1 and writes nothing. Nodes: 08:01 C02: Stored. (context); 08:02 C03: replayed. Same key, digest A. (selected); Key store: Lookup returns D1. (selected); Drafts: 1. Still D1 only. (context).\n\nSame key, new arguments: At 08:03 C04 sends k-02 with digest B because the note says 2.1 bar. The gate refuses it as a conflict. Nodes: 08:02 C03: Replayed. (context); 08:03 C04: conflict. Same key, digest B. (excluded); Key store: Digest B differs from A: refuse. (selected); Drafts: 1. Still D1 only. (context).\n\nAnother user's k-02 (hypothetical): Not in the lab run: the slot is user, tool and key, so a South technician's k-02 for machine C4 would be a new intent and write its own draft. Nodes: tech-s1, k-02: allowed. Slot (tech-s1, create_maintenance_draft, k-02) is new. (selected); Key store: Two separate slots named k-02. (selected); Drafts: 2. D1 and a separate draft for C4. (selected).",
+   "provenance": "Original SpicyBrain authored visual; values are the decisions recorded by Lab L22's local run of its reference gate (Python 3.12 standard library) over synthetic fixtures; no model, platform or network call.",
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "first",
+     "title": "First use",
+     "explanation": "At 08:01 C02 sends key k-02 with digest A. Nothing is stored for the slot, so the draft is written.",
+     "nodes": [
+      {
+       "id": "c02",
+       "label": "08:01 C02",
+       "detail": "tech-n1, k-02, digest A.",
+       "status": "selected",
+       "value": "allowed"
+      },
+      {
+       "id": "keys",
+       "label": "Key store",
+       "detail": "k-02: digest A, D1.",
+       "status": "selected"
+      },
+      {
+       "id": "drafts",
+       "label": "Drafts",
+       "detail": "D1.",
+       "status": "selected",
+       "value": "1"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "replay",
+     "title": "Exact repeat",
+     "explanation": "At 08:02 C03 sends k-02 with digest A again. The gate returns D1 and writes nothing.",
+     "nodes": [
+      {
+       "id": "c02",
+       "label": "08:01 C02",
+       "detail": "Stored.",
+       "status": "context"
+      },
+      {
+       "id": "c03",
+       "label": "08:02 C03",
+       "detail": "Same key, digest A.",
+       "status": "selected",
+       "value": "replayed"
+      },
+      {
+       "id": "keys",
+       "label": "Key store",
+       "detail": "Lookup returns D1.",
+       "status": "selected"
+      },
+      {
+       "id": "drafts",
+       "label": "Drafts",
+       "detail": "Still D1 only.",
+       "status": "context",
+       "value": "1"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "conflict",
+     "title": "Same key, new arguments",
+     "explanation": "At 08:03 C04 sends k-02 with digest B because the note says 2.1 bar. The gate refuses it as a conflict.",
+     "nodes": [
+      {
+       "id": "c03",
+       "label": "08:02 C03",
+       "detail": "Replayed.",
+       "status": "context"
+      },
+      {
+       "id": "c04",
+       "label": "08:03 C04",
+       "detail": "Same key, digest B.",
+       "status": "excluded",
+       "value": "conflict"
+      },
+      {
+       "id": "keys",
+       "label": "Key store",
+       "detail": "Digest B differs from A: refuse.",
+       "status": "selected"
+      },
+      {
+       "id": "drafts",
+       "label": "Drafts",
+       "detail": "Still D1 only.",
+       "status": "context",
+       "value": "1"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "scope",
+     "title": "Another user's k-02 (hypothetical)",
+     "explanation": "Not in the lab run: the slot is user, tool and key, so a South technician's k-02 for machine C4 would be a new intent and write its own draft.",
+     "nodes": [
+      {
+       "id": "other",
+       "label": "tech-s1, k-02",
+       "detail": "Slot (tech-s1, create_maintenance_draft, k-02) is new.",
+       "status": "selected",
+       "value": "allowed"
+      },
+      {
+       "id": "keys",
+       "label": "Key store",
+       "detail": "Two separate slots named k-02.",
+       "status": "selected"
+      },
+      {
+       "id": "drafts",
+       "label": "Drafts",
+       "detail": "D1 and a separate draft for C4.",
+       "status": "selected",
+       "value": "2"
+      }
+     ],
+     "connections": []
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-mcp-visual",
+   "kind": "nodes",
+   "title": "What MCP carries",
+   "alt": "Three states: discovery with tools/list and an application allowlist, a tool with a misleading read-only hint left out, and invocation with tools/call.",
+   "caption": "MCP moves descriptions and calls; the application still chooses and checks. Schematic of Cinderline's assistant if its tools lived on an MCP server; synthetic teaching example.",
+   "textEquivalent": "Discovery: The client asks the server for tools/list and receives names, descriptions, input schemas and optional hints. The application decides which to expose. Nodes: MCP client in the app: Sends tools/list over Streamable HTTP. (selected); Tool server: 5. Advertises five tools. (selected); tools/list result: Names, schemas, hints. (context); App allowlist: 4. Exposes four to the model. (selected); Model: Sees only the four exposed tools. (context). Relationships: MCP client in the app → Tool server: tools/list; Tool server → tools/list result: returns; tools/list result → App allowlist: filtered by; App allowlist → Model: tool list.\n\nA misleading hint: delete_work_order arrives with readOnlyHint: true. Hints are not guarantees; the allowlist leaves it out and the gate denies it by name if proposed. Nodes: delete_work_order: readOnlyHint: true, idempotentHint: true. (warning); App allowlist: Not among the four. (selected); Model: Never offered it. (context); Policy gate: Denies it by name (C12). (selected). Relationships: delete_work_order → App allowlist: left out; App allowlist → Model: four tools.\n\nInvocation: When the gate allows a call, the client sends tools/call with the name and arguments; the server's handler performs it and returns content or an error. Nodes: Policy gate: Allowed C02. (selected); MCP client in the app: Sends tools/call as JSON-RPC 2.0. (selected); Tool server: Its handler runs create_maintenance_draft. (selected); CallToolResult: Content, or isError: true. (context). Relationships: Policy gate → MCP client in the app: allowed; MCP client in the app → Tool server: tools/call; Tool server → CallToolResult: returns.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-tools",
+    "dbxfe-tools-claim-mcp-hints",
+    "dbxfe-tools-claim-mcp-transport",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "discover",
+     "title": "Discovery",
+     "explanation": "The client asks the server for tools/list and receives names, descriptions, input schemas and optional hints. The application decides which to expose.",
+     "nodes": [
+      {
+       "id": "client",
+       "label": "MCP client in the app",
+       "detail": "Sends tools/list over Streamable HTTP.",
+       "status": "selected"
+      },
+      {
+       "id": "server",
+       "label": "Tool server",
+       "detail": "Advertises five tools.",
+       "status": "selected",
+       "value": "5"
+      },
+      {
+       "id": "list",
+       "label": "tools/list result",
+       "detail": "Names, schemas, hints.",
+       "status": "context"
+      },
+      {
+       "id": "allow",
+       "label": "App allowlist",
+       "detail": "Exposes four to the model.",
+       "status": "selected",
+       "value": "4"
+      },
+      {
+       "id": "model",
+       "label": "Model",
+       "detail": "Sees only the four exposed tools.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "client",
+       "to": "server",
+       "label": "tools/list"
+      },
+      {
+       "from": "server",
+       "to": "list",
+       "label": "returns"
+      },
+      {
+       "from": "list",
+       "to": "allow",
+       "label": "filtered by"
+      },
+      {
+       "from": "allow",
+       "to": "model",
+       "label": "tool list"
+      }
+     ]
+    },
+    {
+     "id": "hint",
+     "title": "A misleading hint",
+     "explanation": "delete_work_order arrives with readOnlyHint: true. Hints are not guarantees; the allowlist leaves it out and the gate denies it by name if proposed.",
+     "nodes": [
+      {
+       "id": "hinted",
+       "label": "delete_work_order",
+       "detail": "readOnlyHint: true, idempotentHint: true.",
+       "status": "warning"
+      },
+      {
+       "id": "allow",
+       "label": "App allowlist",
+       "detail": "Not among the four.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "Model",
+       "detail": "Never offered it.",
+       "status": "context"
+      },
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "Denies it by name (C12).",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "hinted",
+       "to": "allow",
+       "label": "left out"
+      },
+      {
+       "from": "allow",
+       "to": "model",
+       "label": "four tools"
+      }
+     ]
+    },
+    {
+     "id": "call",
+     "title": "Invocation",
+     "explanation": "When the gate allows a call, the client sends tools/call with the name and arguments; the server's handler performs it and returns content or an error.",
+     "nodes": [
+      {
+       "id": "gate",
+       "label": "Policy gate",
+       "detail": "Allowed C02.",
+       "status": "selected"
+      },
+      {
+       "id": "client",
+       "label": "MCP client in the app",
+       "detail": "Sends tools/call as JSON-RPC 2.0.",
+       "status": "selected"
+      },
+      {
+       "id": "server",
+       "label": "Tool server",
+       "detail": "Its handler runs create_maintenance_draft.",
+       "status": "selected"
+      },
+      {
+       "id": "result",
+       "label": "CallToolResult",
+       "detail": "Content, or isError: true.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "gate",
+       "to": "client",
+       "label": "allowed"
+      },
+      {
+       "from": "client",
+       "to": "server",
+       "label": "tools/call"
+      },
+      {
+       "from": "server",
+       "to": "result",
+       "label": "returns"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-layers-visual",
+   "kind": "nodes",
+   "title": "Door, handler, target",
+   "alt": "Three states of an MCP tool call, each refused at a different layer: a wrong-audience token at the door, a South machine at the handler, and a missing EXECUTE grant at the target.",
+   "caption": "Each layer refuses independently; a valid token decides nothing about this call's arguments. Synthetic teaching example.",
+   "textEquivalent": "The door: token check: Streamable HTTP carries a bearer token. The server checks expiry, audience and the endpoint's required scopes; a token issued for another server gets 401. Nodes: Bearer token: Audience: another server. (warning); Token check: 401. 401 invalid_token. (selected); Tool handler: Never reached. (excluded); Target system: Never reached. (excluded). Relationships: Bearer token → Token check: presented.\n\nThe handler: this call's arguments: A North technician's valid token with the required scope reaches the handler. The call names South machine C4, so the handler refuses. Nodes: Bearer token: Valid audience and scope. (selected); Token check: Passes. (selected); Tool handler: denied. C4 is South: missing drafts:write:south. (warning); Target system: Never called. (excluded). Relationships: Bearer token → Token check: presented; Token check → Tool handler: passes.\n\nThe target: its own grants: The handler allows the call, but the Unity Catalog function behind it requires EXECUTE for the calling principal, which it lacks. Nodes: Bearer token: Valid. (selected); Token check: Passes. (selected); Tool handler: Allows the call. (selected); Target system: denied. Unity Catalog: principal lacks EXECUTE. (warning). Relationships: Bearer token → Token check: presented; Token check → Tool handler: passes; Tool handler → Target system: calls function.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-auth",
+    "dbxfe-tools-claim-privileges",
+    "dbxfe-tools-claim-databricks-mcp",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "door",
+     "title": "The door: token check",
+     "explanation": "Streamable HTTP carries a bearer token. The server checks expiry, audience and the endpoint's required scopes; a token issued for another server gets 401.",
+     "nodes": [
+      {
+       "id": "token",
+       "label": "Bearer token",
+       "detail": "Audience: another server.",
+       "status": "warning"
+      },
+      {
+       "id": "door",
+       "label": "Token check",
+       "detail": "401 invalid_token.",
+       "status": "selected",
+       "value": "401"
+      },
+      {
+       "id": "handler",
+       "label": "Tool handler",
+       "detail": "Never reached.",
+       "status": "excluded"
+      },
+      {
+       "id": "target",
+       "label": "Target system",
+       "detail": "Never reached.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "token",
+       "to": "door",
+       "label": "presented"
+      }
+     ]
+    },
+    {
+     "id": "handler",
+     "title": "The handler: this call's arguments",
+     "explanation": "A North technician's valid token with the required scope reaches the handler. The call names South machine C4, so the handler refuses.",
+     "nodes": [
+      {
+       "id": "token",
+       "label": "Bearer token",
+       "detail": "Valid audience and scope.",
+       "status": "selected"
+      },
+      {
+       "id": "door",
+       "label": "Token check",
+       "detail": "Passes.",
+       "status": "selected"
+      },
+      {
+       "id": "handler",
+       "label": "Tool handler",
+       "detail": "C4 is South: missing drafts:write:south.",
+       "status": "warning",
+       "value": "denied"
+      },
+      {
+       "id": "target",
+       "label": "Target system",
+       "detail": "Never called.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "token",
+       "to": "door",
+       "label": "presented"
+      },
+      {
+       "from": "door",
+       "to": "handler",
+       "label": "passes"
+      }
+     ]
+    },
+    {
+     "id": "target",
+     "title": "The target: its own grants",
+     "explanation": "The handler allows the call, but the Unity Catalog function behind it requires EXECUTE for the calling principal, which it lacks.",
+     "nodes": [
+      {
+       "id": "token",
+       "label": "Bearer token",
+       "detail": "Valid.",
+       "status": "selected"
+      },
+      {
+       "id": "door",
+       "label": "Token check",
+       "detail": "Passes.",
+       "status": "selected"
+      },
+      {
+       "id": "handler",
+       "label": "Tool handler",
+       "detail": "Allows the call.",
+       "status": "selected"
+      },
+      {
+       "id": "target",
+       "label": "Target system",
+       "detail": "Unity Catalog: principal lacks EXECUTE.",
+       "status": "warning",
+       "value": "denied"
+      }
+     ],
+     "connections": [
+      {
+       "from": "token",
+       "to": "door",
+       "label": "presented"
+      },
+      {
+       "from": "door",
+       "to": "handler",
+       "label": "passes"
+      },
+      {
+       "from": "handler",
+       "to": "target",
+       "label": "calls function"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-audit-visual",
+   "kind": "table",
+   "title": "Rows a reviewer can rely on",
+   "alt": "Tables of Lab L22 audit rows: four refusals, the approval and execution rows of AP3, and which fields are kept or left out.",
+   "caption": "Refusals are rows too, and sensitive text never enters the log. Rows from Lab L22's run on synthetic fixtures.",
+   "textEquivalent": "Refusals are rows: Four of the run's 26 rows record calls that changed nothing. Table columns: Seq, Ref, Actor, Decision / reason. Row: Seq = 10; Ref = C10; Actor = tech-n1; Decision / reason = malformed / schema_violation. Row: Seq = 12; Ref = C12; Actor = tech-n1; Decision / reason = denied / tool_not_exposed. Row: Seq = 14; Ref = C14; Actor = sup-n1; Decision / reason = denied / insufficient_scope. Row: Seq = 15; Ref = C15; Actor = none; Decision / reason = denied / unauthenticated.\n\nA human row and a system row: AP3 writes two rows with different actors in the same minute. Table columns: Seq, Event, Actor, Result. Row: Seq = 21; Event = approval; Actor = sup-n1; Result = approved A1 for tech-n1. Row: Seq = 22; Event = execution; Actor = app-maint-assistant; Result = PR1 on behalf of tech-n1.\n\nWhat a row keeps and leaves out: The digest and key identify the request; note text and tokens never enter the audit. Table columns: Field, Kept as. Row: Field = Arguments; Kept as = 16-character SHA-256 digest. Row: Field = Idempotency key; Kept as = k-08. Row: Field = influenced_by; Kept as = DOC-SUP-117 on C10 to C12. Row: Field = Note text, tokens; Kept as = not stored.",
+   "provenance": "Original SpicyBrain authored visual; values are the decisions recorded by Lab L22's local run of its reference gate (Python 3.12 standard library) over synthetic fixtures; no model, platform or network call.",
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-claim-tracing",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "refusals",
+     "title": "Refusals are rows",
+     "explanation": "Four of the run's 26 rows record calls that changed nothing.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Seq",
+       "Ref",
+       "Actor",
+       "Decision / reason"
+      ],
+      "rows": [
+       [
+        "10",
+        "C10",
+        "tech-n1",
+        "malformed / schema_violation"
+       ],
+       [
+        "12",
+        "C12",
+        "tech-n1",
+        "denied / tool_not_exposed"
+       ],
+       [
+        "14",
+        "C14",
+        "sup-n1",
+        "denied / insufficient_scope"
+       ],
+       [
+        "15",
+        "C15",
+        "none",
+        "denied / unauthenticated"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "two",
+     "title": "A human row and a system row",
+     "explanation": "AP3 writes two rows with different actors in the same minute.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Seq",
+       "Event",
+       "Actor",
+       "Result"
+      ],
+      "rows": [
+       [
+        "21",
+        "approval",
+        "sup-n1",
+        "approved A1 for tech-n1"
+       ],
+       [
+        "22",
+        "execution",
+        "app-maint-assistant",
+        "PR1 on behalf of tech-n1"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "fields",
+     "title": "What a row keeps and leaves out",
+     "explanation": "The digest and key identify the request; note text and tokens never enter the audit.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Field",
+       "Kept as"
+      ],
+      "rows": [
+       [
+        "Arguments",
+        "16-character SHA-256 digest"
+       ],
+       [
+        "Idempotency key",
+        "k-08"
+       ],
+       [
+        "influenced_by",
+        "DOC-SUP-117 on C10 to C12"
+       ],
+       [
+        "Note text, tokens",
+        "not stored"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-tools-matrix-visual",
+   "kind": "table",
+   "title": "Lab L22's call outcomes",
+   "alt": "A call-outcome decision table from Lab L22: calls that changed something, calls refused at each check, calls held or in doubt, and the run's totals.",
+   "caption": "Every decision the gate can make, with the check that decided it. Values from Lab L22's run on synthetic fixtures.",
+   "textEquivalent": "Calls that changed something: Four decisions produced or returned an effect. Table columns: Call, Deciding check, Decision, Effect. Row: Call = C02; Deciding check = all checks pass; Decision = allowed; Effect = D1 written. Row: Call = C03; Deciding check = same key and digest; Decision = replayed; Effect = D1 returned. Row: Call = C16; Deciding check = retry with key k-16; Decision = allowed after retry; Effect = D2, once. Row: Call = AP3; Deciding check = approver holds the grant; Decision = executed; Effect = PR1 sent.\n\nCalls refused before any effect: Each refusal happened at a different check, before any handler ran. Table columns: Call, Deciding check, Decision, Effect. Row: Call = C15; Deciding check = session; Decision = denied; Effect = none. Row: Call = C12; Deciding check = exposed tools; Decision = denied; Effect = none. Row: Call = C06; Deciding check = schema; Decision = malformed; Effect = none. Row: Call = C05; Deciding check = delegated permission; Decision = denied; Effect = none. Row: Call = C04; Deciding check = idempotency key; Decision = conflict; Effect = none.\n\nHeld or in doubt: Two outcomes are not final: a hold waits for a human, and a timeout leaves the effect unknown. Table columns: Call, Deciding check, Decision, Effect. Row: Call = C08; Deciding check = approval policy; Decision = approval_required; Effect = A1 held, nothing sent. Row: Call = C11; Deciding check = approval policy; Decision = approval_required; Effect = A2 held, later rejected. Row: Call = C17; Deciding check = timeout, 3 attempts; Decision = timed_out; Effect = D3 exists, caller unsure.\n\nThe whole run: Twenty calls and five approval actions through one gate. Table columns: Measure, Value. Row: Measure = Audit rows; Value = 26. Row: Measure = Drafts written; Value = 3 (D1, D2, D3). Row: Measure = Purchase requests; Value = 1 (PR1). Row: Measure = Decisions changed by removing content; Value = 0.",
+   "provenance": "Original SpicyBrain authored visual; values are the decisions recorded by Lab L22's local run of its reference gate (Python 3.12 standard library) over synthetic fixtures; no model, platform or network call.",
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "states": [
+    {
+     "id": "effects",
+     "title": "Calls that changed something",
+     "explanation": "Four decisions produced or returned an effect.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Call",
+       "Deciding check",
+       "Decision",
+       "Effect"
+      ],
+      "rows": [
+       [
+        "C02",
+        "all checks pass",
+        "allowed",
+        "D1 written"
+       ],
+       [
+        "C03",
+        "same key and digest",
+        "replayed",
+        "D1 returned"
+       ],
+       [
+        "C16",
+        "retry with key k-16",
+        "allowed after retry",
+        "D2, once"
+       ],
+       [
+        "AP3",
+        "approver holds the grant",
+        "executed",
+        "PR1 sent"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "refused",
+     "title": "Calls refused before any effect",
+     "explanation": "Each refusal happened at a different check, before any handler ran.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Call",
+       "Deciding check",
+       "Decision",
+       "Effect"
+      ],
+      "rows": [
+       [
+        "C15",
+        "session",
+        "denied",
+        "none"
+       ],
+       [
+        "C12",
+        "exposed tools",
+        "denied",
+        "none"
+       ],
+       [
+        "C06",
+        "schema",
+        "malformed",
+        "none"
+       ],
+       [
+        "C05",
+        "delegated permission",
+        "denied",
+        "none"
+       ],
+       [
+        "C04",
+        "idempotency key",
+        "conflict",
+        "none"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "doubt",
+     "title": "Held or in doubt",
+     "explanation": "Two outcomes are not final: a hold waits for a human, and a timeout leaves the effect unknown.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Call",
+       "Deciding check",
+       "Decision",
+       "Effect"
+      ],
+      "rows": [
+       [
+        "C08",
+        "approval policy",
+        "approval_required",
+        "A1 held, nothing sent"
+       ],
+       [
+        "C11",
+        "approval policy",
+        "approval_required",
+        "A2 held, later rejected"
+       ],
+       [
+        "C17",
+        "timeout, 3 attempts",
+        "timed_out",
+        "D3 exists, caller unsure"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "totals",
+     "title": "The whole run",
+     "explanation": "Twenty calls and five approval actions through one gate.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Measure",
+       "Value"
+      ],
+      "rows": [
+       [
+        "Audit rows",
+        "26"
+       ],
+       [
+        "Drafts written",
+        "3 (D1, D2, D3)"
+       ],
+       [
+        "Purchase requests",
+        "1 (PR1)"
+       ],
+       [
+        "Decisions changed by removing content",
+        "0"
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-tools-call-question",
+   "revision": "1",
+   "prompt": "Cinderline's assistant log shows the model returned a create_maintenance_draft call for M7, yet the drafts table is unchanged. Which explanation fits how tool calls work?",
+   "options": [
+    {
+     "id": "dbxfe-tools-call-question-a",
+     "text": "The model wrote the row, but its context limit rolled the transaction back.",
+     "rationale": "A model has no connection to Cinderline's database, so there is no transaction for it to roll back."
+    },
+    {
+     "id": "dbxfe-tools-call-question-b",
+     "text": "The call ran on the model provider's servers and the row is still replicating.",
+     "rationale": "The provider returns text; execution happens in Cinderline's application, not at the provider."
+    },
+    {
+     "id": "dbxfe-tools-call-question-c",
+     "text": "No application code executed it: a proposal has no effect until the gate allows it and a handler runs.",
+     "rationale": "The model's output is text; only the application's handler, after the gate, writes to the store."
+    },
+    {
+     "id": "dbxfe-tools-call-question-d",
+     "text": "The tool schema ran the insert but lacked the commit permission.",
+     "rationale": "A schema describes arguments; it validates, it does not execute or commit anything."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-call-question-c",
+   "conceptIds": [
+    "dbxfe-tools-call-concept",
+    "dbxfe-tools-gate-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-tools",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-schema-question",
+   "revision": "1",
+   "prompt": "request_spare_part's schema requires part_number, quantity and machine_id, with quantity an integer from 1 to 20 and no other properties. The model proposes {\"part_number\": \"P-0415\", \"quantity\": \"2\", \"machine_id\": \"M7\"}. What does a gate that enforces the schema decide?",
+   "options": [
+    {
+     "id": "dbxfe-tools-schema-question-a",
+     "text": "Allowed after converting \"2\" to the integer 2.",
+     "rationale": "Coercion executes a call the model did not propose; the schema says integer, and a string is refused."
+    },
+    {
+     "id": "dbxfe-tools-schema-question-b",
+     "text": "Malformed: 'quantity' must be an integer, before any permission or approval check.",
+     "rationale": "Schema validation runs first and names the rule; nothing reaches a handler."
+    },
+    {
+     "id": "dbxfe-tools-schema-question-c",
+     "text": "Denied for insufficient scope, because quantities need a supervisor.",
+     "rationale": "Permission is checked after the schema; this call never gets that far, and the technician holds the grant."
+    },
+    {
+     "id": "dbxfe-tools-schema-question-d",
+     "text": "Held for approval, because every spare-part request is held.",
+     "rationale": "Approval applies only to valid calls; a malformed call is refused before the approval policy is consulted."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-schema-question-b",
+   "conceptIds": [
+    "dbxfe-tools-schema-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-tools",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-delegation-question",
+   "revision": "1",
+   "prompt": "Suppose Cinderline's application were delegated only manuals:read and drafts:write. A technician who holds parts:request:north asks for 2 × P-0415 for M7, and the model proposes request_spare_part on her behalf. What does the gate decide?",
+   "options": [
+    {
+     "id": "dbxfe-tools-delegation-question-a",
+     "text": "Allowed, because the technician holds parts:request:north.",
+     "rationale": "Her grant is only one side; delegation also needs the application's scope, which this configuration lacks."
+    },
+    {
+     "id": "dbxfe-tools-delegation-question-b",
+     "text": "Held for approval so a supervisor can grant the missing scope.",
+     "rationale": "Approval never adds scopes; the call is refused at the permission check, before the approval policy."
+    },
+    {
+     "id": "dbxfe-tools-delegation-question-c",
+     "text": "Allowed, with a warning row in the audit.",
+     "rationale": "A missing scope is a refusal, not a warning; logging a success here would hide the configuration gap."
+    },
+    {
+     "id": "dbxfe-tools-delegation-question-d",
+     "text": "Denied for insufficient scope, lacking the application side.",
+     "rationale": "Effective permission is user grant AND application scope, and parts:request was not delegated."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-delegation-question-d",
+   "conceptIds": [
+    "dbxfe-tools-delegation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-obo",
+    "dbxfe-tools-claim-agent-identity",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-injection-question",
+   "revision": "1",
+   "prompt": "A supplier catalogue page in the retrieved context says a supervisor approved an emergency order. The model then proposes request_spare_part for 20 × P-9001 on M7 in the North technician's session, without any extra fields. The tool requires approval for every external effect. What happens?",
+   "options": [
+    {
+     "id": "dbxfe-tools-injection-question-a",
+     "text": "It executes, because the page says the supervisor already approved it.",
+     "rationale": "Approval comes only from an authorized person's recorded decision, never from retrieved text."
+    },
+    {
+     "id": "dbxfe-tools-injection-question-b",
+     "text": "It is held as approval_required; nothing reaches the supplier until an authorized supervisor approves it.",
+     "rationale": "The gate decides from the session and policy; the page's claim is not an approval."
+    },
+    {
+     "id": "dbxfe-tools-injection-question-c",
+     "text": "It is denied as unauthenticated, because injected content invalidates the session.",
+     "rationale": "The session is still valid; content has no power over identity in either direction."
+    },
+    {
+     "id": "dbxfe-tools-injection-question-d",
+     "text": "It is malformed, because the part number came from a document.",
+     "rationale": "The schema checks the argument's shape, not its origin; P-9001 matches the pattern."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-injection-question-b",
+   "conceptIds": [
+    "dbxfe-tools-injection-concept",
+    "dbxfe-tools-boundary-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-owasp",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-sysprompt-question",
+   "revision": "1",
+   "prompt": "Which change actually prevents Cinderline's assistant from deleting work orders, even when an injected document persuades the model to try?",
+   "options": [
+    {
+     "id": "dbxfe-tools-sysprompt-question-a",
+     "text": "Add 'You must never delete work orders' to the system prompt in capital letters.",
+     "rationale": "A system prompt is text in the same context the attacker reaches; the model may still comply with the page."
+    },
+    {
+     "id": "dbxfe-tools-sysprompt-question-b",
+     "text": "Ask the model to explain its reasoning before every tool call.",
+     "rationale": "Reasoning text is still model output; it can be persuaded too and enforces nothing."
+    },
+    {
+     "id": "dbxfe-tools-sysprompt-question-c",
+     "text": "Set the model's temperature to zero.",
+     "rationale": "Temperature changes sampling randomness, not what the application allows to execute."
+    },
+    {
+     "id": "dbxfe-tools-sysprompt-question-d",
+     "text": "Remove delete_work_order from the application's exposed tools, so the gate denies it by name.",
+     "rationale": "An allowlist enforced in code holds no matter what the model is persuaded to propose."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-sysprompt-question-d",
+   "conceptIds": [
+    "dbxfe-tools-sysprompt-concept",
+    "dbxfe-tools-agency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-owasp",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-approval-question",
+   "revision": "1",
+   "prompt": "Approval A1 covered 2 × P-0415 and has executed as PR1. The model then resubmits request_spare_part with the same idempotency key k-08 and quantity 20. What should the gate do?",
+   "options": [
+    {
+     "id": "dbxfe-tools-approval-question-a",
+     "text": "Execute it under A1, because the key matches an approved request.",
+     "rationale": "That would let one approval authorize any later change; approvals bind exact arguments, not keys."
+    },
+    {
+     "id": "dbxfe-tools-approval-question-b",
+     "text": "Send 2 units and silently drop the other 18.",
+     "rationale": "Silently changing a request hides the mismatch from the user and the audit; refuse it instead."
+    },
+    {
+     "id": "dbxfe-tools-approval-question-c",
+     "text": "Refuse it as a conflict: same key, different arguments; the approval covered only the stored arguments.",
+     "rationale": "The key is bound to the approved arguments' digest, so the approval cannot stretch to 20."
+    },
+    {
+     "id": "dbxfe-tools-approval-question-d",
+     "text": "Replace A1 with a new approval request for 20 units under the same key.",
+     "rationale": "Reusing a key for a different intent is refused; a genuinely new request needs a new key."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-approval-question-c",
+   "conceptIds": [
+    "dbxfe-tools-approval-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-timeout-question",
+   "revision": "1",
+   "prompt": "Cinderline's gate calls create_maintenance_draft with an idempotency key. Which failures should it retry automatically, within its three-attempt limit?",
+   "options": [
+    {
+     "id": "dbxfe-tools-timeout-question-a",
+     "text": "Only permission denials, because grants can take a moment to propagate.",
+     "rationale": "A denial is a decision, not a transient fault; retrying it hides a configuration problem."
+    },
+    {
+     "id": "dbxfe-tools-timeout-question-b",
+     "text": "Timeouts and temporary unavailability, but not schema, permission or key-conflict refusals.",
+     "rationale": "Only failures that may succeed later are retried, and the key makes a repeat safe."
+    },
+    {
+     "id": "dbxfe-tools-timeout-question-c",
+     "text": "Every failure, up to three times, because retries are cheap.",
+     "rationale": "A schema or permission refusal will fail identically every time; retrying it only adds load and noise."
+    },
+    {
+     "id": "dbxfe-tools-timeout-question-d",
+     "text": "None: a timeout proves the draft was not created, so the user should resubmit.",
+     "rationale": "A timeout proves nothing about the effect; C17's draft D3 existed although every reply was late."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-timeout-question-b",
+   "conceptIds": [
+    "dbxfe-tools-retry-concept",
+    "dbxfe-tools-timeout-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-claim-retry",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-idempotency-question",
+   "revision": "1",
+   "prompt": "Starting from an empty drafts table: C02 creates a draft with key k-02; C03 repeats C02 exactly; C04 reuses k-02 with a different note. How many drafts exist afterwards, and what does C04 receive?",
+   "options": [
+    {
+     "id": "dbxfe-tools-idempotency-question-a",
+     "text": "Three drafts, because keys are only advisory.",
+     "rationale": "The gate enforces the key before executing, so neither repeat reaches the draft store."
+    },
+    {
+     "id": "dbxfe-tools-idempotency-question-b",
+     "text": "Two drafts; C04 creates a new draft because its note differs.",
+     "rationale": "A different intent needs a new key; reusing k-02 for it is the conflict the key exists to catch."
+    },
+    {
+     "id": "dbxfe-tools-idempotency-question-c",
+     "text": "One draft, D1, whose note C04 silently updates.",
+     "rationale": "The gate never turns a create into an update; changing stored effects would need a separate tool."
+    },
+    {
+     "id": "dbxfe-tools-idempotency-question-d",
+     "text": "One draft, D1; C04 is refused as a conflict.",
+     "rationale": "The exact repeat returns D1, and a changed repeat under the same key is refused, not guessed at."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-idempotency-question-d",
+   "conceptIds": [
+    "dbxfe-tools-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-mcp-question",
+   "revision": "1",
+   "prompt": "An MCP server that Cinderline does not operate lists delete_work_order with readOnlyHint: true and idempotentHint: true. What should the assistant's application conclude?",
+   "options": [
+    {
+     "id": "dbxfe-tools-mcp-question-a",
+     "text": "The server has already authorized every caller, so the gate can skip its checks.",
+     "rationale": "Listing a tool authorizes nobody; the token, the handler and the target still decide each call."
+    },
+    {
+     "id": "dbxfe-tools-mcp-question-b",
+     "text": "The tool can be retried freely, so no idempotency key is needed.",
+     "rationale": "An idempotency hint is not a key; the gate's own key handling still decides what a repeat does."
+    },
+    {
+     "id": "dbxfe-tools-mcp-question-c",
+     "text": "Nothing about safety or authority: annotations are hints, so exposure, approval and keys follow the application's own policy.",
+     "rationale": "The specification says clients should not make tool use decisions based on annotations from untrusted servers."
+    },
+    {
+     "id": "dbxfe-tools-mcp-question-d",
+     "text": "The tool is safe to expose without approval because it is read-only.",
+     "rationale": "The hint may be unfaithful, and a tool named delete_work_order plainly claims otherwise."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-mcp-question-c",
+   "conceptIds": [
+    "dbxfe-tools-annotation-concept",
+    "dbxfe-tools-mcp-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-hints",
+    "dbxfe-tools-claim-mcp-tools",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-layers-question",
+   "revision": "1",
+   "prompt": "A North technician's valid token, issued for Cinderline's MCP server and carrying the required scope, arrives with a tools/call that asks create_maintenance_draft for machine C4, which belongs to the South plant. Which layer must refuse?",
+   "options": [
+    {
+     "id": "dbxfe-tools-layers-question-a",
+     "text": "The server's tool handler, by binding C4 to the South plant and checking this caller's grants.",
+     "rationale": "Only the handler sees this call's arguments and can tie them to the caller's permissions."
+    },
+    {
+     "id": "dbxfe-tools-layers-question-b",
+     "text": "The transport's token check, because the scope already covers plants.",
+     "rationale": "The token check sees audience, expiry and endpoint scopes; it knows nothing about machine C4."
+    },
+    {
+     "id": "dbxfe-tools-layers-question-c",
+     "text": "The model, because the system prompt tells it to act only for the user's plant.",
+     "rationale": "A prompt is a request to the model, and the model has already proposed the call."
+    },
+    {
+     "id": "dbxfe-tools-layers-question-d",
+     "text": "No layer: a valid token authorizes every call on that server.",
+     "rationale": "A token proves who connected; each action still needs its own check at the handler and the target."
+    }
+   ],
+   "correctOptionId": "dbxfe-tools-layers-question-a",
+   "conceptIds": [
+    "dbxfe-tools-layers-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-auth",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-tools-identity-self",
+   "revision": "1",
+   "prompt": "The plant manager asks why the assistant should not simply use its own service principal for every tool call, since that principal can already reach every plant. Answer in three or four sentences.",
+   "modelAnswer": "Under app authorization the draft store checks the service principal, so every signed-in user inherits its access to all plants: a South technician's request for North machine M7 would succeed. Carrying the user's delegated identity makes the store check that technician's own grants, so the request is refused exactly where the person has no access, and the audit names who acted. The application's scopes still cap what it may do on anyone's behalf.",
+   "reasoning": "The answer names whose grants the target evaluates in each design and the consequence for a real cross-plant request; adding the scope cap or the audit trail is a good extension rather than a requirement.",
+   "conceptIds": [
+    "dbxfe-tools-identity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-agent-identity",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-audit-self",
+   "revision": "1",
+   "prompt": "Using the fields of Lab L22's audit, write the two rows that approval action AP3 produces, then say which fields let a reviewer answer 'who approved?' and 'who acted, for whom?'.",
+   "modelAnswer": "Row 21: seq 21, 2026-09-21T08:20:00Z, event approval, ref AP3, actor sup-n1, on_behalf_of tech-n1, tool request_spare_part, key k-08, decision approved, reason approved_by_approver, approval A1, no effect. Row 22: seq 22, same minute, event execution, ref AP3, actor app-maint-assistant, on_behalf_of tech-n1, same tool, key and approval, decision allowed, reason executed_after_approval, attempts 1, effect PR1. 'Who approved' is row 21's actor; 'who acted, for whom' is row 22's actor and on_behalf_of, joined through approval A1.",
+   "reasoning": "Separating the human decision from the system effect keeps each actor accountable, and the shared approval id and key let a reviewer join them; adding the argument digest to both rows is an acceptable refinement.",
+   "conceptIds": [
+    "dbxfe-tools-audit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-claim-tracing",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-tools-matrix-self",
+   "revision": "1",
+   "prompt": "Cinderline proposes a new tool, schedule_downtime(machine_id, start, hours), which writes to the production calendar. List the rows of its test matrix: the case, the input and the expected decision and effect count.",
+   "modelAnswer": "Allowed: North supervisor, M7, a valid start, 4 hours → allowed, one calendar entry. Denied: South technician for M7 → insufficient scope, zero entries. Malformed: 30 hours or an extra 'force' property → malformed, zero. Replayed: the same key twice → one entry, same id. Conflict: the same key with 6 hours → conflict. Timed out: a late reply after commit → timed_out, then the same key returns the existing entry. Approval: downtime over 8 hours held for the plant manager, self-approval refused. Injected: a manual page asking for downtime → decisions identical with the page removed. Unauthenticated: expired session → denied, no fallback.",
+   "reasoning": "Each row exercises one gate check and asserts decision, reason and effect count; the 8-hour threshold and the plant manager as approver are assumptions a real review would confirm with the plant.",
+   "conceptIds": [
+    "dbxfe-tools-matrix-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-tools-call",
+   "version": "1.0.0",
+   "title": "The model proposes a call; your application executes it",
+   "outcome": "Trace one tool call from the model's proposal to an executed effect and name the component that performs the effect.",
+   "explanation": "A [[dbxfe-tools-call-concept|tool call]] is a structured proposal: the model returns a tool name and JSON arguments instead of prose. Nothing happens until your application reads the proposal, checks it and runs a handler, which calls the target system and returns a result into the model's context. Notice in the first state that the model only emits text and the draft store still holds nothing; in the second, the application's [[dbxfe-tools-gate-concept|policy gate]] sits between proposal and handler, so every effect passes a check the model cannot skip.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-call",
+   "conceptIds": [
+    "dbxfe-tools-call-concept",
+    "dbxfe-tools-gate-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-tools",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-call-visual",
+   "questionIds": [
+    "dbxfe-tools-call-question"
+   ],
+   "handbook": {
+    "markdown": "### The lifecycle of one call\n1. The application sends the model the conversation, the retrieved context and the exposed tools with their schemas.\n2. The model returns either text or a proposal: a tool name and JSON arguments.\n3. The application parses the proposal and hands it, with the authenticated session, to the policy gate.\n4. The gate decides (allowed, denied, malformed, conflict, replayed, approval_required or timed_out) and writes an audit row.\n5. Only an allowed call reaches a handler, which calls the target with a credential the application holds.\n6. The result, or the refusal, returns to the model as text in its context.\n\n```python\nproposal = parse(model_output)   # {'tool': ..., 'arguments': {...}, 'idempotency_key': ...}\noutcome = gate.handle({**proposal, 'id': 'C02', 'session': session_id, 'context': context_ids})\nmessages.append({'role': 'tool', 'content': summarize(outcome)})\n```\n\nThe same split holds when a tool lives on an MCP server: the client sends `tools/call` and the server's handler performs the effect, so a gate belongs in front of the call and a permission check belongs inside the handler.\n\n**What to inspect when a proposal did nothing:** the gate's audit row for that call (decision and reason), then the handler's log. A missing effect after an `allowed` decision is a handler or target problem; a missing audit row is a gate defect.\n\n**Limits:** a model may name a tool it was never offered or emit malformed JSON. Treat both as data: deny unknown names and reject unparseable arguments rather than repairing them. Returning refusals as tool results lets the model tell the user what happened, which is also how MCP reports tool errors (`isError`).",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-call",
+     "dbxfe-tools-l01-example"
+    ]
+   },
+   "recap": "A tool call is text until your application runs a handler; put the gate between the two.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Socho ghar mein chhota bhai Amazon cart mein cheezein daal deta hai: headphones, shoes, ek naya phone. Cart bharna aasaan hai, par order tab hi jaata hai jab mummy apne phone pe OTP daal ke pay karti hai. Woh pehle dekhti hain kya maanga, kitne ka hai, budget mein hai ya nahi. Cart ek suggestion hai; paisa sirf OTP wale haath se nikalta hai.",
+    "mapping": "The filled cart is the model's proposed tool call; the parent's check and OTP payment are the policy gate and the handler that holds the credential and performs the effect.",
+    "boundary": "A model is not a child with wishes, and a gate applies written rules rather than a parent's judgement; the analogy covers only who can turn a proposal into an effect."
+   },
+   "hint": "Ask which component holds a credential for the draft store."
+  },
+  {
+   "id": "dbxfe-tools-schema",
+   "version": "1.0.0",
+   "title": "A tool schema is a contract the gate enforces",
+   "outcome": "Write a tool schema that makes an out-of-policy argument malformed and predict the gate's verdict for a given call.",
+   "explanation": "A [[dbxfe-tools-schema-concept|tool schema]] names each argument, its type and its limits in JSON Schema. The model reads it as guidance for writing arguments; the gate uses the same schema to refuse a call before any handler runs. In the table, notice that C06's priority: urgent fails not because urgency is discouraged but because priority is not a property and additionalProperties is false, and that C07's 50 units fail the maximum of 20. A description in prose constrains nothing; a schema checked in code does.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-call",
+   "conceptIds": [
+    "dbxfe-tools-schema-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-tools",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-schema-visual",
+   "questionIds": [
+    "dbxfe-tools-schema-question"
+   ],
+   "handbook": {
+    "markdown": "### Writing a schema the gate can enforce\n```json\n{\"type\": \"object\",\n \"required\": [\"machine_id\", \"manual_section\", \"note\"],\n \"properties\": {\n   \"machine_id\": {\"type\": \"string\", \"pattern\": \"^[A-Z][0-9]{1,3}$\"},\n   \"manual_section\": {\"type\": \"string\", \"pattern\": \"^[A-Z][0-9]{1,3}-[0-9]+\\\\.[0-9]+$\"},\n   \"note\": {\"type\": \"string\", \"maxLength\": 500}},\n \"additionalProperties\": false}\n```\n\nValidate in a fixed order and name the rule in every refusal: missing required properties, unexpected properties, then per-property problems (type, pattern, length, range). Lab L22's messages read `unexpected property 'priority'` and `'quantity' 50 above maximum 20`.\n\n**Why `additionalProperties: false` matters.** Authority-bearing fields such as `approved_by`, `user_id` or `priority` should not exist as arguments at all; the gate takes them from the session, the approval record or a person's decision. If extra properties were allowed, an injected `approved_by: sup-n1` would travel into the handler.\n\n**No silent coercion.** `\"2\"` is not `2`, and in Python `True` passes `isinstance(value, int)`, so check for booleans first. Coercing turns an invalid call into a different call from the one proposed.\n\n**What a schema cannot say.** It cannot know that M7 belongs to the North plant or that this caller may draft there; that is authorization. Nor can it express 'only sections retrieved in this conversation' without handler code.\n\n**MCP detail:** a tool's `inputSchema` is a JSON Schema object whose root type is `object`, and its `description` is only a hint to the model. The MCP Python SDK derives the schema from a function's type hints, so `quantity: int` sets the type, but ranges still need explicit constraints.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-call"
+    ]
+   },
+   "recap": "Constraints the model could break belong in the schema and the gate, never only in a tool's description.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "hint": "Look at which check runs first and whether it converts values."
+  },
+  {
+   "id": "dbxfe-tools-identity",
+   "version": "1.0.0",
+   "title": "Three identities meet in every tool call",
+   "outcome": "Name the user, the application's service principal and the principal a target evaluates, and say whose grants apply under app authorization and on behalf of the user.",
+   "explanation": "Every call carries a question: on whose behalf? The user asked; the application, running as a service principal such as app-maint-assistant, holds credentials; the target checks whichever credential arrives, the [[dbxfe-tools-identity-concept|acting identity]]. Under app authorization the draft store sees the service principal, so every technician inherits its reach. Notice in the second state that the same South technician's draft for North machine M7 is refused once the call carries her own identity. Decide the acting identity per tool, deliberately.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-identity",
+   "conceptIds": [
+    "dbxfe-tools-identity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-agent-identity",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-identity-visual",
+   "questionIds": [
+    "dbxfe-tools-identity-self"
+   ],
+   "handbook": {
+    "markdown": "### Three identities, one decision\n| Identity | Represents | Comes from | Risk if misused |\n|---|---|---|---|\n| User | The person who asked | The signed-in session | None if checked; it is the point |\n| Application (agent) | The code holding credentials | Its service principal | Every user inherits its reach |\n| Target principal | Whoever the target evaluates | The credential sent | Decides what actually happens |\n\nDecide per tool. Reading approved manuals that every technician may read can run as the application if the application's access is exactly that set; writing drafts for a plant must carry the user, because plants differ per person.\n\n**On Databricks.** Agents deployed on apps can act with the app's identity or with user authorization. The agent authentication page reviewed for the GenAI module marked user authorization Public Preview and warned that a missing forwarded user token can fall back to the app identity, so test with several callers and with no token at all. In Model Serving, MLflow 3.16.1 documents that a declared resource without `on_behalf_of_user` is accessed with the permissions of the model's creator: app-style access through one person's grants.\n\n**What to inspect:** the principal the target recorded (its audit or query history) for two different users making the same request, and for a request with no user token. If all three show the same principal, you have app authorization whatever the design document says.\n\n**Limits:** this beat does not choose token formats or flows; the Databricks Apps module and the identity module (Identity, authorization and audit) cover platform specifics.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-identity"
+    ]
+   },
+   "recap": "Name who asked, who holds the credential and whose grants the target checks; they are often three answers.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-tools-delegation",
+   "version": "1.0.0",
+   "title": "Delegated permission is an intersection, never a union",
+   "outcome": "Compute a delegated call's effective permission from the user's grants and the application's scopes, and fail closed when the user's credential is missing.",
+   "explanation": "[[dbxfe-tools-delegation-concept|Delegated authorization]] (on-behalf-of-user) lets the application act with the user's identity, bounded by the scopes it was granted. The effective permission is the intersection: user grants and application scopes, then the tool's own limits. In the lab, the North supervisor holds drafts:close:north, but the application was never delegated drafts:close, so closing D1 is refused and the audit names the application as the lacking side. Notice the last table: an expired session is refused rather than quietly retried as the application.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-identity",
+   "conceptIds": [
+    "dbxfe-tools-delegation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-obo",
+    "dbxfe-tools-claim-agent-identity",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-delegation-visual",
+   "questionIds": [
+    "dbxfe-tools-delegation-question"
+   ],
+   "handbook": {
+    "markdown": "### Computing effective permission\nEffective permission = user grants ∩ application scopes ∩ tool constraints. Lab L22's gate evaluates the first two sides explicitly and reports which one is lacking:\n\n```python\npermission = f\"{tool['permission']}:{plant}\"      # e.g. drafts:close:north\nlacking = []\nif permission not in user_grants:          lacking.append('user')\nif tool['permission'] not in app_scopes:   lacking.append('application')\n```\n\nC14 is the instructive row: the supervisor holds `drafts:close:north`, the application lacks `drafts:close`, and the call is refused with `lacking: application`. That is a configuration decision, not a bug: stop exposing the tool, or delegate the scope on purpose.\n\n**Fail closed.** No valid session means no user side, so the call is refused as `unauthenticated`. Substituting the application's identity turns a missing credential into full application access; the lab's fallback shortcut does exactly that and serves C15 with nobody signed in.\n\n**On Databricks Model Serving.** databricks-ai-bridge 0.22.0 obtains a downscoped token for the principal that queried the endpoint and fails if none is available. Its guidance: create the user `WorkspaceClient` inside `predict()`, log the model with a `UserAuthPolicy` listing API scopes, and enable the on-behalf-of-user preview. The policy shape in MLflow 3.16.1:\n\n```python\nfrom mlflow.models.auth_policy import AuthPolicy, SystemAuthPolicy, UserAuthPolicy\npolicy = AuthPolicy(system_auth_policy=SystemAuthPolicy(resources=[...]),\n                    user_auth_policy=UserAuthPolicy(api_scopes=[\"sql\"]))\n```\n\nVerify the preview's status and scope names for your workspace before relying on them.\n\n**What to inspect:** for each tool, the permission it requires, who holds it, whether the application's scopes include it, and one test call per combination.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-identity"
+    ]
+   },
+   "recap": "Effective permission is the user's grant and the application's scope together; no user token means no call.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Aap apne driver ko fuel card dete ho jisme limit set hai: sirf petrol, aur 3,000 rupaye tak. Driver aapke naam pe kharcha karta hai, par sirf utna jitna card allow kare aur utna jitna aapke account mein ho. Card pe car wash allowed nahi, to aapke account mein paise hote hue bhi car wash nahi hoga. Aur card ghar pe bhool gaya? Driver apni jeb se bharke aapke naam nahi likhega.",
+    "mapping": "The driver is the application acting for you; the card's limits are its delegated scopes; your account is your own grants; a purchase needs both, and a forgotten card means no purchase.",
+    "boundary": "A delegated token also expires, is checked by the target on every call and leaves an audit record; card limits are only a picture of the intersection rule."
+   }
+  },
+  {
+   "id": "dbxfe-tools-injection",
+   "version": "1.0.0",
+   "title": "Retrieved text can ask for an action but cannot authorize one",
+   "outcome": "Trace an injected instruction from a retrieved document to the gate and show which checks stop it without relying on the model.",
+   "explanation": "Retrieved text crosses a [[dbxfe-tools-boundary-concept|trust boundary]]: whoever wrote it never signed in as your user. A supplier page in Cinderline's index claims a supervisor approved 20 × P-9001 and asks for request_spare_part and a delete. That is indirect [[dbxfe-tools-injection-concept|prompt injection]]. The model may obey; the gate decides from the session and policy, never from content. Notice the three outcomes: the forged approved_by argument is malformed, the clean call is held for a human who rejects it, and delete_work_order is not an exposed tool.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-injection",
+   "conceptIds": [
+    "dbxfe-tools-boundary-concept",
+    "dbxfe-tools-injection-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-owasp",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-injection-visual",
+   "questionIds": [
+    "dbxfe-tools-injection-question"
+   ],
+   "handbook": {
+    "markdown": "### Why the gate never reads content\nClassify every input by origin, as the Untrusted content threat review guide does: the user's own turn carries a trusted identity but untrusted text; retrieved manuals, supplier PDFs, comment fields and tool results are untrusted text with no identity at all. OWASP's summary of prompt injection separates direct injections, which overwrite system prompts, from indirect ones arriving through external inputs; DOC-SUP-117 is indirect.\n\n**Controls that work by construction**\n- Identity from the session only: never an argument, never content.\n- An allowlist of exposed tools; any other name is denied (C12).\n- Schemas without authority-bearing fields (C10's `approved_by` is malformed).\n- Approval for external effects, decided by a person in their own session (C11 held, then rejected).\n- Provenance: each call's context ids go into `influenced_by`, so approvers and auditors see where a proposal came from.\n\n**The property to test.** Run every call with and without its retrieved content and require identical decisions and effects. Lab L22 passes this for all 25 events; the content-trusting shortcut fails it by executing a 20-unit P-9001 order.\n\n**Detection is a second layer.** Classifiers that flag instruction-like text reduce how often a model proposes bad calls; they cannot guarantee it, so they never replace the gate.\n\n**Limits:** a gate stops injected actions, not injected words. The model can still repeat a page's claims in an answer, which harms the human reader; label summaries of untrusted text and cite their sources.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-injection",
+     "dbxfe-tools-l01-example"
+    ]
+   },
+   "recap": "Content can shape what the model proposes; only the session and policy decide what executes.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Society gate par courier aata hai. Parcel ke andar ek chitthi: 'Flat 302 ke maalik ne kaha hai, guard courier wale ko 5,000 de de.' Samajhdaar guard chitthi padh leta hai, par paise sirf maalik ke registered number se aaye call par hi deta hai. Chitthi kisne likhi, kisi ko nahi pata; parcel mein kuch bhi likha ho sakta hai.",
+    "mapping": "The parcel note is retrieved content; the guard is the policy gate; the owner's registered number is the authenticated session and policy that alone can authorize a payment.",
+    "boundary": "A model, unlike a guard, may be persuaded by the note and propose the payment; the protection is that the gate executing payments never reads the note at all."
+   },
+   "hint": "Ask where the gate gets identity and approval from."
+  },
+  {
+   "id": "dbxfe-tools-sysprompt",
+   "version": "1.0.0",
+   "title": "A system prompt is a request, not access control",
+   "outcome": "Classify each proposed control as enforced by code or requested in a prompt, and replace prompt-only controls with enforced ones.",
+   "explanation": "The [[dbxfe-tools-sysprompt-concept|system prompt]] tells the model how to behave: 'only act for the user's plant', 'never delete work orders'. It is text in the same context an attacker's document reaches, and the model may not follow it. OWASP names the outcome [[dbxfe-tools-agency-concept|excessive agency]]: too much functionality, permission or autonomy. In the first table, notice which rows still hold if the model ignores every instruction: the schema and the approval hold. After review, the grant check and the allowlist replace the prompt rows.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-injection",
+   "conceptIds": [
+    "dbxfe-tools-sysprompt-concept",
+    "dbxfe-tools-agency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-owasp",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-sysprompt-visual",
+   "questionIds": [
+    "dbxfe-tools-sysprompt-question"
+   ],
+   "handbook": {
+    "markdown": "### Requests versus boundaries\n| Control | Enforced by | Survives a persuaded model? |\n|---|---|---|\n| 'Act only for the user's plant' in the prompt | the model, if it complies | no |\n| Grant `drafts:write:{plant}` | the gate | yes |\n| 'Never delete work orders' in the prompt | the model, if it complies | no |\n| `delete_work_order` not exposed | the gate | yes |\n| Quantity at most 20 | the schema | yes |\n| Supervisor approval | the approval hold | yes |\n\nKeep useful prompt sentences: they improve normal behaviour and reduce noise. Just do not count them in a threat review, and never let a review pass because of them.\n\n**Excessive agency.** OWASP traces this risk to three levers: functionality (tools the task does not need), permissions (grants broader than the task) and autonomy (effects without a human). Cinderline pulls all three: four exposed tools instead of the server's five, three delegated scopes with plant-scoped user grants, and approval for every external effect.\n\n**Treat the system prompt as readable.** Anyone who can talk to the assistant may coax it into revealing its instructions, so never put a credential, an internal hostname or a secret policy detail there. If disclosure of the prompt would be a problem, the problem is what the prompt contains.\n\n**What to inspect:** list every rule in the prompt and find the code that enforces it. A rule without code is a finding with an owner and a date.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-injection"
+    ]
+   },
+   "recap": "Count only controls that hold when the model disobeys; the system prompt is guidance, not a boundary.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "hint": "Imagine the model has already been persuaded; which row still stops the delete?"
+  },
+  {
+   "id": "dbxfe-tools-approval",
+   "version": "1.0.0",
+   "title": "An approval binds a named person to the exact operation",
+   "outcome": "Design an approval step that records who approved which exact arguments, refuses self-approval, and executes once.",
+   "explanation": "An [[dbxfe-tools-approval-concept|approval step]] separates the model's request from a human's decision. The gate holds the call, stores its exact arguments and digest, and shows the approver the operation itself, not the model's summary. In the lab the technician cannot approve her own request, a South technician lacks parts:approve:north, and the North supervisor's approval executes one purchase request; a second click changes nothing. Notice the last state: reusing the approved key with quantity 20 is a conflict, so an approval for 2 cannot stretch to 20.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-approval",
+   "conceptIds": [
+    "dbxfe-tools-approval-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-approval-visual",
+   "questionIds": [
+    "dbxfe-tools-approval-question"
+   ],
+   "handbook": {
+    "markdown": "### Designing the approval step\n**Record** (Lab L22's `approvals`): id, tool, exact arguments and their digest, requester, plant, idempotency key, status (pending, approved, executed, rejected, in doubt), approver, effect id and `influenced_by`.\n\n**Rules**\n1. The approver acts in their own authenticated session, outside the model; there is no 'approve' tool.\n2. Self-approval is refused first; then the approver needs the approve grant for the request's plant (`parts:approve:north`).\n3. Execution uses the stored arguments, never new ones, and happens once; approving a decided request returns `already_decided`.\n4. The request's key stays bound to its digest: C19, quantity 20 under the key of an approved quantity 2, is a conflict.\n5. Rejection is final for that key; a new request needs a new key and a new approval.\n\n**What the approver sees.** The exact operation (tool, arguments, plant), who asked, and where the proposal came from. A2's `influenced_by: DOC-SUP-117` made its rejection easy: an unreviewed supplier page had asked for 20 filter kits.\n\n**Two audit rows.** The human decision (actor `sup-n1`) and the system effect (actor `app-maint-assistant` on behalf of `tech-n1`) are separate rows sharing the approval id, so accountability stays clear.\n\n**Limits:** an approval is evidence of a human step only if a named owner acts on the queue; an unattended queue silently becomes 'never'. Approval does not replace authorization: the requester still needs `parts:request:north` and the application still needs the scope. Expiry of stale approvals is a design choice the lab does not implement.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-approval"
+    ]
+   },
+   "recap": "Hold the call, show the exact operation, record the named approver, execute once, refuse any stretch.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Office mein reimbursement claim: aap 1,200 ka taxi bill lagate ho, manager wahi bill dekh ke approve karta hai. Agar baad mein koi claim mein 1,200 ko 12,000 kar de, to purani approval us par lagu nahi hoti; naya claim, nayi approval. Aur apna claim khud approve karna? Kisi bhi accounts team mein nahi chalta.",
+    "mapping": "The claim is the held tool call; the manager's sign-off on that exact bill is the approval record; an edited amount under the old approval is a conflict; self-approval is refused.",
+    "boundary": "A reimbursement is paid once by accounts staff; in the gate the stored arguments are executed by code, exactly once, and the approver never retypes or edits them."
+   }
+  },
+  {
+   "id": "dbxfe-tools-timeout",
+   "version": "1.1.0",
+   "title": "A timeout means the outcome is unknown, not that nothing happened",
+   "outcome": "Explain why a timed-out write may already have committed, and plan a bounded retry that cannot duplicate the effect.",
+   "explanation": "A [[dbxfe-tools-timeout-concept|timeout]] tells the caller only that no reply arrived in time. In the lab, the draft store wrote D3 on C17's first attempt, but the reply took 2.5 seconds against a 2-second limit; two more attempts were also late, so the gate reported timed_out with outcome unknown while D3 already existed. A [[dbxfe-tools-retry-concept|bounded retry]] of three attempts, waiting 0.5 then 1 second, is safe only because every attempt carried the same key. Notice that C18 later found D3 instead of writing a fourth draft.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-retries",
+   "conceptIds": [
+    "dbxfe-tools-timeout-concept",
+    "dbxfe-tools-retry-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-claim-retry",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-timeout-visual",
+   "questionIds": [
+    "dbxfe-tools-timeout-question"
+   ],
+   "handbook": {
+    "markdown": "### Timeouts, retries and unknown outcomes\nSet a timeout at each hop (client to gate, gate to handler, handler to target) and an overall deadline. When one fires, three things may be true: the request never arrived, it arrived and failed, or it succeeded and only the reply was lost. The caller cannot tell which.\n\n**Retry only what may succeed later and cannot duplicate.** Retry timeouts and temporary unavailability; never retry a schema refusal, a permission denial or a key conflict. Bound the attempts and grow the wait: Lab L22 uses three attempts and 500 × 2^(attempt − 1) ms between them. General-purpose clients encode the same caution: urllib3's `Retry` retries a read timeout or a retryable status by default only for methods considered idempotent (GET, HEAD, PUT, DELETE, OPTIONS, TRACE), not POST; a connection error, raised before the request is sent, is retried for any method.\n\n| Call | Attempt log | Elapsed | Decision |\n|---|---|---|---|\n| C16 | 3500 ms timeout, wait 500; 300 ms reply | 2800 ms | allowed after retry, D2 |\n| C17 | 2500 timeout, wait 500; 2500 timeout, wait 1000; 2500 timeout | 7500 ms | timed_out, D3 exists |\n\n**Report the truth.** C17 returns 'no reply within 2000 ms after 3 attempts; safe to retry with the same key' and marks the key `in_doubt`. Saying 'failed' would invite a resubmission with a new key and a duplicate.\n\n**Reconcile.** For an in-doubt key, retry with the same key (C18 found D3) or read the target by key before telling the user anything.\n\n**Limits:** the lab's latencies are scripted on an event clock. Real networks add partial failures, reordering and targets that commit minutes later, so size timeouts from measured latency, not from these numbers.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-retries",
+     "dbxfe-tools-l01-example"
+    ]
+   },
+   "recap": "After a timeout assume the effect may exist; retry a bounded number of times, always with the same key.",
+   "changeNote": "The handbook and the retry-settings extension card no longer say that urllib3 never retries a POST by default. urllib3 2.6.3's retry code (src/urllib3/util/retry.py at its release tag) retries a read error, such as a timed-out reply, or a retryable status by default only for idempotent methods, and retries a connection error, raised before the request is sent, for any method, POST included.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Doctor ke clinic phone kiya appointment ke liye; receptionist 'haan, likh rahi hoon...' bol hi rahi thi ki call kat gayi. Appointment bani ya nahi? Dobara call karke naya slot mat lo, warna do appointments ban sakti hain. Pehle poocho: 'Mere naam pe kal 5 baje ki booking hai kya?'",
+    "mapping": "The dropped call is the timeout; the booking that may already exist is the committed effect; asking by your name and slot is retrying with the same idempotency key.",
+    "boundary": "A clinic can search by name; a system finds the earlier request only if the client sent a stable key and the target stored it, and a fresh key on every retry defeats the lookup."
+   },
+   "hint": "Separate failures that are decisions from failures that are accidents."
+  },
+  {
+   "id": "dbxfe-tools-idempotency",
+   "version": "1.0.0",
+   "title": "An idempotency key turns a repeat into a lookup",
+   "outcome": "Predict the effect count for replayed and conflicting calls, and define a key's scope, storage and conflict rule.",
+   "explanation": "An [[dbxfe-tools-idempotency-concept|idempotency key]] names one intent. The gate stores the key with the arguments' digest and the outcome; the target stores the key with the effect. In the lab, C02 creates D1 with k-02; C03 repeats it exactly and gets D1 back with no second draft; C04 reuses k-02 with a different note and is refused as a conflict. Notice in the last state that the key is scoped to user and tool, so another technician's k-02 is a different intent. Create a key once per intent, never once per attempt.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-retries",
+   "conceptIds": [
+    "dbxfe-tools-idempotency-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-idempotency-visual",
+   "questionIds": [
+    "dbxfe-tools-idempotency-question"
+   ],
+   "handbook": {
+    "markdown": "### Keys that make repeats safe\n**Generate** one key per intent, on the client side, when a user's request becomes a proposal; reuse it for every retry, replay and recovery of that intent, and never derive it per attempt.\n\n**Scope** it to user and tool. Lab L22's slot is `(user, tool, key)`, so a South technician's `k-02` is a different intent from a North technician's, and the target stores keys the same way.\n\n**Store** the argument digest, the state and the outcome:\n\n```python\ndef key_status(slot, args_digest):\n    if slot not in keys:                     return 'new'\n    if keys[slot]['digest'] != args_digest:  return 'conflict'\n    return 'resolve' if keys[slot]['state'] == 'in_doubt' else 'replay'\n```\n\n| Event | Key | Digest | Result | Drafts |\n|---|---|---|---|---|\n| C02 | k-02 | A | allowed, D1 | 1 |\n| C03 | k-02 | A | replayed, D1 | 1 |\n| C04 | k-02 | B | conflict | 1 |\n\n**Retention** must outlast the longest retry or recovery window; a key forgotten too early turns a late retry into a duplicate. Decide it explicitly and write it in the tool card.\n\n**Both ends.** The gate's store stops duplicates it knows about; the target's own key handling is what saves you after a timeout, because only the target knows what it committed. If a target cannot deduplicate, read it by key before retrying.\n\n**MCP note:** `idempotentHint` describes a tool's claimed behaviour. It is a hint, not a key, and it does not make a call safe to repeat.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-retries"
+    ]
+   },
+   "recap": "One intent, one key: the same arguments return the first outcome, different arguments are refused.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "Bijli ka bill online bharte waqt page atak gaya aur aapne 'Pay' do baar daba diya. Achha payment gateway bill number aur transaction reference dekh ke kehta hai: 'Yeh payment ho chuki hai', aur paisa ek hi baar katta hai. Par agar koi wahi reference kisi aur amount ke saath bheje, to gateway mana kar deta hai.",
+    "mapping": "The transaction reference is the idempotency key; the gateway's lookup is the gate's stored outcome; the second click is a replay; the same reference with another amount is a conflict.",
+    "boundary": "Payment gateways set their own reference rules; in a tool gate the key must be created once per intent and scoped to user and tool, or it protects nothing."
+   }
+  },
+  {
+   "id": "dbxfe-tools-mcp",
+   "version": "1.0.0",
+   "title": "MCP standardizes discovery and transport, not permission",
+   "outcome": "Describe what the Model Context Protocol carries between client and server and what it leaves to the application's own checks.",
+   "explanation": "The [[dbxfe-tools-mcp-concept|Model Context Protocol (MCP)]] lets a server expose tools, resources and prompts to any compatible client over JSON-RPC 2.0. A client discovers tools with tools/list (name, description, input schema, optional annotations) and calls one with tools/call, over a [[dbxfe-tools-transport-concept|transport]] such as stdio for a local subprocess or Streamable HTTP for a server at a URL. Notice in the second state that the server advertises delete_work_order as read-only: annotations are hints, and clients should not decide anything from hints sent by untrusted servers.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-mcp",
+   "conceptIds": [
+    "dbxfe-tools-mcp-concept",
+    "dbxfe-tools-transport-concept",
+    "dbxfe-tools-annotation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-tools",
+    "dbxfe-tools-claim-mcp-hints",
+    "dbxfe-tools-claim-mcp-transport",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-mcp-visual",
+   "questionIds": [
+    "dbxfe-tools-mcp-question"
+   ],
+   "handbook": {
+    "markdown": "### MCP in one page\n**Roles.** A host application (the assistant) runs MCP clients; each client connects to one server. Servers expose **tools** (actions), **resources** (readable data) and **prompts** (templates).\n\n**Messages.** JSON-RPC 2.0: discovery with `tools/list`, invocation with `tools/call`, and `notifications/tools/list_changed` when the list changes. Each tool has a `name`, a `description` (a hint to the model), an `inputSchema` (JSON Schema with an object root), an optional `outputSchema` and optional `annotations`.\n\n```json\n{\"jsonrpc\": \"2.0\", \"id\": 7, \"method\": \"tools/call\",\n \"params\": {\"name\": \"create_maintenance_draft\",\n            \"arguments\": {\"machine_id\": \"M7\", \"manual_section\": \"M7-4.2\", \"note\": \"Pressure drop 1.8 bar\"}}}\n```\n\n**Results and errors.** A tool reports its own failure inside the result with `isError: true`, so the model can see it; failing to find the tool is a protocol-level error.\n\n**Transports.** stdio for a local server started as a subprocess; Streamable HTTP for a server at a URL; the Python SDK also still speaks SSE. The protocol is versioned by dated revisions: mcp-types 2.2.0 lists 2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25 and 2026-07-28, so check which revision a client and server use.\n\n**Annotations are hints.** `readOnlyHint` defaults to false, `destructiveHint` to true, `idempotentHint` to false and `openWorldHint` to true, and clients should never make tool use decisions based on annotations from untrusted servers.\n\n**What MCP does not do.** It does not choose which tools the model sees, does not know your plants and approves nothing. Keep the allowlist, the gate and the approvals in your application.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-mcp"
+    ]
+   },
+   "recap": "MCP moves tool descriptions and calls between client and server; it does not decide who may act.",
+   "changeNote": "New academy beat.",
+   "mediaIds": [],
+   "samajh": {
+    "text": "USB-C charger lagbhag har phone mein lag jaata hai: ek standard plug, baat karne ka ek standard tareeka. Par plug lagne se phone unlock nahi hota. Lock screen alag cheez hai, aur woh maalik ki pehchaan maangti hai. Standard plug ne sirf jodna aasaan kiya; kaun kya khol sakta hai, woh phone khud tay karta hai.",
+    "mapping": "The USB-C standard is MCP's discovery and transport; the lock screen is authorization, enforced by the token check, the tool handler and the target system.",
+    "boundary": "MCP does define an authorization flow for HTTP transports that proves who connected; unlike a lock screen, it still does not decide each individual action."
+   }
+  },
+  {
+   "id": "dbxfe-tools-layers",
+   "version": "1.1.0",
+   "title": "MCP authorization checks the token; the handler still decides the action",
+   "outcome": "Place the checks for an MCP-exposed tool at the transport, the server handler and the target system, and diagnose which layer refused a call.",
+   "explanation": "For HTTP transports, MCP authorization is OAuth-based. In the MCP Python SDK the server refuses a missing or expired token with 401 and a token lacking the endpoint's required scopes with 403 insufficient_scope; it refuses a token issued for another server only once audience validation is enabled, as the specification requires. That proves who connected and with which scopes; it says nothing about whether this user may draft for machine C4. Notice the three [[dbxfe-tools-layers-concept|layers]]: the door (the token), the handler (this call's arguments) and the target (its own grants, such as EXECUTE on a Unity Catalog function). Each can refuse independently.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-mcp",
+   "conceptIds": [
+    "dbxfe-tools-layers-concept",
+    "dbxfe-tools-managed-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-auth",
+    "dbxfe-tools-claim-privileges",
+    "dbxfe-tools-claim-databricks-mcp",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-layers-visual",
+   "questionIds": [
+    "dbxfe-tools-layers-question"
+   ],
+   "handbook": {
+    "markdown": "### Where authorization happens with MCP\n**Door (transport).** For HTTP transports MCP uses OAuth-based authorization. In the MCP Python SDK 2.2.0, a server configured to verify tokens refuses a missing or expired token, or one its token verifier rejects, with `401 invalid_token` and a token lacking the endpoint's required scopes with `403 insufficient_scope`; with a resource server URL configured it publishes protected resource metadata so clients can find the authorization server. The required scopes apply to the whole endpoint. The SDK itself compares a token's resource with the server's own URL, and refuses a token issued for another server with `401`, only when `AuthSettings.validate_token_resource` is set to `True`. Left unset with a resource server URL configured, 2.2.0 warns and skips that comparison, so a token issued for another server is refused only if your token verifier rejects it. The MCP specification requires servers to validate that a token was issued for them, so enable it, or check the audience in your token verifier.\n\n**Handler (this call).** The tool handler reads the verified token (the SDK exposes it through request context), maps it to a user, binds the arguments to entities (C4 → South) and checks that user's grant, as Lab L22's gate does. The SDK's tool decorator has no per-tool permission setting, so this code is yours.\n\n**Target (its own grants).** The system behind the handler applies its own permissions to whoever calls it. A Unity Catalog function requires `EXECUTE` on the function plus `USE CATALOG` and `USE SCHEMA` on its parents.\n\n**On Databricks.** The Databricks-authored databricks-mcp 0.9.2 client reaches managed MCP servers on the workspace host at `/api/2.0/mcp/functions/<catalog>/<schema>`, `/api/2.0/mcp/vector-search/<catalog>/<schema>`, `/api/2.0/mcp/genie/<space-id>` and `/api/2.0/mcp/external/<connection>`, sending the caller's Databricks credentials as a bearer token, so the platform evaluates that principal's permissions on those objects. Custom servers hosted on Databricks Apps require OAuth, and a calling service principal needs permission to query the app. Read server types, preview status and regions from the current MCP on Databricks documentation.\n\n**stdio.** A local server started as a subprocess runs with whatever credentials its environment gives it, so the host's process identity matters as much as any token.\n\n**Diagnose by layer:** 401 or 403 at the door, a handler refusal naming the entity, or a target error naming the privilege.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-mcp"
+    ]
+   },
+   "recap": "A token proves who connected and with which scopes; the handler and the target still decide each action.",
+   "changeNote": "The door layer no longer says the MCP Python SDK refuses a token issued for another server by default. The SDK's auth source at tag v2.2.0 shows it refuses such a token only when validate_token_resource is enabled or your token verifier checks the audience, a check the MCP specification (2025-11-25, authorization) requires of servers. The managed-server concept now uses the name in Databricks' developer documentation source: Genie Agents, formerly Genie spaces.",
+   "mediaIds": [],
+   "hint": "Ask which layer is the first to see machine C4."
+  },
+  {
+   "id": "dbxfe-tools-audit",
+   "version": "1.0.0",
+   "title": "The audit trail records every decision, including refusals",
+   "outcome": "Specify an audit row for a tool decision and use rows to reconstruct who asked, who acted, what was decided and why.",
+   "explanation": "An [[dbxfe-tools-audit-concept|audit trail]] is written by the gate, not by the model, and it records refusals as carefully as successes. Each lab row carries sequence, time, actor, on-behalf-of, executing identity, tool, argument digest, key, decision, reason, attempts, effect or approval id, and the documents that influenced the call. Notice that C10's malformed call and C12's unexposed tool are rows too, that notes appear only as a digest, and that the supervisor's approval and the execution it triggered are two rows with different actors.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-audit",
+   "conceptIds": [
+    "dbxfe-tools-audit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-claim-tracing",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-audit-visual",
+   "questionIds": [
+    "dbxfe-tools-audit-self"
+   ],
+   "handbook": {
+    "markdown": "### What an audit row must answer\nWho asked, who acted, with which identity, what was proposed, what was decided and why, what happened, and what influenced it. One of Lab L22's rows:\n\n```json\n{\"seq\": 22, \"at\": \"2026-09-21T08:20:00Z\", \"event\": \"execution\", \"ref\": \"AP3\",\n \"actor\": \"app-maint-assistant\", \"on_behalf_of\": \"tech-n1\",\n \"tool\": \"request_spare_part\", \"args_digest\": \"<16 hex characters>\", \"idempotency_key\": \"k-08\",\n \"decision\": \"allowed\", \"reason\": \"executed_after_approval\", \"detail\": \"approved by sup-n1\",\n \"attempts\": 1, \"effect_id\": \"PR1\", \"approval_id\": \"A1\", \"influenced_by\": [\"DOC-M7-4.2\"]}\n```\n\n**Rules.** The gate writes the row, never the model. Every decision is a row, refusals included; the Tool action review guide's worked example found schema rejections unlogged, which would make a burst of malformed calls invisible. Rows are append-only. Sensitive values become digests or are left out: notes, tokens and personal remarks never enter the audit.\n\n**Audit versus trace.** MLflow tracing records intermediate inputs, outputs, latency, token usage and execution flow so an engineer can debug a model's path. An audit record serves accountability, with its own retention, access control and owner. Link the two by request id; never substitute one for the other.\n\n**A reviewer's first query**\n```sql\nSELECT decision, reason, COUNT(*) AS calls\nFROM tool_audit\nWHERE at >= '2026-09-21'\nGROUP BY decision, reason\nORDER BY calls DESC;\n```\n\n**Limits:** an audit proves what was logged, not that everything relevant was logged, so test that each decision type produces its row.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-audit",
+     "dbxfe-tools-l01-example"
+    ]
+   },
+   "recap": "If a refusal is not in the audit, you cannot show the boundary held.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-tools-matrix",
+   "version": "1.0.0",
+   "title": "Prove the gate with the calls that must fail",
+   "outcome": "Build a tool test matrix of allowed, denied, malformed, replayed, timed-out, approval and injected cases, and state what a local stub run proves and does not prove.",
+   "explanation": "A [[dbxfe-tools-matrix-concept|test matrix]] runs each decision the gate can make and asserts the decision, the reason and the effect count. Lab L22 does this with local stubs that append to lists: 20 calls and 5 approval actions produce 26 audit rows, three drafts and one purchase request, and every decision is identical with its retrieved content removed. Notice what the tables cannot show: the platform's real permissions, network timing and transactions. Those cases are rerun against the platform with real identities before launch.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-audit",
+   "conceptIds": [
+    "dbxfe-tools-matrix-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance",
+    "dbxfe-tools-fiction"
+   ],
+   "visualId": "dbxfe-tools-matrix-visual",
+   "questionIds": [
+    "dbxfe-tools-matrix-self"
+   ],
+   "handbook": {
+    "markdown": "### Building and reading the test matrix\nOne row per decision the gate can make, each asserting decision, reason and effect count:\n\n| Case | Lab L22 example | Asserts |\n|---|---|---|\n| Allowed | C02 | allowed, D1, one audit row |\n| Denied | C05, C13, C14, C15 | reason and lacking side, no effect |\n| Malformed | C06, C07, C10 | rule named, zero attempts |\n| Replayed or conflict | C03, C04, C19, C20 | same effect id, or a refusal |\n| Timed out | C16, C17, C18 | attempt log, unknown outcome, no duplicate |\n| Approval | C08, AP1 to AP5 | held, self-approval refused, executed once |\n| Injected | C10 to C13 | identical decisions without content |\n| Transfer | T01 to T08 | same code, a different policy |\n\n**Make the tests able to fail.** Write expected values by hand from the fixtures; never copy them from the gate's output. Lab L22's mutation check breaks nine rules one at a time (delegation as a union, self-approval allowed, an audit that keeps only successes, a target that ignores keys, and five more) and each turns the suite red.\n\n**What local stubs prove:** the gate's logic, for these cases. **What they do not:** the platform's grants, token lifetimes, network behaviour, target transactions or a real model's inventiveness. Rerun denied, replayed and timed-out cases against the platform with two real identities, record the results beside the stub's, and name an owner for every case not yet rerun.\n\n**Keep it alive.** Add rows whenever a tool, a scope, a user population or a retrieval source changes; the Tool action review guide's template has the same columns.",
+    "sourceSectionIds": [
+     "dbxfe-tools-l01-audit",
+     "dbxfe-tools-l01-example"
+    ]
+   },
+   "recap": "A gate deserves trust only as far as its failing cases have been run and recorded.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-tools-l01-card1",
+   "beatId": "dbxfe-tools-call"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card2",
+   "beatId": "dbxfe-tools-schema"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card3",
+   "beatId": "dbxfe-tools-identity"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card4",
+   "beatId": "dbxfe-tools-delegation"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card5",
+   "beatId": "dbxfe-tools-injection"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card6",
+   "beatId": "dbxfe-tools-sysprompt"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card7",
+   "beatId": "dbxfe-tools-approval"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card8",
+   "beatId": "dbxfe-tools-timeout"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card9",
+   "beatId": "dbxfe-tools-idempotency"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card10",
+   "beatId": "dbxfe-tools-mcp"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card11",
+   "beatId": "dbxfe-tools-layers"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card12",
+   "beatId": "dbxfe-tools-audit"
+  },
+  {
+   "cardId": "dbxfe-tools-l01-card13",
+   "beatId": "dbxfe-tools-matrix"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-tools-extension-hints",
+   "revision": "1",
+   "prompt": "An unfamiliar MCP server omits annotations on a write tool. What should a client assume?",
+   "answer": "The protocol's cautious defaults: not read-only, possibly destructive, not idempotent and open-world; and even stated hints from an unknown server are untrusted.",
+   "explanation": "The MCP schema defines ToolAnnotations as hints. readOnlyHint defaults to false, destructiveHint to true and idempotentHint to false, the last two meaningful only when the tool is not read-only, and openWorldHint defaults to true. Every annotation may be unfaithful, and the specification says clients should never make tool use decisions based on annotations from untrusted servers. A client can use a trusted server's hints for display, such as a warning before a destructive call, while its gate keeps enforcing exposure, approval and idempotency keys itself. Missing annotations therefore justify more caution, not less.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-mcp",
+   "conceptIds": [
+    "dbxfe-tools-extension-hints-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-hints",
+    "dbxfe-tools-guidance"
+   ],
+   "beatId": "dbxfe-tools-mcp",
+   "whyItMatters": "Shows that silence from a server means the cautious defaults, and that even stated hints never replace the gate's own rules."
+  },
+  {
+   "id": "dbxfe-tools-extension-audience",
+   "revision": "1",
+   "prompt": "Why does an MCP server refuse a valid token that another server's authorization issued?",
+   "answer": "Its audience names a different resource; accepting it would let a token meant for one service act on another.",
+   "explanation": "The MCP specification requires servers to validate that a token was issued for them as its audience. In the MCP Python SDK 2.2.0 the server's bearer check compares the token's RFC 8707 resource indicator with the server's own URL, and refuses a mismatch with 401, only when AuthSettings.validate_token_resource is enabled; left unset with a resource server URL configured, it warns and leaves the audience to the token verifier. With a resource server URL configured, the server publishes RFC 9728 protected resource metadata so clients know where to obtain a token for it. The same reasoning applies in the other direction: a tool server that forwarded the tokens it received to downstream APIs would let one audience's token act elsewhere, so each hop should hold a token issued for that hop.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-mcp",
+   "conceptIds": [
+    "dbxfe-tools-extension-audience-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-mcp-auth",
+    "dbxfe-tools-guidance"
+   ],
+   "beatId": "dbxfe-tools-layers",
+   "whyItMatters": "Explains a refusal that can look like a bug, and why forwarding tokens between services undermines identity boundaries."
+  },
+  {
+   "id": "dbxfe-tools-extension-methods",
+   "revision": "2",
+   "prompt": "Why will a generic HTTP client's retry setting not protect a draft-creating POST?",
+   "answer": "urllib3 retries a timed-out reply by default only for methods considered idempotent, which excludes POST, and forcing POST retries without a key can duplicate the effect.",
+   "explanation": "urllib3 2.6.3's Retry documents allowed_methods as the methods considered idempotent, meaning multiple identical requests leave the same state: DELETE, GET, HEAD, OPTIONS, PUT and TRACE. POST is absent, so a POST whose reply timed out (a read timeout) is not retried unless allowed_methods is set to None or includes it; a connect timeout, raised before the request is sent, is retried for any method. Setting allowed_methods that way without a stable idempotency key is exactly Lab L22's fresh-key shortcut: two drafts for one intent. The library's backoff sleeps backoff_factor times 2 to the power of previous retries, is disabled by default, and is capped by backoff_max.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-retries",
+   "conceptIds": [
+    "dbxfe-tools-extension-methods-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-retry",
+    "dbxfe-tools-claim-lab",
+    "dbxfe-tools-guidance"
+   ],
+   "beatId": "dbxfe-tools-timeout",
+   "whyItMatters": "Connects a familiar library default to the duplicate-effect risk, and shows that retry safety is a property of the server, not a client setting."
+  },
+  {
+   "id": "dbxfe-tools-extension-invoker",
+   "revision": "1",
+   "prompt": "Why must a served agent create its user-credential client inside predict() rather than at load time?",
+   "answer": "On-behalf-of credentials belong to each request's invoker; at load time there is no invoker, so the strategy fails rather than borrowing another identity.",
+   "explanation": "databricks-ai-bridge 0.22.0's ModelServingUserCredentials acts as the principal that queried the serving endpoint, using a downscoped user token that exists only while that request runs, and raises when none is available. Its error text asks for the WorkspaceClient to be created inside predict() or predict_stream(), for a UserAuthPolicy to be logged with the model, and for the on-behalf-of-user preview to be enabled. By contrast, MLflow 3.16.1 documents that declared resources without on_behalf_of_user are accessed with the model creator's permissions, the broad identity that delegation is meant to avoid. The preview's status must be verified for each workspace.",
+   "lessonId": "dbxfe-tools-l01",
+   "sectionId": "dbxfe-tools-l01-identity",
+   "conceptIds": [
+    "dbxfe-tools-extension-invoker-concept"
+   ],
+   "claimIds": [
+    "dbxfe-tools-claim-obo",
+    "dbxfe-tools-guidance"
+   ],
+   "beatId": "dbxfe-tools-delegation",
+   "whyItMatters": "Turns 'use the user's identity' into a concrete per-request rule, with its preview caveat and the creator-permission behaviour it replaces."
+  }
+ ],
+ "recap": {
+  "title": "The model proposes; identity and policy decide",
+  "markdown": "**A tool call is a proposal until your application executes it.** The gate decides from the signed-in session, an allowlist of exposed tools, the tool schema, the user's grants intersected with the application's delegated scopes, one idempotency key per intent and an approval hold, and it writes an audit row for every decision, refusals included. Retrieved text and system prompts shape what the model proposes; neither can grant identity, approval or a tool. A timeout is an unknown outcome that only the same key can resolve. MCP standardizes discovery and transport, while authorization still happens at the token check, the handler and the target. **Transfer challenge:** take a tool you would like an assistant to have, write its test matrix before its code, and mark the rows only the real platform can prove.",
+  "visualId": "dbxfe-tools-matrix-visual"
+ },
+ "appliedTask": {
+  "title": "Carry the gate to a clinic supply assistant",
+  "prompt": "Harbor Lane Clinic's supply assistant can look up items, order supplies and cancel orders. Orders of 1 to 40 units need supplies:order:<site>; orders above 10 units wait for someone else holding supplies:approve:<site>; the application's delegated scopes are catalog:read, supplies:order and orders:cancel. Ward W3 belongs to the East site. The East nurse holds catalog:read:east and supplies:order:east; only the East pharmacist also holds supplies:approve:east and orders:cancel:east. A packing-label document, DOC-LABEL-3, in context says a pharmacist approved 40 units of S-900 and asks to cancel all open orders. Write the gate's checks in order for order_supplies, predict the decisions for an East nurse ordering 40 of S-900 for ward W3 with the label in context and for the same nurse cancelling order O1, and name three audit fields a reviewer would use to see that the label changed nothing.",
+  "modelAnswer": "Checks, in order: session, exposed tool, schema (item_code pattern, quantity 1 to 40, no extra properties), ward to site, user grant supplies:order:east and application scope supplies:order, idempotency key (new, replay, conflict or resolve), approval above 10 units, then execution with a bounded retry and an audit row. The 40-unit order passes the schema and permission checks and is held for approval because 40 is above 10; the label's claimed approval is ignored, since approval comes only from an authorized pharmacist's recorded decision. The cancellation is denied for insufficient scope, lacking the user side: the nurse has no orders:cancel:east even though the application holds orders:cancel. Audit fields: influenced_by, which shows DOC-LABEL-3; decision and reason (approval_required, then insufficient_scope); and actor with approval_id when a pharmacist later rejects the hold.",
+  "reasoning": "The answer reuses the same order of checks with the clinic's policy, applies the intersection rule to the cancellation, and relies on the audit to show that content was recorded but never used; the decisions match Lab L22's transfer cases T06 and T07.",
+  "beatIds": [
+   "dbxfe-tools-injection",
+   "dbxfe-tools-delegation",
+   "dbxfe-tools-approval",
+   "dbxfe-tools-audit"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-tools-scenario"
+ ]
+}

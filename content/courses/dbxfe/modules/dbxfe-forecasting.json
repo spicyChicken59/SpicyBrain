@@ -1,0 +1,352 @@
+{
+  "module": {
+    "id": "dbxfe-forecasting",
+    "title": "Forecasting, anomalies and practical model selection",
+    "summary": "Evaluate a weekly forecast against naive and seasonal naive baselines on rolling origins without leakage, state its uncertainty as a range with measured coverage, choose an anomaly threshold by the inspection load and costs it creates, and judge a ranked queue at its real capacity.",
+    "objectives": [
+      "Fix a forecast's origin and horizon, compute naive and seasonal naive baselines and build rolling-origin folds that never train on later days or read inputs the origin cannot see.",
+      "Compare a readable model with its baselines fold by fold using MAE and MASE, explain why MAPE fails on zero actuals, and publish an interval with its measured coverage.",
+      "Turn an anomaly threshold into inspection load, false positives and misses, re-choose it when costs change, and evaluate a ranked queue with precision at its capacity."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m07"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-forecasting-l01.json"
+    ],
+    "scenarioId": "dbxfe-forecasting-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-forecasting-scenario",
+      "title": "Recommend L4's roster forecast, alert threshold and lot queue",
+      "context": "Fictional Cinderline Components plans inspector rosters for bracket line L4 each Friday for the following Saturday to Friday, and the roster meeting is moving from 23:00 to 16:00. Quality wants a daily defect alert, and the incoming-goods team can inspect four of about twenty lots per shift. The evidence is 82 days of synthetic line data (2026-06-01 to 2026-08-21) with a published calendar (Sundays closed), five injected bad-lot days and one breakdown, plus a hand-scored queue of 20 lots from two models, as executed in lab L19.",
+      "task": "Write a one-page recommendation for the planning review: which forecast to publish and on what backtest evidence, how to state its uncertainty, which alert threshold to run under each cost assumption and why, which model should order the lot queue, and what remains unknown.",
+      "requirements": [
+        "Compare any model with naive and seasonal naive on rolling origins at the seven-day horizon the roster uses, fold by fold, on working days only.",
+        "Name every input as known or unknown at the Friday origin, and exclude the unknown ones.",
+        "State the interval as a range with its measured coverage and the event it did not contain.",
+        "Choose the alert threshold from flags, false positives, misses and inspector-hours under both cost assumptions, naming who owns each cost and the break-even.",
+        "Evaluate the lot queue at the inspectors' capacity, and give no safety or financial guarantee from synthetic results."
+      ],
+      "model": "### Roster forecast\nPublish the two-lag regression (about half of last week's same day plus half of the week before) with seasonal naive beside it. On four Friday origins from TimeSeriesSplit(n_splits=4, test_size=7) its MAE on working days is 21.17 units against 23.67 for seasonal naive and 57.46 for naive; it wins three folds and loses fold 1, so the gain is real but small. Inputs are lags of 7 and 14 days and the published calendar; run hours are excluded because they are written after each day, and a run-hours model's 12.06 error is not achievable. Because Friday's night-shift count arrives after the new 16:00 meeting, rerun the backtest with gap=1 before adoption; from a Thursday origin next Friday is step 8, which lag 7 cannot reach, so that day uses seasonal naive from two weeks back.\n\n### Uncertainty\nPublish an 80% band (forecast plus about -20 to +20 units, from training residuals). It contained 20 of 24 held-out days; it did not contain the 19 August breakdown and will not contain the next one.\n\n### Alert threshold\nRun 2.5 while a miss is estimated at 12 hours: 5 reviews, 4 of 5 bad lots, 27 inspector-hours. Switch to 1.5 during the customer audit, when a miss is put at 40 hours: 12 reviews, all 5 caught, 7 false positives, 36 hours. The break-even is 21 hours. Both costs are estimates by quality engineering and the customer-quality lead, not measurements.\n\n### Lot queue\nOrder by model B while four inspections per shift is the capacity (precision at 4 of 1.00 against 0.50, although its accuracy is lower); revisit if capacity reaches eight, where model A is better.\n\n### Unknowns\nFour folds, 24 scored days and five bad lots are small samples; the costs are unmeasured; nothing here guarantees quality, safety or savings.",
+      "reasoning": "The recommendation fixes the decision's origin and horizon before comparing models, beats both baselines on the same folds and reports the losing fold, excludes an input written after the day, adapts the backtest to the late Friday count, states the band with its coverage and its blind spot, derives the threshold from named costs with a break-even, and ties the queue metric to capacity. A reviewer can check every number against lab L19.",
+      "rubric": [
+        {
+          "id": "dbxfe-forecasting-scenario-rubric-1",
+          "criterion": "Evaluation design",
+          "weak": "One random split or an in-sample fit; no baselines; the mean alone.",
+          "partial": "Rolling origins and baselines, but the horizon or origin weekday does not match the Friday roster, or the losing fold is hidden.",
+          "strong": "Friday origins, seven-day test weeks, naive and seasonal naive on the same folds, every fold reported, gap=1 considered for the late count."
+        },
+        {
+          "id": "dbxfe-forecasting-scenario-rubric-2",
+          "criterion": "Leakage and inputs",
+          "weak": "Run hours or other same-day values used as inputs; the better score is celebrated.",
+          "partial": "Same-day inputs removed, but lags shorter than the horizon or whole-series calibration go unexamined.",
+          "strong": "Every input dated as known or unknown at the origin, run hours excluded with the reason, calibration windows before the scored days."
+        },
+        {
+          "id": "dbxfe-forecasting-scenario-rubric-3",
+          "criterion": "Uncertainty and metrics",
+          "weak": "Point forecasts only, or MAPE quoted over closed days.",
+          "partial": "An interval given without its coverage, or MAPE used without discussing zeros and small actuals.",
+          "strong": "MAE and MASE on working days, an 80% band with measured coverage, and the breakdown named as outside its scope."
+        },
+        {
+          "id": "dbxfe-forecasting-scenario-rubric-4",
+          "criterion": "Thresholds, costs and ranking",
+          "weak": "A single threshold chosen for accuracy; the lot queue chosen by accuracy.",
+          "partial": "A threshold table without costs, or costs without the break-even and their owners.",
+          "strong": "Threshold chosen by total hours under both costs with the break-even and owners, and the queue chosen by precision at the real capacity."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Is Friday's count final when the roster is set at 16:00?",
+          "response": "No. The night shift's count is posted around 22:00, so the meeting sees Thursday as the last complete day."
+        },
+        {
+          "question": "What does a missed bad-lot day cost?",
+          "response": "Quality engineering estimates 12 inspector-hours of containment; during the customer audit the customer-quality lead puts it at 40. Neither figure has been measured."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-forecasting-l01"
+      ],
+      "claimIds": [
+        "dbxfe-forecasting-course-claim-tscv",
+        "dbxfe-forecasting-course-claim-baselines",
+        "dbxfe-forecasting-course-claim-percentage",
+        "dbxfe-forecasting-course-claim-mase",
+        "dbxfe-forecasting-course-claim-intervals",
+        "dbxfe-forecasting-course-claim-threshold",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-forecasting-course-claim-lab"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-forecasting-course-source-cv",
+      "title": "Cross-validation: evaluating estimator performance",
+      "url": "https://scikit-learn.org/stable/modules/cross_validation.html",
+      "publisher": "scikit-learn developers",
+      "type": "official documentation",
+      "context": "scikit-learn 1.9.1 user guide; time-ordered cross-validation.",
+      "accessDate": "2026-09-20",
+      "reviewDate": "2026-09-20",
+      "caveat": "A split is valid only if it matches the decision's timing. Title and URL reused from the machine-learning foundations module's record reviewed 2026-09-20; not re-confirmed by search in this build session (web-search budget exhausted) and the page body was not fetched (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-forecasting-course-source-tss",
+      "title": "TimeSeriesSplit",
+      "url": "https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html",
+      "publisher": "scikit-learn developers",
+      "type": "official documentation",
+      "context": "scikit-learn API reference; lab L19 executes version 1.9.1.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The fold boundaries quoted in this module were executed and checked in lab L19. URL as supplied in the build's source list and title unconfirmed; not confirmed by search in this build session (web-search budget exhausted) and the page body was not fetched (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-forecasting-course-source-fpp3",
+      "title": "Forecasting: Principles and Practice (3rd ed)",
+      "url": "https://otexts.com/fpp3/",
+      "publisher": "OTexts (Rob J Hyndman and George Athanasopoulos)",
+      "type": "primary reference",
+      "context": "Open forecasting textbook; methods are software-independent.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Cited at the book's landing page; chapter details are the author's unverified summary. URL as supplied in the build's source list and title unconfirmed; not confirmed by search in this build session (web-search budget exhausted) and the page body was not fetched (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-forecasting-course-source-automl",
+      "title": "What is AutoML?",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/automl/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; AutoML for classification, regression and forecasting.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Supported runtimes, compute and algorithms change and nothing here ran AutoML. URL as supplied in the build's source list and title unconfirmed; not confirmed by search in this build session (web-search budget exhausted) and the page body was not fetched (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-forecasting-course-source-metrics",
+      "title": "Metrics and scoring: quantifying prediction quality",
+      "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
+      "publisher": "scikit-learn developers",
+      "type": "official documentation",
+      "context": "scikit-learn 1.9.1 user guide; regression and classification metrics.",
+      "accessDate": "2026-09-20",
+      "reviewDate": "2026-09-20",
+      "caveat": "The MAPE behaviour on a zero actual was executed in lab L19. Title and URL reused from the machine-learning foundations module's record reviewed 2026-09-20; not re-confirmed by search in this build session (web-search budget exhausted) and the page body was not fetched (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-forecasting-course-source-threshold",
+      "title": "Tuning the decision threshold for class prediction",
+      "url": "https://scikit-learn.org/stable/modules/classification_threshold.html",
+      "publisher": "scikit-learn developers",
+      "type": "official documentation",
+      "context": "scikit-learn 1.9.1 user guide; scores separate from action thresholds.",
+      "accessDate": "2026-09-20",
+      "reviewDate": "2026-09-20",
+      "caveat": "Written for classifiers and applied here to an anomaly score by analogy. Title and URL reused from the machine-learning foundations module's record reviewed 2026-09-20; not re-confirmed by search in this build session (web-search budget exhausted) and the page body was not fetched (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-forecasting-course-claim-tscv",
+      "description": "Time-series cross-validation evaluates forecasts on a rolling origin: scikit-learn's TimeSeriesSplit keeps every training index before its test indices, with test_size, gap and max_train_size setting the test block, the samples dropped before it and the training window, whereas shuffled K-fold assumes independent samples.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-forecasting-course-source-cv",
+        "dbxfe-forecasting-course-source-tss",
+        "dbxfe-forecasting-course-source-fpp3"
+      ],
+      "context": "General forecasting evaluation; scikit-learn 1.9.1 executed in lab L19."
+    },
+    {
+      "id": "dbxfe-forecasting-course-claim-baselines",
+      "description": "The naive method forecasts every step as the last observation; the seasonal naive method forecasts each step as the last observed value from the same season.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-forecasting-course-source-fpp3"
+      ],
+      "context": "Standard forecasting baselines."
+    },
+    {
+      "id": "dbxfe-forecasting-course-claim-percentage",
+      "description": "Percentage errors are undefined or infinite when an actual is zero and extreme when it is near zero; scikit-learn's MAPE divides by the larger of the actual's magnitude and a small epsilon, so a zero actual yields a huge finite value.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-forecasting-course-source-fpp3",
+        "dbxfe-forecasting-course-source-metrics"
+      ],
+      "context": "Forecast accuracy measures; executed in lab L19."
+    },
+    {
+      "id": "dbxfe-forecasting-course-claim-mase",
+      "description": "Scaled errors such as MASE divide forecast errors by the in-sample MAE of a naive or seasonal naive method and stay defined when actuals are zero.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-forecasting-course-source-fpp3"
+      ],
+      "context": "Forecast accuracy measures."
+    },
+    {
+      "id": "dbxfe-forecasting-course-claim-intervals",
+      "description": "A prediction interval states a range expected to contain the future value with a given probability under the method's assumptions, and intervals usually widen as the horizon grows.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-forecasting-course-source-fpp3"
+      ],
+      "context": "Forecast uncertainty; the lab's band is an empirical residual range."
+    },
+    {
+      "id": "dbxfe-forecasting-course-claim-threshold",
+      "description": "A score and the threshold that turns it into an action are separate choices; precision is TP/(TP+FP) and changes with the threshold.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-forecasting-course-source-threshold",
+        "dbxfe-forecasting-course-source-metrics"
+      ],
+      "context": "Classification thresholds, applied to an anomaly score and a ranked queue by analogy."
+    },
+    {
+      "id": "dbxfe-forecasting-course-claim-automl",
+      "description": "Databricks documents AutoML as preparing data, training and tuning candidate models and generating a notebook for each trial, for classification, regression and forecasting problems.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-forecasting-course-source-automl"
+      ],
+      "context": "Databricks on AWS; availability must be verified; nothing here ran AutoML."
+    },
+    {
+      "id": "dbxfe-forecasting-course-claim-lab",
+      "description": "Line L4's daily data, the 20 lots, the injected events, the inspector-hour costs and every number quoted from lab L19 are synthetic, produced by a seeded generator and executed locally with pandas, numpy and scikit-learn.",
+      "kind": "fictional",
+      "sourceIds": [],
+      "context": "Not measurements of a real line; no safety or financial guarantee follows."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-forecasting-l01-horizon-concept",
+      "term": "forecast origin and horizon",
+      "aliases": [
+        "forecast origin",
+        "forecast horizon",
+        "lead time"
+      ],
+      "definition": "The origin is the last day whose data a forecast may use; the horizon is how many steps ahead it must cover.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-horizon"
+    },
+    {
+      "id": "dbxfe-forecasting-l01-baseline-concept",
+      "term": "naive and seasonal naive baselines",
+      "aliases": [
+        "naive forecast",
+        "seasonal naive",
+        "snaive"
+      ],
+      "definition": "Two no-fit forecasts: repeat the last value, or repeat the last value from the same point in the season.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-horizon"
+    },
+    {
+      "id": "dbxfe-forecasting-l01-backtest-concept",
+      "term": "rolling-origin backtest",
+      "aliases": [
+        "time series cross-validation",
+        "TimeSeriesSplit",
+        "walk-forward validation"
+      ],
+      "definition": "Evaluation at several successive origins, each fitted only on data before its own test period.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-backtest"
+    },
+    {
+      "id": "dbxfe-forecasting-l01-leakage-concept",
+      "term": "temporal leakage",
+      "aliases": [
+        "look-ahead bias",
+        "future leakage"
+      ],
+      "definition": "Using, in training or evaluation, a value that would not exist at the forecast origin.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-backtest"
+    },
+    {
+      "id": "dbxfe-forecasting-l01-metric-concept",
+      "term": "MAPE and MASE",
+      "aliases": [
+        "mean absolute percentage error",
+        "mean absolute scaled error"
+      ],
+      "definition": "MAPE divides errors by the actuals and breaks on zeros; MASE divides MAE by a seasonal naive method's in-sample MAE.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-metrics"
+    },
+    {
+      "id": "dbxfe-forecasting-l01-interval-concept",
+      "term": "prediction interval and coverage",
+      "aliases": [
+        "uncertainty band",
+        "empirical coverage"
+      ],
+      "definition": "A stated range expected to contain the future value with a given probability, checked by the share of held-out values it contained.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-uncertainty"
+    },
+    {
+      "id": "dbxfe-forecasting-l01-anomaly-concept",
+      "term": "anomaly score and threshold",
+      "aliases": [
+        "false positive",
+        "inspection load",
+        "alert threshold"
+      ],
+      "definition": "A score of how far a day is from its expectation, and the cut-off that turns scores into reviews.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-anomaly"
+    },
+    {
+      "id": "dbxfe-forecasting-l01-cost-concept",
+      "term": "decision cost",
+      "aliases": [
+        "cost-based threshold",
+        "expected cost"
+      ],
+      "definition": "The total cost of the reviews a threshold triggers plus the misses it allows, used to choose the threshold.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-anomaly"
+    },
+    {
+      "id": "dbxfe-forecasting-l01-ranking-concept",
+      "term": "precision at k",
+      "aliases": [
+        "precision@k",
+        "ranking metric",
+        "recommendation evaluation"
+      ],
+      "definition": "The share of relevant items among the k highest-ranked ones, which is what a capacity-limited user acts on.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-ranking"
+    },
+    {
+      "id": "dbxfe-forecasting-l01-automl-concept",
+      "term": "managed forecasting",
+      "aliases": [
+        "Databricks AutoML",
+        "AutoML forecasting"
+      ],
+      "definition": "A platform service that searches and tunes candidate models, leaving the decision's evaluation design to the team.",
+      "lessonId": "dbxfe-forecasting-l01",
+      "sectionId": "dbxfe-forecasting-l01-platform"
+    }
+  ]
+}

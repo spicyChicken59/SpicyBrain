@@ -1,0 +1,3359 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-finops",
+ "title": "Compute choices, cost and FinOps reasoning",
+ "summary": "Six cost drivers in their own units, compute chosen by workload pattern, running time split into idle, startup and queue, usage attributed from the billable usage table, unit costs with a guard, and a sensitivity range instead of a single number.",
+ "outcomes": [
+  "Separate a cost question into drivers, each with its own unit, currency and period, and name what a compute decision moves.",
+  "Choose job compute, all-purpose compute, a SQL warehouse or serverless from the workload's pattern, and read idle, startup, queue and quota evidence.",
+  "Attribute usage with tags and usage policies, read the billable usage system table with its corrections, and compute unit economics with a zero-denominator guard.",
+  "Build a low, base and high sensitivity table in one currency per month, place budgets and policies in their governance roles, and report a controlled cost experiment with its spread."
+ ],
+ "startingAssumptions": [
+  "The platform module has placed classic and serverless compute, and the SQL performance module introduced concurrency, latency and a controlled capacity experiment.",
+  "SQL aggregation is familiar; the decimal arithmetic in the lab is explained where it is used."
+ ],
+ "lessonIds": [
+  "dbxfe-finops-l01"
+ ],
+ "optionalBridgeLessonIds": [
+  "dbxfe-workspace-compute"
+ ],
+ "editorialRationale": "FinOps teaching fails when it starts from a price or a single total, so the module starts from drivers in their own units, chooses compute from workload patterns, then splits running time into idle, startup and queue before quotas, attribution evidence, unit economics, comparable units and sensitivity; governance and a controlled experiment close it. Every rate is labelled hypothetical, product facts are sourced to reused course records and to the SDK docstrings read in this build, and Lab L13 executes the worksheet and the experiment locally.",
+ "sources": [
+  {
+   "id": "dbxfe-finops-source-compute",
+   "title": "Compute",
+   "url": "https://docs.databricks.com/aws/en/compute/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-20",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the compute landing page: serverless compute, classic all-purpose and jobs compute, and SQL warehouses.",
+   "caveat": "Product names, compute types and serverless availability change and depend on workspace and region; verify the current page and the workspace's entitlement before recommending a class.",
+   "reviewedEvidence": "Reuses the course's existing record of this page: the retained platform module's source dbxfe-m03-source-compute (same URL, title and publisher) was reviewed on 2026-09-20, and the repository's source-availability probe reached the page (HTTP 200) that day. Not re-confirmed by this author on 2026-09-23: the build session's web-search allowance was used up and the documentation host is blocked by the sandbox egress proxy, so the page body was not fetched in this build. Passage relied on, as summarized in that earlier review's record (not re-read in this build): the compute overview distinguishes workload resources, SQL warehouses from the resources for notebook and job work; serverless compute is on-demand and managed automatically, while classic compute is created and configured by the customer as all-purpose compute for interactive notebooks or jobs compute that the job scheduler creates for a run and terminates when the run completes."
+  },
+  {
+   "id": "dbxfe-finops-source-warehouse",
+   "title": "SQL warehouse sizing, scaling, and queuing behavior",
+   "url": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-behavior",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-19",
+   "publishedAt": null,
+   "context": "Databricks on AWS; how each SQL warehouse type sizes, scales and queues queries.",
+   "caveat": "Serverless and pro or classic behaviour differ and the page revises its sizing advice; read the current page for the type in use and never infer price or performance from a size label.",
+   "reviewedEvidence": "Reuses the course's existing record of this page, dbxfe-src-warehouse (same URL, title and publisher), reviewed on 2026-09-19; the retained SQL performance module reviewed it again on 2026-09-20 and the repository's availability probe reached it (HTTP 200) that day. Not re-confirmed by this author on 2026-09-23: the build session's web-search allowance was used up and the documentation host is blocked by the sandbox egress proxy, so the page body was not fetched in this build. Passage relied on, as summarized in those earlier review records (not re-read in this build): warehouse size and cluster count address different resource dimensions, and serverless and classic or pro warehouses manage workload differently; serverless warehouses admit a query when capacity is available and otherwise queue it while scaling (Intelligent Workload Management); queues and spills are inspected before capacity is changed."
+  },
+  {
+   "id": "dbxfe-finops-source-billing",
+   "title": "Billable usage system table reference",
+   "url": "https://docs.databricks.com/aws/en/admin/system-tables/billing",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-19",
+   "publishedAt": null,
+   "context": "Databricks on AWS; schema and example queries for system.billing.usage.",
+   "caveat": "Column names, freshness and correction behaviour are read from the current reference; usage quantities multiplied by list prices give list-price arithmetic, not a negotiated rate or an invoice.",
+   "reviewedEvidence": "Reuses the course's existing record of this page: the retained modules' sources dbxfe-m10-source-billing and dbxfe-m11-source-billing (same URL, title and publisher) were reviewed on 2026-09-19, and the repository's availability probe reached the page (HTTP 200) on 2026-09-20. Not re-confirmed by this author on 2026-09-23: the build session's web-search allowance was used up and the documentation host is blocked by the sandbox egress proxy, so the page body was not fetched in this build. Passage relied on, as summarized in that earlier review's record (not re-read in this build): the schema includes the usage unit, quantity, time basis, SKU and original, retraction and restatement record types, and original records are typically available within twelve hours, not instantly; rows also carry custom tags, usage metadata identifying the job, run, warehouse or cluster, and identity metadata."
+  },
+  {
+   "id": "dbxfe-finops-source-budgets",
+   "title": "Create and monitor budgets",
+   "url": "https://docs.databricks.com/aws/en/admin/account-settings/budgets",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; account-console budgets and budget alerts.",
+   "caveat": "Preview status, supported actions and the basis of the spend figure are read from the current page; this module does not assume what the API's block-usage action covers.",
+   "reviewedEvidence": "The URL and title were not confirmed in this build session: no module had a search-confirmed record of the page, the build session's web-search allowance was used up on 2026-09-23 and the documentation host is blocked by the sandbox egress proxy. The URL comes from this build's assignment list for the module and is corroborated by the databricks-sdk 0.141.0 package read in this session, whose BudgetsAPI docstring links the page's earlier address https://docs.databricks.com/en/admin/account-settings/budgets.html. Details used here are those the SDK docstrings also state: budgets monitor usage across the account, either account-wide or filtered to the spending of specific teams, projects or workspaces, and alerts fire when cumulative monthly spend crosses a threshold."
+  },
+  {
+   "id": "dbxfe-finops-source-pricing",
+   "title": "Databricks pricing",
+   "url": "https://www.databricks.com/product/pricing",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks commercial pricing page across clouds; defines the billing units.",
+   "caveat": "No figure from this page is quoted in this module; rates depend on cloud, region, tier, product and commercial terms and must be read from the current page, dated, at decision time.",
+   "reviewedEvidence": "The URL and title were not confirmed in this build session (the web-search allowance was used up on 2026-09-23 and the host is blocked by the sandbox egress proxy); the URL is the one in the project's own source index (docs/IMPLEMENTATION-CONTRACT.md, entry 'Databricks pricing'), which directs every real pricing input to it. No figure from the page is used. Unverified summary written by the module's author, hedged here to definitions only: Databricks describes pay-as-you-go pricing, and defines a Databricks Unit (DBU) as a normalized unit of processing power used for measurement and pricing, the DBUs a workload consumes depending on the compute resources used and the data processed; the Clusters API docstring read in this session also maps node instance types to DBUs."
+  },
+  {
+   "id": "dbxfe-finops-source-cost",
+   "title": "Cost optimization for Databricks",
+   "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/cost-optimization/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-19",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the cost optimization pillar of the well-architected lakehouse framework.",
+   "caveat": "Principles, not measurements; any saving attributed to a practice depends on the workload and must be shown from the customer's own usage rows.",
+   "reviewedEvidence": "Reuses the course's existing record of this page, dbxfe-src-cost (same URL, title and publisher), reviewed on 2026-09-19; the repository's availability probe reached it (HTTP 200) on 2026-09-20. Not re-confirmed by this author on 2026-09-23: the build session's web-search allowance was used up and the documentation host is blocked by the sandbox egress proxy, so the page body was not fetched in this build. Passage relied on, as summarized in that earlier review's record (not re-read in this build): cost optimization relates resource decisions to delivered value, and the pillar organizes practice under choosing optimal resources, dynamically allocating resources, monitoring and controlling cost, and designing cost-effective workloads, with job compute for non-interactive work, auto-termination, compute policies and tagging among its practices."
+  },
+  {
+   "id": "dbxfe-finops-source-sdk",
+   "title": "databricks-sdk 0.141.0 (Databricks SDK for Python)",
+   "url": "https://pypi.org/project/databricks-sdk/0.141.0/",
+   "publisher": "Databricks (package published on the Python Package Index)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks SDK for Python, release 0.141.0 published on PyPI on 2026-09-23 (Beta); API model docstrings for clusters, pools, cluster policies, SQL warehouses, query metrics, jobs and budgets.",
+   "caveat": "API reference text in a Beta SDK names fields, defaults and enumerations, not recommended settings; product behaviour is confirmed in the current documentation for the workspace's cloud and region.",
+   "reviewedEvidence": "Read in this session: the wheel databricks_sdk-0.141.0-py3-none-any.whl was downloaded from PyPI on 2026-09-23, its SHA-256 matched the index (053ddd3702b5ed99e01951915fc3421565fc72f82f41623d51e13a0209ba2b79), and these docstrings were read locally. ClustersAPI: all-purpose clusters are used to analyze data collaboratively in interactive notebooks and can be terminated and restarted manually and shared; job clusters run automated jobs; Databricks maps node instance types to compute units known as DBUs. autotermination_minutes: a cluster inactive for that many minutes terminates, and a cluster with the field unset is not terminated automatically. custom_tags: Databricks tags all cluster resources, such as AWS instances and EBS volumes, with them in addition to default tags. InstancePoolsAPI: pools keep idle, ready-to-use instances to reduce cluster start and autoscaling times; Databricks does not charge DBUs while instances are idle in the pool, and instance provider billing does apply. SQL warehouses: auto_stop_mins is the idle time before a warehouse stops, 0 meaning no autostop and 120 minutes the default; cluster_size lets larger queries run, while concurrent queries are tuned with max_num_clusters; min_num_clusters keeps clusters running, which may reduce cold start time; tags are applied to all resources such as AWS instances and EBS volumes. QueryMetrics: provisioning_queue_start_timestamp marks waiting for a cluster to be provisioned and overloading_queue_start_timestamp marks waiting while the warehouse is at max load, beside compilation and execution times. Jobs: new_cluster describes a cluster created for each run; running on an existing cluster may need manual restarts, so new clusters are suggested for reliability; jobs and runs record the usage policy used for cost attribution. TerminationReasonCode includes AWS_RESOURCE_QUOTA_EXCEEDED and AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE; NodeTypeFlexibility lists alternate node types used as fallbacks when the primary node type is unavailable during launch and upscale. ClusterPoliciesAPI: policies limit the attributes users can set, including limits on attributes that impact the hourly rate. Budgets: alert thresholds are measured as LIST_PRICE_DOLLARS_USD over a MONTH and trigger on CUMULATIVE_SPENDING_EXCEEDED, scoped shared or per user, with EMAIL_NOTIFICATION and BLOCK_USAGE action types; budget policies carry customer-defined custom tags."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-finops-guidance",
+   "kind": "guidance",
+   "sourceIds": [],
+   "description": "Original SpicyBrain reasoning about compute choice, utilization, unit economics, sensitivity modelling and spend governance; not Databricks commercial advice and not personalized financial advice.",
+   "context": "Independent curriculum; every model built with it needs the customer's own dated rates, usage rows and owners."
+  },
+  {
+   "id": "dbxfe-finops-fiction",
+   "kind": "fictional",
+   "sourceIds": [],
+   "description": "Cinderline Components, its workloads, usage rows, run observations, tags, budgets, quotas and every rate and monetary figure in this module are synthetic teaching values; rates are labelled hypothetical rate, not a price, in hypothetical USD.",
+   "context": "No price, discount, quotation, benchmark or saving is asserted; nothing was run on Databricks or any cloud."
+  },
+  {
+   "id": "dbxfe-finops-claim-compute",
+   "description": "Databricks separates serverless compute, provisioned and scaled on demand, from classic compute the customer configures: all-purpose compute for interactive, shareable and restartable analysis, and job compute that the scheduler creates for a run and terminates afterwards; SQL warehouses are a separate compute type for SQL in serverless, pro or classic form.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-compute",
+    "dbxfe-finops-source-sdk"
+   ],
+   "context": "Databricks on AWS; serverless availability and names vary by workspace and region."
+  },
+  {
+   "id": "dbxfe-finops-claim-idle",
+   "description": "An all-purpose cluster terminates after the inactivity minutes set in autotermination_minutes and is not terminated automatically when the field is unset; a SQL warehouse stops after auto_stop_mins idle minutes, which the API defaults to 120, with 0 meaning no auto-stop.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk"
+   ],
+   "context": "API field docstrings in databricks-sdk 0.141.0; interface defaults can differ by warehouse type."
+  },
+  {
+   "id": "dbxfe-finops-claim-pools",
+   "description": "Pools keep idle, ready-to-use instances to reduce cluster start and autoscaling times; Databricks charges no DBUs for instances idle in a pool while the cloud provider's instance billing applies; a SQL warehouse's minimum cluster count keeps clusters running, which may reduce cold starts.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk"
+   ],
+   "context": "Classic compute and SQL warehouse API docstrings; pricing of each unit is read from current pricing."
+  },
+  {
+   "id": "dbxfe-finops-claim-warehouse",
+   "description": "Warehouse size and cluster count are different capacity dimensions: a larger size lets larger queries run and the maximum cluster count serves more concurrent queries; serverless warehouses start a query when capacity exists and queue it otherwise; query metrics timestamp waiting for provisioning separately from waiting while the warehouse is at maximum load.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-warehouse",
+    "dbxfe-finops-source-sdk"
+   ],
+   "context": "SQL warehouse behaviour on AWS; type availability varies by workspace."
+  },
+  {
+   "id": "dbxfe-finops-claim-quota",
+   "description": "Classic compute can terminate with cloud-side reasons including AWS_RESOURCE_QUOTA_EXCEEDED and AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE; flexible node type settings list alternate node types used as fallbacks when the primary node type is unavailable during launch and upscale.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk"
+   ],
+   "context": "Termination reasons and node type flexibility in the Clusters API model; quotas belong to the cloud account."
+  },
+  {
+   "id": "dbxfe-finops-claim-tags",
+   "description": "Custom tags on clusters and SQL warehouses are applied to their cloud resources, such as AWS instances and EBS volumes, alongside default tags, and billable usage rows carry custom tags; serverless usage is attributed through usage policies, formerly budget policies, that carry customer-defined tags, and jobs record the usage policy used for their cost attribution.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk",
+    "dbxfe-finops-source-billing"
+   ],
+   "context": "Attribution mechanics on AWS; tags apply to usage recorded after they are set."
+  },
+  {
+   "id": "dbxfe-finops-claim-billing",
+   "description": "system.billing.usage records billable usage with SKU, usage date and time, quantity and unit, custom tags and usage metadata such as job, warehouse and cluster identifiers; corrections arrive as retraction and restatement records beside the original; records arrive after the usage, not instantly.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-billing"
+   ],
+   "context": "Billable usage system table; schema read from the current reference."
+  },
+  {
+   "id": "dbxfe-finops-claim-budgets",
+   "description": "Budgets monitor account-wide or filtered usage and alert recipients when spending crosses a threshold; the current budget API measures thresholds in list-price US dollars over cumulative monthly spend, shared or per user, and lists email-notification and block-usage action types.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-budgets",
+    "dbxfe-finops-source-sdk"
+   ],
+   "context": "Account budgets; the scope and availability of the block-usage action are verified before use."
+  },
+  {
+   "id": "dbxfe-finops-claim-policies",
+   "description": "Compute (cluster) policies limit which attributes and values users can set when creating clusters, including limits on attributes that affect the hourly rate; the cost optimization pillar lists compute policies, auto-termination and tagging among its cost controls.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk",
+    "dbxfe-finops-source-cost"
+   ],
+   "context": "Workspace compute policies; admins create policies and grant their use."
+  },
+  {
+   "id": "dbxfe-finops-claim-pricing",
+   "description": "Databricks prices usage pay-as-you-go and defines the DBU as a normalized unit of processing power used for measurement and pricing; the Clusters API maps node instance types to DBUs. This module quotes no rate.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-pricing",
+    "dbxfe-finops-source-sdk"
+   ],
+   "context": "Commercial page and API docstring; real rates are read live, dated and never copied into teaching."
+  },
+  {
+   "id": "dbxfe-finops-claim-cost",
+   "description": "The cost optimization pillar groups practice under choosing optimal resources, dynamically allocating resources, monitoring and controlling cost, and designing cost-effective workloads.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-finops-source-cost"
+   ],
+   "context": "Well-architected lakehouse guidance; savings depend on the workload and are shown from usage rows."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-finops-driver-concept",
+   "term": "cost driver",
+   "aliases": [
+    "cost category",
+    "cost input"
+   ],
+   "definition": "One thing a workload is paid for, counted in its own unit and period: compute time, platform usage, storage, data movement, operations effort or a one-off migration.",
+   "example": "The nightly job drives instance-hours and DBUs; the operator's weekly checks drive hours of effort.",
+   "sourceIds": [
+    "dbxfe-finops-source-pricing",
+    "dbxfe-finops-source-cost"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-class-concept",
+   "term": "compute class",
+   "aliases": [
+    "job compute",
+    "jobs compute",
+    "job cluster",
+    "all-purpose compute",
+    "interactive compute",
+    "SQL warehouse",
+    "serverless compute",
+    "Lakeflow Jobs",
+    "Databricks Workflows"
+   ],
+   "definition": "A kind of Databricks compute chosen by workload pattern: job compute created per run, all-purpose compute for interactive work, a SQL warehouse for SQL and BI, or a serverless variant provisioned on demand.",
+   "example": "The nightly resolution job runs on job compute created for each run; the morning report reads through a SQL warehouse.",
+   "sourceIds": [
+    "dbxfe-finops-source-compute",
+    "dbxfe-finops-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-utilization-concept",
+   "term": "utilization",
+   "aliases": [
+    "busy time",
+    "idle time",
+    "paid idle"
+   ],
+   "definition": "Useful work time divided by the time a resource was running and billable, for one resource over one stated period.",
+   "example": "Two busy hours on a cluster that ran ten hours is 20 percent utilization.",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk",
+    "dbxfe-finops-source-cost"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-startup-concept",
+   "term": "startup overhead",
+   "aliases": [
+    "cold start",
+    "startup time",
+    "provisioning wait"
+   ],
+   "definition": "The time between asking for compute and its first useful work, waited for, and often paid for, once per start whatever the run length.",
+   "example": "A three-minute startup before a six-minute job is a third of the running time.",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk",
+    "dbxfe-finops-source-compute"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-queue-concept",
+   "term": "queue",
+   "aliases": [
+    "queueing",
+    "concurrency",
+    "waiting at capacity",
+    "overloading queue"
+   ],
+   "definition": "Work that has arrived but cannot start because the compute has no free capacity, recorded as waiting time separate from execution time.",
+   "example": "Twelve dashboard queries against synthetic capacity for ten leave two waiting.",
+   "sourceIds": [
+    "dbxfe-finops-source-warehouse",
+    "dbxfe-finops-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-quota-concept",
+   "term": "cloud quota",
+   "aliases": [
+    "service quota",
+    "instance limit",
+    "vCPU limit",
+    "capacity failure"
+   ],
+   "definition": "A cloud account's limit on how many instances or cores a region may run, enforced by the cloud provider when classic compute launches.",
+   "example": "A synthetic 64-vCPU quota refuses four more 16-vCPU nodes while another cluster holds 48.",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-tag-concept",
+   "term": "tag",
+   "aliases": [
+    "custom tag",
+    "cost attribution",
+    "usage policy",
+    "serverless budget policy"
+   ],
+   "definition": "A key and value attached to a compute resource, or applied through a usage policy, that is written into each billable usage row so the usage can be assigned to a project, team or owner.",
+   "example": "project=quality-pilot on the nightly job's compute appears in custom_tags on every usage row it produces.",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk",
+    "dbxfe-finops-source-billing"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-systemtable-concept",
+   "term": "billable usage system table",
+   "aliases": [
+    "system table",
+    "system.billing.usage",
+    "usage table"
+   ],
+   "definition": "The account-wide table Databricks maintains with one row per billable usage record, carrying SKU, quantity, unit, date, tags and metadata; the evidence behind dashboards and budgets.",
+   "example": "Summing usage_quantity for rows tagged project=quality-pilot gives the pilot's DBUs for September.",
+   "sourceIds": [
+    "dbxfe-finops-source-billing"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-dbu-concept",
+   "term": "DBU",
+   "aliases": [
+    "Databricks Unit",
+    "platform usage unit"
+   ],
+   "definition": "The Databricks Unit, a normalized unit of processing power used to measure and price platform usage; how many a workload consumes depends on the compute used and the data processed.",
+   "example": "The nightly job's usage rows show 4.2 DBU per run; its cloud instances are billed separately in instance-hours.",
+   "sourceIds": [
+    "dbxfe-finops-source-pricing",
+    "dbxfe-finops-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-unit-concept",
+   "term": "unit economics",
+   "aliases": [
+    "cost per run",
+    "cost per query",
+    "cost per model",
+    "cost per unit of work"
+   ],
+   "definition": "Cost divided by a counted unit of work over the same period, using only the drivers that work causes, with a guard that returns unknown when the count is zero.",
+   "example": "77.40 hypothetical USD over 30 nightly runs is 2.58 per run.",
+   "sourceIds": [
+    "dbxfe-finops-source-billing",
+    "dbxfe-finops-source-cost"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-comparability-concept",
+   "term": "comparable units",
+   "aliases": [
+    "currency",
+    "period",
+    "unit mismatch",
+    "incomparable billing units"
+   ],
+   "definition": "Quantities can be added or compared only in one unit, one currency and one period; different billing units are converted with their own labelled rates first.",
+   "example": "300 DBU plus 120 instance-hours is not 420 of anything until each is priced.",
+   "sourceIds": [
+    "dbxfe-finops-source-pricing",
+    "dbxfe-finops-source-billing"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-sensitivity-concept",
+   "term": "sensitivity table",
+   "aliases": [
+    "low base high",
+    "swing",
+    "what-if table"
+   ],
+   "definition": "A table of every cost driver in its own unit with low, base and high values, a labelled rate and one normalized period, showing how far each driver can move the total.",
+   "example": "Operations effort swings the month by 1,170.00 while platform usage swings it by 150.00.",
+   "sourceIds": [
+    "dbxfe-finops-source-pricing",
+    "dbxfe-finops-source-cost"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-budget-concept",
+   "term": "budget",
+   "aliases": [
+    "budget alert",
+    "spend threshold",
+    "spend governance"
+   ],
+   "definition": "An account-level spend monitor with thresholds and recipients that informs people when cumulative spend crosses a threshold; any action beyond notification is configured and verified separately.",
+   "example": "An 80 percent alert emails the data lead at 21:00 while the idle cluster keeps running.",
+   "sourceIds": [
+    "dbxfe-finops-source-budgets",
+    "dbxfe-finops-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-policy-concept",
+   "term": "compute policy",
+   "aliases": [
+    "cluster policy",
+    "auto-termination",
+    "auto-stop"
+   ],
+   "definition": "A rule set that limits what compute users can create, such as sizes, required tags and auto-termination, so spend is constrained before it happens.",
+   "example": "A policy for analysts fixes auto-termination at 30 minutes and requires a team tag.",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk",
+    "dbxfe-finops-source-cost"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-experiment-concept",
+   "term": "controlled cost experiment",
+   "aliases": [
+    "cost per unit of work experiment",
+    "repeated observations"
+   ],
+   "definition": "Repeated runs of the same work on each candidate configuration, recording duration and units consumed per run, reported as cost per unit of work with its spread and run count.",
+   "example": "Three runs per configuration on the same 1,000 work items, ranked only where the ranges do not overlap.",
+   "sourceIds": [
+    "dbxfe-finops-source-warehouse",
+    "dbxfe-finops-source-cost"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-extension-pools-concept",
+   "term": "instance pool",
+   "aliases": [
+    "pool",
+    "idle instances",
+    "warm instances"
+   ],
+   "definition": "A set of idle, ready-to-use cloud instances that attached clusters draw from to start and scale faster.",
+   "example": "Two idle pool instances accrue cloud instance-hours overnight but no DBUs.",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-extension-flexible-concept",
+   "term": "flexible node types",
+   "aliases": [
+    "node type fallback",
+    "alternate node types"
+   ],
+   "definition": "A compute setting listing alternate node types that a launch or upscale falls back to when the primary node type is unavailable.",
+   "example": "The preferred family is unavailable, so the job launches on the listed alternate type at that type's rate.",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-extension-corrections-concept",
+   "term": "usage correction",
+   "aliases": [
+    "retraction record",
+    "restatement record",
+    "record_type"
+   ],
+   "definition": "The way a wrong billable usage row is fixed: a retraction row negating the original and a restatement row with the corrected values, never an edit in place.",
+   "example": "A 5.0 DBU row, a minus 5.0 retraction and a 4.5 restatement sum to 4.5 DBU.",
+   "sourceIds": [
+    "dbxfe-finops-source-billing"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-extension-budget-action-concept",
+   "term": "budget alert action",
+   "aliases": [
+    "EMAIL_NOTIFICATION",
+    "BLOCK_USAGE",
+    "alert action"
+   ],
+   "definition": "What a budget alert does when its threshold is crossed; the current API lists an email notification and a usage-blocking action type.",
+   "example": "An alert configured only with email informs the data lead and changes nothing that runs.",
+   "sourceIds": [
+    "dbxfe-finops-source-sdk",
+    "dbxfe-finops-source-budgets"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-finops-drivers-visual",
+   "kind": "nodes",
+   "title": "Six drivers, one bill",
+   "alt": "Six drivers, one bill. Every driver is counted in its own unit and period, so the sponsor's question has six answers before it has one number.",
+   "caption": "Each driver is counted in its own unit and period; a compute decision moves two of them and leaves the rest to other decisions. Synthetic teaching example.",
+   "textEquivalent": "What the pilot pays for: Every driver is counted in its own unit and period, so the sponsor's question has six answers before it has one number. Nodes: Compute time: instance-hours. Cloud instances running for classic compute. (selected); Platform usage: DBU. DBUs, the normalized processing unit. (selected); Storage held: GB-month. Tables, logs and history kept for the month. (selected); Data movement: GB. Bytes moved across regions or to consumers. (selected); Operations effort: hours per week. People's hours to operate, check and fix. (selected); Migration one-off: hours, once. Building and cutting over, paid once. (selected).\n\nWhat a compute choice moves: Moving the nightly job from an always-on cluster to job compute changes compute time and platform usage; storage, movement, effort and the one-off are decided elsewhere. Nodes: Compute time: moves. Idle hours disappear; a startup per run appears. (selected); Platform usage: moves. Fewer running hours, fewer DBUs; the rate per DBU is a separate SKU question. (selected); Storage held: unchanged. Same tables, same bytes. (excluded); Data movement: unchanged. Same sources, same consumers. (excluded); Operations effort: separate decision. Changes only if operating the job changes. (context); Migration one-off: unchanged. Already budgeted as a one-off. (excluded). Relationships: Compute time → Platform usage: both follow running time.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-architecture"
+   ],
+   "states": [
+    {
+     "id": "units",
+     "title": "What the pilot pays for",
+     "explanation": "Every driver is counted in its own unit and period, so the sponsor's question has six answers before it has one number.",
+     "nodes": [
+      {
+       "id": "compute",
+       "label": "Compute time",
+       "detail": "Cloud instances running for classic compute.",
+       "status": "selected",
+       "value": "instance-hours"
+      },
+      {
+       "id": "platform",
+       "label": "Platform usage",
+       "detail": "DBUs, the normalized processing unit.",
+       "status": "selected",
+       "value": "DBU"
+      },
+      {
+       "id": "storage",
+       "label": "Storage held",
+       "detail": "Tables, logs and history kept for the month.",
+       "status": "selected",
+       "value": "GB-month"
+      },
+      {
+       "id": "movement",
+       "label": "Data movement",
+       "detail": "Bytes moved across regions or to consumers.",
+       "status": "selected",
+       "value": "GB"
+      },
+      {
+       "id": "effort",
+       "label": "Operations effort",
+       "detail": "People's hours to operate, check and fix.",
+       "status": "selected",
+       "value": "hours per week"
+      },
+      {
+       "id": "migration",
+       "label": "Migration one-off",
+       "detail": "Building and cutting over, paid once.",
+       "status": "selected",
+       "value": "hours, once"
+      }
+     ],
+     "connections": []
+    },
+    {
+     "id": "moved",
+     "title": "What a compute choice moves",
+     "explanation": "Moving the nightly job from an always-on cluster to job compute changes compute time and platform usage; storage, movement, effort and the one-off are decided elsewhere.",
+     "nodes": [
+      {
+       "id": "compute",
+       "label": "Compute time",
+       "detail": "Idle hours disappear; a startup per run appears.",
+       "status": "selected",
+       "value": "moves"
+      },
+      {
+       "id": "platform",
+       "label": "Platform usage",
+       "detail": "Fewer running hours, fewer DBUs; the rate per DBU is a separate SKU question.",
+       "status": "selected",
+       "value": "moves"
+      },
+      {
+       "id": "storage",
+       "label": "Storage held",
+       "detail": "Same tables, same bytes.",
+       "status": "excluded",
+       "value": "unchanged"
+      },
+      {
+       "id": "movement",
+       "label": "Data movement",
+       "detail": "Same sources, same consumers.",
+       "status": "excluded",
+       "value": "unchanged"
+      },
+      {
+       "id": "effort",
+       "label": "Operations effort",
+       "detail": "Changes only if operating the job changes.",
+       "status": "context",
+       "value": "separate decision"
+      },
+      {
+       "id": "migration",
+       "label": "Migration one-off",
+       "detail": "Already budgeted as a one-off.",
+       "status": "excluded",
+       "value": "unchanged"
+      }
+     ],
+     "connections": [
+      {
+       "from": "compute",
+       "to": "platform",
+       "label": "both follow running time"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-classes-visual",
+   "kind": "table",
+   "title": "A compute decision table by pattern",
+   "alt": "A compute decision table by pattern. Each class fits a pattern of arrival, duration and idle time; the size question comes after the class.",
+   "caption": "Rows are workload patterns, not sizes; the second state places Cinderline's three workloads without choosing a size. Synthetic teaching example.",
+   "textEquivalent": "Pattern to class: Each class fits a pattern of arrival, duration and idle time; the size question comes after the class. Columns: Workload pattern; Compute class; Why it fits; Verify first. Rows: Scheduled batch, idle between runs | Job compute created per run, or serverless jobs | Exists only for the run; terminates itself | Startup share; serverless availability; People exploring in notebooks | All-purpose compute, or serverless notebooks | Interactive, shareable, restartable | Auto-termination; who may create it; SQL and BI, many concurrent readers | SQL warehouse: serverless, pro or classic | Queues and scales by concurrency | Type available; auto-stop minutes; Continuous stream | Pipeline or job compute sized for steady load | Always on by design | Steady units per hour.\n\nCinderline's workloads placed: The nightly job, the morning report and ad hoc exploration take different rows; nothing here sets a size. Columns: Cinderline workload; Observed pattern; Class chosen; Open question. Rows: Nightly resolution job | One run after the 01:30 export, published by about 02:10, idle otherwise | Job compute per run | Startup share; quota for the node family; Morning report | Eleven users, at most four overlapping queries, 07:30 to 08:15 | One small SQL warehouse that stops after the window | Queue wait in the busiest minute; Analyst exploration | Ad hoc, unpredictable, often idle | All-purpose compute under a policy with auto-termination | Tags; who may resize.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-claim-warehouse",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "states": [
+    {
+     "id": "patterns",
+     "title": "Pattern to class",
+     "explanation": "Each class fits a pattern of arrival, duration and idle time; the size question comes after the class.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Workload pattern",
+       "Compute class",
+       "Why it fits",
+       "Verify first"
+      ],
+      "rows": [
+       [
+        "Scheduled batch, idle between runs",
+        "Job compute created per run, or serverless jobs",
+        "Exists only for the run; terminates itself",
+        "Startup share; serverless availability"
+       ],
+       [
+        "People exploring in notebooks",
+        "All-purpose compute, or serverless notebooks",
+        "Interactive, shareable, restartable",
+        "Auto-termination; who may create it"
+       ],
+       [
+        "SQL and BI, many concurrent readers",
+        "SQL warehouse: serverless, pro or classic",
+        "Queues and scales by concurrency",
+        "Type available; auto-stop minutes"
+       ],
+       [
+        "Continuous stream",
+        "Pipeline or job compute sized for steady load",
+        "Always on by design",
+        "Steady units per hour"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "placed",
+     "title": "Cinderline's workloads placed",
+     "explanation": "The nightly job, the morning report and ad hoc exploration take different rows; nothing here sets a size.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Cinderline workload",
+       "Observed pattern",
+       "Class chosen",
+       "Open question"
+      ],
+      "rows": [
+       [
+        "Nightly resolution job",
+        "One run after the 01:30 export, published by about 02:10, idle otherwise",
+        "Job compute per run",
+        "Startup share; quota for the node family"
+       ],
+       [
+        "Morning report",
+        "Eleven users, at most four overlapping queries, 07:30 to 08:15",
+        "One small SQL warehouse that stops after the window",
+        "Queue wait in the busiest minute"
+       ],
+       [
+        "Analyst exploration",
+        "Ad hoc, unpredictable, often idle",
+        "All-purpose compute under a policy with auto-termination",
+        "Tags; who may resize"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-utilization-visual",
+   "kind": "timeline",
+   "title": "Running time against busy time",
+   "alt": "Running time against busy time. Running 08:00 to 18:00 with two busy hours: utilization is 2 of 10 hours, 20 percent; the other eight hours are paid idle.",
+   "caption": "The same two hours of work kept alive three ways: all day, per run, or interactive with auto-termination. Synthetic teaching example.",
+   "textEquivalent": "Always-on all-purpose cluster: Running 08:00 to 18:00 with two busy hours: utilization is 2 of 10 hours, 20 percent; the other eight hours are paid idle. Nodes: 08:00 started: running. Started by the first user; nothing attached yet. (context); 09:00 to 10:00 busy: busy. Morning checks and refresh. (selected); 10:00 to 15:00 idle: paid idle. Nobody attached; still running. (warning); 15:00 to 16:00 busy: busy. Afternoon reprocessing. (selected); 16:00 to 18:00 idle: paid idle. No auto-termination set. (warning); 18:00 stopped: stopped. Terminated by hand. (context). Relationships: 08:00 started → 09:00 to 10:00 busy: 1 h idle first; 09:00 to 10:00 busy → 10:00 to 15:00 idle: then; 10:00 to 15:00 idle → 15:00 to 16:00 busy: 5 h idle; 15:00 to 16:00 busy → 16:00 to 18:00 idle: then; 16:00 to 18:00 idle → 18:00 stopped: 2 h idle.\n\nJob compute per run: The same two hours as two runs: each job compute exists from its start to the end of its run, 2 × 63 minutes = 2.1 hours running, utilization about 95 percent. Nodes: 08:57 start: startup. Scheduler creates job compute; synthetic 3-minute startup. (pending); 09:00 to 10:00 busy: busy. Run one. (selected); 10:00 terminated: not running. Terminated when the run completes. (excluded); 14:57 start: startup. Second job compute; 3-minute startup. (pending); 15:00 to 16:00 busy: busy. Run two. (selected); 16:00 terminated: not running. Nothing runs until tomorrow. (excluded). Relationships: 08:57 start → 09:00 to 10:00 busy: startup, then work; 09:00 to 10:00 busy → 10:00 terminated: ends; 10:00 terminated → 14:57 start: no compute exists; 14:57 start → 15:00 to 16:00 busy: startup, then work; 15:00 to 16:00 busy → 16:00 terminated: ends.\n\nInteractive with auto-termination: Analysts keep interactive compute, but auto-termination ends each idle tail after 30 minutes: 2 × (3 + 60 + 30) minutes = 3.1 hours running, utilization about 65 percent. Nodes: 08:57 start: startup. First user starts the cluster; 3-minute startup. (pending); 09:00 to 10:00 busy: busy. Morning checks and refresh. (selected); 10:30 auto-terminated: 30 min idle. 30 idle minutes, then the cluster ends itself. (warning); 14:57 restart: startup. Restarted for the afternoon; 3-minute startup. (pending); 15:00 to 16:00 busy: busy. Afternoon reprocessing. (selected); 16:30 auto-terminated: 30 min idle. Ends itself after 30 idle minutes. (warning). Relationships: 08:57 start → 09:00 to 10:00 busy: startup, then work; 09:00 to 10:00 busy → 10:30 auto-terminated: idle tail; 10:30 auto-terminated → 14:57 restart: not running; 14:57 restart → 15:00 to 16:00 busy: startup, then work; 15:00 to 16:00 busy → 16:30 auto-terminated: idle tail.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-claim-idle",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "states": [
+    {
+     "id": "allpurpose",
+     "title": "Always-on all-purpose cluster",
+     "explanation": "Running 08:00 to 18:00 with two busy hours: utilization is 2 of 10 hours, 20 percent; the other eight hours are paid idle.",
+     "nodes": [
+      {
+       "id": "t0800",
+       "label": "08:00 started",
+       "detail": "Started by the first user; nothing attached yet.",
+       "status": "context",
+       "value": "running"
+      },
+      {
+       "id": "t0900",
+       "label": "09:00 to 10:00 busy",
+       "detail": "Morning checks and refresh.",
+       "status": "selected",
+       "value": "busy"
+      },
+      {
+       "id": "t1000",
+       "label": "10:00 to 15:00 idle",
+       "detail": "Nobody attached; still running.",
+       "status": "warning",
+       "value": "paid idle"
+      },
+      {
+       "id": "t1500",
+       "label": "15:00 to 16:00 busy",
+       "detail": "Afternoon reprocessing.",
+       "status": "selected",
+       "value": "busy"
+      },
+      {
+       "id": "t1600",
+       "label": "16:00 to 18:00 idle",
+       "detail": "No auto-termination set.",
+       "status": "warning",
+       "value": "paid idle"
+      },
+      {
+       "id": "t1800",
+       "label": "18:00 stopped",
+       "detail": "Terminated by hand.",
+       "status": "context",
+       "value": "stopped"
+      }
+     ],
+     "connections": [
+      {
+       "from": "t0800",
+       "to": "t0900",
+       "label": "1 h idle first"
+      },
+      {
+       "from": "t0900",
+       "to": "t1000",
+       "label": "then"
+      },
+      {
+       "from": "t1000",
+       "to": "t1500",
+       "label": "5 h idle"
+      },
+      {
+       "from": "t1500",
+       "to": "t1600",
+       "label": "then"
+      },
+      {
+       "from": "t1600",
+       "to": "t1800",
+       "label": "2 h idle"
+      }
+     ]
+    },
+    {
+     "id": "jobcompute",
+     "title": "Job compute per run",
+     "explanation": "The same two hours as two runs: each job compute exists from its start to the end of its run, 2 × 63 minutes = 2.1 hours running, utilization about 95 percent.",
+     "nodes": [
+      {
+       "id": "s0857",
+       "label": "08:57 start",
+       "detail": "Scheduler creates job compute; synthetic 3-minute startup.",
+       "status": "pending",
+       "value": "startup"
+      },
+      {
+       "id": "t0900",
+       "label": "09:00 to 10:00 busy",
+       "detail": "Run one.",
+       "status": "selected",
+       "value": "busy"
+      },
+      {
+       "id": "t1000",
+       "label": "10:00 terminated",
+       "detail": "Terminated when the run completes.",
+       "status": "excluded",
+       "value": "not running"
+      },
+      {
+       "id": "s1457",
+       "label": "14:57 start",
+       "detail": "Second job compute; 3-minute startup.",
+       "status": "pending",
+       "value": "startup"
+      },
+      {
+       "id": "t1500",
+       "label": "15:00 to 16:00 busy",
+       "detail": "Run two.",
+       "status": "selected",
+       "value": "busy"
+      },
+      {
+       "id": "t1600",
+       "label": "16:00 terminated",
+       "detail": "Nothing runs until tomorrow.",
+       "status": "excluded",
+       "value": "not running"
+      }
+     ],
+     "connections": [
+      {
+       "from": "s0857",
+       "to": "t0900",
+       "label": "startup, then work"
+      },
+      {
+       "from": "t0900",
+       "to": "t1000",
+       "label": "ends"
+      },
+      {
+       "from": "t1000",
+       "to": "s1457",
+       "label": "no compute exists"
+      },
+      {
+       "from": "s1457",
+       "to": "t1500",
+       "label": "startup, then work"
+      },
+      {
+       "from": "t1500",
+       "to": "t1600",
+       "label": "ends"
+      }
+     ]
+    },
+    {
+     "id": "autoterm",
+     "title": "Interactive with auto-termination",
+     "explanation": "Analysts keep interactive compute, but auto-termination ends each idle tail after 30 minutes: 2 × (3 + 60 + 30) minutes = 3.1 hours running, utilization about 65 percent.",
+     "nodes": [
+      {
+       "id": "s0857",
+       "label": "08:57 start",
+       "detail": "First user starts the cluster; 3-minute startup.",
+       "status": "pending",
+       "value": "startup"
+      },
+      {
+       "id": "t0900",
+       "label": "09:00 to 10:00 busy",
+       "detail": "Morning checks and refresh.",
+       "status": "selected",
+       "value": "busy"
+      },
+      {
+       "id": "t1030",
+       "label": "10:30 auto-terminated",
+       "detail": "30 idle minutes, then the cluster ends itself.",
+       "status": "warning",
+       "value": "30 min idle"
+      },
+      {
+       "id": "s1457",
+       "label": "14:57 restart",
+       "detail": "Restarted for the afternoon; 3-minute startup.",
+       "status": "pending",
+       "value": "startup"
+      },
+      {
+       "id": "t1500",
+       "label": "15:00 to 16:00 busy",
+       "detail": "Afternoon reprocessing.",
+       "status": "selected",
+       "value": "busy"
+      },
+      {
+       "id": "t1630",
+       "label": "16:30 auto-terminated",
+       "detail": "Ends itself after 30 idle minutes.",
+       "status": "warning",
+       "value": "30 min idle"
+      }
+     ],
+     "connections": [
+      {
+       "from": "s0857",
+       "to": "t0900",
+       "label": "startup, then work"
+      },
+      {
+       "from": "t0900",
+       "to": "t1030",
+       "label": "idle tail"
+      },
+      {
+       "from": "t1030",
+       "to": "s1457",
+       "label": "not running"
+      },
+      {
+       "from": "s1457",
+       "to": "t1500",
+       "label": "startup, then work"
+      },
+      {
+       "from": "t1500",
+       "to": "t1630",
+       "label": "idle tail"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-startup-visual",
+   "kind": "equation",
+   "title": "Startup share of running time",
+   "alt": "Startup share of running time. Startup is paid once per start; on a short run it is a third of the running time.",
+   "caption": "The same three-minute startup is a third of a short run and a twentieth of a long one; a pool moves the wait into idle instance time. Synthetic teaching example.",
+   "textEquivalent": "Six-minute run: Startup is paid once per start; on a short run it is a third of the running time. Equation: startup share = startup ÷ (startup + run) = 3 min ÷ (3 min + 6 min) = 3 ÷ 9 = 33.3 %\n\nSixty-minute run: The same startup before a long run is under five percent of the running time. Equation: startup share = 3 min ÷ (3 min + 60 min) = 3 ÷ 63 = 4.8 %\n\nTen six-minute jobs instead of one hour: Splitting the hour into ten jobs pays ten startups: ninety minutes running for sixty minutes of work. Equation: running = 10 × (3 min + 6 min) = 90 min, of which startup = 30 min (33.3 %); one 60-minute job: 3 + 60 = 63 min\n\nA warm pool shortens each start: With a synthetic one-minute start from a pool, the ten jobs run 70 minutes; two idle pool instances kept overnight add cloud instance time but no DBUs. Equation: running = 10 × (1 min + 6 min) = 70 min; overnight pool = 2 idle instances × 10 h = 20 instance-hours, 0 DBU",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-pools",
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "states": [
+    {
+     "id": "short",
+     "title": "Six-minute run",
+     "explanation": "Startup is paid once per start; on a short run it is a third of the running time.",
+     "nodes": [],
+     "connections": [],
+     "equation": "startup share = startup ÷ (startup + run) = 3 min ÷ (3 min + 6 min) = 3 ÷ 9 = 33.3 %"
+    },
+    {
+     "id": "long",
+     "title": "Sixty-minute run",
+     "explanation": "The same startup before a long run is under five percent of the running time.",
+     "nodes": [],
+     "connections": [],
+     "equation": "startup share = 3 min ÷ (3 min + 60 min) = 3 ÷ 63 = 4.8 %"
+    },
+    {
+     "id": "split",
+     "title": "Ten six-minute jobs instead of one hour",
+     "explanation": "Splitting the hour into ten jobs pays ten startups: ninety minutes running for sixty minutes of work.",
+     "nodes": [],
+     "connections": [],
+     "equation": "running = 10 × (3 min + 6 min) = 90 min, of which startup = 30 min (33.3 %); one 60-minute job: 3 + 60 = 63 min"
+    },
+    {
+     "id": "pool",
+     "title": "A warm pool shortens each start",
+     "explanation": "With a synthetic one-minute start from a pool, the ten jobs run 70 minutes; two idle pool instances kept overnight add cloud instance time but no DBUs.",
+     "nodes": [],
+     "connections": [],
+     "equation": "running = 10 × (1 min + 6 min) = 70 min; overnight pool = 2 idle instances × 10 h = 20 instance-hours, 0 DBU"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-queue-visual",
+   "kind": "comparison",
+   "title": "Twelve queries, synthetic capacity ten",
+   "alt": "Twelve queries, synthetic capacity ten. At 07:31 on a month-end morning twelve queries arrive together; ten run and two wait at capacity, each still executing in about five seconds.",
+   "caption": "A queue is arrivals beyond capacity; execution time did not change, so the fix is capacity or timing, not the query. Synthetic teaching example.",
+   "textEquivalent": "One cluster, capacity ten: At 07:31 on a month-end morning twelve queries arrive together; ten run and two wait at capacity, each still executing in about five seconds. Nodes: 12 queries arrive: arrivals. 07:31, month-end review across users. (context); 10 running: executing. About 5 s each, as in the quiet period. (selected); 2 waiting at capacity: queued. About 5 s for a free slot, recorded as waiting, not executing. (warning); Slowest user sees 10 s: latency. 5 s waiting plus 5 s executing. (warning). Relationships: 12 queries arrive → 10 running: 10 admitted; 12 queries arrive → 2 waiting at capacity: 2 held; 2 waiting at capacity → Slowest user sees 10 s: adds wait.\n\nA second cluster admits all twelve: Raising the maximum cluster count, or a serverless warehouse scaling up, admits all twelve; the cost is the second cluster's running time. Nodes: 12 queries arrive: arrivals. Same 07:31 arrivals. (context); 12 running: executing. Two clusters, or one serverless warehouse after scaling up. (selected); 0 waiting at capacity: cleared. No at-capacity wait recorded. (excluded); Slowest user sees 5 s: latency. Execution only. (selected). Relationships: 12 queries arrive → 12 running: all admitted; 12 running → Slowest user sees 5 s: no wait.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-warehouse",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-warehouse"
+   ],
+   "states": [
+    {
+     "id": "queued",
+     "title": "One cluster, capacity ten",
+     "explanation": "At 07:31 on a month-end morning twelve queries arrive together; ten run and two wait at capacity, each still executing in about five seconds.",
+     "nodes": [
+      {
+       "id": "arrive",
+       "label": "12 queries arrive",
+       "detail": "07:31, month-end review across users.",
+       "status": "context",
+       "value": "arrivals"
+      },
+      {
+       "id": "running",
+       "label": "10 running",
+       "detail": "About 5 s each, as in the quiet period.",
+       "status": "selected",
+       "value": "executing"
+      },
+      {
+       "id": "waiting",
+       "label": "2 waiting at capacity",
+       "detail": "About 5 s for a free slot, recorded as waiting, not executing.",
+       "status": "warning",
+       "value": "queued"
+      },
+      {
+       "id": "result",
+       "label": "Slowest user sees 10 s",
+       "detail": "5 s waiting plus 5 s executing.",
+       "status": "warning",
+       "value": "latency"
+      }
+     ],
+     "connections": [
+      {
+       "from": "arrive",
+       "to": "running",
+       "label": "10 admitted"
+      },
+      {
+       "from": "arrive",
+       "to": "waiting",
+       "label": "2 held"
+      },
+      {
+       "from": "waiting",
+       "to": "result",
+       "label": "adds wait"
+      }
+     ]
+    },
+    {
+     "id": "scaled",
+     "title": "A second cluster admits all twelve",
+     "explanation": "Raising the maximum cluster count, or a serverless warehouse scaling up, admits all twelve; the cost is the second cluster's running time.",
+     "nodes": [
+      {
+       "id": "arrive",
+       "label": "12 queries arrive",
+       "detail": "Same 07:31 arrivals.",
+       "status": "context",
+       "value": "arrivals"
+      },
+      {
+       "id": "running",
+       "label": "12 running",
+       "detail": "Two clusters, or one serverless warehouse after scaling up.",
+       "status": "selected",
+       "value": "executing"
+      },
+      {
+       "id": "waiting",
+       "label": "0 waiting at capacity",
+       "detail": "No at-capacity wait recorded.",
+       "status": "excluded",
+       "value": "cleared"
+      },
+      {
+       "id": "result",
+       "label": "Slowest user sees 5 s",
+       "detail": "Execution only.",
+       "status": "selected",
+       "value": "latency"
+      }
+     ],
+     "connections": [
+      {
+       "from": "arrive",
+       "to": "running",
+       "label": "all admitted"
+      },
+      {
+       "from": "running",
+       "to": "result",
+       "label": "no wait"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-quota-visual",
+   "kind": "nodes",
+   "title": "Where a quota refuses a launch",
+   "alt": "Where a quota refuses a launch. The scheduler asks for job compute; a synthetic 64-vCPU quota has room for four 16-vCPU nodes; instances launch and the run starts.",
+   "caption": "The launch request travels from the scheduler to the cloud account; a refusal happens before any usage row exists, and quota differs from capacity. Synthetic teaching example.",
+   "textEquivalent": "A normal launch: The scheduler asks for job compute; a synthetic 64-vCPU quota has room for four 16-vCPU nodes; instances launch and the run starts. Nodes: Scheduler: Job run requested at 01:30. (context); Control plane: Requests four instances in Cinderline's AWS account. (selected); Cloud quota: 64 of 64 vCPU free. Synthetic quota; nothing else running. (selected); Four instances: Launched; startup begins. (selected); Job run: Starts at 06:03; usage rows begin. (selected). Relationships: Scheduler → Control plane: run; Control plane → Cloud quota: launch 4 × 16 vCPU; Cloud quota → Four instances: allowed; Four instances → Job run: ready.\n\nThe same launch while exploration runs: An analyst's 48-vCPU cluster was left running; four more nodes would exceed the quota, the cloud refuses, and the job never starts. Nodes: Scheduler: Same 01:30 request. (context); Control plane: Requests four instances. (selected); Cloud quota: 16 of 64 vCPU free. 48 vCPU held by an overnight exploration cluster. (warning); Four instances: not launched. Refused: AWS_RESOURCE_QUOTA_EXCEEDED. (excluded); Job run: no usage. Never starts: no usage rows, a termination reason to read. (excluded). Relationships: Scheduler → Control plane: run; Control plane → Cloud quota: launch 4 × 16 vCPU; Cloud quota → Four instances: refused; Four instances → Job run: nothing.\n\nCapacity, not quota: The quota had room, but the zone had no instances of that type: AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE. A retry later or a listed alternate node type helps; a quota increase does not. Nodes: Scheduler: Same 01:30 request. (context); Control plane: Requests four instances of the preferred type. (selected); Cloud quota: 64 of 64 vCPU free. Room to spare. (selected); Four instances: no capacity. Preferred type unavailable in the zone right now. (warning); Alternate node type: fallback. A listed fallback: a different instance at a different rate. (pending); Job run: waiting. Starts only if the fallback or a retry succeeds. (pending). Relationships: Scheduler → Control plane: run; Control plane → Cloud quota: within quota; Cloud quota → Four instances: no supply; Four instances → Alternate node type: fall back; Alternate node type → Job run: if launched.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-quota",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-architecture"
+   ],
+   "states": [
+    {
+     "id": "launch",
+     "title": "A normal launch",
+     "explanation": "The scheduler asks for job compute; a synthetic 64-vCPU quota has room for four 16-vCPU nodes; instances launch and the run starts.",
+     "nodes": [
+      {
+       "id": "sched",
+       "label": "Scheduler",
+       "detail": "Job run requested at 01:30.",
+       "status": "context"
+      },
+      {
+       "id": "control",
+       "label": "Control plane",
+       "detail": "Requests four instances in Cinderline's AWS account.",
+       "status": "selected"
+      },
+      {
+       "id": "quotanode",
+       "label": "Cloud quota",
+       "detail": "Synthetic quota; nothing else running.",
+       "status": "selected",
+       "value": "64 of 64 vCPU free"
+      },
+      {
+       "id": "instances",
+       "label": "Four instances",
+       "detail": "Launched; startup begins.",
+       "status": "selected"
+      },
+      {
+       "id": "run",
+       "label": "Job run",
+       "detail": "Starts at 06:03; usage rows begin.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "sched",
+       "to": "control",
+       "label": "run"
+      },
+      {
+       "from": "control",
+       "to": "quotanode",
+       "label": "launch 4 × 16 vCPU"
+      },
+      {
+       "from": "quotanode",
+       "to": "instances",
+       "label": "allowed"
+      },
+      {
+       "from": "instances",
+       "to": "run",
+       "label": "ready"
+      }
+     ]
+    },
+    {
+     "id": "refused",
+     "title": "The same launch while exploration runs",
+     "explanation": "An analyst's 48-vCPU cluster was left running; four more nodes would exceed the quota, the cloud refuses, and the job never starts.",
+     "nodes": [
+      {
+       "id": "sched",
+       "label": "Scheduler",
+       "detail": "Same 01:30 request.",
+       "status": "context"
+      },
+      {
+       "id": "control",
+       "label": "Control plane",
+       "detail": "Requests four instances.",
+       "status": "selected"
+      },
+      {
+       "id": "quotanode",
+       "label": "Cloud quota",
+       "detail": "48 vCPU held by an overnight exploration cluster.",
+       "status": "warning",
+       "value": "16 of 64 vCPU free"
+      },
+      {
+       "id": "instances",
+       "label": "Four instances",
+       "detail": "Refused: AWS_RESOURCE_QUOTA_EXCEEDED.",
+       "status": "excluded",
+       "value": "not launched"
+      },
+      {
+       "id": "run",
+       "label": "Job run",
+       "detail": "Never starts: no usage rows, a termination reason to read.",
+       "status": "excluded",
+       "value": "no usage"
+      }
+     ],
+     "connections": [
+      {
+       "from": "sched",
+       "to": "control",
+       "label": "run"
+      },
+      {
+       "from": "control",
+       "to": "quotanode",
+       "label": "launch 4 × 16 vCPU"
+      },
+      {
+       "from": "quotanode",
+       "to": "instances",
+       "label": "refused"
+      },
+      {
+       "from": "instances",
+       "to": "run",
+       "label": "nothing"
+      }
+     ]
+    },
+    {
+     "id": "capacity",
+     "title": "Capacity, not quota",
+     "explanation": "The quota had room, but the zone had no instances of that type: AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE. A retry later or a listed alternate node type helps; a quota increase does not.",
+     "nodes": [
+      {
+       "id": "sched",
+       "label": "Scheduler",
+       "detail": "Same 01:30 request.",
+       "status": "context"
+      },
+      {
+       "id": "control",
+       "label": "Control plane",
+       "detail": "Requests four instances of the preferred type.",
+       "status": "selected"
+      },
+      {
+       "id": "quotanode",
+       "label": "Cloud quota",
+       "detail": "Room to spare.",
+       "status": "selected",
+       "value": "64 of 64 vCPU free"
+      },
+      {
+       "id": "instances",
+       "label": "Four instances",
+       "detail": "Preferred type unavailable in the zone right now.",
+       "status": "warning",
+       "value": "no capacity"
+      },
+      {
+       "id": "alternate",
+       "label": "Alternate node type",
+       "detail": "A listed fallback: a different instance at a different rate.",
+       "status": "pending",
+       "value": "fallback"
+      },
+      {
+       "id": "run",
+       "label": "Job run",
+       "detail": "Starts only if the fallback or a retry succeeds.",
+       "status": "pending",
+       "value": "waiting"
+      }
+     ],
+     "connections": [
+      {
+       "from": "sched",
+       "to": "control",
+       "label": "run"
+      },
+      {
+       "from": "control",
+       "to": "quotanode",
+       "label": "within quota"
+      },
+      {
+       "from": "quotanode",
+       "to": "instances",
+       "label": "no supply"
+      },
+      {
+       "from": "instances",
+       "to": "alternate",
+       "label": "fall back"
+      },
+      {
+       "from": "alternate",
+       "to": "run",
+       "label": "if launched"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-attribution-visual",
+   "kind": "table",
+   "title": "Usage rows and their tags",
+   "alt": "Usage rows and their tags. Each row names its SKU, quantity and the tags its resource carried on 14 September; the exploration cluster carried none.",
+   "caption": "Tags are written into each usage row when the usage happens; a policy fixes attribution from then on, not backwards. Synthetic teaching example.",
+   "textEquivalent": "Usage rows for one day: Each row names its SKU, quantity and the tags its resource carried on 14 September; the exploration cluster carried none. Columns: Resource; SKU (illustrative); Quantity; custom_tags. Rows: Nightly job compute | jobs compute SKU | 4.2 DBU | project=quality-pilot; env=pilot; Morning SQL warehouse | SQL warehouse SKU | 5.0 DBU | project=quality-pilot; Serverless notebook | serverless SKU | 2.0 DBU | project=quality-pilot (from a usage policy); Analyst exploration cluster | all-purpose SKU | 20.0 DBU | (no tag).\n\nThe same day grouped by project: Summing by the project tag puts the exploration cluster's 20.0 DBU in a no-tag line that belongs to nobody's project. Columns: project tag; DBU; Share; Owner. Rows: quality-pilot | 11.2 | 35.9 % | Data lead; (no tag) | 20.0 | 64.1 % | Nobody, until a tag rule exists; Total | 31.2 | 100 % | Account.\n\nAfter a policy requires a team tag: From 15 September the analysts' policy requires a team tag, so new rows carry one; the 14 September row keeps what it had. Columns: usage_date; Resource; DBU; custom_tags. Rows: 2026-09-14 | Analyst exploration cluster | 20.0 | (no tag): stays unattributed; 2026-09-15 | Analyst exploration cluster | 18.5 | team=analytics (required by policy); 2026-09-15 | Nightly job compute | 4.2 | project=quality-pilot; env=pilot.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-tags",
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "states": [
+    {
+     "id": "rows",
+     "title": "Usage rows for one day",
+     "explanation": "Each row names its SKU, quantity and the tags its resource carried on 14 September; the exploration cluster carried none.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Resource",
+       "SKU (illustrative)",
+       "Quantity",
+       "custom_tags"
+      ],
+      "rows": [
+       [
+        "Nightly job compute",
+        "jobs compute SKU",
+        "4.2 DBU",
+        "project=quality-pilot; env=pilot"
+       ],
+       [
+        "Morning SQL warehouse",
+        "SQL warehouse SKU",
+        "5.0 DBU",
+        "project=quality-pilot"
+       ],
+       [
+        "Serverless notebook",
+        "serverless SKU",
+        "2.0 DBU",
+        "project=quality-pilot (from a usage policy)"
+       ],
+       [
+        "Analyst exploration cluster",
+        "all-purpose SKU",
+        "20.0 DBU",
+        "(no tag)"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "grouped",
+     "title": "The same day grouped by project",
+     "explanation": "Summing by the project tag puts the exploration cluster's 20.0 DBU in a no-tag line that belongs to nobody's project.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "project tag",
+       "DBU",
+       "Share",
+       "Owner"
+      ],
+      "rows": [
+       [
+        "quality-pilot",
+        "11.2",
+        "35.9 %",
+        "Data lead"
+       ],
+       [
+        "(no tag)",
+        "20.0",
+        "64.1 %",
+        "Nobody, until a tag rule exists"
+       ],
+       [
+        "Total",
+        "31.2",
+        "100 %",
+        "Account"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "policyfix",
+     "title": "After a policy requires a team tag",
+     "explanation": "From 15 September the analysts' policy requires a team tag, so new rows carry one; the 14 September row keeps what it had.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "usage_date",
+       "Resource",
+       "DBU",
+       "custom_tags"
+      ],
+      "rows": [
+       [
+        "2026-09-14",
+        "Analyst exploration cluster",
+        "20.0",
+        "(no tag): stays unattributed"
+       ],
+       [
+        "2026-09-15",
+        "Analyst exploration cluster",
+        "18.5",
+        "team=analytics (required by policy)"
+       ],
+       [
+        "2026-09-15",
+        "Nightly job compute",
+        "4.2",
+        "project=quality-pilot; env=pilot"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-system-visual",
+   "kind": "table",
+   "title": "Usage rows priced, then corrected",
+   "alt": "Usage rows priced, then corrected. Each row's quantity times a hypothetical rate, not a price, gives an amount that can be checked by hand; it is not an invoice.",
+   "caption": "Pricing rows with a labelled rate gives a figure a reader can recompute; a correction adds two rows rather than editing one. Synthetic teaching example.",
+   "textEquivalent": "Usage × a labelled rate: Each row's quantity times a hypothetical rate, not a price, gives an amount that can be checked by hand; it is not an invoice. Columns: usage_date; SKU (illustrative); usage_quantity; rate (hypothetical); amount (hypothetical USD). Rows: 2026-09-14 | jobs compute | 4.2 DBU | 0.50 per DBU | 2.10; 2026-09-14 | SQL warehouse | 5.0 DBU | 0.50 per DBU | 2.50; 2026-09-14 | serverless | 2.0 DBU | 0.50 per DBU | 1.00; 2026-09-14 | all-purpose | 20.0 DBU | 0.50 per DBU | 10.00; Total | all SKUs | 31.2 DBU | one rate on purpose | 15.60.\n\nA correction arrives later: The warehouse row was wrong: a retraction negates it and a restatement carries 4.5 DBU, so only the sum of all three rows is right. Columns: record_type; usage_date; usage_quantity; amount (hypothetical USD). Rows: ORIGINAL | 2026-09-14 | 5.0 DBU | 2.50; RETRACTION | 2026-09-14 | −5.0 DBU | −2.50; RESTATEMENT | 2026-09-14 | 4.5 DBU | 2.25; Sum of all three rows | 2026-09-14 | 4.5 DBU | 2.25; ORIGINAL rows only (wrong) | 2026-09-14 | 5.0 DBU | 2.50.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "states": [
+    {
+     "id": "joined",
+     "title": "Usage × a labelled rate",
+     "explanation": "Each row's quantity times a hypothetical rate, not a price, gives an amount that can be checked by hand; it is not an invoice.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "usage_date",
+       "SKU (illustrative)",
+       "usage_quantity",
+       "rate (hypothetical)",
+       "amount (hypothetical USD)"
+      ],
+      "rows": [
+       [
+        "2026-09-14",
+        "jobs compute",
+        "4.2 DBU",
+        "0.50 per DBU",
+        "2.10"
+       ],
+       [
+        "2026-09-14",
+        "SQL warehouse",
+        "5.0 DBU",
+        "0.50 per DBU",
+        "2.50"
+       ],
+       [
+        "2026-09-14",
+        "serverless",
+        "2.0 DBU",
+        "0.50 per DBU",
+        "1.00"
+       ],
+       [
+        "2026-09-14",
+        "all-purpose",
+        "20.0 DBU",
+        "0.50 per DBU",
+        "10.00"
+       ],
+       [
+        "Total",
+        "all SKUs",
+        "31.2 DBU",
+        "one rate on purpose",
+        "15.60"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "corrected",
+     "title": "A correction arrives later",
+     "explanation": "The warehouse row was wrong: a retraction negates it and a restatement carries 4.5 DBU, so only the sum of all three rows is right.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "record_type",
+       "usage_date",
+       "usage_quantity",
+       "amount (hypothetical USD)"
+      ],
+      "rows": [
+       [
+        "ORIGINAL",
+        "2026-09-14",
+        "5.0 DBU",
+        "2.50"
+       ],
+       [
+        "RETRACTION",
+        "2026-09-14",
+        "−5.0 DBU",
+        "−2.50"
+       ],
+       [
+        "RESTATEMENT",
+        "2026-09-14",
+        "4.5 DBU",
+        "2.25"
+       ],
+       [
+        "Sum of all three rows",
+        "2026-09-14",
+        "4.5 DBU",
+        "2.25"
+       ],
+       [
+        "ORIGINAL rows only (wrong)",
+        "2026-09-14",
+        "5.0 DBU",
+        "2.50"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-unit-visual",
+   "kind": "equation",
+   "title": "Cost per nightly run, with its guard",
+   "alt": "Cost per nightly run, with its guard. The nightly job's own usage for the month, priced with labelled hypothetical rates, over 30 runs.",
+   "caption": "Only the drivers a run causes go in the numerator; a fully loaded ratio answers a different question; zero runs means unknown. Synthetic teaching example.",
+   "textEquivalent": "Base month: The nightly job's own usage for the month, priced with labelled hypothetical rates, over 30 runs. Equation: cost per run = (126 DBU × 0.50 + 36 instance-hours × 0.40) ÷ 30 runs = (63.00 + 14.40) ÷ 30 = 77.40 ÷ 30 = 2.58 hypothetical USD per run\n\nFully loaded is a different ratio: Adding the pilot's operations effort gives a fully loaded figure that falls whenever runs rise, with nothing saved. Equation: (77.40 + 780.00) ÷ 30 runs = 857.40 ÷ 30 = 28.58 per run; at 60 runs: (154.80 + 780.00) ÷ 60 = 15.58 per run, though the month costs more\n\nA month with no runs: No runs means no cost per run: the answer is unknown, reported with its reason. Equation: cost per run = 0.00 ÷ 0 runs = unknown (zero denominator), reported with the reason, not 0.00 and not an error",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "states": [
+    {
+     "id": "base",
+     "title": "Base month",
+     "explanation": "The nightly job's own usage for the month, priced with labelled hypothetical rates, over 30 runs.",
+     "nodes": [],
+     "connections": [],
+     "equation": "cost per run = (126 DBU × 0.50 + 36 instance-hours × 0.40) ÷ 30 runs = (63.00 + 14.40) ÷ 30 = 77.40 ÷ 30 = 2.58 hypothetical USD per run"
+    },
+    {
+     "id": "loaded",
+     "title": "Fully loaded is a different ratio",
+     "explanation": "Adding the pilot's operations effort gives a fully loaded figure that falls whenever runs rise, with nothing saved.",
+     "nodes": [],
+     "connections": [],
+     "equation": "(77.40 + 780.00) ÷ 30 runs = 857.40 ÷ 30 = 28.58 per run; at 60 runs: (154.80 + 780.00) ÷ 60 = 15.58 per run, though the month costs more"
+    },
+    {
+     "id": "guard",
+     "title": "A month with no runs",
+     "explanation": "No runs means no cost per run: the answer is unknown, reported with its reason.",
+     "nodes": [],
+     "connections": [],
+     "equation": "cost per run = 0.00 ÷ 0 runs = unknown (zero denominator), reported with the reason, not 0.00 and not an error"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-comparability-visual",
+   "kind": "comparison",
+   "title": "An invalid sum and a valid one",
+   "alt": "An invalid sum and a valid one. Three quantities in three billing units are added into one number that means nothing and cannot be checked.",
+   "caption": "Units must be priced with their own labelled rates before a total exists, and weekly figures restated per month. Synthetic teaching example.",
+   "textEquivalent": "Adding units that are not alike: Three quantities in three billing units are added into one number that means nothing and cannot be checked. Nodes: 300 DBU: unit: DBU. Platform usage unit. (warning); 120 instance-hours: unit: instance-hour. Cloud compute unit. (warning); 500 GB-month: unit: GB-month. Storage unit. (warning); 920 of what?: refused. No unit, no currency, no period. (excluded). Relationships: 300 DBU → 920 of what?: +; 120 instance-hours → 920 of what?: +; 500 GB-month → 920 of what?: +.\n\nEach priced, then summed: Each quantity times its own hypothetical rate gives hypothetical USD per month, and those amounts can be added. Nodes: 300 DBU × 0.50: 150.00 USD per month. Hypothetical rate, not a price. (selected); 120 instance-hours × 0.40: 48.00 USD per month. Hypothetical rate, not a price. (selected); 500 GB-month × 0.02: 10.00 USD per month. Hypothetical rate, not a price. (selected); 208.00 hypothetical USD per month: valid total. One currency, one period, checkable by hand. (selected). Relationships: 300 DBU × 0.50 → 208.00 hypothetical USD per month: +; 120 instance-hours × 0.40 → 208.00 hypothetical USD per month: +; 500 GB-month × 0.02 → 208.00 hypothetical USD per month: +.\n\nWeekly effort is not monthly: Three hours a week is thirteen hours a month; reading the week as a month loses 600.00 at 60.00 an hour. Nodes: 3 hours per week: period: week. Operations effort as logged. (warning); × 52 ÷ 12: 13 hours per month. Restates the period. (selected); 13 hours × 60.00: 780.00 USD per month. Hypothetical rate, not a price. (selected); 3 × 60.00 = 180.00: 600.00 missing. The week read as a month. (excluded). Relationships: 3 hours per week → × 52 ÷ 12: normalize; × 52 ÷ 12 → 13 hours × 60.00: price; 3 hours per week → 3 × 60.00 = 180.00: no normalization.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "states": [
+    {
+     "id": "invalid",
+     "title": "Adding units that are not alike",
+     "explanation": "Three quantities in three billing units are added into one number that means nothing and cannot be checked.",
+     "nodes": [
+      {
+       "id": "dbu",
+       "label": "300 DBU",
+       "detail": "Platform usage unit.",
+       "status": "warning",
+       "value": "unit: DBU"
+      },
+      {
+       "id": "hours",
+       "label": "120 instance-hours",
+       "detail": "Cloud compute unit.",
+       "status": "warning",
+       "value": "unit: instance-hour"
+      },
+      {
+       "id": "gbm",
+       "label": "500 GB-month",
+       "detail": "Storage unit.",
+       "status": "warning",
+       "value": "unit: GB-month"
+      },
+      {
+       "id": "sum",
+       "label": "920 of what?",
+       "detail": "No unit, no currency, no period.",
+       "status": "excluded",
+       "value": "refused"
+      }
+     ],
+     "connections": [
+      {
+       "from": "dbu",
+       "to": "sum",
+       "label": "+"
+      },
+      {
+       "from": "hours",
+       "to": "sum",
+       "label": "+"
+      },
+      {
+       "from": "gbm",
+       "to": "sum",
+       "label": "+"
+      }
+     ]
+    },
+    {
+     "id": "valid",
+     "title": "Each priced, then summed",
+     "explanation": "Each quantity times its own hypothetical rate gives hypothetical USD per month, and those amounts can be added.",
+     "nodes": [
+      {
+       "id": "dbu",
+       "label": "300 DBU × 0.50",
+       "detail": "Hypothetical rate, not a price.",
+       "status": "selected",
+       "value": "150.00 USD per month"
+      },
+      {
+       "id": "hours",
+       "label": "120 instance-hours × 0.40",
+       "detail": "Hypothetical rate, not a price.",
+       "status": "selected",
+       "value": "48.00 USD per month"
+      },
+      {
+       "id": "gbm",
+       "label": "500 GB-month × 0.02",
+       "detail": "Hypothetical rate, not a price.",
+       "status": "selected",
+       "value": "10.00 USD per month"
+      },
+      {
+       "id": "sum",
+       "label": "208.00 hypothetical USD per month",
+       "detail": "One currency, one period, checkable by hand.",
+       "status": "selected",
+       "value": "valid total"
+      }
+     ],
+     "connections": [
+      {
+       "from": "dbu",
+       "to": "sum",
+       "label": "+"
+      },
+      {
+       "from": "hours",
+       "to": "sum",
+       "label": "+"
+      },
+      {
+       "from": "gbm",
+       "to": "sum",
+       "label": "+"
+      }
+     ]
+    },
+    {
+     "id": "period",
+     "title": "Weekly effort is not monthly",
+     "explanation": "Three hours a week is thirteen hours a month; reading the week as a month loses 600.00 at 60.00 an hour.",
+     "nodes": [
+      {
+       "id": "week",
+       "label": "3 hours per week",
+       "detail": "Operations effort as logged.",
+       "status": "warning",
+       "value": "period: week"
+      },
+      {
+       "id": "factor",
+       "label": "× 52 ÷ 12",
+       "detail": "Restates the period.",
+       "status": "selected",
+       "value": "13 hours per month"
+      },
+      {
+       "id": "month",
+       "label": "13 hours × 60.00",
+       "detail": "Hypothetical rate, not a price.",
+       "status": "selected",
+       "value": "780.00 USD per month"
+      },
+      {
+       "id": "wrong",
+       "label": "3 × 60.00 = 180.00",
+       "detail": "The week read as a month.",
+       "status": "excluded",
+       "value": "600.00 missing"
+      }
+     ],
+     "connections": [
+      {
+       "from": "week",
+       "to": "factor",
+       "label": "normalize"
+      },
+      {
+       "from": "factor",
+       "to": "month",
+       "label": "price"
+      },
+      {
+       "from": "week",
+       "to": "wrong",
+       "label": "no normalization"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-sensitivity-visual",
+   "kind": "table",
+   "title": "A sensitivity table separating the drivers",
+   "alt": "A sensitivity table separating the drivers. Each row is one driver in its own unit and period with a labelled hypothetical rate; nothing is summed yet.",
+   "caption": "Every driver keeps its unit, labelled hypothetical rate and period; the month is normalized and the migration kept apart. Synthetic teaching example.",
+   "textEquivalent": "Drivers with low, base and high inputs: Each row is one driver in its own unit and period with a labelled hypothetical rate; nothing is summed yet. Columns: Driver; Unit; Low; Base; High; Rate (hypothetical); Period. Rows: Compute time | instance-hour | 80 | 120 | 200 | 0.40 USD | month; Platform usage | DBU | 200 | 300 | 500 | 0.50 USD | month; Storage | GB-month | 400 | 500 | 800 | 0.02 USD | month; Data movement | GB | 120 | 240 | 600 | 0.05 USD | month; Operations effort | hour | 1.5 | 3 | 6 | 60.00 USD | week; Migration one-off | hour | 150 | 250 | 400 | 60.00 USD | once.\n\nNormalized to a month, with the swing: Weeks become months at 52 ÷ 12; the one-off is reported apart; the swing is high minus low, all in hypothetical USD per month. Columns: Driver; Low; Base; High; Swing. Rows: Compute time | 32.00 | 48.00 | 80.00 | 48.00; Platform usage | 100.00 | 150.00 | 250.00 | 150.00; Storage | 8.00 | 10.00 | 16.00 | 8.00; Data movement | 6.00 | 12.00 | 30.00 | 24.00; Operations effort | 390.00 | 780.00 | 1,560.00 | 1,170.00; Recurring total | 536.00 | 1,000.00 | 1,936.00 | 1,400.00; Migration one-off (apart) | 9,000.00 | 15,000.00 | 24,000.00 | 15,000.00.\n\nRanked by swing: Operations effort carries most of the month's uncertainty, so it is the first input to measure. Columns: Rank; Driver; Swing (USD per month); Share of total swing. Rows: 1 | Operations effort | 1,170.00 | 83.6 %; 2 | Platform usage | 150.00 | 10.7 %; 3 | Compute time | 48.00 | 3.4 %; 4 | Data movement | 24.00 | 1.7 %; 5 | Storage | 8.00 | 0.6 %.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values. The worksheet is the fixture Lab L13 evaluates locally (fixtures/worksheet.json) and these figures equal its hand-authored expected output, which the lab's local run reproduced; no price, quotation or cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-claim-cost",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "states": [
+    {
+     "id": "inputs",
+     "title": "Drivers with low, base and high inputs",
+     "explanation": "Each row is one driver in its own unit and period with a labelled hypothetical rate; nothing is summed yet.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Driver",
+       "Unit",
+       "Low",
+       "Base",
+       "High",
+       "Rate (hypothetical)",
+       "Period"
+      ],
+      "rows": [
+       [
+        "Compute time",
+        "instance-hour",
+        "80",
+        "120",
+        "200",
+        "0.40 USD",
+        "month"
+       ],
+       [
+        "Platform usage",
+        "DBU",
+        "200",
+        "300",
+        "500",
+        "0.50 USD",
+        "month"
+       ],
+       [
+        "Storage",
+        "GB-month",
+        "400",
+        "500",
+        "800",
+        "0.02 USD",
+        "month"
+       ],
+       [
+        "Data movement",
+        "GB",
+        "120",
+        "240",
+        "600",
+        "0.05 USD",
+        "month"
+       ],
+       [
+        "Operations effort",
+        "hour",
+        "1.5",
+        "3",
+        "6",
+        "60.00 USD",
+        "week"
+       ],
+       [
+        "Migration one-off",
+        "hour",
+        "150",
+        "250",
+        "400",
+        "60.00 USD",
+        "once"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "normalized",
+     "title": "Normalized to a month, with the swing",
+     "explanation": "Weeks become months at 52 ÷ 12; the one-off is reported apart; the swing is high minus low, all in hypothetical USD per month.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Driver",
+       "Low",
+       "Base",
+       "High",
+       "Swing"
+      ],
+      "rows": [
+       [
+        "Compute time",
+        "32.00",
+        "48.00",
+        "80.00",
+        "48.00"
+       ],
+       [
+        "Platform usage",
+        "100.00",
+        "150.00",
+        "250.00",
+        "150.00"
+       ],
+       [
+        "Storage",
+        "8.00",
+        "10.00",
+        "16.00",
+        "8.00"
+       ],
+       [
+        "Data movement",
+        "6.00",
+        "12.00",
+        "30.00",
+        "24.00"
+       ],
+       [
+        "Operations effort",
+        "390.00",
+        "780.00",
+        "1,560.00",
+        "1,170.00"
+       ],
+       [
+        "Recurring total",
+        "536.00",
+        "1,000.00",
+        "1,936.00",
+        "1,400.00"
+       ],
+       [
+        "Migration one-off (apart)",
+        "9,000.00",
+        "15,000.00",
+        "24,000.00",
+        "15,000.00"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "ranked",
+     "title": "Ranked by swing",
+     "explanation": "Operations effort carries most of the month's uncertainty, so it is the first input to measure.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Rank",
+       "Driver",
+       "Swing (USD per month)",
+       "Share of total swing"
+      ],
+      "rows": [
+       [
+        "1",
+        "Operations effort",
+        "1,170.00",
+        "83.6 %"
+       ],
+       [
+        "2",
+        "Platform usage",
+        "150.00",
+        "10.7 %"
+       ],
+       [
+        "3",
+        "Compute time",
+        "48.00",
+        "3.4 %"
+       ],
+       [
+        "4",
+        "Data movement",
+        "24.00",
+        "1.7 %"
+       ],
+       [
+        "5",
+        "Storage",
+        "8.00",
+        "0.6 %"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-governance-visual",
+   "kind": "nodes",
+   "title": "Governance layers: who is told, what is stopped",
+   "alt": "Governance layers: who is told, what is stopped. From the account down to the resource, each layer either informs, attributes or constrains.",
+   "caption": "Budgets and dashboards inform people, tags attribute, and policies and auto-termination change what runs; each alert still needs an owner. Synthetic teaching example.",
+   "textEquivalent": "The layers: From the account down to the resource, each layer either informs, attributes or constrains. Nodes: Budget and alert: informs. Thresholds in list-price USD per month; email recipients; a block-usage action type to verify before use. (context); Usage dashboard: informs. Groups usage rows by SKU and tag. (context); Tags and usage policies: attributes. Make usage attributable; change nothing that runs. (context); Compute policy: constrains. Limits what users may create: sizes, required tags, auto-termination. (selected); Auto-termination and auto-stop: constrains. Ends an idle cluster or warehouse after the set minutes. (selected). Relationships: Budget and alert → Compute policy: a person decides; Usage dashboard → Tags and usage policies: reads; Compute policy → Auto-termination and auto-stop: can require.\n\nThe idle exploration cluster at night: The 80 percent alert emails the data lead at 21:00 and the cluster keeps running; only auto-termination, which no policy required, would have ended it at 18:30. Nodes: Budget and alert: informed. Email sent at 21:00; no other action configured. (warning); Usage dashboard: later. Shows the rows once they arrive. (context); Tags and usage policies: unattributed. No tag: the rows land in the no-tag line. (warning); Compute policy: missing. No policy applied to analysts yet. (excluded); Auto-termination and auto-stop: missing. Not set; running until morning. (excluded). Relationships: Budget and alert → Compute policy: should prompt a change; Compute policy → Auto-termination and auto-stop: would have required.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-finops-claim-budgets",
+    "dbxfe-finops-claim-policies",
+    "dbxfe-finops-claim-idle",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "states": [
+    {
+     "id": "layers",
+     "title": "The layers",
+     "explanation": "From the account down to the resource, each layer either informs, attributes or constrains.",
+     "nodes": [
+      {
+       "id": "budgetnode",
+       "label": "Budget and alert",
+       "detail": "Thresholds in list-price USD per month; email recipients; a block-usage action type to verify before use.",
+       "status": "context",
+       "value": "informs"
+      },
+      {
+       "id": "dash",
+       "label": "Usage dashboard",
+       "detail": "Groups usage rows by SKU and tag.",
+       "status": "context",
+       "value": "informs"
+      },
+      {
+       "id": "tagnode",
+       "label": "Tags and usage policies",
+       "detail": "Make usage attributable; change nothing that runs.",
+       "status": "context",
+       "value": "attributes"
+      },
+      {
+       "id": "policy",
+       "label": "Compute policy",
+       "detail": "Limits what users may create: sizes, required tags, auto-termination.",
+       "status": "selected",
+       "value": "constrains"
+      },
+      {
+       "id": "autostop",
+       "label": "Auto-termination and auto-stop",
+       "detail": "Ends an idle cluster or warehouse after the set minutes.",
+       "status": "selected",
+       "value": "constrains"
+      }
+     ],
+     "connections": [
+      {
+       "from": "budgetnode",
+       "to": "policy",
+       "label": "a person decides"
+      },
+      {
+       "from": "dash",
+       "to": "tagnode",
+       "label": "reads"
+      },
+      {
+       "from": "policy",
+       "to": "autostop",
+       "label": "can require"
+      }
+     ]
+    },
+    {
+     "id": "night",
+     "title": "The idle exploration cluster at night",
+     "explanation": "The 80 percent alert emails the data lead at 21:00 and the cluster keeps running; only auto-termination, which no policy required, would have ended it at 18:30.",
+     "nodes": [
+      {
+       "id": "budgetnode",
+       "label": "Budget and alert",
+       "detail": "Email sent at 21:00; no other action configured.",
+       "status": "warning",
+       "value": "informed"
+      },
+      {
+       "id": "dash",
+       "label": "Usage dashboard",
+       "detail": "Shows the rows once they arrive.",
+       "status": "context",
+       "value": "later"
+      },
+      {
+       "id": "tagnode",
+       "label": "Tags and usage policies",
+       "detail": "No tag: the rows land in the no-tag line.",
+       "status": "warning",
+       "value": "unattributed"
+      },
+      {
+       "id": "policy",
+       "label": "Compute policy",
+       "detail": "No policy applied to analysts yet.",
+       "status": "excluded",
+       "value": "missing"
+      },
+      {
+       "id": "autostop",
+       "label": "Auto-termination and auto-stop",
+       "detail": "Not set; running until morning.",
+       "status": "excluded",
+       "value": "missing"
+      }
+     ],
+     "connections": [
+      {
+       "from": "budgetnode",
+       "to": "policy",
+       "label": "should prompt a change"
+      },
+      {
+       "from": "policy",
+       "to": "autostop",
+       "label": "would have required"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-finops-experiment-visual",
+   "kind": "table",
+   "title": "Three runs per configuration on the same work",
+   "alt": "Three runs per configuration on the same work. Each row is one synthetic run: configuration, work items, duration in seconds and units consumed.",
+   "caption": "Cost per unit of work is units consumed times a labelled rate over the work items; the spread and the run count are part of the answer. Synthetic teaching example.",
+   "textEquivalent": "Run observations from the CSV: Each row is one synthetic run: configuration, work items, duration in seconds and units consumed. Columns: run; configuration; work items; seconds; units; unit. Rows: r01 | small | 1000 | 600 | 4.0 | DBU; r02 | small | 1000 | 660 | 4.4 | DBU; r03 | small | 1000 | 630 | 4.2 | DBU; r04 | small | 0 | 120 | 1.0 | DBU; r05 | large | 1000 | 240 | 4.8 | DBU; r06 | large | 1000 | 300 | 6.0 | DBU; r07 | large | 1000 | 270 | 5.4 | DBU; r08 | large | 1000 | 255 | 0.3 | instance-hour; r09 | xlarge | 1000 | 200 | 8.0 | DBU.\n\nCost per 1,000 work items at 0.50 per DBU: Large is faster and costs more per unit of work; the failed run's DBU is spent with no work; xlarge was observed once. Columns: configuration; runs used; median seconds; min / median / max (hypothetical USD); caveat. Rows: small | 3 | 630 | 2.00 / 2.10 / 2.20 | r04 did no work: 1.0 DBU spent, excluded; large | 3 | 270 | 2.40 / 2.70 / 3.00 | r08 in instance-hours: refused; xlarge | 1 | 200 | 4.00 / 4.00 / 4.00 | one run: spread unknown, not ranked.\n\nWhat the experiment can and cannot say: Each claim is checked against the runs; a single observation and a synthetic file limit what can be said. Columns: Claim; Supported?; Why. Rows: small costs less per 1,000 items than large | Yes, in these runs | small's max 2.20 is below large's min 2.40; large is faster | Yes, in these runs | median 270 s against 630 s; xlarge is the best choice | Not established | one observation; small will cost 2.10 in production | No | synthetic runs; volume and rates not measured.",
+   "provenance": "Original SpicyBrain authored visual; the run rows reproduce the synthetic fixture Lab L13 reads (fixtures/runs.csv) and the summary equals the lab's hand-authored expected output, which its local run reproduced; no cloud result and no benchmark.",
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-warehouse"
+   ],
+   "states": [
+    {
+     "id": "runs",
+     "title": "Run observations from the CSV",
+     "explanation": "Each row is one synthetic run: configuration, work items, duration in seconds and units consumed.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "run",
+       "configuration",
+       "work items",
+       "seconds",
+       "units",
+       "unit"
+      ],
+      "rows": [
+       [
+        "r01",
+        "small",
+        "1000",
+        "600",
+        "4.0",
+        "DBU"
+       ],
+       [
+        "r02",
+        "small",
+        "1000",
+        "660",
+        "4.4",
+        "DBU"
+       ],
+       [
+        "r03",
+        "small",
+        "1000",
+        "630",
+        "4.2",
+        "DBU"
+       ],
+       [
+        "r04",
+        "small",
+        "0",
+        "120",
+        "1.0",
+        "DBU"
+       ],
+       [
+        "r05",
+        "large",
+        "1000",
+        "240",
+        "4.8",
+        "DBU"
+       ],
+       [
+        "r06",
+        "large",
+        "1000",
+        "300",
+        "6.0",
+        "DBU"
+       ],
+       [
+        "r07",
+        "large",
+        "1000",
+        "270",
+        "5.4",
+        "DBU"
+       ],
+       [
+        "r08",
+        "large",
+        "1000",
+        "255",
+        "0.3",
+        "instance-hour"
+       ],
+       [
+        "r09",
+        "xlarge",
+        "1000",
+        "200",
+        "8.0",
+        "DBU"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "summary",
+     "title": "Cost per 1,000 work items at 0.50 per DBU",
+     "explanation": "Large is faster and costs more per unit of work; the failed run's DBU is spent with no work; xlarge was observed once.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "configuration",
+       "runs used",
+       "median seconds",
+       "min / median / max (hypothetical USD)",
+       "caveat"
+      ],
+      "rows": [
+       [
+        "small",
+        "3",
+        "630",
+        "2.00 / 2.10 / 2.20",
+        "r04 did no work: 1.0 DBU spent, excluded"
+       ],
+       [
+        "large",
+        "3",
+        "270",
+        "2.40 / 2.70 / 3.00",
+        "r08 in instance-hours: refused"
+       ],
+       [
+        "xlarge",
+        "1",
+        "200",
+        "4.00 / 4.00 / 4.00",
+        "one run: spread unknown, not ranked"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "claims",
+     "title": "What the experiment can and cannot say",
+     "explanation": "Each claim is checked against the runs; a single observation and a synthetic file limit what can be said.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Claim",
+       "Supported?",
+       "Why"
+      ],
+      "rows": [
+       [
+        "small costs less per 1,000 items than large",
+        "Yes, in these runs",
+        "small's max 2.20 is below large's min 2.40"
+       ],
+       [
+        "large is faster",
+        "Yes, in these runs",
+        "median 270 s against 630 s"
+       ],
+       [
+        "xlarge is the best choice",
+        "Not established",
+        "one observation"
+       ],
+       [
+        "small will cost 2.10 in production",
+        "No",
+        "synthetic runs; volume and rates not measured"
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-finops-drivers-question",
+   "revision": "1",
+   "prompt": "Cinderline moves the nightly job from an always-on all-purpose cluster to job compute created for each run. Which drivers in the pilot's worksheet should the analyst expect this change to move?",
+   "options": [
+    {
+     "id": "dbxfe-finops-drivers-question-a",
+     "text": "Compute time and platform usage, because both follow how long compute runs.",
+     "rationale": "Correct: removing idle running hours reduces instance time and the DBUs consumed; the other drivers do not depend on how long compute runs."
+    },
+    {
+     "id": "dbxfe-finops-drivers-question-b",
+     "text": "Storage and data movement, because job compute writes the tables.",
+     "rationale": "The same tables are written with the same bytes either way; storage and movement follow data volume and consumers, not the compute class."
+    },
+    {
+     "id": "dbxfe-finops-drivers-question-c",
+     "text": "Operations effort only, because the scheduler manages job compute.",
+     "rationale": "Effort changes only if operating the job changes, which is a separate decision; the direct effect of the class is on running time."
+    },
+    {
+     "id": "dbxfe-finops-drivers-question-d",
+     "text": "All six drivers equally, because the total cost changes.",
+     "rationale": "A changed total does not mean every driver moved; keeping drivers apart is what shows which two moved and why."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-drivers-question-a",
+   "conceptIds": [
+    "dbxfe-finops-driver-concept",
+    "dbxfe-finops-class-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-classes-question",
+   "revision": "1",
+   "prompt": "Which pairing of workload and compute class follows the pattern-first rule for Cinderline?",
+   "options": [
+    {
+     "id": "dbxfe-finops-classes-question-a",
+     "text": "The nightly resolution job on job compute created for each run, and the analysts' ad hoc notebooks on all-purpose compute with auto-termination.",
+     "rationale": "Correct: the batch exists only for its run, and interactive work needs shareable, restartable compute whose idle time is capped."
+    },
+    {
+     "id": "dbxfe-finops-classes-question-b",
+     "text": "The nightly job and the analysts' notebooks together on one always-on all-purpose cluster, so they share the startup.",
+     "rationale": "Sharing makes interactive users wait on the job's timing and pays idle hours all day; the documented job pattern creates compute for each run."
+    },
+    {
+     "id": "dbxfe-finops-classes-question-c",
+     "text": "The morning report on job compute created for every dashboard query, to avoid paying for a warehouse.",
+     "rationale": "Per-query job compute would pay a startup for every click; concurrent SQL readers are the pattern a SQL warehouse queues and scales for."
+    },
+    {
+     "id": "dbxfe-finops-classes-question-d",
+     "text": "Every workload on the largest SQL warehouse, since size fixes both speed and concurrency.",
+     "rationale": "Size and cluster count are different capacity dimensions, and a warehouse is not the class for Python batch jobs or exploration notebooks."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-classes-question-a",
+   "conceptIds": [
+    "dbxfe-finops-class-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-claim-warehouse",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-utilization-question",
+   "revision": "1",
+   "prompt": "Cinderline's morning report uses its SQL warehouse from 07:30 to 08:15 and nobody queries it afterwards. The warehouse keeps the API default auto-stop of 120 idle minutes. When does it stop, and how long does it run idle?",
+   "options": [
+    {
+     "id": "dbxfe-finops-utilization-question-a",
+     "text": "It stops at 10:15, after running idle for 120 minutes.",
+     "rationale": "Correct: auto-stop counts idle minutes after the last query ends at 08:15, so the default adds two hours of running with no work."
+    },
+    {
+     "id": "dbxfe-finops-utilization-question-b",
+     "text": "It stops at 08:15, as soon as the last query finishes.",
+     "rationale": "Stopping immediately would need an idle time of zero, and in the API an auto-stop of 0 means auto-stop is disabled, not instant."
+    },
+    {
+     "id": "dbxfe-finops-utilization-question-c",
+     "text": "It stops at 08:25, after ten idle minutes.",
+     "rationale": "Ten minutes is what a deliberately shortened setting would give; this warehouse keeps the 120-minute default."
+    },
+    {
+     "id": "dbxfe-finops-utilization-question-d",
+     "text": "It never stops, because auto-stop applies only to serverless warehouses.",
+     "rationale": "The API describes auto-stop as a warehouse setting without limiting it to serverless; idle minutes count whatever the type."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-utilization-question-a",
+   "conceptIds": [
+    "dbxfe-finops-utilization-concept",
+    "dbxfe-finops-policy-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-idle",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-startup-question",
+   "revision": "1",
+   "prompt": "A team replaces one sixty-minute job with ten six-minute jobs on job compute, each paying a synthetic three-minute startup. How much total compute running time does the day use, and what share of it is startup?",
+   "options": [
+    {
+     "id": "dbxfe-finops-startup-question-a",
+     "text": "90 minutes, of which 30 minutes, or 33.3 percent, is startup.",
+     "rationale": "Correct: each of the ten runs pays three minutes of startup plus six of work, so 10 × 9 = 90 minutes with 30 of them starting."
+    },
+    {
+     "id": "dbxfe-finops-startup-question-b",
+     "text": "63 minutes, the same as the single sixty-minute job.",
+     "rationale": "That is the single job: one startup before sixty minutes of work. Splitting the work multiplies the startups, not the work."
+    },
+    {
+     "id": "dbxfe-finops-startup-question-c",
+     "text": "60 minutes, because startup is not part of a run.",
+     "rationale": "Startup is running time before useful work on every start; leaving it out hides exactly the cost that splitting creates."
+    },
+    {
+     "id": "dbxfe-finops-startup-question-d",
+     "text": "9 minutes, because the ten jobs can run in parallel.",
+     "rationale": "Parallel runs shorten the wall clock, not the total running time: ten compute resources each still run nine minutes."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-startup-question-a",
+   "conceptIds": [
+    "dbxfe-finops-startup-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pools",
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-queue-question",
+   "revision": "1",
+   "prompt": "Query timings for the 07:31 peak show the slowest queries waiting about five seconds at capacity and executing for about five, with no provisioning wait and no spill to disk. Which change targets the waiting?",
+   "options": [
+    {
+     "id": "dbxfe-finops-queue-question-a",
+     "text": "Raise the warehouse's maximum cluster count, or move scheduled refreshes out of that minute.",
+     "rationale": "Correct: waiting at capacity means arrivals exceeded concurrent capacity, which more clusters or fewer simultaneous arrivals remove."
+    },
+    {
+     "id": "dbxfe-finops-queue-question-b",
+     "text": "Increase the warehouse size so each query gets more resources.",
+     "rationale": "Size helps large or spilling queries; these queries do not spill, and the API ties concurrent queries to the cluster count."
+    },
+    {
+     "id": "dbxfe-finops-queue-question-c",
+     "text": "Rewrite the slowest query so that it executes faster.",
+     "rationale": "Execution already takes five seconds, as in quiet periods; the extra five seconds are spent waiting, not executing."
+    },
+    {
+     "id": "dbxfe-finops-queue-question-d",
+     "text": "Lengthen auto-stop so the warehouse is already running at 07:31.",
+     "rationale": "That removes provisioning waits, but the timings show none; this wait happens at capacity while the warehouse is running."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-queue-question-a",
+   "conceptIds": [
+    "dbxfe-finops-queue-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-warehouse",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-warehouse"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-comparability-question",
+   "revision": "1",
+   "prompt": "Two alternatives for the same work are proposed: A uses 440 DBU and 880 instance-hours a month; B uses 92.4 DBU a month, and its instance-hours have not been estimated. Which statement about comparing them is correct?",
+   "options": [
+    {
+     "id": "dbxfe-finops-comparability-question-a",
+     "text": "They cannot be compared yet: B must price the same drivers in the same units before either total means anything.",
+     "rationale": "Correct: leaving out B's instance-hours makes it look cheaper only because it is incomplete; both need every driver priced with labelled rates."
+    },
+    {
+     "id": "dbxfe-finops-comparability-question-b",
+     "text": "B is cheaper, because 92.4 is smaller than 440 plus 880.",
+     "rationale": "Adding DBUs to instance-hours produces a number with no unit, and B's missing driver makes any total incomplete."
+    },
+    {
+     "id": "dbxfe-finops-comparability-question-c",
+     "text": "They can be compared on DBUs alone, since DBUs are the platform's unit.",
+     "rationale": "DBUs are one driver; instance time is billed separately on classic compute, so a DBU-only comparison omits real cost."
+    },
+    {
+     "id": "dbxfe-finops-comparability-question-d",
+     "text": "Convert A's instance-hours into DBUs one for one, then compare the DBU totals.",
+     "rationale": "No fixed conversion exists between the two units; each is priced with its own rate and then compared in one currency."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-comparability-question-a",
+   "conceptIds": [
+    "dbxfe-finops-comparability-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-quota-question",
+   "revision": "2",
+   "prompt": "The 01:30 nightly job fails to launch with AWS_RESOURCE_QUOTA_EXCEEDED while an analyst's large all-purpose cluster has been running since the previous evening. What is the most useful first response?",
+   "options": [
+    {
+     "id": "dbxfe-finops-quota-question-a",
+     "text": "Find which quota was exceeded and what else held it, then stop or cap the overnight cluster or request a higher quota from the cloud provider.",
+     "rationale": "Correct: the refusal came from the cloud account's limit, and the evidence is the concurrent usage; both remedies act on that limit."
+    },
+    {
+     "id": "dbxfe-finops-quota-question-b",
+     "text": "Raise the budget threshold so the job is allowed to spend more.",
+     "rationale": "A budget monitors spend and grants no instances; nothing was spent, because the launch never happened."
+    },
+    {
+     "id": "dbxfe-finops-quota-question-c",
+     "text": "Retry the launch every minute until it succeeds.",
+     "rationale": "Blind retries hit the same limit while the analyst's cluster holds it; they add noise, not capacity."
+    },
+    {
+     "id": "dbxfe-finops-quota-question-d",
+     "text": "Switch the job to larger nodes so that fewer nodes are needed.",
+     "rationale": "The quota counts cores, so larger nodes can need as many vCPUs or more; the request still exceeds what is free."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-quota-question-a",
+   "conceptIds": [
+    "dbxfe-finops-quota-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-quota",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-architecture"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-system-question",
+   "revision": "1",
+   "prompt": "For 14 September the SQL warehouse has three usage rows: ORIGINAL 5.0 DBU, RETRACTION −5.0 DBU and RESTATEMENT 4.5 DBU. A report filters to ORIGINAL rows only. What does it report, and what is the corrected quantity?",
+   "options": [
+    {
+     "id": "dbxfe-finops-system-question-a",
+     "text": "It reports 5.0 DBU; the corrected quantity is 4.5 DBU, the signed sum of all three rows.",
+     "rationale": "Correct: the retraction cancels the original and the restatement carries the corrected value, so only the full sum is right."
+    },
+    {
+     "id": "dbxfe-finops-system-question-b",
+     "text": "It reports 4.5 DBU, because the restatement replaces the original row in place.",
+     "rationale": "Corrections are added as new rows; the original row is not edited, so a filter on original rows still sees 5.0."
+    },
+    {
+     "id": "dbxfe-finops-system-question-c",
+     "text": "It reports 14.5 DBU, because every row is added regardless of its sign.",
+     "rationale": "Adding absolute values ignores the retraction's negative quantity; the signed sum of the three rows is 4.5."
+    },
+    {
+     "id": "dbxfe-finops-system-question-d",
+     "text": "It reports 0.0 DBU, because a retraction removes the day's usage.",
+     "rationale": "A retraction negates only the row it corrects, and the restatement then adds the corrected 4.5 DBU back."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-system-question-a",
+   "conceptIds": [
+    "dbxfe-finops-systemtable-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-unit-question",
+   "revision": "1",
+   "prompt": "In a month with 30 nightly runs, the job's own usage costs 77.40 hypothetical USD and the pilot's operations effort costs 780.00. Next month runs double to 60 while effort stays the same. What happens to the fully loaded cost per run, and what does it show?",
+   "options": [
+    {
+     "id": "dbxfe-finops-unit-question-a",
+     "text": "It falls from 28.58 to 15.58 although the month costs more; the fall comes from spreading fixed effort, not from any saving.",
+     "rationale": "Correct: (154.80 + 780.00) ÷ 60 = 15.58 while the total rises from 857.40 to 934.80, so the ratio moved without any cost falling."
+    },
+    {
+     "id": "dbxfe-finops-unit-question-b",
+     "text": "It stays at 28.58, because cost per run is a property of the job.",
+     "rationale": "Only the part the runs cause scales with them; the fixed effort is spread over more runs, so the fully loaded ratio changes."
+    },
+    {
+     "id": "dbxfe-finops-unit-question-c",
+     "text": "It falls to 2.58, because effort stops counting once runs double.",
+     "rationale": "2.58 is the per-run cost of the job's own usage; effort still counts in a fully loaded figure at any run count."
+    },
+    {
+     "id": "dbxfe-finops-unit-question-d",
+     "text": "It rises to 57.16, because twice the runs means twice the cost per run.",
+     "rationale": "Doubling runs doubles the variable part of the total, not the cost of each run; the per-run figure cannot double."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-unit-question-a",
+   "conceptIds": [
+    "dbxfe-finops-unit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-experiment-question",
+   "revision": "1",
+   "prompt": "In the experiment, xlarge ran once at 4.00 hypothetical USD per 1,000 items in 200 seconds, while small ran three times at 2.00 to 2.20 in about 630 seconds. What can the team honestly conclude about xlarge?",
+   "options": [
+    {
+     "id": "dbxfe-finops-experiment-question-a",
+     "text": "Nothing rankable yet: one run has no spread, so repeat it before comparing it with the others.",
+     "rationale": "Correct: a single observation cannot show whether 4.00 or 200 seconds is typical, so it stays out of the ranking."
+    },
+    {
+     "id": "dbxfe-finops-experiment-question-b",
+     "text": "xlarge is the best choice because it is the fastest configuration.",
+     "rationale": "Speed from one run is not established, and speed alone ignores that its one observation costs almost twice small's median."
+    },
+    {
+     "id": "dbxfe-finops-experiment-question-c",
+     "text": "xlarge always costs about twice as much as small per unit of work.",
+     "rationale": "One run cannot support 'always'; the ratio could change with more observations or with other data."
+    },
+    {
+     "id": "dbxfe-finops-experiment-question-d",
+     "text": "xlarge should be dropped because its cost is the highest.",
+     "rationale": "Dropping it is also a ranking decision; with one observation the honest move is to repeat the run, not to decide either way."
+    }
+   ],
+   "correctOptionId": "dbxfe-finops-experiment-question-a",
+   "conceptIds": [
+    "dbxfe-finops-experiment-concept",
+    "dbxfe-finops-unit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-finops-attribution-self",
+   "revision": "1",
+   "prompt": "The exploration cluster ran untagged for two weeks and the sponsor wants the pilot's share of September. Explain what the usage table can and cannot tell you, and what you would change so that October is attributable.",
+   "modelAnswer": "The rows already written keep the tags they had, so the exploration cluster's usage carries no project tag and cannot be reassigned by tagging the cluster now. I can still group those rows by the cluster identifier in the usage metadata and allocate them to the analytics team by a documented rule, labelled as an allocation rather than a tag. For October, a compute policy for analysts requires a team or project tag and auto-termination, serverless work runs under a usage policy with the pilot's tags, and a weekly query lists any usage without a project tag.",
+   "reasoning": "It separates what the rows record from what an analyst allocates afterwards, keeps any allocation visible, and fixes the cause where compute is created; checking tag coverage monthly instead of weekly is an acceptable variation.",
+   "conceptIds": [
+    "dbxfe-finops-tag-concept",
+    "dbxfe-finops-systemtable-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-tags",
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-claim-policies",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-sensitivity-self",
+   "revision": "1",
+   "prompt": "The sponsor asks for 'the number' for the pilot. Using the sensitivity table, write the two sentences you would say, and name the one measurement that would narrow the answer most.",
+   "modelAnswer": "In hypothetical USD, the pilot's recurring base case is 1,000.00 a month, somewhere between 536.00 and 1,936.00 depending mostly on how many hours of operations effort it really takes, plus a one-off migration of about 15,000.00 in year one. The measurement that narrows it most is two weeks of logged operations hours, because effort swings the month by 1,170.00 while platform usage swings it by 150.00.",
+   "reasoning": "It gives a range with the driver behind it instead of a single figure, keeps the one-off apart and targets the largest swing; logging effort over a different stated period is equally acceptable.",
+   "conceptIds": [
+    "dbxfe-finops-sensitivity-concept",
+    "dbxfe-finops-driver-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-claim-cost",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-finops-governance-self",
+   "revision": "1",
+   "prompt": "The exploration cluster ran all night and the budget alert fired at 21:00. The data lead asks for 'a budget that stops this'. Explain which layers you would change, in what order, and what the budget can and cannot be relied on for.",
+   "modelAnswer": "First, a compute policy for the analysts that sets auto-termination, bounds node types and sizes and requires a team tag, so an idle cluster ends itself and its usage is attributable. Second, the analysts' existing clusters move under that policy. Third, the budget keeps its email alert to a named owner with a written action. I would not rely on the budget to stop compute unless the current documentation shows that its block-usage action covers this kind of compute, and it has been configured and tested.",
+   "reasoning": "It fixes the cause where compute is created, keeps the budget as the signal it is designed to be, and treats any blocking action as something to verify; a scheduled nightly shutdown is an acceptable extra layer.",
+   "conceptIds": [
+    "dbxfe-finops-budget-concept",
+    "dbxfe-finops-policy-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-budgets",
+    "dbxfe-finops-claim-policies",
+    "dbxfe-finops-claim-idle",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-finops-drivers",
+   "version": "1.0.0",
+   "title": "A cost question has six answers before it has one number",
+   "outcome": "Separate a workload's cost into drivers, each in its own unit and period, and name which ones a compute decision moves.",
+   "explanation": "Cinderline's sponsor asks what the quality pilot costs. The honest first answer is a list of [[dbxfe-finops-driver-concept|cost drivers]]: compute time in instance-hours, platform usage in DBUs, storage in GB-months, data movement in GB, operations effort in hours per week, and a migration paid once. Each has its own unit, period and owner. Notice in the second state that moving the nightly job to job compute moves only two of the six, so a compute choice cannot be presented as the whole cost story.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-drivers",
+   "conceptIds": [
+    "dbxfe-finops-driver-concept",
+    "dbxfe-finops-dbu-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-architecture"
+   ],
+   "visualId": "dbxfe-finops-drivers-visual",
+   "questionIds": [
+    "dbxfe-finops-drivers-question"
+   ],
+   "hint": "Ask which drivers depend on how long compute runs.",
+   "handbook": {
+    "markdown": "A cost driver is anything the workload is paid for that moves independently of the others. Keep six apart for a Databricks workload on classic compute:\n\n| Driver | Unit | Typical owner |\n|---|---|---|\n| Compute time | instance-hours of cloud machines | platform team |\n| Platform usage | DBUs | data lead |\n| Storage | GB-months held | data lead |\n| Data movement | GB moved between regions or to consumers | platform team |\n| Operations effort | hours per week | operations |\n| Migration | hours, once | sponsor |\n\nOn classic compute one running hour produces two charges: DBUs from Databricks and instance time from the cloud provider, because classic compute runs in the customer's cloud account. A DBU is a normalized unit of processing power; how many a workload consumes depends on the compute used and the data processed. Serverless compute runs in a Databricks-managed plane, so its instances do not appear on the customer's cloud bill; what its rate covers is read from the current pricing page, never assumed.\n\nWhy separate them: each has its own owner, uncertainty and lever. A compute decision (job compute instead of an always-on cluster, auto-termination, a different warehouse) moves compute time and platform usage. It does not move storage, which follows data volume and retention, or data movement, which follows consumers and regions. Operations effort moves only if running the workload changes, and a migration is paid once and never averaged silently into a monthly figure.\n\nWhat to inspect: usage rows by SKU for platform usage, the cloud bill for instance time, storage metrics, egress records and a short effort log. How to explain it: \"these are the six things we pay for, in their own units; this decision moves two of them.\" How to demonstrate honestly: a worksheet that carries a unit, period, labelled rate and owner on every row, as Lab L13's does.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-drivers"
+    ]
+   },
+   "recap": "Six drivers in six units and periods; a compute decision moves two of them.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-classes",
+   "version": "1.0.0",
+   "title": "Choose the compute class from the workload's pattern, not its size",
+   "outcome": "Match scheduled, interactive, SQL and streaming patterns to job compute, all-purpose compute, SQL warehouses or serverless, and name what to verify first.",
+   "explanation": "Start from how work arrives. A scheduled batch that is idle between runs fits [[dbxfe-finops-class-concept|job compute]] created for each run, which terminates when the run completes. People exploring in notebooks need interactive all-purpose compute that can be shared and restarted. Many concurrent SQL and BI readers fit a SQL warehouse, serverless, pro or classic. Serverless variants remove instance provisioning where the workspace allows them. Notice in the second state that each Cinderline workload takes a different row and no size appears: size is the next question, not the first.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-choose",
+   "conceptIds": [
+    "dbxfe-finops-class-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-claim-warehouse",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "visualId": "dbxfe-finops-classes-visual",
+   "questionIds": [
+    "dbxfe-finops-classes-question"
+   ],
+   "hint": "Look at what each workload does between its busy periods.",
+   "handbook": {
+    "markdown": "Current names change, so read them from the documentation of the day. Lakeflow Jobs (formerly Databricks Workflows) schedules work; its runs execute on job compute, which the API still calls a job cluster, on serverless compute for jobs where the workspace allows it, or on an existing all-purpose cluster. The Jobs API describes a new cluster as one created for each run and suggests new clusters over existing ones for reliability, because an existing cluster may need a manual restart if it stops responding.\n\nChoose in this order:\n\n1. **Pattern.** When does work arrive, how long does it run, and what happens between runs? A nightly batch is idle most of the day.\n2. **Interaction.** Does a person wait on it (notebooks, dashboards) or a schedule (jobs)?\n3. **Concurrency.** How many queries overlap at the busiest minute, observed rather than guessed from headcount.\n4. **Constraints.** Serverless availability and policy, network rules, cloud quotas, and who may change the configuration.\n5. **Size, last.** Only once the class is fixed does the size question make sense.\n\nWhen the table does not decide it: a stream that must run continuously is always on by design, so the question becomes steady usage per hour rather than idle time. Very short, frequent jobs may lose more to startup than they save in idle time; batching, pools or serverless change that balance. One all-purpose cluster shared by a scheduled job and interactive users makes the morning's latency depend on the job's timing, which is why the compute choice field guide records it as the option not chosen.\n\nWhat to inspect: job run durations and their setup time, the warehouse's query timings, the workspace's compute policies and whether serverless is enabled. What fails: scheduled work parked on an interactive cluster that nobody terminates.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-choose"
+    ]
+   },
+   "recap": "Pattern first, then interaction, concurrency and constraints; size comes last.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-utilization",
+   "version": "1.0.0",
+   "title": "Idle hours on running compute are paid hours",
+   "outcome": "Compute utilization for one resource over a stated period and choose the setting that removes paid idle time.",
+   "explanation": "[[dbxfe-finops-utilization-concept|Utilization]] is useful work divided by running time for one resource over one period. The analysts' all-purpose cluster ran from 08:00 to 18:00 for two busy hours, so it was 20 percent utilized and eight hours were paid idle. Notice the second state: the same work as two job-compute runs keeps compute alive about 2.1 hours. The third state keeps interactive compute but lets auto-termination end each idle tail after 30 minutes, the lever for work that must stay interactive.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-time",
+   "conceptIds": [
+    "dbxfe-finops-utilization-concept",
+    "dbxfe-finops-policy-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-idle",
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "visualId": "dbxfe-finops-utilization-visual",
+   "samajh": {
+    "text": "Socho aapne auto-rickshaw poore din ke liye book kar liya. Aap do ghante ghoome, baaki aath ghante auto bahar khada raha, par meter chalta raha. Doosra tareeka: har trip ke liye alag auto bulao; auto aane tak thoda intezaar hota hai, par khade rehne ka paisa nahi lagta. Teesra tareeka: auto rakho, par driver se keh do ki aadha ghanta koi na aaye toh woh chala jaaye.",
+    "mapping": "The day-long booking is the always-on all-purpose cluster, the meter running while parked is paid idle time, calling an auto per trip is job compute with its startup wait, and the driver's half-hour rule is auto-termination.",
+    "boundary": "Cloud compute is billed in several units at once, DBUs and instance time on classic compute, and whether startup minutes are billed in each unit is read from current pricing, not from the analogy."
+   },
+   "questionIds": [
+    "dbxfe-finops-utilization-question"
+   ],
+   "handbook": {
+    "markdown": "Utilization = useful work time ÷ running time, for one resource over one stated period. Both numbers need a clock: busy time from job run or query records, running time from the resource's start and termination or from its usage rows.\n\nWorked example (synthetic): the analysts' cluster ran 08:00 to 18:00 (10 hours) and was busy 09:00 to 10:00 and 15:00 to 16:00 (2 hours), so 2 ÷ 10 = 20 percent. As two job compute runs with a three-minute start each, 2 ÷ 2.1 ≈ 95 percent. As interactive compute with 30-minute auto-termination, 2 ÷ 3.1 ≈ 65 percent.\n\nTwo settings govern idle time, and both are documented API fields. An all-purpose cluster's autotermination_minutes ends it after that many inactive minutes; if the field is unset, the cluster is not terminated automatically. A SQL warehouse's auto_stop_mins stops it after that many idle minutes; the API default is 120 and 0 means no auto-stop. A morning report used from 07:30 to 08:15 with the default therefore keeps its warehouse running until 10:15.\n\nLimits: utilization is a diagnostic, not a target. A continuously busy stream is meant to be near 100 percent; an interactive warehouse at 100 percent is queueing its users. Shortening auto-stop trades idle running time for more cold starts, so check the startup evidence before cutting it to the minimum.\n\nWhat to inspect: start and termination events, idle windows between runs, usage rows by hour. How to explain it: \"eight of the ten hours we paid for did no work; auto-termination ends that for interactive work, and per-run compute ends it for scheduled work.\"",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-time"
+    ]
+   },
+   "recap": "Utilization is busy time over running time; auto-termination and per-run compute remove paid idle hours.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-startup",
+   "version": "1.0.0",
+   "title": "Startup is paid once per start, so short runs pay the most for it",
+   "outcome": "Compute the startup share of a run's running time and decide when batching, pools or serverless change the answer.",
+   "explanation": "Every start waits for compute before useful work begins. That [[dbxfe-finops-startup-concept|startup overhead]] is the same three synthetic minutes before a six-minute job and before an hour-long one, so it is a third of the short run and under five percent of the long one. Notice the third state: splitting one hour into ten six-minute jobs pays ten startups, ninety minutes of running for sixty of work. The fourth state shows a pool shortening each start while its idle instances accrue cloud instance time but no DBUs.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-time",
+   "conceptIds": [
+    "dbxfe-finops-startup-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pools",
+    "dbxfe-finops-claim-compute",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "visualId": "dbxfe-finops-startup-visual",
+   "questionIds": [
+    "dbxfe-finops-startup-question"
+   ],
+   "hint": "Divide the startup by the startup plus the run, then multiply by the number of starts.",
+   "handbook": {
+    "markdown": "Startup share = startup ÷ (startup + run). With a synthetic three-minute start, a six-minute job spends 33.3 percent of its running time starting and a sixty-minute job 4.8 percent. Ten six-minute jobs instead of one sixty-minute job run 90 minutes instead of 63. The synthetic examples count startup minutes as running time; in practice the wait is always paid in latency, and whether each billing unit counts those minutes is read from current pricing.\n\nWhere startup shows up: in a job run's setup time before its tasks execute and, for SQL, in query metrics that record when a query waited for a cluster to be provisioned, separately from waiting at capacity and from execution.\n\nLevers, each with its own cost:\n\n- **Batch small jobs** into fewer runs: fewer starts, later results.\n- **Pools** keep idle, ready-to-use instances so clusters start and scale faster. Databricks charges no DBUs while instances are idle in a pool, but the cloud provider bills those instances, so a pool moves cost from startup minutes into idle instance-hours.\n- **A minimum cluster count on a SQL warehouse** keeps clusters running, which may reduce cold starts, and is paid for while they run.\n- **Serverless compute** is provisioned by Databricks on demand; it shortens the provisioning the customer waits for, but it is still a start, and its rate is read from current pricing.\n- **A scheduled warm-up** before a known window, such as ten minutes before 07:30 in the compute choice guide, is an assumption to test, not a fact.\n\nWhen startup does not matter: a job with an hour of slack before its deadline. When it dominates: frequent short jobs and the first interactive query of the morning. What to inspect: the gap between a run's start and its first task, and provisioning waits in the query metrics.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-time"
+    ]
+   },
+   "recap": "A start costs the same whatever the run length, so frequent short runs pay most for it.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-queue",
+   "version": "1.0.0",
+   "title": "A queue is arrivals beyond capacity, not a slow query",
+   "outcome": "Separate waiting from executing in query evidence and choose between more clusters, a larger size or a different arrival time.",
+   "explanation": "A query's latency has parts: waiting for compute to be provisioned, waiting while the warehouse is at capacity, and executing. When twelve queries arrive together against synthetic capacity for ten, two wait in a [[dbxfe-finops-queue-concept|queue]] even though each still executes in about five seconds. Notice that the second state adds a cluster rather than a bigger size: the warehouse API describes size as letting larger queries run and the maximum cluster count as serving concurrent ones. Waiting is fixed with capacity or timing, not by rewriting the query.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-time",
+   "conceptIds": [
+    "dbxfe-finops-queue-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-warehouse",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-warehouse"
+   ],
+   "visualId": "dbxfe-finops-queue-visual",
+   "samajh": {
+    "text": "Socho bank mein das counter hain aur mahine ki aakhri tareekh ko subah barah log ek saath aa gaye. Das logon ka kaam shuru ho gaya, do line mein khade hain. Har kaam paanch minute ka hi hai; clerk dheema nahi hua. Ek aur counter khol do, line khatam. Tez clerk laane se line tabhi chhoti hogi jab kaam hi bada tha.",
+    "mapping": "Counters are concurrent capacity such as warehouse clusters, customers are queries arriving together, the line is the queue recorded as waiting time, and a faster clerk for bigger jobs is a larger warehouse size.",
+    "boundary": "A warehouse does not admit queries through a fixed number of counters: serverless warehouses predict each query's needs and scale, and queries differ in size, so capacity is read from query evidence, not assumed."
+   },
+   "questionIds": [
+    "dbxfe-finops-queue-question"
+   ],
+   "handbook": {
+    "markdown": "The query metrics separate four parts of a query's latency: waiting for a cluster to be provisioned, waiting while the warehouse is at maximum load, compilation, and execution. Only the last two belong to the query itself, and only they respond to rewriting it.\n\nWorked example (synthetic): at 07:31 on a month-end morning twelve queries arrive against capacity for ten. Ten execute in about five seconds; two wait about five seconds for a slot and finish at ten. Execution time is unchanged, so a faster query would not remove the wait.\n\nSize and cluster count are different capacity dimensions. The SQL warehouse API describes cluster size as letting larger queries run, and says concurrent queries are tuned with the maximum number of clusters. Serverless warehouses predict each query's needs and start it when capacity exists, queueing it otherwise while they scale. So waiting at capacity points to more clusters or a different arrival time, while spilling to disk points to size.\n\nA cheaper fix than capacity is often timing: refresh dashboards once after the nightly job so users read cached results, and stagger scheduled queries away from the busiest minute. The retained SQL performance lesson's controlled experiment (a baseline, one change, and a quiet-period check) is how to test either change before paying for it.\n\nCost: an extra cluster costs its running time. Scaling up for a five-minute peak and back down may be small; a permanently higher minimum is not. Never size from headcount: the compute choice guide counted eleven users and at most four overlapping queries where headcount suggested thirty.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-time"
+    ]
+   },
+   "recap": "Waiting at capacity needs clusters or a new arrival time; execution time is the query's own.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-quota",
+   "version": "1.0.0",
+   "title": "A quota refusal happens before any usage exists",
+   "outcome": "Read a launch failure as quota or capacity and route it to the cloud account, the schedule or a fallback node type.",
+   "explanation": "Classic compute launches instances in Cinderline's AWS account, so the cloud provider's [[dbxfe-finops-quota-concept|quota]] can refuse them. In the second state an analyst's 48-vCPU cluster is still running, four more 16-vCPU nodes would exceed a synthetic 64-vCPU quota, and the nightly job never starts: no usage rows, only a termination reason such as AWS_RESOURCE_QUOTA_EXCEEDED. Notice the third state: a capacity failure is different, because the quota had room but the zone had no instances of that type.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-limits",
+   "conceptIds": [
+    "dbxfe-finops-quota-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-quota",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-architecture"
+   ],
+   "visualId": "dbxfe-finops-quota-visual",
+   "questionIds": [
+    "dbxfe-finops-quota-question"
+   ],
+   "hint": "Ask what else was running in the same account at 01:30.",
+   "handbook": {
+    "markdown": "Classic compute launches instances in the customer's cloud account, so the cloud provider decides whether they exist. Two refusals look alike to a user whose job did not start:\n\n| Termination reason | Meaning | Response |\n|---|---|---|\n| AWS_RESOURCE_QUOTA_EXCEEDED | The account's limit for that resource is used up | Find what holds it; stop it, cap it by policy, or request a higher quota from the cloud provider |\n| AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE | The zone has no instances of that type right now | Retry later, or list alternate node types; a quota increase does not help |\n\nA refused launch produces no usage rows, so a cost report will not show it; the evidence is the run's termination reason and the concurrent usage at that minute. Worked example (synthetic): a 64-vCPU quota, an analyst's 48-vCPU cluster left running overnight, and a nightly job asking for four 16-vCPU nodes at 01:30: 48 + 64 exceeds 64, so the launch is refused.\n\nFlexible node types list alternate node types that a launch or upscale falls back to when the primary type is unavailable. A fallback is a different instance with a different rate and perhaps different performance, so it belongs in the worksheet and the experiment. A pool has its own maximum capacity, which is another limit to read, not a cloud quota.\n\nServerless compute runs in the Databricks account, so the customer's instance quotas do not apply to it; its own service limits are documented by Databricks. What fails: retrying blindly, or raising a budget, neither of which creates capacity. How to explain it: \"the job cost nothing because it never started: the account's quota was already full.\"",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-limits"
+    ]
+   },
+   "recap": "Quota is the account's limit and capacity is the zone's supply; neither leaves usage rows.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-attribution",
+   "version": "1.0.0",
+   "title": "Tags are written when usage happens, not afterwards",
+   "outcome": "Design tags and usage policies so every usage row names its owner, and explain why an untagged day stays unattributed.",
+   "explanation": "A [[dbxfe-finops-tag-concept|tag]] on a cluster or SQL warehouse is written into every usage row that resource produces, and serverless work takes its tags from a usage policy, formerly called a budget policy. Notice the second state: grouped by project, the exploration cluster's 20.0 untagged DBU land in a no-tag line that belongs to nobody. The third state shows the fix working forward only: once a policy requires a team tag, new rows carry it, while the rows already written keep what they had when the usage happened.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-attribution",
+   "conceptIds": [
+    "dbxfe-finops-tag-concept",
+    "dbxfe-finops-systemtable-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-tags",
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-claim-policies",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "visualId": "dbxfe-finops-attribution-visual",
+   "samajh": {
+    "text": "Socho ek housing society ka bijli bill ek hi main meter se aata hai. Jin flats mein sub-meter laga hai, unka hissa har mahine alag likha jaata hai. Jis flat mein sub-meter nahi tha, uska kharcha common hisaab mein chala gaya. Aaj sub-meter laga do toh agle mahine se hisaab milega; pichhle mahine ka bill phir bhi common mein hi rahega.",
+    "mapping": "The main meter is the account's usage, sub-meters are tags recorded on each usage row, the common line is untagged usage, and fitting a sub-meter today is a policy that attributes only future usage.",
+    "boundary": "Tags attribute usage but reduce none of it, and where tags reach (cloud resources, usage rows, serverless policies) is read from the current documentation for each resource type."
+   },
+   "questionIds": [
+    "dbxfe-finops-attribution-self"
+   ],
+   "handbook": {
+    "markdown": "Design the tag scheme before the usage: a few keys with owners, for example project, team, env and cost-center, and a rule that every compute resource carries project or team.\n\nWhere tags come from:\n\n- **Clusters and SQL warehouses** carry custom tags that are written into their billable usage rows and applied to their cloud resources, such as AWS instances and EBS volumes, alongside the default tags Databricks adds.\n- **Serverless work** has no cluster to tag; a usage policy (formerly a budget policy) carries customer-defined tags for the serverless usage of the people and jobs that use it, and each job records the usage policy used for its cost attribution.\n- **Compute policies** can require tags, so untagged interactive clusters cannot be created at all.\n\nThe usage table then answers who used what:\n\n```sql\nSELECT custom_tags['project'] AS project,\n       usage_unit,\n       SUM(usage_quantity)    AS quantity\nFROM system.billing.usage\nWHERE usage_date BETWEEN '2026-09-01' AND '2026-09-30'\nGROUP BY custom_tags['project'], usage_unit\nORDER BY quantity DESC;\n```\n\nA null project is usage nobody owns. It cannot be re-tagged, because rows keep the tags the resource had when the usage happened. It can still be allocated, for example by grouping on the cluster identifier in the usage metadata and mapping clusters to teams, but that is a documented allocation rule, labelled as such.\n\nShowback reports each owner's usage; chargeback moves money between budgets. Both depend on tag coverage, so report the untagged share every month. What fails: tags added after the fact, free-text tag values that split one project into five, and serverless work with no usage policy.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-attribution"
+    ]
+   },
+   "recap": "Tags are recorded with the usage; fix the scheme at creation and allocate old rows by a stated rule.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-system",
+   "version": "1.0.0",
+   "title": "The usage table is the evidence; dashboards and budgets read it",
+   "outcome": "Price usage rows with a labelled rate, include correction records in every sum, and state what the result is not.",
+   "explanation": "The [[dbxfe-finops-systemtable-concept|billable usage system table]], system.billing.usage, holds one row per usage record: SKU, date, quantity and unit, tags, and metadata naming the job, warehouse or cluster. Notice the first state: multiplying each row's DBUs by a labelled hypothetical rate gives an amount anyone can recompute, and it is arithmetic, not an invoice. In the second state a correction arrives as a retraction and a restatement beside the original, so the sum of all three rows is right and a filter on original rows overstates the day.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-attribution",
+   "conceptIds": [
+    "dbxfe-finops-systemtable-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "visualId": "dbxfe-finops-system-visual",
+   "questionIds": [
+    "dbxfe-finops-system-question"
+   ],
+   "hint": "A correction adds rows; it never edits the original.",
+   "handbook": {
+    "markdown": "system.billing.usage is the account-wide record of billable usage and the evidence behind usage dashboards and budgets. Each row carries the SKU, the usage date and its start and end times, usage_quantity with its usage_unit, custom_tags, usage_metadata identifying the job, run, warehouse or cluster, and identity metadata. Rows arrive after the usage, typically within hours, so the table explains last week, not the last five minutes.\n\nPricing rows: multiply usage_quantity by a dated, labelled rate from the current pricing page or the customer's contract. That arithmetic is not an invoice: commitments and discounts are commercial terms this course does not model.\n\nCorrections: a wrong row is never edited. A RETRACTION row negates it and a RESTATEMENT row carries the corrected value, and the record_type column says which is which. Always sum all record types:\n\n```sql\nSELECT usage_date, sku_name, usage_unit,\n       SUM(usage_quantity) AS quantity  -- original, retraction and restatement rows together\nFROM system.billing.usage\nWHERE usage_date = '2026-09-14'\nGROUP BY usage_date, sku_name, usage_unit;\n```\n\nWorked example (synthetic): 5.0, −5.0 and 4.5 DBU sum to 4.5; filtering to ORIGINAL keeps the wrong 5.0.\n\nPer-job cost: group by the job and run identifiers in usage_metadata to see which job and run caused which usage; for classic compute the cloud's instance charges arrive in the cloud bill and are found through the same tags.\n\nWhat to check before trusting a number: the unit column (never sum across units), the date range of the question, whether corrections have arrived, and tag coverage. How to demonstrate honestly: show the query, the rows and the rate with its date and label.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-attribution"
+    ]
+   },
+   "recap": "Price the usage rows with a labelled rate and sum every record type, corrections included.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-unit",
+   "version": "1.0.0",
+   "title": "Unit cost divides only what the unit of work causes",
+   "outcome": "Compute cost per run with the right numerator, label a fully loaded figure separately, and return unknown for a zero count.",
+   "explanation": "[[dbxfe-finops-unit-concept|Unit economics]] asks what one unit of work costs: a run, a query, a model trained. The numerator holds only the drivers that the work causes. Notice the base state: the nightly job's 126 DBU and 36 instance-hours, priced with labelled hypothetical rates, give 77.40 over 30 runs, 2.58 per run. Adding the pilot's operations effort gives a fully loaded 28.58 that falls whenever runs rise, with nothing saved. The third state is the guard: a month with no runs is unknown, not zero and not an error.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-units",
+   "conceptIds": [
+    "dbxfe-finops-unit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "visualId": "dbxfe-finops-unit-visual",
+   "questionIds": [
+    "dbxfe-finops-unit-question"
+   ],
+   "hint": "Ask which parts of the numerator would double if the runs doubled.",
+   "handbook": {
+    "markdown": "Unit economics = cost the unit of work causes ÷ count of that work, over the same period. The unit is whatever the business counts: a pipeline run, a dashboard query, a model trained, a thousand records processed.\n\nWorked example (synthetic, labelled hypothetical rates): the nightly job's month is 126 DBU × 0.50 + 36 instance-hours × 0.40 = 77.40 hypothetical USD over 30 runs, 2.58 per run. That is the variable, or marginal, cost per run.\n\nA fully loaded figure adds shared costs such as operations effort: (77.40 + 780.00) ÷ 30 = 28.58. It is a legitimate number with a different meaning, and it moves with volume: at 60 runs it is (154.80 + 780.00) ÷ 60 = 15.58, although the month costs more. Report the two side by side and labelled, or a reader will take the fall for a saving.\n\nThe denominator needs a definition (successful runs, or every attempt?) and a guard:\n\n```python\nfrom decimal import Decimal, ROUND_HALF_UP\n\ndef cost_per_unit(cost: Decimal, count: int) -> dict:\n    if count < 0:\n        raise ValueError(\"negative count\")\n    if count == 0:\n        return {\"value\": None, \"reason\": \"zero_denominator\"}\n    return {\"value\": (cost / count).quantize(Decimal(\"0.01\"), ROUND_HALF_UP), \"reason\": None}\n```\n\nZero runs returns unknown with its reason: 0.00 would claim the work was free, and an exception would lose the rest of the report. Failed runs spend usage with no work; count their units as spent and show them rather than dividing by zero.\n\nWhat to inspect: usage rows grouped by job and run identifiers, the run count from the job's run history for the same dates, and whether retries are counted as runs.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-units"
+    ]
+   },
+   "recap": "Divide only what the work causes, label fully loaded figures, and return unknown for zero work.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-comparability",
+   "version": "1.0.0",
+   "title": "Different billing units add up only after each has its own rate",
+   "outcome": "Refuse sums across units, currencies or periods and convert each quantity with its own labelled rate first.",
+   "explanation": "300 DBU, 120 instance-hours and 500 GB-months do not add up to 920 of anything. Each is a different billing unit, so each is priced with its own labelled rate before any sum exists: 150.00, 48.00 and 10.00 hypothetical USD per month make 208.00, a figure in [[dbxfe-finops-comparability-concept|one currency per period]] that a reader can recompute. Notice the third state: three hours of effort a week is thirteen hours a month, and reading the week as a month loses 600.00 at the rate shown.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-units",
+   "conceptIds": [
+    "dbxfe-finops-comparability-concept",
+    "dbxfe-finops-dbu-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "visualId": "dbxfe-finops-comparability-visual",
+   "samajh": {
+    "text": "Socho kirane ki list: do kilo aata, teen litre doodh, ek darjan ande. Koi kahe 'kul chhe cheezein', toh bill ka kya pata chala? Kuch nahi. Har cheez ka apna bhaav lagao, rupaye mein badlo, phir jodo. Aur agar doodh roz ka hisaab hai aur aata mahine ka, toh pehle dono ko mahine ka banao, tabhi total ka matlab banega.",
+    "mapping": "Kilos, litres and dozens are DBUs, instance-hours and GB-months; each item's own price is its labelled rate; rupees are the one currency; and turning daily milk into a monthly amount is period normalization.",
+    "boundary": "A real rate needs a dated source and can depend on volume, region and contract, so the shop's fixed prices are a simplification; this module uses only hypothetical rates."
+   },
+   "questionIds": [
+    "dbxfe-finops-comparability-question"
+   ],
+   "handbook": {
+    "markdown": "Three rules keep a worksheet honest.\n\n**One unit per sum.** DBUs, instance-hours, GB-months, GB and hours are different quantities, so 300 + 120 + 500 = 920 means nothing. Price each with its own labelled rate first: 300 × 0.50 + 120 × 0.40 + 500 × 0.02 = 150.00 + 48.00 + 10.00 = 208.00 hypothetical USD per month.\n\n**One currency.** A model that receives a rate in another currency should refuse it rather than guess an exchange rate. If a conversion is needed, it happens outside the model with a dated, sourced exchange rate recorded beside the result.\n\n**One period.** Restate everything per month, or per year, before adding: a week is 52 ÷ 12 of a month, a quarter a third, a year a twelfth. Three hours a week is 13 hours a month; at 60.00 an hour that is 780.00, not 180.00. One-offs are never averaged into a month silently: report them apart and show any amortization as a labelled reading aid.\n\nThe same rules govern comparing alternatives. Both must price the same drivers in the same units: an always-on cluster priced with DBUs and instance-hours cannot be compared with a per-run alternative priced with DBUs alone, because the cheaper-looking one is simply incomplete. Lab L13 refuses each case with a reason code (incomparable_units, currency_mismatch, unknown_period, driver_sets_differ) and compares 572.00 with 120.12 hypothetical USD per month only after both sides are complete.\n\nWhat fails: comparisons \"per DBU\" across SKUs whose rates differ, which only current pricing can settle, and totals that mix a weekly effort log with a monthly usage report.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-units"
+    ]
+   },
+   "recap": "Price each unit with its own rate, in one currency and one period, before adding or comparing.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-sensitivity",
+   "version": "1.0.0",
+   "title": "A sensitivity table shows which input moves the answer",
+   "outcome": "Build low, base and high cases per driver in one currency and period, rank the swings, and say what to measure first.",
+   "explanation": "A [[dbxfe-finops-sensitivity-concept|sensitivity table]] keeps every driver in its own unit with a labelled rate, a period and low, base and high values, then restates each per month. Notice the second state: the pilot's base month is 1,000.00 hypothetical USD, 536.00 low and 1,936.00 high, with the migration kept apart. The third state ranks the swings: operations effort moves the month by 1,170.00, platform usage by 150.00. The sponsor's uncertainty is people's hours, so that is the input to measure first, not the DBU rate.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-sensitivity",
+   "conceptIds": [
+    "dbxfe-finops-sensitivity-concept",
+    "dbxfe-finops-driver-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-claim-cost",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "visualId": "dbxfe-finops-sensitivity-visual",
+   "questionIds": [
+    "dbxfe-finops-sensitivity-self"
+   ],
+   "hint": "Compare each driver's high minus low, not its base value.",
+   "handbook": {
+    "markdown": "Build the table in six steps, the same ones the cost and value field guide uses:\n\n1. List the drivers with unit, currency, period, source label (measured, quoted or hypothetical) and the owner of the uncertainty.\n2. Give each a low, base and high value; the range is the owner's honest uncertainty, not a negotiating position.\n3. Restate every recurring driver per month in one currency; keep one-offs apart.\n4. Compute low, base and high totals and each driver's swing, high minus low.\n5. Rank the swings and name the driver that moves the answer most.\n6. Write the period and the exclusions beside the table.\n\nWorked result (synthetic, hypothetical USD per month): base 1,000.00, low 536.00, high 1,936.00. Swings: operations effort 1,170.00 (83.6 percent of the total swing), platform usage 150.00, compute time 48.00, data movement 24.00, storage 8.00. The migration is 15,000.00 in the base case, reported apart, so year one is 12,000.00 recurring plus 15,000.00, or 27,000.00: the cost side that the transparent value calculation lesson assumes, now broken into drivers.\n\nWhat it tells the sponsor: tuning compute is the smaller lever here, and two weeks of logged operations hours would narrow the answer most. What it is not: a forecast, a quotation or a budget. The high case is not a target and the base case is not a promise. Real rates enter only from the current pricing page, dated, with the source label changed from hypothetical to quoted.\n\nLab L13 evaluates exactly this worksheet, refuses its broken variants by reason, and runs a transfer worksheet whose periods differ.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-sensitivity"
+    ]
+   },
+   "recap": "Rank the swings: here operations effort, not DBUs, carries the uncertainty.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-governance",
+   "version": "1.0.0",
+   "title": "A budget tells people; a policy changes what can run",
+   "outcome": "Place budgets, dashboards, tags, compute policies and auto-termination in layers and pick the layer that actually stops a given waste.",
+   "explanation": "Spend governance has layers. A [[dbxfe-finops-budget-concept|budget]] watches cumulative monthly spend and alerts recipients at a threshold; dashboards and tags make usage visible and attributable. A [[dbxfe-finops-policy-concept|compute policy]] limits what users may create, and auto-termination or auto-stop ends idle compute. Notice the second state: the 80 percent alert reaches the data lead at 21:00 while the untagged exploration cluster keeps running, because no policy required auto-termination. The current budget API also lists a block-usage action; verify what it covers before relying on it.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-governance",
+   "conceptIds": [
+    "dbxfe-finops-budget-concept",
+    "dbxfe-finops-policy-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-budgets",
+    "dbxfe-finops-claim-policies",
+    "dbxfe-finops-claim-idle",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "visualId": "dbxfe-finops-governance-visual",
+   "samajh": {
+    "text": "Socho phone plan mein 80 percent data khatam hone par SMS aata hai. SMS aaya, par video chalta raha aur data khatam hota raha. Data tabhi ruka jab phone ki setting mein 'limit par data band karo' pehle se laga tha. SMS batata hai, setting rokti hai. Aur kaunsi app kitna data kha rahi hai, woh alag list se pata chalta hai.",
+    "mapping": "The SMS is the budget alert, the phone's data-limit setting is a compute policy or auto-termination, and the per-app usage list is the usage dashboard grouped by tags.",
+    "boundary": "Budgets and policies are separate account and workspace features with their own permissions and preview status, and a newer budget action may block usage in cases the current documentation defines; verify rather than assume."
+   },
+   "questionIds": [
+    "dbxfe-finops-governance-self"
+   ],
+   "handbook": {
+    "markdown": "Place each control by what it can do:\n\n| Layer | Does | Does not |\n|---|---|---|\n| Budget and alert | Tracks cumulative monthly spend against thresholds, measured in list-price US dollars in the current API, and notifies recipients | Change what runs, unless a blocking action is configured and verified |\n| Usage dashboard | Shows usage by SKU, workspace and tag | Enforce anything |\n| Tags and usage policies | Attribute usage to owners | Reduce usage |\n| Compute policy | Limits what users may create: node types, sizes, required tags, auto-termination | Change compute created outside it |\n| Auto-termination and auto-stop | End idle clusters and warehouses | Decide who should run what |\n\nThe budget API lists a block-usage action type beside email notification. This module does not assume what it blocks, for which products, or whether it is available to an account: read the current budgets page and test it before relying on it.\n\nOrder of work for Cinderline: a compute policy for analysts (auto-termination, bounded sizes, a required team tag), existing clusters moved under it, warehouse auto-stop set for the morning window, usage policies for serverless notebooks, then budgets with named owners and a written action for each threshold. The cost optimization pillar lists compute policies, auto-termination and tagging among its controls.\n\nWhat fails: a budget with no owner, alerts routed to a shared mailbox nobody reads, policies that exempt the one team that creates most clusters, and treating an alert as a stop. How to explain it: \"the budget tells us; the policy stops it.\" Nothing here guarantees a level of spend; usage rows show what actually happened.",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-governance"
+    ]
+   },
+   "recap": "Budgets inform, tags attribute, and policies with auto-termination change what runs.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-finops-experiment",
+   "version": "1.0.0",
+   "title": "Cost per unit of work needs repeated runs and their spread",
+   "outcome": "Design a small controlled experiment, compute cost per unit of work with its spread, and decline to rank what one run cannot show.",
+   "explanation": "A [[dbxfe-finops-experiment-concept|controlled cost experiment]] runs the same work several times on each candidate configuration and records duration and units consumed per run. Notice the summary state: at a hypothetical 0.50 per DBU, small costs 2.00 to 2.20 per 1,000 items and large 2.40 to 3.00, but large finishes in less than half the time. The failed run's DBU is real spend with no work to divide by, the instance-hour row is refused, and xlarge, observed once, is not ranked. These rows are Lab L13's synthetic fixture.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-experiment",
+   "conceptIds": [
+    "dbxfe-finops-experiment-concept",
+    "dbxfe-finops-unit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pricing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction",
+    "dbxfe-fact-warehouse"
+   ],
+   "visualId": "dbxfe-finops-experiment-visual",
+   "questionIds": [
+    "dbxfe-finops-experiment-question"
+   ],
+   "hint": "Ask what a single observation can say about typical cost.",
+   "handbook": {
+    "markdown": "A controlled cost experiment answers \"which configuration costs least per unit of work at an acceptable time?\" with evidence rather than a label.\n\nDesign:\n\n- Same work every run (same input data and code), same time window, caches treated the same way.\n- At least three runs per configuration, interleaved rather than all of one configuration first.\n- Record per run: configuration, work items, duration, and units consumed with their unit.\n- Price units with one labelled rate per unit and report cost per unit of work, here per 1,000 items.\n\nWorked result (synthetic, Lab L13 fixture, 0.50 hypothetical USD per DBU): small 2.00 / 2.10 / 2.20 per 1,000 items in a median 630 seconds; large 2.40 / 2.70 / 3.00 in 270 seconds; xlarge 4.00 once, in 200 seconds. Small's whole range sits below large's, so across these runs it is cheaper per unit of work, while large is faster. xlarge is not ranked because one run has no spread. A failed run that processed nothing spent 1.0 DBU; it is excluded from the ratio and still reported as spend. A row recorded in instance-hours is refused because the experiment's basis is DBU.\n\nDecide against the latency tolerance: the nightly job must publish before the morning page's 06:30 refresh, so small fits unless measured production runs over the real volume say otherwise.\n\nLimits: synthetic runs demonstrate the method, not performance; toy timings are not benchmarks; platform usage is only one driver, and classic compute's instance time must be measured too. The lab's transfer file has overlapping ranges, where the honest answer is \"no clear winner yet\".",
+    "sourceSectionIds": [
+     "dbxfe-finops-l01-experiment"
+    ]
+   },
+   "recap": "Repeat each configuration, report cost per unit of work with its spread, and rank only what the runs support.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-finops-l01-card1",
+   "beatId": "dbxfe-finops-drivers"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card2",
+   "beatId": "dbxfe-finops-classes"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card3",
+   "beatId": "dbxfe-finops-utilization"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card4",
+   "beatId": "dbxfe-finops-startup"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card5",
+   "beatId": "dbxfe-finops-queue"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card6",
+   "beatId": "dbxfe-finops-quota"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card7",
+   "beatId": "dbxfe-finops-attribution"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card8",
+   "beatId": "dbxfe-finops-system"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card9",
+   "beatId": "dbxfe-finops-unit"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card10",
+   "beatId": "dbxfe-finops-comparability"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card11",
+   "beatId": "dbxfe-finops-sensitivity"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card12",
+   "beatId": "dbxfe-finops-governance"
+  },
+  {
+   "cardId": "dbxfe-finops-l01-card13",
+   "beatId": "dbxfe-finops-experiment"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-finops-extension-pools",
+   "revision": "1",
+   "prompt": "What does an idle instance in a Databricks pool cost, and in which billing unit?",
+   "answer": "No DBUs while it waits in the pool, but the cloud provider still bills the instance's running time.",
+   "explanation": "A [[dbxfe-finops-extension-pools-concept|pool]] keeps idle, ready-to-use instances so that attached clusters start and autoscale faster; clusters take instances from it and return them when they release them. The Instance Pools API says Databricks does not charge DBUs while instances are idle in the pool and that instance provider billing does apply. A pool therefore trades startup minutes for idle instance-hours: two instances kept warm overnight cost cloud time and no platform units. Size the pool's idle minimum from how often clusters actually start, and price both units before calling it a saving.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-time",
+   "conceptIds": [
+    "dbxfe-finops-extension-pools-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-pools",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "beatId": "dbxfe-finops-startup",
+   "whyItMatters": "Shows that shortening startup moves cost into a different billing unit rather than removing it, which a single-unit estimate would miss."
+  },
+  {
+   "id": "dbxfe-finops-extension-flexible",
+   "revision": "1",
+   "prompt": "What changes when a cluster uses flexible node types and its preferred node type is unavailable?",
+   "answer": "The launch or upscale falls back to a listed alternate node type, so the work runs on a different instance with its own rate.",
+   "explanation": "The Clusters API's [[dbxfe-finops-extension-flexible-concept|flexible node type]] setting lists alternate node type identifiers used as fallbacks when the primary node type is unavailable during launch and upscale. It addresses a shortage of that instance type, such as AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE, not an exhausted account quota, which still needs a quota increase or freed capacity. Because the fallback is a different instance, its DBU mapping, cloud rate and performance can differ, so the worksheet and the cost experiment include the fallback type, and the feature's availability is checked in the current documentation.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-limits",
+   "conceptIds": [
+    "dbxfe-finops-extension-flexible-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-quota",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "beatId": "dbxfe-finops-quota",
+   "whyItMatters": "Separates a capacity fallback from a quota fix and keeps the fallback's different rate inside the cost model."
+  },
+  {
+   "id": "dbxfe-finops-extension-corrections",
+   "revision": "1",
+   "prompt": "How does the billable usage table correct a wrong usage record, and what does that mean for a monthly report?",
+   "answer": "It adds a retraction row that negates the original and a restatement row with the corrected value, so reports sum every record type.",
+   "explanation": "A [[dbxfe-finops-extension-corrections-concept|usage correction]] never edits the original row. The record_type column marks rows as original, retraction or restatement: the retraction carries the negative of the original quantity and the restatement carries the corrected one. Summing every row gives the corrected figure; a report filtered to original rows keeps the error, and a report run before the correction arrives shows the old value. A monthly report is therefore rerun, or labelled with the date it was run, while late corrections can still land.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-attribution",
+   "conceptIds": [
+    "dbxfe-finops-extension-corrections-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-billing",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "beatId": "dbxfe-finops-system",
+   "whyItMatters": "Explains why two runs of the same monthly query can disagree, and which of the two to trust."
+  },
+  {
+   "id": "dbxfe-finops-extension-budget-action",
+   "revision": "1",
+   "prompt": "According to the current budget API, what can a budget alert do when its threshold is crossed?",
+   "answer": "It can notify recipients by email, and the API also lists a block-usage action type whose scope must be verified first.",
+   "explanation": "The budget API models each [[dbxfe-finops-extension-budget-action-concept|alert action]] with an action type, EMAIL_NOTIFICATION or BLOCK_USAGE, and a target such as an email address. Thresholds are measured in list-price US dollars over cumulative monthly spend and can be evaluated for the whole budget or per user, with per-user threshold overrides. The SDK text does not say which products a block affects or whether the action is available to every account, so a governance design treats blocking as a verification item and keeps compute policies and auto-termination as the controls that certainly act on compute.",
+   "lessonId": "dbxfe-finops-l01",
+   "sectionId": "dbxfe-finops-l01-governance",
+   "conceptIds": [
+    "dbxfe-finops-extension-budget-action-concept"
+   ],
+   "claimIds": [
+    "dbxfe-finops-claim-budgets",
+    "dbxfe-finops-guidance",
+    "dbxfe-finops-fiction"
+   ],
+   "beatId": "dbxfe-finops-governance",
+   "whyItMatters": "Corrects the belief that budgets can only inform, while refusing to assume that they can stop spend."
+  }
+ ],
+ "recap": {
+  "title": "Six drivers, three clocks, one honest range",
+  "markdown": "**A cost answer starts as drivers, not a number.** Compute time and platform usage move with the compute class; storage, data movement, operations effort and the one-off move with other decisions. Running time splits into busy, idle, starting and queued, and each has its own lever: auto-termination or per-run compute, batching or pools, more clusters or a different arrival time. Quotas refuse a launch before any usage exists. Tags written at usage time make the billable usage system table attributable, and corrections are summed, never filtered out. Unit costs divide only what the work causes and return unknown for zero work. A sensitivity table in one currency and one period shows which input to measure first, and budgets inform while policies act. **Transfer challenge:** redo the worksheet for a nightly job that moves to serverless compute for jobs. Which drivers leave your cloud bill, which remain on the platform line, and which facts must you read from current pricing, dated, before the comparison means anything?",
+  "visualId": "dbxfe-finops-sensitivity-visual"
+ },
+ "appliedTask": {
+  "title": "The second plant joins in October",
+  "prompt": "In October a second plant joins: the nightly job runs once per plant, the morning report's busiest minute rises to eight overlapping queries, a new analyst team wants its own cluster, and the second plant's data doubles storage and data movement. Update the worksheet's base case with every rate labelled hypothetical, choose compute for the new work, say what evidence you would read before resizing the warehouse, and write the attribution and governance changes.",
+  "modelAnswer": "Worksheet: compute time and platform usage roughly double for the nightly work because each plant gets its own run; storage and data movement double to 1,000 GB-month and 480 GB a month; operations effort is re-estimated with the operations director and stays the widest input; the migration one-off stays apart unless the second plant needs its own cutover, and every rate keeps the label hypothetical rate, not a price. Compute: a second job compute run per night, or a second task per plant, never a longer-lived cluster; the new team gets all-purpose compute under the analysts' policy with auto-termination and a required team tag. Evidence: query timings for the busiest minute, separating provisioning and at-capacity waits from execution; add a cluster only if at-capacity waiting appears, and a larger size only for spilling queries. Attribution and governance: plant and project tags on every resource, a usage policy for serverless notebooks, a weekly check for untagged usage, and a budget alert with a named owner.",
+  "reasoning": "It changes only the drivers the new work moves, keeps each figure labelled and in one period, ties capacity changes to waiting evidence rather than headcount, and fixes attribution before the new usage starts instead of after.",
+  "beatIds": [
+   "dbxfe-finops-drivers",
+   "dbxfe-finops-classes",
+   "dbxfe-finops-queue",
+   "dbxfe-finops-attribution",
+   "dbxfe-finops-sensitivity",
+   "dbxfe-finops-governance"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-finops-scenario"
+ ]
+}

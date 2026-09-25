@@ -18,7 +18,7 @@ A **decision gate** states the question, evidence required, accepting stakeholde
 |---|---|
 | Decision | Invest in a bounded one-plant quality pilot? |
 | Evidence needed | Source access confirmed; metric definition agreed; sample reconciliation designed |
-| Acceptor | Operations sponsor, with data and security leads |
+| Acceptor | Operations sponsor, with quality, data and security leads |
 | Continue | Owners accept the scope and test criteria |
 | Pause | Source access or operating owner remains unresolved |
 | Change direction | Daily batch already meets the actual business need |

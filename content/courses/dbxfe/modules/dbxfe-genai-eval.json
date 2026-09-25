@@ -1,0 +1,288 @@
+{
+  "module": {
+    "id": "dbxfe-genai-eval",
+    "title": "GenAI evaluation, traces and failure analysis",
+    "summary": "Evaluate a GenAI assistant from its traces: cases with expected properties written before any output, validated deterministic scorers, a failure taxonomy that separates retrieval failures, reasoning failures, denied tools and policy blocks, and human review, calibrated judges and MLflow 3 monitoring in their proper places.",
+    "objectives": [
+      "Write a test dataset whose cases declare checkable expected properties and blocking before any output exists.",
+      "Score answers and traces with deterministic checks, validate each scorer against reference verdicts, and classify every failure by class, earliest divergence and owner.",
+      "Decide where human review and calibrated model-based judges belong, and map the loop onto MLflow 3 evaluation, tracing and production monitoring."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-retrieval"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-genai-eval-l01.json"
+    ],
+    "scenarioId": "dbxfe-genai-eval-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-genai-eval-scenario",
+      "title": "Write the evaluation readout for Cinderline's assistant pilot",
+      "context": "Fictional Cinderline Components ran a deterministic evaluation harness over twelve authored cases for its read-only maintenance assistant: five passed, one retrieval failure (a superseded revision), four reasoning failures, one tool request denied by authorization after a shift note planted an instruction, and one drafted safety bypass stopped by the output policy. The maintenance lead wants to expand to Plant 2 next month. A vendor offers an LLM judge that produces one 'quality score' per answer. Security asks whether the denied request was a real risk. No production traffic exists yet, and nobody has calibrated a judge.",
+      "task": "Write a one-page readout and recommendation: results by class with earliest divergences and owners, the blocking results, what will change before the rerun, how human review and any judge will be introduced, what monitoring will run after release and where, and what this run cannot show.",
+      "requirements": [
+        "Report results by failure class and case class with the blocking results named, and give no blended overall score.",
+        "Name a control and an owner for each failure, keeping contained failures apart from uncontained ones.",
+        "Introduce any model-based judge only after calibration against reviewed examples, and record its version.",
+        "Plan monitoring: what runs automatically, what runs in the application or offline, and how findings return to the dataset.",
+        "List what the run cannot show, including traffic realism and judge calibration."
+      ],
+      "model": "### Results\nTwelve authored cases: pass 5; retrieval failure 1 (c02: revision 3 never retrieved, revision 2 cited); reasoning failure 4 (c03 cited the wrong manual; c04 invented a chunk instead of abstaining; c10 looked up the wrong part; c11 dropped the citations field); denied tool 1 (c08, after shift note 114); policy block 1 (c07, a drafted bypass). Blocking, as declared before the run: c04, c07, c08.\n\n### Controls and owners\nIndex owner: remove superseded revisions and carry revision status on each chunk (c02). Application owner: a citation validator against the context given to the model (here the retrieved set) with forced abstention (c03, c04), argument checks before tool calls (c10) and schema validation of the answer payload (c11). Agent owner and security: treat retrieved text as content and keep authorization outside the prompt (c08). The guardrail stays a second line, so the draft behaviour behind c07 is fixed too.\n\n### Reviewers and judges\nThe vendor's single score is declined as a gate. The maintenance lead reviews a sample for citation support; a judge is added only after it matches those labels on held-out items, with its model and rubric recorded.\n\n### Monitoring\nOpen-source automatic evaluation runs LLM judges only, so the citation validator and forbidden-tool logging run inside the application; a calibrated groundedness judge samples traces; each confirmed failure becomes a case.\n\n### What this run cannot show\nThe real question mix, rare-event rates, judge calibration, cost and latency under load. Decision: not ready to expand; rerun all twelve cases after the fixes.",
+      "reasoning": "The readout keeps classes and owners apart, treats contained failures as failures, refuses an uncalibrated single score, puts deterministic checks where the platform will not schedule them, and ends with a decision tied to evidence.",
+      "rubric": [
+        {
+          "id": "dbxfe-genai-eval-scenario-rubric-1",
+          "criterion": "Results by class",
+          "weak": "One overall pass rate, or 'mostly fine'.",
+          "partial": "Counts by class, but blocking results or earliest divergences are missing.",
+          "strong": "Counts by failure and case class, earliest divergences, blocking results named, no blended score."
+        },
+        {
+          "id": "dbxfe-genai-eval-scenario-rubric-2",
+          "criterion": "Controls and owners",
+          "weak": "'Improve the prompt' for every failure.",
+          "partial": "Controls named, but contained failures are treated as passes.",
+          "strong": "A control and an owner per failure, with contained and uncontained failures kept apart."
+        },
+        {
+          "id": "dbxfe-genai-eval-scenario-rubric-3",
+          "criterion": "Reviewers and judges",
+          "weak": "Adopts the vendor's score as the release gate.",
+          "partial": "Mentions calibration without a method or a held-out set.",
+          "strong": "Reviewer sample first, judge only after held-out agreement, judge version recorded."
+        },
+        {
+          "id": "dbxfe-genai-eval-scenario-rubric-4",
+          "criterion": "Monitoring and limits",
+          "weak": "No monitoring plan and no limits.",
+          "partial": "Monitoring planned, but it assumes code scorers run automatically.",
+          "strong": "Sampled judges plus in-application deterministic checks, findings fed back as cases, explicit limits."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Was the denied work-order request a real risk?",
+          "response": "Security's view: the denial shows the control held today, but the model followed a planted instruction; one mistaken grant would have created a work order, so the case stays blocking until the behaviour changes."
+        },
+        {
+          "question": "Can the vendor's quality score replace the reviewers?",
+          "response": "The vendor could not show agreement figures against our reviewers. The maintenance lead will label a sample first, and the score is considered only after that comparison."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-genai-eval-l01"
+      ],
+      "claimIds": [
+        "dbxfe-fact-evaluation",
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-genai-eval-course-claim-evaluate",
+        "dbxfe-genai-eval-course-claim-trace",
+        "dbxfe-genai-eval-course-claim-scorers",
+        "dbxfe-genai-eval-course-claim-monitoring",
+        "dbxfe-genai-eval-course-claim-judging"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-genai-eval-course-source-evaluation",
+      "title": "LLM and Agent Evaluation",
+      "url": "https://mlflow.org/docs/latest/genai/eval-monitor/",
+      "publisher": "MLflow",
+      "type": "official documentation",
+      "context": "Open-source MLflow 3 GenAI evaluation, read at release 3.16.1.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Page source read on 2026-09-23 from docs/docs/genai/eval-monitor/index.mdx in the MLflow repository at tag v3.16.1; the URL, which the mlflow 3.16.1 package links, was not fetched (mlflow.org blocked by the sandbox egress proxy) and was not confirmed by search in this build session (search allowance exhausted). The 'latest' pages move with each release."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-source-tracing",
+      "title": "LLM Tracing and Agent Observability",
+      "url": "https://mlflow.org/docs/latest/genai/tracing/",
+      "publisher": "MLflow",
+      "type": "official documentation",
+      "context": "Open-source MLflow 3 tracing, read at release 3.16.1.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Page source read on 2026-09-23 from docs/docs/genai/tracing/index.mdx at tag v3.16.1; the URL, which the mlflow 3.16.1 package links, was not fetched (mlflow.org blocked by the sandbox egress proxy) and was not confirmed by search in this build session (search allowance exhausted). What a trace holds depends on instrumentation."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-source-scorers",
+      "title": "LLM Judges and Scorers",
+      "url": "https://mlflow.org/docs/latest/genai/eval-monitor/scorers/",
+      "publisher": "MLflow",
+      "type": "official documentation",
+      "context": "Open-source MLflow 3 scorers and judges, read at release 3.16.1.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Page source read on 2026-09-23 from docs/docs/genai/eval-monitor/scorers/index.mdx at tag v3.16.1; the URL, which the mlflow 3.16.1 package links, was not fetched (mlflow.org blocked by the sandbox egress proxy) and was not confirmed by search in this build session (search allowance exhausted). Built-in judge availability changes between releases; in the 3.16.1 package Safety and RetrievalRelevance also run on non-Databricks judge models, although a note on that release's built-in-judges page calls them Databricks-managed only."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-source-automatic",
+      "title": "Automatic Evaluation (documentation source, MLflow 3.16.1)",
+      "url": "https://raw.githubusercontent.com/mlflow/mlflow/v3.16.1/docs/docs/genai/eval-monitor/automatic-evaluations/index.mdx",
+      "publisher": "MLflow (mlflow/mlflow repository)",
+      "type": "official documentation",
+      "context": "Source file of the open-source MLflow Automatic Evaluation page, pinned to tag v3.16.1.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Fetched on 2026-09-23 (HTTP 200) and read; the rendered documentation page was not fetched. Open-source behaviour; managed Databricks monitoring may differ, and judge calls cost money, so check current pricing."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-source-judging",
+      "title": "Judging LLM-as-a-judge with MT-Bench and Chatbot Arena",
+      "url": "https://arxiv.org/abs/2306.05685",
+      "publisher": "arXiv (Zheng et al., LMSYS)",
+      "type": "primary reference",
+      "context": "2023 research paper on LLMs as judges of chat assistants.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The arXiv page was not fetched (host blocked by the sandbox egress proxy) and not confirmed by search in this session; the authors' repository README, fetched on 2026-09-23, links this page and gives the title and citation, and their judge code runs each pairwise comparison in both orders. The module attributes no measured result to the paper; measure your own judge."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-source-lmsys-blog",
+      "title": "Chatbot Arena Leaderboard Week 8: Introducing MT-Bench and Vicuna-33B (blog post source)",
+      "url": "https://github.com/lm-sys/lm-sys.github.io/blob/722a68b0dbffa5d3943df3e1d2c1cba1c5b78fee/blog/2023-06-22-leaderboard.md",
+      "publisher": "LMSYS (lm-sys/lm-sys.github.io, the source repository of lmsys.org)",
+      "type": "primary reference",
+      "context": "The 2023 study authors' own blog summary of their paper (Zheng, Chiang, Sheng and Zhang, 22 June 2023).",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/lm-sys/lm-sys.github.io/722a68b0dbffa5d3943df3e1d2c1cba1c5b78fee/blog/2023-06-22-leaderboard.md: 'In our latest paper, [\"Judging LLM-as-a-judge\"](https://arxiv.org/abs/2306.05685), we conducted a systematic study to answer how reliable those LLM judges are. ... We begin by acknowledging potential limitations of LLM-as-a-judge: ... - **Position bias** where LLM judges may favor the first answer in a pairwise comparison. ... - **Verbosity bias** where LLM judges may favor lengthier answers, regardless of their quality. ... - **Self-enhancement bias** where LLM judges may favor their own responses.' The authors' summary, not the paper's measurements: it lists the biases as potential limitations LLM judges may have; the arXiv paper was not read (host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-source-fastchat-judge-code",
+      "title": "FastChat llm_judge source: fastchat/llm_judge/common.py (pairwise judging)",
+      "url": "https://github.com/lm-sys/FastChat/blob/587d5cfa1609a43d192cedb8441cac3c17db105d/fastchat/llm_judge/common.py",
+      "publisher": "LMSYS (lm-sys/FastChat repository)",
+      "type": "primary reference",
+      "context": "The 2023 study authors' MT-Bench judging code at a pinned commit.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/lm-sys/FastChat/587d5cfa1609a43d192cedb8441cac3c17db105d/fastchat/llm_judge/common.py: 'g1_winner, g1_user_prompt, g1_judgment = run_judge_pair( ... question, answer_1, answer_2, judge, ref_answer, multi_turn=multi_turn ... g2_winner, g2_user_prompt, g2_judgment = run_judge_pair( ... question, answer_2, answer_1, judge, ref_answer, multi_turn=multi_turn ... if g1_winner == g2_winner: ... winner = \"inconsistent\"'. Open-source research code, scope limited to how the authors ran pairwise judgments: each pair in both orders, a disagreeing pair recorded as 'inconsistent'."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-genai-eval-course-claim-evaluate",
+      "description": "An MLflow 3 evaluation combines a dataset of inputs and expectations, scorers and an optional predict function in mlflow.genai.evaluate(), and the page lists human feedback, LLM judges and production monitoring among its capabilities.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-eval-course-source-evaluation"
+      ],
+      "context": "Open-source MLflow 3.16.1."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-claim-trace",
+      "description": "MLflow Tracing is OpenTelemetry-compatible and records the inputs, outputs and metadata of each intermediate step of a request, with feedback attached to traces.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-eval-course-source-tracing"
+      ],
+      "context": "Open-source MLflow 3.16.1."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-claim-scorers",
+      "description": "MLflow classifies LLM judges and code-based scorers alike as scorers, recommends a workflow from traces through human feedback and error analysis to judges, and states that LLM judges have natural biases and should be aligned with human feedback.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-eval-course-source-scorers"
+      ],
+      "context": "Open-source MLflow 3.16.1."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-claim-monitoring",
+      "description": "Open-source MLflow automatic evaluation runs registered LLM judges on a sampled, optionally filtered share of logged traces; code-based scorers are not supported there and run offline.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-eval-course-source-automatic"
+      ],
+      "context": "Open-source MLflow 3.16.1."
+    },
+    {
+      "id": "dbxfe-genai-eval-course-claim-judging",
+      "description": "The authors of a 2023 study of LLMs as judges list position, verbosity and self-enhancement bias among the potential limitations of LLM judges; their code runs pairwise judgments in both orders and records disagreement as inconsistent.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-genai-eval-course-source-judging",
+        "dbxfe-genai-eval-course-source-lmsys-blog",
+        "dbxfe-genai-eval-course-source-fastchat-judge-code"
+      ],
+      "context": "Research findings on the judges studied; measure your own."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-genai-eval-l01-property-concept",
+      "term": "expected property",
+      "aliases": [
+        "expectation",
+        "case property"
+      ],
+      "definition": "A checkable statement a test case makes about its answer or trace, written before any output exists.",
+      "lessonId": "dbxfe-genai-eval-l01",
+      "sectionId": "dbxfe-genai-eval-l01-cases"
+    },
+    {
+      "id": "dbxfe-genai-eval-l01-scorer-concept",
+      "term": "deterministic scorer",
+      "aliases": [
+        "code-based scorer",
+        "deterministic check"
+      ],
+      "definition": "A function of recorded evidence returning pass, fail or not applicable with a reason code, identically on every run.",
+      "lessonId": "dbxfe-genai-eval-l01",
+      "sectionId": "dbxfe-genai-eval-l01-scorers"
+    },
+    {
+      "id": "dbxfe-genai-eval-l01-trace-concept",
+      "term": "trace and span",
+      "aliases": [
+        "MLflow trace",
+        "span tree"
+      ],
+      "definition": "The recorded tree of steps for one request, each span holding its type, parent, status, inputs, outputs and attributes.",
+      "lessonId": "dbxfe-genai-eval-l01",
+      "sectionId": "dbxfe-genai-eval-l01-traces"
+    },
+    {
+      "id": "dbxfe-genai-eval-l01-taxonomy-concept",
+      "term": "failure taxonomy",
+      "aliases": [
+        "retrieval failure",
+        "reasoning failure",
+        "denied tool",
+        "policy block"
+      ],
+      "definition": "Ordered rules that assign each failed case one class and owner and keep the earliest divergent span.",
+      "lessonId": "dbxfe-genai-eval-l01",
+      "sectionId": "dbxfe-genai-eval-l01-taxonomy"
+    },
+    {
+      "id": "dbxfe-genai-eval-l01-judge-concept",
+      "term": "model-based judge",
+      "aliases": [
+        "LLM judge",
+        "LLM-as-a-judge"
+      ],
+      "definition": "A language model applying a rubric to outputs or traces, whose verdicts need calibration against human labels.",
+      "lessonId": "dbxfe-genai-eval-l01",
+      "sectionId": "dbxfe-genai-eval-l01-judges"
+    },
+    {
+      "id": "dbxfe-genai-eval-l01-monitoring-concept",
+      "term": "production monitoring",
+      "aliases": [
+        "automatic evaluation",
+        "online evaluation"
+      ],
+      "definition": "Scoring a sample of real logged traces after release so that new failures become new test cases.",
+      "lessonId": "dbxfe-genai-eval-l01",
+      "sectionId": "dbxfe-genai-eval-l01-mlflow"
+    }
+  ]
+}

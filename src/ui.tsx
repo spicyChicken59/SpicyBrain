@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -8,8 +9,15 @@ import {
 } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { Asset, Course } from "./content-schema";
-import { lessonHref, paths } from "./catalog";
+import type { Asset } from "./content-schema";
+import type { CatalogCourse } from "./catalog-types";
+import {
+  cachedReferences,
+  lessonHref,
+  loadReferences,
+  paths,
+  subscribeReferences,
+} from "./catalog";
 import { pathForLesson } from "./paths";
 import { StudyStore, exportText } from "./study";
 export const store = new StudyStore();
@@ -78,6 +86,33 @@ export function StudyDownload({
       {error && <p role="alert">{error}</p>}
     </>
   );
+}
+/**
+ * A course download (an exercise bundle or data pack): a same-origin static
+ * archive whose bytes the build checked against the declared SHA-256.
+ * Downloading never executes anything or records completion.
+ */
+export function ContentDownload({
+  course,
+  downloadId,
+}: {
+  course: CatalogCourse;
+  downloadId: string;
+}) {
+  const file = course.downloads?.find((d) => d.id === downloadId);
+  return file ? (
+    <>
+      <a
+        href={baseAsset(
+          `content-downloads/${file.path.replace(/^downloads\//, "")}`,
+        )}
+        download
+      >
+        {file.title}
+      </a>
+      <p>{file.description}</p>
+    </>
+  ) : null;
 }
 export function MD({
   children,
@@ -274,47 +309,143 @@ export function StorageNotice() {
     </>
   );
 }
+/**
+ * A course's reference tier (full sources, claims and glossary records).
+ * Returned at once when a view already loaded it; otherwise fetched when
+ * `enabled` first becomes true, so a closed Sources panel costs nothing.
+ */
+export function useReferences(courseId: string, enabled = true) {
+  // Every panel reads the one loader's cache, so a load or a Retry in any of
+  // them updates all of them (an earlier failure in another panel included).
+  const references = useSyncExternalStore(subscribeReferences, () =>
+    cachedReferences(courseId),
+  );
+  const [state, setState] = useState<{ courseId: string; error?: string }>({
+    courseId,
+  });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!enabled || references) return;
+    let live = true;
+    loadReferences(courseId).then(
+      () => live && setState({ courseId }),
+      (error: unknown) =>
+        live &&
+        setState({
+          courseId,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Sources could not load. Your study data is safe.",
+        }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [courseId, enabled, references, attempt]);
+  return {
+    references,
+    error: !references && state.courseId === courseId ? state.error : undefined,
+    retry: () => {
+      setState({ courseId });
+      setAttempt((n) => n + 1);
+    },
+  };
+}
+/**
+ * What a Sources panel shows while its references load or after they fail.
+ * Retry moves focus to the panel's own summary or heading first: the button
+ * is replaced by the loading status and then by the sources, and focus must
+ * not fall back to the page.
+ */
+export function ReferencesPending({
+  error,
+  retry,
+}: {
+  error?: string;
+  retry: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  return (
+    <div ref={box} className="references-pending">
+      {error ? (
+        <div className="sc-notice" role="alert">
+          <p>{error}</p>
+          <button
+            className="sc-btn sc-btn--secondary"
+            onClick={() => {
+              const host =
+                box.current?.closest("details")?.querySelector("summary") ??
+                box.current?.closest("section")?.querySelector("h2");
+              if (host) {
+                if (host.tagName === "H2") host.tabIndex = -1;
+                host.focus();
+              }
+              retry();
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
+        <p role="status">Loading sources…</p>
+      )}
+    </div>
+  );
+}
 export function Sources({
   course,
   claimIds,
 }: {
-  course: Course;
+  course: CatalogCourse;
   claimIds: string[];
 }) {
-  const claims = course.claims.filter((c) => claimIds.includes(c.id));
+  const [opened, setOpened] = useState(false);
+  const { references, error, retry } = useReferences(course.id, opened);
+  const claims =
+    references?.claims.filter((c) => claimIds.includes(c.id)) ?? [];
   const ids = new Set(claims.flatMap((c) => c.sourceIds));
   return (
-    <details className="sc-details section-sources">
+    <details
+      className="sc-details section-sources"
+      onToggle={(e) => e.currentTarget.open && setOpened(true)}
+    >
       <summary>Sources & context</summary>
-      {claims.map((c) => (
-        <p key={c.id}>
-          <strong>
-            {c.kind === "documented"
-              ? "Documented product fact"
-              : c.kind === "fictional"
-                ? "Fictional teaching example"
-                : "SpicyBrain educational guidance"}
-            .
-          </strong>{" "}
-          {c.description} <span className="sc-muted">{c.context}</span>
-        </p>
-      ))}
-      {course.sources
-        .filter((s) => ids.has(s.id))
-        .map((s) => (
-          <div className="source-record" key={s.id}>
-            <a href={s.url} target="_blank" rel="noopener noreferrer">
-              {s.title} ↗
-            </a>
-            <p>
-              {s.publisher} · {s.type} · checked {s.accessDate}. Reviewed{" "}
-              {s.reviewDate}.
+      {!references ? (
+        <ReferencesPending error={error} retry={retry} />
+      ) : (
+        <>
+          {claims.map((c) => (
+            <p key={c.id}>
+              <strong>
+                {c.kind === "documented"
+                  ? "Documented product fact"
+                  : c.kind === "fictional"
+                    ? "Fictional teaching example"
+                    : "SpicyBrain educational guidance"}
+                .
+              </strong>{" "}
+              {c.description} <span className="sc-muted">{c.context}</span>
             </p>
-            <p>
-              {s.context} {s.caveat}
-            </p>
-          </div>
-        ))}
+          ))}
+          {references.sources
+            .filter((s) => ids.has(s.id))
+            .map((s) => (
+              <div className="source-record" key={s.id}>
+                <a href={s.url} target="_blank" rel="noopener noreferrer">
+                  {s.title} ↗
+                </a>
+                <p>
+                  {s.publisher} · {s.type} · checked {s.accessDate}. Reviewed{" "}
+                  {s.reviewDate}.
+                </p>
+                <p>
+                  {s.context} {s.caveat}
+                </p>
+              </div>
+            ))}
+        </>
+      )}
     </details>
   );
 }

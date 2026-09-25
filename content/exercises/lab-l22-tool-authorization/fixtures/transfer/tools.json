@@ -1,0 +1,141 @@
+{
+  "exposed": [
+    {
+      "name": "lookup_item",
+      "effect": "read",
+      "description": "Look up a catalogue item for a ward.",
+      "permission": "catalog:read",
+      "entity_arg": "ward_id",
+      "key_required": false,
+      "approval": "never",
+      "timeout_ms": 1500,
+      "max_attempts": 2,
+      "backoff_ms": 250,
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "item_code",
+          "ward_id"
+        ],
+        "properties": {
+          "item_code": {
+            "type": "string",
+            "pattern": "^S-[0-9]{3}$"
+          },
+          "ward_id": {
+            "type": "string",
+            "pattern": "^W[0-9]{1,2}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "order_supplies",
+      "effect": "external-effect",
+      "description": "Order supplies for a ward; large orders wait for a pharmacist.",
+      "permission": "supplies:order",
+      "entity_arg": "ward_id",
+      "key_required": true,
+      "approval": {
+        "above": {
+          "field": "quantity",
+          "value": 10
+        }
+      },
+      "approve_permission": "supplies:approve",
+      "timeout_ms": 1500,
+      "max_attempts": 2,
+      "backoff_ms": 250,
+      "effect_collection": "orders",
+      "effect_prefix": "O",
+      "effect_fields": [
+        "item_code",
+        "quantity",
+        "ward_id"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "item_code",
+          "quantity",
+          "ward_id"
+        ],
+        "properties": {
+          "item_code": {
+            "type": "string",
+            "pattern": "^S-[0-9]{3}$"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 40
+          },
+          "ward_id": {
+            "type": "string",
+            "pattern": "^W[0-9]{1,2}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "cancel_order",
+      "effect": "internal-write",
+      "description": "Cancel an open order.",
+      "permission": "orders:cancel",
+      "entity_arg": "ward_id",
+      "key_required": true,
+      "approval": "never",
+      "timeout_ms": 1500,
+      "max_attempts": 2,
+      "backoff_ms": 250,
+      "effect_collection": "cancellations",
+      "effect_prefix": "X",
+      "effect_fields": [
+        "order_id",
+        "ward_id"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "order_id",
+          "ward_id"
+        ],
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "pattern": "^O[0-9]+$"
+          },
+          "ward_id": {
+            "type": "string",
+            "pattern": "^W[0-9]{1,2}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ],
+  "advertised": [
+    {
+      "name": "lookup_item",
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "order_supplies",
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "cancel_order",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    }
+  ]
+}

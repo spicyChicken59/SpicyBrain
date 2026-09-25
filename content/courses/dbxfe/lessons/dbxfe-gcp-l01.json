@@ -1,0 +1,657 @@
+{
+ "id": "dbxfe-gcp-l01",
+ "title": "Google Cloud deployment and network boundaries",
+ "summary": "Place Cinderline's organization, projects, Databricks account and two compute planes correctly, trace one query across its trust boundaries with named identities, and run ordered diagnoses for a denied and an unreachable request while keeping unverified capabilities unknown.",
+ "contentVersion": "1.1.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 18,
+ "objectives": [
+  "Place the control plane, the classic compute plane and a serverless workspace against Cinderline's organization, folders and projects, and name the owner of every resource.",
+  "Trace one query's author, control, execution and storage paths with the identity and owning project at each hop, including the service account behind a Unity Catalog storage credential.",
+  "Run ordered diagnoses for a denied and an unreachable request and assemble an evidence matrix whose unverified Google Cloud capabilities stay marked unknown."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Governance and cloud architecture",
+  "Google Cloud",
+  "VPC",
+  "Private Service Connect",
+  "Unity Catalog",
+  "IAM",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-gcp-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-gcp-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-gcp-l01-hierarchy-concept",
+    "dbxfe-gcp-l01-plane-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-workspace"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-start",
+   "kind": "prerequisites",
+   "title": "Before the Google Cloud diagram",
+   "conceptIds": [
+    "dbxfe-gcp-l01-plane-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-placement",
+   "kind": "mechanism",
+   "title": "Organization, project, workspace and two compute planes",
+   "conceptIds": [
+    "dbxfe-gcp-l01-hierarchy-concept",
+    "dbxfe-gcp-l01-plane-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-hierarchy",
+    "dbxfe-gcp-course-claim-workspace",
+    "dbxfe-gcp-course-claim-serverless"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-identities",
+   "kind": "mechanism",
+   "title": "Service accounts, IAM roles and bucket authorization",
+   "conceptIds": [
+    "dbxfe-gcp-l01-account-concept",
+    "dbxfe-gcp-l01-credential-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-accounts",
+    "dbxfe-gcp-course-claim-storage"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-network",
+   "kind": "mechanism",
+   "title": "Classic compute in your VPC",
+   "conceptIds": [
+    "dbxfe-gcp-l01-vpc-concept",
+    "dbxfe-gcp-l01-firewall-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-vpc",
+    "dbxfe-gcp-course-claim-egress",
+    "dbxfe-gcp-course-claim-firewall"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-private",
+   "kind": "mechanism",
+   "title": "Private Service Connect: back-end, front-end and DNS",
+   "conceptIds": [
+    "dbxfe-gcp-l01-psc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-psc",
+    "dbxfe-gcp-course-claim-frontend",
+    "dbxfe-gcp-course-claim-egress"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-serverless",
+   "kind": "mechanism",
+   "title": "Serverless responsibilities and the cells that stay unknown",
+   "conceptIds": [
+    "dbxfe-gcp-l01-ncc-concept",
+    "dbxfe-gcp-l01-unknown-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-serverless",
+    "dbxfe-gcp-course-claim-ncc"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-differs",
+   "kind": "mechanism",
+   "title": "What differs from AWS and Azure",
+   "conceptIds": [
+    "dbxfe-gcp-l01-vpc-concept",
+    "dbxfe-gcp-l01-credential-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-contrast",
+    "dbxfe-gcp-course-claim-workspace",
+    "dbxfe-gcp-course-claim-vpc",
+    "dbxfe-gcp-course-claim-frontend",
+    "dbxfe-gcp-course-claim-ncc"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-example",
+   "kind": "example",
+   "title": "Two failures on the same table",
+   "conceptIds": [
+    "dbxfe-gcp-l01-diagnosis-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-storage",
+    "dbxfe-gcp-course-claim-psc",
+    "dbxfe-gcp-course-claim-firewall",
+    "dbxfe-fact-privileges"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-task",
+   "kind": "exercise",
+   "title": "Diagnose a changed case",
+   "conceptIds": [
+    "dbxfe-gcp-l01-diagnosis-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-storage",
+    "dbxfe-gcp-course-claim-ncc"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-solution",
+   "kind": "solution",
+   "title": "A bounded diagnosis",
+   "conceptIds": [
+    "dbxfe-gcp-l01-diagnosis-concept",
+    "dbxfe-gcp-l01-ncc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-storage",
+    "dbxfe-gcp-course-claim-ncc",
+    "dbxfe-gcp-course-claim-hierarchy"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-limits",
+   "kind": "mistakes",
+   "title": "What this diagram cannot claim",
+   "conceptIds": [
+    "dbxfe-gcp-l01-unknown-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-vpc",
+    "dbxfe-gcp-course-claim-psc",
+    "dbxfe-gcp-course-claim-ncc"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-sources",
+   "kind": "sources",
+   "title": "Sources and verification scope",
+   "conceptIds": [
+    "dbxfe-gcp-l01-unknown-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-hierarchy",
+    "dbxfe-gcp-course-claim-workspace",
+    "dbxfe-gcp-course-claim-serverless",
+    "dbxfe-gcp-course-claim-accounts",
+    "dbxfe-gcp-course-claim-storage",
+    "dbxfe-gcp-course-claim-vpc",
+    "dbxfe-gcp-course-claim-egress",
+    "dbxfe-gcp-course-claim-firewall",
+    "dbxfe-gcp-course-claim-psc",
+    "dbxfe-gcp-course-claim-frontend",
+    "dbxfe-gcp-course-claim-ncc",
+    "dbxfe-gcp-course-claim-contrast"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-links",
+   "kind": "related",
+   "title": "Where this connects",
+   "conceptIds": [
+    "dbxfe-gcp-l01-diagnosis-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-gcp-l01-revisit",
+   "kind": "revisit",
+   "title": "Check your understanding",
+   "conceptIds": [
+    "dbxfe-gcp-l01-diagnosis-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-gcp-l01-q1",
+   "revision": "1",
+   "prompt": "In the changed case, Ardent's bucket refuses the serverless query with a storage error naming cred_quality's service account. Who must make the fix?",
+   "options": [
+    {
+     "id": "dbxfe-gcp-l01-q1-a",
+     "text": "Ardent's bucket administrator, by binding that service account email to roles on gs://ardent-parts-feed.",
+     "rationale": "Correct: the refusal came from Cloud Storage IAM on Ardent's bucket, and only Ardent's administrator can change that bucket's policy."
+    },
+    {
+     "id": "dbxfe-gcp-l01-q1-b",
+     "text": "Cinderline's project owner, by granting a storage admin role on cl-dbx-prod.",
+     "rationale": "A role on Cinderline's project does not reach a bucket in Ardent's organization, and it would widen every bucket in cl-dbx-prod."
+    },
+    {
+     "id": "dbxfe-gcp-l01-q1-c",
+     "text": "A Databricks account admin, by changing the private access settings.",
+     "rationale": "Private access settings govern which endpoints reach the workspace UI and API, not bucket permissions."
+    },
+    {
+     "id": "dbxfe-gcp-l01-q1-d",
+     "text": "Cinderline's network team, by adding Cloud NAT to cl-vpc-dbx.",
+     "rationale": "A refusal proves the request arrived; no network path is missing, and serverless compute does not use Cinderline's NAT."
+    }
+   ],
+   "correctOptionId": "dbxfe-gcp-l01-q1-a",
+   "conceptIds": [
+    "dbxfe-gcp-l01-diagnosis-concept",
+    "dbxfe-gcp-l01-credential-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-storage",
+    "dbxfe-gcp-course-claim-hierarchy"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-q2",
+   "revision": "1",
+   "prompt": "After back-end PSC is enabled in the Tuesday example, which answer from inside dbx-nodes-use4 shows the relay name is set up correctly?",
+   "options": [
+    {
+     "id": "dbxfe-gcp-l01-q2-a",
+     "text": "tunnel.us-east4.gcp.databricks.com resolves to relay-pe's internal address, 10.20.8.5.",
+     "rationale": "Correct: the private zone must answer the tunnel name with the relay endpoint's address inside the node's VPC."
+    },
+    {
+     "id": "dbxfe-gcp-l01-q2-b",
+     "text": "tunnel.us-east4.gcp.databricks.com resolves to a public address.",
+     "rationale": "That is the fault in the example: with no NAT, a public answer leaves the node without a path."
+    },
+    {
+     "id": "dbxfe-gcp-l01-q2-c",
+     "text": "The workspace URL resolves privately, whatever the tunnel name returns.",
+     "rationale": "The workspace records serve REST calls; the relay tunnel needs its own record."
+    },
+    {
+     "id": "dbxfe-gcp-l01-q2-d",
+     "text": "Any answer works, because Cloud NAT carries the traffic either way.",
+     "rationale": "Databricks' template creates no Cloud NAT with back-end PSC, so the private answer is the only path."
+    }
+   ],
+   "correctOptionId": "dbxfe-gcp-l01-q2-a",
+   "conceptIds": [
+    "dbxfe-gcp-l01-psc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-psc",
+    "dbxfe-gcp-course-claim-egress"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-q3",
+   "revision": "1",
+   "prompt": "Which sentence about serverless private connectivity can go into Cinderline's Google Cloud design note today?",
+   "options": [
+    {
+     "id": "dbxfe-gcp-l01-q3-a",
+     "text": "Unknown until verified: the provider documentation lists NCC binding for AWS and Azure only, the SDK models Google Cloud endpoint rules, and the account team must confirm region and release status in writing.",
+     "rationale": "Correct: it records what each source shows and names the evidence that would settle the question."
+    },
+    {
+     "id": "dbxfe-gcp-l01-q3-b",
+     "text": "Supported, because the SDK already has a gcp_endpoint field.",
+     "rationale": "A schema field shows what the API can describe, not what Cinderline's account and region can use."
+    },
+    {
+     "id": "dbxfe-gcp-l01-q3-c",
+     "text": "Supported, because it works on Azure.",
+     "rationale": "Copying another cloud's answer is exactly the mistake the common questions matrix exists to prevent."
+    },
+    {
+     "id": "dbxfe-gcp-l01-q3-d",
+     "text": "Impossible on Google Cloud.",
+     "rationale": "The read sources do not establish absence either; the SDK fields suggest the question is open, so claiming impossibility overreaches."
+    }
+   ],
+   "correctOptionId": "dbxfe-gcp-l01-q3-a",
+   "conceptIds": [
+    "dbxfe-gcp-l01-ncc-concept",
+    "dbxfe-gcp-l01-unknown-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-ncc",
+    "dbxfe-gcp-course-claim-serverless"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-gcp-l01-card1",
+   "revision": "1",
+   "prompt": "Does an IAM role granted on Cinderline's organization apply to a bucket in a project two folders below it?",
+   "answer": "Yes. IAM policies are inherited down the hierarchy, so the bucket's effective policy includes the organization's and folders' policies as well as its own.",
+   "explanation": "Policy Troubleshooter's description lists the policies it evaluates for a permission: the resource's own and those inherited from the project, folder and organization. With uniform bucket-level access, bucket-level or higher policies decide. A broad grant high in the tree reaches every bucket beneath it, which is why reviews look upward, not only at the bucket.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-placement",
+   "conceptIds": [
+    "dbxfe-gcp-l01-hierarchy-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-hierarchy",
+    "dbxfe-gcp-course-claim-storage"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card2",
+   "revision": "1",
+   "prompt": "Which Google Cloud resources does a classic Databricks workspace place in the project it names?",
+   "answer": "Compute Engine VMs for its clusters, its two workspace storage buckets and, unless a customer-managed VPC is given, a Databricks-created VPC.",
+   "explanation": "The workspace's cloud resource container is the project Databricks uses to instantiate the workspace's cloud resources. Databricks' reference architecture names the two workspace storage buckets and the compute VMs' persistent disks as workspace storage, and by default Databricks creates a VPC in the project for each workspace. Those are the objects Cinderline operates, encrypts and diagnoses.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-placement",
+   "conceptIds": [
+    "dbxfe-gcp-l01-plane-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-workspace"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card3",
+   "revision": "1",
+   "prompt": "In the nightly query's storage path, whose identity does Cloud Storage actually check?",
+   "answer": "The storage credential's Databricks-managed service account, through its roles on the bucket, not the analyst's identity or the job's service principal.",
+   "explanation": "Unity Catalog checks the job's run-as principal against catalog grants, then the external location's credential reads the objects. Cloud Storage never sees the principal: it evaluates the service account's bindings on the bucket and anything inherited from above. That split is why a storage refusal names a service account while a catalog refusal names the job's principal.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-placement",
+   "conceptIds": [
+    "dbxfe-gcp-l01-account-concept",
+    "dbxfe-gcp-l01-credential-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-storage",
+    "dbxfe-gcp-course-claim-accounts"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card4",
+   "revision": "1",
+   "prompt": "What does the email db-8811223344556677@prod-gcp-us-east4.iam.gserviceaccount.com tell a reviewer about ownership?",
+   "answer": "It is the workspace's service account, and its owning project, prod-gcp-us-east4, is a Databricks project, not one of Cinderline's.",
+   "explanation": "Google builds a service account's email from its owning project and a name, and the provider documents the workspace service account in exactly this form. Cinderline cannot manage the account itself; it can only see and control what roles the account holds on Cinderline's resources, which is the evidence to capture before and after workspace creation.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-identities",
+   "conceptIds": [
+    "dbxfe-gcp-l01-account-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-accounts"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card5",
+   "revision": "1",
+   "prompt": "What must happen on the bucket after a Google Cloud storage credential is created?",
+   "answer": "The bucket's administrator must bind the credential's returned service account email to roles on the bucket; until then the external location cannot read.",
+   "explanation": "Creating the credential only makes Databricks create a managed service account and return its email. Cloud Storage decides access from IAM bindings on the bucket or above, so someone with authority over the bucket, perhaps in another project or organization, must grant that email roles. Databricks' guide binds Storage Object Admin and Storage Legacy Bucket Reader; verify the minimum.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-identities",
+   "conceptIds": [
+    "dbxfe-gcp-l01-credential-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-storage"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card6",
+   "revision": "1",
+   "prompt": "Which facts does a Google Cloud network configuration pin for a classic workspace's compute?",
+   "answer": "The VPC's project, the VPC and one subnet in the workspace region with a netmask between /29 and /9, plus any registered PSC endpoints.",
+   "explanation": "The gcp_network_info block names network_project_id, vpc_id, subnet_id and subnet_region, and vpc_endpoints lists the relay and REST endpoints when PSC is used. The subnet cannot be shared with other workspaces or resources, and the nodes need an outbound path through Cloud NAT or a similar appliance unless PSC carries control-plane traffic.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-network",
+   "conceptIds": [
+    "dbxfe-gcp-l01-vpc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-vpc",
+    "dbxfe-gcp-course-claim-psc"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card7",
+   "revision": "1",
+   "prompt": "With back-end PSC and no Cloud NAT, which destinations can classic nodes still reach?",
+   "answer": "The relay and REST API through the PSC endpoints, and Google APIs such as Cloud Storage through Private Google Access; public internet destinations have no path.",
+   "explanation": "Private Google Access covers Google APIs and services for VMs without external addresses, while Cloud NAT is what carries internet traffic. Databricks' reference template drops the NAT when PSC is used, so package indexes and external APIs need a deliberate design, such as a mirror, a proxy or a NAT kept on purpose with egress rules.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-network",
+   "conceptIds": [
+    "dbxfe-gcp-l01-vpc-concept",
+    "dbxfe-gcp-l01-psc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-egress",
+    "dbxfe-gcp-course-claim-psc"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card8",
+   "revision": "1",
+   "prompt": "Two egress rules match a node's connection: an allow at priority 1000 and a deny at priority 900. Which one decides?",
+   "answer": "The deny at priority 900, because the lowest priority number takes precedence regardless of how specific the allow's address range is.",
+   "explanation": "Google Cloud orders matching firewall rules by priority, from 0 to 65535, and at equal priority a deny beats an allow. Address specificity plays no part. A broad deny added later at a lower number silently overrides every narrower allow above it, so a hardened network keeps its allows numbered below any broad deny.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-network",
+   "conceptIds": [
+    "dbxfe-gcp-l01-firewall-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-firewall"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card9",
+   "revision": "1",
+   "prompt": "Which three hostnames does Databricks' reference template answer in its private gcp.databricks.com zone?",
+   "answer": "The workspace URL, its dp- prefixed variant and tunnel.<region>.gcp.databricks.com, each pointing at a PSC endpoint's internal address.",
+   "explanation": "The template's private zone is visible to the workspace VPC and maps the two workspace names to the REST endpoint's address and the tunnel name to the relay endpoint's address. A name missing from a visible zone gets NXDOMAIN, so the node resolves nothing; with the zone attached to another network, nodes resolve public addresses instead. Either way they never use the endpoints, however healthy those are.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-private",
+   "conceptIds": [
+    "dbxfe-gcp-l01-psc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-psc"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card10",
+   "revision": "1",
+   "prompt": "How does ENDPOINT private access level differ from ACCOUNT level for a workspace?",
+   "answer": "ACCOUNT admits any VPC endpoint registered in the Databricks account; ENDPOINT admits only the endpoint IDs listed in allowed_vpc_endpoint_ids.",
+   "explanation": "Private access settings are attached to a workspace and consulted for connections to its UI and API. At ACCOUNT level an endpoint registered for another team's workspace can connect too; ENDPOINT level turns the object into an explicit allow list. With public access enabled, which is the Google Cloud default, IP access lists govern the public path separately.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-private",
+   "conceptIds": [
+    "dbxfe-gcp-l01-psc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-frontend"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card11",
+   "revision": "1",
+   "prompt": "Why is a gcp_endpoint field in the Databricks SDK not proof that serverless PSC works for Cinderline?",
+   "answer": "A schema field shows what the API can describe, not what an account, region or release stage can use, and the provider documentation still lists NCC binding for AWS and Azure only.",
+   "explanation": "Generated SDKs follow the API definition, which can run ahead of or apart from availability, and provider documentation can lag. Neither is the Databricks product page for Google Cloud. The honest design cell is unknown until verified, with the page, the account team's written answer and a test named as the evidence that would close it.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-serverless",
+   "conceptIds": [
+    "dbxfe-gcp-l01-ncc-concept",
+    "dbxfe-gcp-l01-unknown-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-ncc"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card12",
+   "revision": "1",
+   "prompt": "Name two classic network differences between Databricks on Google Cloud and on AWS.",
+   "answer": "Google Cloud takes one regional subnet where AWS takes two subnets in different availability zones, and it filters traffic with network firewall rules instead of security groups.",
+   "explanation": "The Google Cloud network configuration names a project, a VPC and one subnet in the workspace region with a /29 to /9 netmask; the AWS one takes at least two subnets in different zones with /17 to /25 netmasks plus security groups. Checklists built for one therefore ask for objects the other does not have.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-differs",
+   "conceptIds": [
+    "dbxfe-gcp-l01-vpc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-contrast",
+    "dbxfe-gcp-course-claim-vpc"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card13",
+   "revision": "1",
+   "prompt": "A storage error names the credential's service account and storage.objects.get. What has the error already ruled out?",
+   "answer": "The catalog privilege check: Unity Catalog had allowed the request, so the next place to look is the bucket's IAM policy for that email.",
+   "explanation": "A catalog refusal names the job's principal and a catalog privilege, and happens before any storage call. An error that names a Google permission and the credential's account comes from Cloud Storage, after the catalog agreed. Starting there saves re-granting catalog privileges that were never the problem and keeps the diagnosis on the layer that refused.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-example",
+   "conceptIds": [
+    "dbxfe-gcp-l01-diagnosis-concept",
+    "dbxfe-gcp-l01-credential-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-storage",
+    "dbxfe-fact-privileges"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card14",
+   "revision": "1",
+   "prompt": "After back-end PSC is enabled, cluster starts time out. What is the first check from the node subnet?",
+   "answer": "Resolve tunnel.<region>.gcp.databricks.com and confirm it answers the relay endpoint's internal address from the private zone.",
+   "explanation": "A timeout names no layer, so the diagnosis follows the packet: name, endpoint status, then firewall priority. If the name answers publicly, the node never reaches the endpoint, and with no NAT the public address has no path either. Endpoint status and rules only become meaningful once the name points at the endpoint.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-example",
+   "conceptIds": [
+    "dbxfe-gcp-l01-diagnosis-concept",
+    "dbxfe-gcp-l01-psc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-psc",
+    "dbxfe-gcp-course-claim-firewall"
+   ]
+  },
+  {
+   "id": "dbxfe-gcp-l01-card15",
+   "revision": "1",
+   "prompt": "Which rows of Cinderline's evidence matrix must stay unknown after reading only the provider, SDK and reference-template sources?",
+   "answer": "The default classic VM service account, the required firewall rules, serverless private connectivity, and tier or region requirements for PSC and customer-managed keys.",
+   "explanation": "None of the sources read in this build states those facts for Google Cloud, and the product pages that would were unreachable. Marking them unknown, with the page, the account team or a test named as the next evidence, keeps the design note honest and gives each row an owner instead of a guess borrowed from another cloud.",
+   "lessonId": "dbxfe-gcp-l01",
+   "sectionId": "dbxfe-gcp-l01-limits",
+   "conceptIds": [
+    "dbxfe-gcp-l01-unknown-concept"
+   ],
+   "claimIds": [
+    "dbxfe-guidance",
+    "dbxfe-fiction",
+    "dbxfe-gcp-course-claim-ncc",
+    "dbxfe-gcp-course-claim-vpc",
+    "dbxfe-gcp-course-claim-psc"
+   ]
+  }
+ ]
+}

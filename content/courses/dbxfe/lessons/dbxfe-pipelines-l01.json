@@ -1,0 +1,658 @@
+{
+ "id": "dbxfe-pipelines-l01",
+ "title": "Declarative pipelines and change-data processing",
+ "summary": "Read a pipeline as datasets, flows and a dependency graph; choose between incremental tables, rebuilt views and full refreshes; weigh expectation actions; and derive SCD type 1 and type 2 tables from late, tied and unplaceable change events.",
+ "contentVersion": "1.0.0",
+ "teachingFormat": "flexible",
+ "estimatedMinutes": 18,
+ "objectives": [
+  "Explain datasets, flows, streaming tables, materialized views and the dependency graph, and predict what an incremental update and a full refresh read.",
+  "Choose warn, drop or fail for an expectation and name what no row rule can see.",
+  "Derive SCD type 1 and type 2 tables from change events with late, tied and unplaceable changes, and map them onto AUTO CDC and snapshot comparison.",
+  "Place a pipeline capability in a named Apache Spark release or in Databricks Lakeflow before promising it."
+ ],
+ "prerequisiteIds": [],
+ "tags": [
+  "Reliable data engineering",
+  "Declarative pipelines",
+  "Change data capture",
+  "SCD type 2",
+  "Expectations",
+  "AUTO CDC",
+  "Substantive technical topic"
+ ],
+ "bodyFile": "lessons/dbxfe-pipelines-l01.md",
+ "sections": [
+  {
+   "id": "dbxfe-pipelines-l01-outcome",
+   "kind": "outcome",
+   "title": "What you will be able to do",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-flow-concept",
+    "dbxfe-pipelines-l01-scd-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-sdp",
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-start",
+   "kind": "prerequisites",
+   "title": "Before the pipeline",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sequence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-graph",
+   "kind": "mechanism",
+   "title": "Datasets, flows and the graph",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-flow-concept",
+    "dbxfe-pipelines-l01-graph-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-sdp",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-refresh",
+   "kind": "mechanism",
+   "title": "Incremental, rebuilt and fully refreshed",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-refresh-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-refresh",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-expectations",
+   "kind": "mechanism",
+   "title": "Expectations: one row, three actions",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-expectation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-expectations",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-scd",
+   "kind": "mechanism",
+   "title": "Type 1 and type 2 from one event sequence",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-scd-concept",
+    "dbxfe-pipelines-l01-sequence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-autocdc",
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-sequence",
+   "kind": "mechanism",
+   "title": "Late, tied and unplaceable changes",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sequence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-autocdc",
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-autocdc",
+   "kind": "mechanism",
+   "title": "AUTO CDC and snapshot-derived changes",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-autocdc-concept",
+    "dbxfe-pipelines-l01-snapshot-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-autocdc",
+    "dbxfe-pipelines-course-claim-releases",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-editions",
+   "kind": "mechanism",
+   "title": "Apache Spark Declarative Pipelines and Lakeflow",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sdp-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-releases",
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-example",
+   "kind": "example",
+   "title": "Worked example: Cinderline's three batches",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-scd-concept",
+    "dbxfe-pipelines-l01-sequence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-exercise",
+   "kind": "exercise",
+   "title": "Predict Marlow's tables",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sequence-concept",
+    "dbxfe-pipelines-l01-scd-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-solution",
+   "kind": "solution",
+   "title": "Marlow's tables, and why",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sequence-concept",
+    "dbxfe-pipelines-l01-scd-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-mistakes",
+   "kind": "mistakes",
+   "title": "Mistakes that publish the wrong state",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sequence-concept",
+    "dbxfe-pipelines-l01-expectation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-expectations",
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-sources",
+   "kind": "sources",
+   "title": "Sources and execution scope",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sdp-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-sdp",
+    "dbxfe-pipelines-course-claim-releases",
+    "dbxfe-pipelines-course-claim-autocdc",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-related",
+   "kind": "related",
+   "title": "Where this connects",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-flow-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  },
+  {
+   "id": "dbxfe-pipelines-l01-revisit",
+   "kind": "revisit",
+   "title": "Check and revisit",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sequence-concept",
+    "dbxfe-pipelines-l01-snapshot-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ],
+   "assetIds": []
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-pipelines-l01-q1",
+   "revision": "1",
+   "prompt": "After all three Cinderline batches, how many history rows does P-100 have, and which of them did batch 3 change?",
+   "options": [
+    {
+     "id": "dbxfe-pipelines-l01-q1-a",
+     "text": "Two rows; batch 3 changed nothing because seq 3 was already current.",
+     "rationale": "The current row stayed, but the late seq 2 still needs its own version in history."
+    },
+    {
+     "id": "dbxfe-pipelines-l01-q1-b",
+     "text": "Three rows; the version starting at 1 now ends at 2, and a version from 2 to 3 was inserted.",
+     "rationale": "Correct: the late change shortens the closed version and adds one between two existing versions."
+    },
+    {
+     "id": "dbxfe-pipelines-l01-q1-c",
+     "text": "Three rows; the version starting at 3 now ends at 2.",
+     "rationale": "That is the append-only mistake: an interval from 3 to 2 ends before it starts."
+    },
+    {
+     "id": "dbxfe-pipelines-l01-q1-d",
+     "text": "Four rows; each arrival adds a row.",
+     "rationale": "Rows follow sequence values, not arrivals; three sequence values give three versions."
+    }
+   ],
+   "correctOptionId": "dbxfe-pipelines-l01-q1-b",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-scd-concept",
+    "dbxfe-pipelines-l01-sequence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-q2",
+   "revision": "1",
+   "prompt": "e-17 has a blank part_id and fails an expectation whose action is warn. What reaches part_events_valid?",
+   "options": [
+    {
+     "id": "dbxfe-pipelines-l01-q2-a",
+     "text": "Nothing from e-17; warn removes failing rows.",
+     "rationale": "Removing the row is the drop action; warn keeps it."
+    },
+    {
+     "id": "dbxfe-pipelines-l01-q2-b",
+     "text": "e-17 itself, with a blank key, plus one counted failure.",
+     "rationale": "Correct: warn writes the failing row and records the failure, so a blank key travels on to the CDC flow."
+    },
+    {
+     "id": "dbxfe-pipelines-l01-q2-c",
+     "text": "No row from the whole batch, because the update fails.",
+     "rationale": "Stopping the update is the fail action, not warn."
+    },
+    {
+     "id": "dbxfe-pipelines-l01-q2-d",
+     "text": "e-17 with its part_id repaired from the previous event.",
+     "rationale": "An expectation never edits a row; it only keeps, drops or fails."
+    }
+   ],
+   "correctOptionId": "dbxfe-pipelines-l01-q2-b",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-expectation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-expectations",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-q3",
+   "revision": "1",
+   "prompt": "Lab L07 runs on PySpark 4.0.4. Which statement about its environment is accurate?",
+   "options": [
+    {
+     "id": "dbxfe-pipelines-l01-q3-a",
+     "text": "It runs a Spark Declarative Pipelines project with spark-pipelines run.",
+     "rationale": "The spark-pipelines command and pyspark.pipelines arrive with 4.1.0; the lab recorded neither in 4.0.4."
+    },
+    {
+     "id": "dbxfe-pipelines-l01-q3-b",
+     "text": "It uses AUTO CDC from the open-source pipelines API.",
+     "rationale": "Open-source AUTO CDC first appears at the 4.2.0 tag, and only for SCD type 1."
+    },
+    {
+     "id": "dbxfe-pipelines-l01-q3-c",
+     "text": "pyspark.pipelines is not importable, so the lab computes the SCD tables with DataFrame and SQL window functions.",
+     "rationale": "Correct: the runner records the module as not importable and holds window-function results to hand-written literals."
+    },
+    {
+     "id": "dbxfe-pipelines-l01-q3-d",
+     "text": "It runs on a Databricks workspace in local mode.",
+     "rationale": "Local mode means one machine running open-source Spark; nothing in the lab touched Databricks."
+    }
+   ],
+   "correctOptionId": "dbxfe-pipelines-l01-q3-c",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sdp-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-releases",
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "dbxfe-pipelines-l01-card1",
+   "revision": "1",
+   "prompt": "What does one CREATE STREAMING TABLE ... AS SELECT ... FROM STREAM statement create?",
+   "answer": "A streaming table that stores rows and a flow that reads the source, applies the query and writes into that table.",
+   "explanation": "The one-statement form hides the flow behind the table's name. Writing the flow explicitly with create_streaming_table and append_flow, or CREATE FLOW in SQL, is how a second source joins the same streaming table; a materialized view accepts only its own batch flow.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-graph",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-flow-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-sdp",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card2",
+   "revision": "1",
+   "prompt": "How does a declarative pipeline decide which dataset to update first?",
+   "answer": "It records which datasets each flow's query reads and orders updates along that dependency graph, running independent branches in parallel.",
+   "explanation": "Nobody writes the order. An edge runs from every dataset a query reads to the dataset its flow writes, so cost_summary waits for part_current and supplier_history, while part_history and supplier_history can run side by side. A cycle has no order and fails dry-run.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-graph",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-graph-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-sdp",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card3",
+   "revision": "1",
+   "prompt": "Why does a streaming table keep an old supplier name after the supplier is renamed?",
+   "answer": "Its flow processed those rows once and its checkpoint marks them done, so no update rereads or rewrites them.",
+   "explanation": "A streaming table only reads input that arrived since its checkpoint. The join with the supplier name happened when each row was read. A materialized view over the same join is rebuilt from its query on each update, so it shows the new name; the streaming table needs a full refresh to change old rows.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-refresh",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-refresh-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-refresh",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card4",
+   "revision": "1",
+   "prompt": "What decides how much history a full refresh of a streaming table can rebuild?",
+   "answer": "The retention of its sources: the refresh clears the table and its checkpoints and rereads only what the sources still hold.",
+   "explanation": "A landing zone that keeps 30 days of files returns days 11 to 40 when a 40-day-old table is fully refreshed; days 1 to 10 vanish from the table and everything downstream. Check retention and consumers first, and protect irreplaceable tables from an accidental reset.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-refresh",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-refresh-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-refresh",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card5",
+   "revision": "1",
+   "prompt": "Contrast warn, drop and fail for a row that breaks an expectation.",
+   "answer": "Warn writes the row and counts the failure, drop removes the row and counts it, and fail stops the update so nothing from that batch is written.",
+   "explanation": "Each action puts the damage somewhere different. Warn passes a bad row downstream, drop hides it behind a metric, and fail blocks every good row in the batch until someone acts. Choose by what a failing row means for consumers, and keep failures in a quarantine table if they matter.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-expectations",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-expectation-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-expectations",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card6",
+   "revision": "1",
+   "prompt": "Why can no single expectation catch the P-300 tie between e-08 and e-15?",
+   "answer": "Each row is valid on its own; the conflict exists only between two rows, which needs a grouped check.",
+   "explanation": "An expectation evaluates one row and cannot query other tables. Grouping by part_id and seq and counting distinct payloads returns P-300 at seq 2 with two payloads, while P-500's three identical deliveries count as one payload. The check must sit upstream of the SCD flow to protect it.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-expectations",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-expectation-concept",
+    "dbxfe-pipelines-l01-sequence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-fact-expectations",
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card7",
+   "revision": "1",
+   "prompt": "Predict P-100's type 1 row after its seq 2 change arrives last.",
+   "answer": "It stays at seq 3 with a cost of 1310, because the late change is older by sequence.",
+   "explanation": "Type 1 keeps the change with the highest sequence value per key. Arrival order never enters, so a change that arrives last can still be the oldest. Ranking by batch instead would publish 1290, the price that was replaced, as current.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-scd",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-scd-concept",
+    "dbxfe-pipelines-l01-sequence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card8",
+   "revision": "1",
+   "prompt": "Which invariants must every type 2 history satisfy for each key?",
+   "answer": "At most one open row, every closed interval ending after it starts, and no two intervals overlapping.",
+   "explanation": "Half-open intervals from valid_from to valid_to let versions meet without overlapping, so an as-of lookup returns exactly one row. The checks catch structural damage such as a stretched interval or a second open row; they cannot catch a wrong but well-formed value, which is what hand-written expected rows are for.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-scd",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-scd-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card9",
+   "revision": "1",
+   "prompt": "Which history edits does a late seq 2 change force when seq 1 and seq 3 already exist?",
+   "answer": "Shorten the seq 1 version to end at 2 and insert a version from 2 to 3; the open seq 3 row stays.",
+   "explanation": "The late change belongs between two published versions. A maintainer that can only append would instead close the open row at 2 and write an interval from 3 to 2, which the interval check rejects. Consumers holding an older extract must recompute the restated period.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-sequence",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sequence-concept",
+    "dbxfe-pipelines-l01-scd-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card10",
+   "revision": "1",
+   "prompt": "Why is sequencing by ingestion time not a fix for a tied sequence value?",
+   "answer": "Ingestion time records when a copy arrived, not when the change was made, so it turns delivery accidents into history.",
+   "explanation": "A tie means the source's ordering cannot place two payloads. The legitimate fixes are a second ordering field the source assigns, such as Marlow's revision_no in a sequence struct, or withholding the key until the source owner corrects it. Event id order and picking the higher value are guesses too.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-sequence",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sequence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-autocdc",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card11",
+   "revision": "1",
+   "prompt": "What does lab L07's reference do with a key whose change has an invalid sequence value?",
+   "answer": "It quarantines the change with its reason and withholds the key from both tables, listing it as unresolved.",
+   "explanation": "The unreadable change might be the key's latest state, so publishing the older state would be a guess. Dropping the change instead publishes P-400 at 90 as if current. A withheld key needs an owner and a visible count beside the published table.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-sequence",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sequence-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card12",
+   "revision": "1",
+   "prompt": "Name two duties an AUTO CDC declaration leaves with the pipeline author.",
+   "answer": "Validating and quarantining changes before the flow, and guaranteeing one distinct change per key per sequence value with no NULL sequences.",
+   "explanation": "The declaration covers keys, sequence, deletes, columns and SCD type, and the engine handles out-of-order changes incrementally. It has no clause for quarantine reasons or tie policy, and its documentation asks for clean, unique, non-NULL sequencing, so both belong upstream in the pipeline and the source contract.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-autocdc",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-autocdc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-autocdc",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card13",
+   "revision": "1",
+   "prompt": "What can a snapshot-derived history never show?",
+   "answer": "A change that happened and reverted between two consecutive snapshots, and the exact moment of any change inside that gap.",
+   "explanation": "Comparing snapshots yields changes dated to the first snapshot that shows them. Skip snapshot 2 and SUP-B's 9-day lead time disappears, while SUP-C's delete moves to snapshot 3. Absence counts as deletion only when the snapshot is known to be complete.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-autocdc",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-snapshot-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-autocdc",
+    "dbxfe-pipelines-course-claim-lab",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-pipelines-l01-card14",
+   "revision": "1",
+   "prompt": "Before promising AUTO CDC to a team on open-source Spark, what do you check?",
+   "answer": "Their exact release: 4.0.x and 4.1.x have no AUTO CDC, and at 4.2.0 the Python flow stores SCD type 1 only.",
+   "explanation": "Open-source pipelines arrive with 4.1.0 and AUTO CDC with the 4.2.0 Python API; expectations, type 2 through AUTO CDC and snapshot CDC are documented for Databricks Lakeflow. Reading the release's own exports, as lab L07 did for 4.0.4, settles the question faster than a product name.",
+   "lessonId": "dbxfe-pipelines-l01",
+   "sectionId": "dbxfe-pipelines-l01-editions",
+   "conceptIds": [
+    "dbxfe-pipelines-l01-sdp-concept",
+    "dbxfe-pipelines-l01-autocdc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-pipelines-course-claim-releases",
+    "dbxfe-fact-pipelines",
+    "dbxfe-guidance",
+    "dbxfe-fiction"
+   ]
+  }
+ ]
+}

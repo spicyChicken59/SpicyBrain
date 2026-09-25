@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { Course } from "../src/content-schema";
+import type { CatalogCourse } from "../src/catalog-types";
 import { emptyState, studyBytes, type StudyState } from "../src/study";
 export const fixtureAt = "2026-09-19T10:00:00.000Z";
 const catalog = JSON.parse(
@@ -7,7 +7,7 @@ const catalog = JSON.parse(
     new URL("../src/generated/catalog.json", import.meta.url),
     "utf8",
   ),
-) as Course[];
+) as CatalogCourse[];
 // Keep the exact original regression fixture independent of new topic order.
 export const fixtureLessons = catalog
   .flatMap((c) => c.modules.flatMap((m) => m.lessons))

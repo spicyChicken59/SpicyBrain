@@ -1,0 +1,3264 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-industry",
+ "title": "Manufacturing and cross-industry solution patterns",
+ "summary": "One chain from operational source to responsible human action, the data rules every plant pattern depends on, seven manufacturing patterns, their transfer to other industries, and a brief whose verdict can be 'not enough evidence yet'.",
+ "outcomes": [
+  "Draw any use case as operational source, governed data, decision and responsible human action, and write its metric contract at a declared grain.",
+  "Choose event identity, unit, timestamp and effective-dated asset hierarchy rules for plant data.",
+  "Apply those rules to quality analytics, lot traceability, engineering data, predictive maintenance, demand, scheduling under supply constraints and document knowledge.",
+  "Transfer a pattern to retail, financial services or healthcare by re-deriving identity, grain, hierarchy, clock and owner, without giving compliance, clinical or safety advice.",
+  "Evaluate candidate use cases on evidence and write a brief whose conclusion may be 'not enough evidence yet'."
+ ],
+ "startingAssumptions": [
+  "The architecture and migration module has introduced target designs and governed layers.",
+  "SQL joins, aggregates and window functions are familiar, and Unity Catalog's owners and grants are known in outline."
+ ],
+ "lessonIds": [
+  "dbxfe-industry-l01"
+ ],
+ "optionalBridgeLessonIds": [],
+ "editorialRationale": "Industry modules fail when they list use cases by name, so this one starts from the chain every use case must complete and the data rules (grain, identity, units, clocks, dated hierarchies) that decide whether any pattern works. Seven manufacturing patterns then reuse those rules on concrete synthetic records, one transfer beat shows what changes in retail, financial services and healthcare while naming specialist owners instead of advising, and the module ends with an evidence-based verdict, including 'not enough evidence yet', as its practice output.",
+ "sources": [
+  {
+   "id": "dbxfe-industry-source-manufacturing",
+   "title": "Manufacturing Solutions",
+   "url": "https://www.databricks.com/solutions/industries/manufacturing-industry-solutions",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks industry solution page for manufacturing; vendor positioning, not product documentation.",
+   "caveat": "A marketing page: its named outcomes are the vendor's own claims and are not evidence that any use case here will work.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Snippet relied on: the platform is built to ingest and harmonize streaming and batch manufacturing data (MES, ERP, historians, SCADA, MQTT and vision systems), unifies OT data (sensors, PLCs, historians) with IT data (ERP, MES, PLM, quality, supply chain) on a governed foundation, and names outcomes such as reducing unplanned downtime through predictive maintenance, improving OEE and first-pass yield, faster root-cause analysis on defects and more resilient supply chains; solution accelerators include digital twins, supply chain optimization, demand forecasting and real-time IoT analytics."
+  },
+  {
+   "id": "dbxfe-industry-source-isa95",
+   "title": "ISA-95 Standard: Enterprise-Control System Integration",
+   "url": "https://www.isa.org/standards-and-publications/isa-standards/isa-95-standard",
+   "publisher": "International Society of Automation (ISA)",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Standards landing page for ANSI/ISA-95 (IEC 62264); the standard's parts are purchased documents.",
+   "caveat": "The standard's text was not read; level names are used as a vocabulary aid, and the module's site, line, machine and sensor tree is a simplification of it.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Snippet relied on: ISA-95 (ANSI/ISA-95, IEC 62264) is the international set of standards for integrating enterprise and control systems; an ISA InTech article snippet states that its equipment hierarchy model expanded on the physical hierarchy model of ISA-88 and applies across discrete, continuous and logistics industries. The level names enterprise, site, area, work center and work unit were confirmed only through secondary search results in this session."
+  },
+  {
+   "id": "dbxfe-industry-source-lineage",
+   "title": "Lineage in Unity Catalog",
+   "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; data lineage captured by Unity Catalog.",
+   "caveat": "Lineage is data dependency evidence; it does not record physical material flow, and its coverage limits are listed on the page.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: lineage is captured down to the column level for all languages, visualized in Catalog Explorer in near real time and aggregated across workspaces attached to a Unity Catalog metastore; capturing it requires Unity Catalog-registered tables and queries through the Spark DataFrame or Databricks SQL interfaces; graph nodes can be tables and views, ML model versions, external assets and file paths."
+  },
+  {
+   "id": "dbxfe-industry-source-timestamp",
+   "title": "TIMESTAMP type",
+   "url": "https://docs.databricks.com/aws/en/sql/language-manual/data-types/timestamp-type",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS, SQL language manual.",
+   "caveat": "Describes the zone-normalized TIMESTAMP; TIMESTAMP_NTZ is documented on its own page with different rules.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: TIMESTAMP values are normalized and persisted in UTC, and the session time zone is applied whenever a value or a portion of it is displayed or extracted."
+  },
+  {
+   "id": "dbxfe-industry-source-ntz",
+   "title": "TIMESTAMP_NTZ type",
+   "url": "https://docs.databricks.com/aws/en/sql/language-manual/data-types/timestamp-ntz-type",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS, SQL language manual; Databricks SQL and Databricks Runtime 13.3 LTS and above.",
+   "caveat": "Runtime support and cast behavior are read from the current page; nothing was executed in this build. A snippet of the same page read for the SQL Server module marked the type Public Preview; re-check the release status.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Snippet relied on: TIMESTAMP_NTZ represents date and time values without a time zone in Databricks SQL and Databricks Runtime 13.3 LTS and above; casting a TIMESTAMP to TIMESTAMP_NTZ applies the session time zone; the TIMEZONE parameter sets the session's local zone and the system default is UTC. As previously read: changing the session time zone affects TIMESTAMP columns but not TIMESTAMP_NTZ values."
+  },
+  {
+   "id": "dbxfe-industry-source-ml",
+   "title": "Machine learning on Databricks",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; overview of AI and machine learning capabilities.",
+   "caveat": "Platform capabilities do not establish a valid target, enough labelled outcomes or a useful decision.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Snippet relied on: Databricks provides an integrated platform to build, deploy and manage machine learning applications across the lifecycle from data preparation to production monitoring, including experiment and model management, Model Serving for real-time and batch inference, and monitoring and governance tools."
+  },
+  {
+   "id": "dbxfe-industry-source-pillars",
+   "title": "Databricks well-architected framework",
+   "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/well-architected",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the seven pillars of the lakehouse well-architected framework.",
+   "caveat": "A framework of concerns, not a use-case scoring method; pillar names are quoted and no assessment against them is claimed.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Snippet relied on: the framework consists of seven pillars describing areas of concern for implementing Databricks in the cloud; five align with cloud provider frameworks (operational excellence; security, privacy and compliance; reliability; performance efficiency; cost optimization) and two are specific to the lakehouse (data and AI governance; interoperability and usability). The seven names match the record another module confirmed by search on the same date."
+  },
+  {
+   "id": "dbxfe-industry-source-retail",
+   "title": "Retail and Consumer Goods Solutions",
+   "url": "https://www.databricks.com/solutions/industries/retail-industry-solutions",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks industry solution page for retail and consumer goods; vendor positioning.",
+   "caveat": "A marketing page; the use cases named are the vendor's framing and carry no outcome evidence.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Snippet relied on: the page names retail media networks, pricing and revenue management, assortment optimization and fine-grained demand forecasting for all items and stores using point-of-sale, mobile application, inventory and fulfillment data, among the retail and consumer goods use cases."
+  },
+  {
+   "id": "dbxfe-industry-source-finance",
+   "title": "Databricks for Financial Services",
+   "url": "https://www.databricks.com/solutions/industries/financial-services",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks industry solution page for banking, capital markets and insurance; vendor positioning.",
+   "caveat": "A marketing page; mentions of risk and compliance are the vendor's framing and are not regulatory guidance.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Snippet relied on: the page describes analytics, agents and apps on unified financial data across credit, fraud, trading, treasury, compliance and customer experience, naming fraud detection with entity resolution and graph analytics, risk management on customer, bureau, income and behavioral data, and targeted customer engagement."
+  },
+  {
+   "id": "dbxfe-industry-source-health",
+   "title": "Healthcare and Life Sciences Solutions",
+   "url": "https://www.databricks.com/solutions/industries/healthcare-and-life-sciences",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks industry solution page for healthcare and life sciences; vendor positioning.",
+   "caveat": "A marketing page; this module uses it only to name data shapes and gives no clinical, privacy or regulatory guidance.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Snippet relied on: healthcare and life sciences organizations use the platform to unify clinical, claims and research data for analytics, operational apps and AI agents on one governed platform, connecting structured and unstructured data from EHRs, wearables, imaging platforms and genome sequencers."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-industry-claim-manufacturing",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-industry-source-manufacturing"
+   ],
+   "description": "Databricks' manufacturing solutions page describes ingesting and harmonizing MES, ERP, historian, SCADA, MQTT and vision data, unifying OT and IT data on a governed foundation, and names predictive maintenance, OEE and first-pass yield, defect root-cause analysis, supply chain optimization and demand forecasting among its use cases.",
+   "context": "Vendor solution page; named outcomes are marketing claims, not evidence for a specific use case."
+  },
+  {
+   "id": "dbxfe-industry-claim-isa95",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-industry-source-isa95"
+   ],
+   "description": "ISA-95 (IEC 62264) is the ISA standard for integrating enterprise and control systems; its equipment hierarchy model organizes physical assets in nested levels named enterprise, site, area, work center and work unit, and extends ISA-88's physical model across discrete, continuous and logistics industries.",
+   "context": "Standard text not read; level names confirmed through search results only."
+  },
+  {
+   "id": "dbxfe-industry-claim-lineage",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-industry-source-lineage"
+   ],
+   "description": "Unity Catalog captures lineage down to the column level for queries on registered tables through Spark DataFrames or Databricks SQL, shows it in near real time across workspaces attached to a metastore, and its nodes are data assets such as tables, views, model versions, external assets and paths.",
+   "context": "Data dependency lineage on Databricks; not a record of physical material."
+  },
+  {
+   "id": "dbxfe-industry-claim-timestamp",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-industry-source-timestamp",
+    "dbxfe-industry-source-ntz"
+   ],
+   "description": "In Databricks SQL a TIMESTAMP is normalized to UTC and shown or extracted in the session time zone, while TIMESTAMP_NTZ holds date and time fields without a zone and is not changed by the session time zone; the session TIMEZONE defaults to UTC.",
+   "context": "Databricks SQL language manual; TIMESTAMP_NTZ is documented for Databricks SQL and Runtime 13.3 LTS and above, and a snippet of the same page read on 2026-09-23 marked it Public Preview, so check its release status for your workspace."
+  },
+  {
+   "id": "dbxfe-industry-claim-ml",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-industry-source-ml"
+   ],
+   "description": "Databricks documents an integrated machine learning lifecycle from data preparation through experiment tracking, model deployment with Model Serving for real-time and batch inference, to production monitoring and governance.",
+   "context": "Platform capability overview; says nothing about whether a given target has enough labelled outcomes."
+  },
+  {
+   "id": "dbxfe-industry-claim-pillars",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-industry-source-pillars"
+   ],
+   "description": "The Databricks well-architected framework has seven pillars: data and AI governance; interoperability and usability; operational excellence; security, privacy and compliance; reliability; performance efficiency; and cost optimization.",
+   "context": "Architecture framework of concerns; not a scoring method for use cases."
+  },
+  {
+   "id": "dbxfe-industry-claim-industries",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-industry-source-retail",
+    "dbxfe-industry-source-finance",
+    "dbxfe-industry-source-health"
+   ],
+   "description": "Databricks' industry pages name fine-grained demand forecasting and pricing for retail and consumer goods, fraud detection, risk and customer engagement for financial services, and unifying clinical, claims and research data for healthcare and life sciences.",
+   "context": "Vendor industry pages; framing only, with no outcome, compliance or clinical claim relied on."
+  },
+  {
+   "id": "dbxfe-industry-guidance",
+   "kind": "guidance",
+   "sourceIds": [],
+   "description": "Original SpicyBrain solution-pattern reasoning: decision chains, metric contracts, event identity, unit and timestamp guards, effective-dated hierarchies, trace and evaluation procedures, and use-case verdicts. Not a Databricks method and not compliance, clinical, safety or regulatory advice.",
+   "context": "Independent curriculum; adapt with the organization's own quality, safety, legal and domain owners."
+  },
+  {
+   "id": "dbxfe-industry-fiction",
+   "kind": "fictional",
+   "sourceIds": [],
+   "description": "Cinderline Components, its Harwick plant, lots, serials, machines, sensors, documents, orders, readings, counts and outcomes, and Marrowby Grocers, are synthetic teaching records.",
+   "context": "No real plant, retailer, bank or healthcare organization is described; no system was queried or executed."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-industry-chain-concept",
+   "term": "decision chain",
+   "aliases": [
+    "source-to-action chain",
+    "operational source to human action"
+   ],
+   "definition": "The path from an operational source through governed data and an analytical or model decision to a named person who acts and records the outcome.",
+   "example": "MES scrap events feed a governed scrap table, a rule recommends holding lot C-3302, and the quality engineer holds it and records the result.",
+   "sourceIds": [
+    "dbxfe-industry-source-manufacturing"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-grain-concept",
+   "term": "business grain",
+   "aliases": [
+    "grain",
+    "row grain"
+   ],
+   "definition": "The real-world thing one row represents, such as one lot at one operation, which fixes what can be counted, summed and joined.",
+   "example": "scrap_by_lot_operation has one row per lot per operation, so its units can be summed across lots.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-contract-concept",
+   "term": "metric contract",
+   "aliases": [
+    "metric definition",
+    "KPI contract"
+   ],
+   "definition": "A written agreement fixing a metric's name, grain, numerator, denominator, aggregation, time basis, exclusions and owner.",
+   "example": "Scrap rate: lot × operation grain, scrapped units over started units, summed before dividing, owned by quality engineering.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-identity-concept",
+   "term": "event identity",
+   "aliases": [
+    "natural key",
+    "idempotency key",
+    "event key"
+   ],
+   "definition": "The combination of fields that names one real occurrence, such as source system, record id and revision, so resends collapse and corrections stay distinct.",
+   "example": "(MES-A, INS-4472, 2) is the corrected result of inspection INS-4472 from plant A's MES.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-time-concept",
+   "term": "event time",
+   "aliases": [
+    "occurrence time",
+    "event timestamp"
+   ],
+   "definition": "When something happened at the source, stored as an unambiguous instant and kept separate from the time the platform received it.",
+   "example": "Two readings both labelled 01:30 local on 1 November are 06:30Z and 07:30Z as instants.",
+   "sourceIds": [
+    "dbxfe-industry-source-timestamp",
+    "dbxfe-industry-source-ntz"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-unit-concept",
+   "term": "unit of measure",
+   "aliases": [
+    "UoM",
+    "engineering unit"
+   ],
+   "definition": "The unit a measured value is expressed in, carried as data beside the value so any conversion is explicit and checkable.",
+   "example": "unit_raw = 'degF' beside value_raw = 185 lets the pipeline store 85.0 °C and keep the original.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-hierarchy-concept",
+   "term": "asset hierarchy",
+   "aliases": [
+    "equipment hierarchy",
+    "site → line → machine → sensor"
+   ],
+   "definition": "A parent-child structure placing each physical asset under the asset that contains it, used to roll events and readings up to a business grain.",
+   "example": "Sensor S-118 sits under machine DC-07, which sits under Line 3 at the Harwick site.",
+   "sourceIds": [
+    "dbxfe-industry-source-isa95"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-effective-concept",
+   "term": "effective dating",
+   "aliases": [
+    "valid-from and valid-to",
+    "type 2 slowly changing dimension"
+   ],
+   "definition": "Recording the period during which a relationship held, so a historical fact joins to the parent that was true when it happened.",
+   "example": "S-118 is under DC-07 from 2025-02-01 to 2026-06-15 and under DC-09 from 2026-06-15 onward.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-fpy-concept",
+   "term": "first-pass yield",
+   "aliases": [
+    "FPY",
+    "first-time-right rate"
+   ],
+   "definition": "The share of units entering an operation that pass their first inspection without rework or repair.",
+   "example": "440 of 500 castings pass first time, so first-pass yield is 88.0% even though final yield is 97.0%.",
+   "sourceIds": [
+    "dbxfe-industry-source-manufacturing"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-genealogy-concept",
+   "term": "lot genealogy",
+   "aliases": [
+    "product genealogy",
+    "traceability",
+    "where-used and where-from"
+   ],
+   "definition": "The recorded consumption links between input lots, produced lots, serial numbers and shipments that support forward and backward traces of physical material.",
+   "example": "Ingot lot AL-5521 was consumed by casting lots C-3301 and C-3302, which went into assembly lots A-801 and A-802.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-bom-concept",
+   "term": "BOM effectivity",
+   "aliases": [
+    "bill of materials revision",
+    "as-designed versus as-built"
+   ],
+   "definition": "The rule stating which revision of a bill of materials governs which dates or serial ranges, kept separate from what was actually consumed.",
+   "example": "PH-200 revision B, with seal S-12, is effective from serial 1061; serial 1063 consumed S-10 anyway.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-label-concept",
+   "term": "failure label",
+   "aliases": [
+    "target definition",
+    "outcome label"
+   ],
+   "definition": "The recorded outcome a maintenance model learns to predict, such as a failure-coded work order within a stated horizon after the prediction time.",
+   "example": "Label = 1 when a work order coded BRG-01 opens within 14 days after the prediction time.",
+   "sourceIds": [
+    "dbxfe-industry-source-ml"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-leadtime-concept",
+   "term": "actionable lead time",
+   "aliases": [
+    "warning lead time"
+   ],
+   "definition": "The minimum warning a responsible person needs to act, such as parts delivery plus planning time, which bounds the useful prediction horizon from below.",
+   "example": "Replacement bearings take 7 days to arrive, so a warning 3 days before failure cannot be acted on.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-censored-concept",
+   "term": "censored demand",
+   "aliases": [
+    "lost sales",
+    "unconstrained demand"
+   ],
+   "definition": "Demand that went unobserved because supply ran out, so recorded sales or shipments for that period are a lower bound rather than the demand itself.",
+   "example": "Week 2 shipped 80 units with the part out of stock for three days, so demand was at least 80.",
+   "sourceIds": [
+    "dbxfe-industry-source-manufacturing"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-feasible-concept",
+   "term": "feasible schedule",
+   "aliases": [
+    "finite capacity schedule",
+    "constrained schedule"
+   ],
+   "definition": "A production schedule that respects capacity, changeovers, material availability and maintenance windows before it is judged on lateness or cost.",
+   "example": "Order O-3 moves to Wednesday because its alloy arrives Wednesday, making it one day late.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-revision-concept",
+   "term": "controlled document revision",
+   "aliases": [
+    "document effectivity",
+    "revision in force"
+   ],
+   "definition": "The status and effective date of one version of a controlled document, used to decide which text an answer may quote.",
+   "example": "WI-114 revision C is current from 2026-05-01; revision B is superseded and must not be cited.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-industry-transfer-concept",
+   "term": "pattern transfer",
+   "aliases": [
+    "cross-industry transfer"
+   ],
+   "definition": "Reusing a solution pattern in another industry by re-deriving its event identity, grain, hierarchy, clock and responsible person instead of copying its tables.",
+   "example": "Lot genealogy becomes supplier lot → distribution centre → store receipts for a grocery recall scope.",
+   "sourceIds": [
+    "dbxfe-industry-source-retail",
+    "dbxfe-industry-source-finance",
+    "dbxfe-industry-source-health"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-verdict-concept",
+   "term": "evidence verdict",
+   "aliases": [
+    "not enough evidence yet",
+    "use-case conclusion"
+   ],
+   "definition": "A use-case conclusion stating whether the evidence supports proceeding and, if not, which named evidence would change the answer and when it will be reviewed.",
+   "example": "Spindle prediction: not enough evidence yet; revisit after six months of coded failures and dated sensor mounts.",
+   "sourceIds": [
+    "dbxfe-industry-source-pillars"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-extension-lineage-concept",
+   "term": "data lineage (Unity Catalog)",
+   "aliases": [
+    "table lineage",
+    "column lineage"
+   ],
+   "definition": "The record Unity Catalog captures of which data assets, down to columns, were read to produce which others.",
+   "example": "The genealogy_edges table's lineage shows it was built from the MES consumption landing table by one pipeline.",
+   "sourceIds": [
+    "dbxfe-industry-source-lineage"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-extension-isa95-concept",
+   "term": "ISA-95 equipment hierarchy",
+   "aliases": [
+    "IEC 62264 equipment hierarchy"
+   ],
+   "definition": "The standard's nested equipment levels, enterprise, site, area, work center and work unit, used to align enterprise and plant vocabulary.",
+   "example": "Line 3 is a work center (production line) and cell DC-07 is a work unit within it.",
+   "sourceIds": [
+    "dbxfe-industry-source-isa95"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-extension-ntz-concept",
+   "term": "TIMESTAMP_NTZ",
+   "aliases": [
+    "timestamp without time zone"
+   ],
+   "definition": "A Databricks SQL type holding date and time fields without a time zone, unaffected by the session time zone.",
+   "example": "A PLC's raw wall-clock stamp 2026-11-01 01:30 stored as TIMESTAMP_NTZ beside the site's zone name.",
+   "sourceIds": [
+    "dbxfe-industry-source-ntz"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-extension-pillars-concept",
+   "term": "well-architected pillars",
+   "aliases": [
+    "Databricks well-architected framework"
+   ],
+   "definition": "The seven areas of concern Databricks' well-architected framework uses to review an implementation, from governance to cost.",
+   "example": "The reliability pillar asks what the trace query does when the MES feed stops for a shift.",
+   "sourceIds": [
+    "dbxfe-industry-source-pillars"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-industry-chain-visual",
+   "kind": "nodes",
+   "title": "From operational source to a person who acts",
+   "alt": "From operational source to a person who acts. MES and historian events land, are conformed into governed tables, scored into a hold recommendation, acted on by a quality engineer, and the outcome is written back.",
+   "caption": "The chain only closes when a named person acts and the outcome is recorded; the second state computes the same score and changes nothing. Synthetic teaching example.",
+   "textEquivalent": "Chain with an owner: Each link hands a defined thing to the next, and the engineer's decision writes an outcome row that later evaluation can read. Nodes: MES and historian: Scrap, consumption and sensor events at the machine. (selected); Landing tables: Raw copies with source ids and receive times. (selected); Governed tables: Declared grain, units, time basis and owner in Unity Catalog. (selected); Hold recommendation: score 0.82. Rule scores casting lot C-3302 against the scrap threshold. (selected); Quality engineer: Holds or releases the lot within the shift. (selected); Outcome record: Decision, time, reason and later result written back. (selected). Relationships: MES and historian → Landing tables: ingest; Landing tables → Governed tables: conform; Governed tables → Hold recommendation: score; Hold recommendation → Quality engineer: assigned to; Quality engineer → Outcome record: records; Outcome record → Governed tables: feeds evaluation.\n\nNo named owner: The same score reaches a dashboard tile nobody is assigned to. The lot ships, no outcome is written, and the use case can never be evaluated. Nodes: MES and historian: Unchanged. (selected); Landing tables: Unchanged. (selected); Governed tables: Unchanged. (selected); Hold recommendation: score 0.82. Still computed every hour. (warning); Dashboard tile: Refreshes; no person or action is attached. (warning); Outcome record: Never written; nothing to evaluate. (excluded). Relationships: MES and historian → Landing tables: ingest; Landing tables → Governed tables: conform; Governed tables → Hold recommendation: score; Hold recommendation → Dashboard tile: displayed; Dashboard tile → Outcome record: nothing recorded.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-claim-manufacturing",
+    "dbxfe-fact-unity",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "owned",
+     "title": "Chain with an owner",
+     "explanation": "Each link hands a defined thing to the next, and the engineer's decision writes an outcome row that later evaluation can read.",
+     "nodes": [
+      {
+       "id": "mes",
+       "label": "MES and historian",
+       "detail": "Scrap, consumption and sensor events at the machine.",
+       "status": "selected"
+      },
+      {
+       "id": "landing",
+       "label": "Landing tables",
+       "detail": "Raw copies with source ids and receive times.",
+       "status": "selected"
+      },
+      {
+       "id": "governed",
+       "label": "Governed tables",
+       "detail": "Declared grain, units, time basis and owner in Unity Catalog.",
+       "status": "selected"
+      },
+      {
+       "id": "decision",
+       "label": "Hold recommendation",
+       "value": "score 0.82",
+       "detail": "Rule scores casting lot C-3302 against the scrap threshold.",
+       "status": "selected"
+      },
+      {
+       "id": "engineer",
+       "label": "Quality engineer",
+       "detail": "Holds or releases the lot within the shift.",
+       "status": "selected"
+      },
+      {
+       "id": "outcome",
+       "label": "Outcome record",
+       "detail": "Decision, time, reason and later result written back.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "mes",
+       "to": "landing",
+       "label": "ingest"
+      },
+      {
+       "from": "landing",
+       "to": "governed",
+       "label": "conform"
+      },
+      {
+       "from": "governed",
+       "to": "decision",
+       "label": "score"
+      },
+      {
+       "from": "decision",
+       "to": "engineer",
+       "label": "assigned to"
+      },
+      {
+       "from": "engineer",
+       "to": "outcome",
+       "label": "records"
+      },
+      {
+       "from": "outcome",
+       "to": "governed",
+       "label": "feeds evaluation"
+      }
+     ]
+    },
+    {
+     "id": "orphan",
+     "title": "No named owner",
+     "explanation": "The same score reaches a dashboard tile nobody is assigned to. The lot ships, no outcome is written, and the use case can never be evaluated.",
+     "nodes": [
+      {
+       "id": "mes",
+       "label": "MES and historian",
+       "detail": "Unchanged.",
+       "status": "selected"
+      },
+      {
+       "id": "landing",
+       "label": "Landing tables",
+       "detail": "Unchanged.",
+       "status": "selected"
+      },
+      {
+       "id": "governed",
+       "label": "Governed tables",
+       "detail": "Unchanged.",
+       "status": "selected"
+      },
+      {
+       "id": "decision",
+       "label": "Hold recommendation",
+       "value": "score 0.82",
+       "detail": "Still computed every hour.",
+       "status": "warning"
+      },
+      {
+       "id": "tile",
+       "label": "Dashboard tile",
+       "detail": "Refreshes; no person or action is attached.",
+       "status": "warning"
+      },
+      {
+       "id": "outcome",
+       "label": "Outcome record",
+       "detail": "Never written; nothing to evaluate.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "mes",
+       "to": "landing",
+       "label": "ingest"
+      },
+      {
+       "from": "landing",
+       "to": "governed",
+       "label": "conform"
+      },
+      {
+       "from": "governed",
+       "to": "decision",
+       "label": "score"
+      },
+      {
+       "from": "decision",
+       "to": "tile",
+       "label": "displayed"
+      },
+      {
+       "from": "tile",
+       "to": "outcome",
+       "label": "nothing recorded"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-contract-visual",
+   "kind": "table",
+   "title": "One dataset, two scrap rates, one contract",
+   "alt": "One dataset, two scrap rates, one contract. Three lots give 4.0% as a mean of lot rates and 1.9% as a pooled rate; the contract fixes the pooled definition.",
+   "caption": "Averaging lot rates weights a 200-unit lot like a 1,000-unit lot; the contract names the grain and the aggregation once. Synthetic teaching example.",
+   "textEquivalent": "Two aggregations, one dataset: The same three rows give 4.0% when lot rates are averaged and 1.9% when scrapped units are summed over started units. Table columns: Row | Units started | Units scrapped | Scrap rate. Rows: Lot L-1 | 1,000 | 10 | 1.0% / Lot L-2 | 200 | 20 | 10.0% / Lot L-3 | 800 | 8 | 1.0% / Mean of lot rates | — | — | 4.0% / Pooled (sum ÷ sum) | 2,000 | 38 | 1.9%.\n\nContract fixes one answer: Written once, the contract names the grain, both halves of the ratio and how they are aggregated, so only 1.9% can be published as scrap rate. Table columns: Field | Scrap rate contract. Rows: Grain | lot × operation / Numerator | units with final disposition scrap at the operation / Denominator | units started at the operation / Aggregation | sum of numerator ÷ sum of denominator / Time basis | operation completion, site local day / Exclusions | engineering trial lots, reported separately / Owner | quality engineering lead / This week | 1.9% (38 ÷ 2,000).",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "two",
+     "title": "Two aggregations, one dataset",
+     "explanation": "The same three rows give 4.0% when lot rates are averaged and 1.9% when scrapped units are summed over started units.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Row",
+       "Units started",
+       "Units scrapped",
+       "Scrap rate"
+      ],
+      "rows": [
+       [
+        "Lot L-1",
+        "1,000",
+        "10",
+        "1.0%"
+       ],
+       [
+        "Lot L-2",
+        "200",
+        "20",
+        "10.0%"
+       ],
+       [
+        "Lot L-3",
+        "800",
+        "8",
+        "1.0%"
+       ],
+       [
+        "Mean of lot rates",
+        "—",
+        "—",
+        "4.0%"
+       ],
+       [
+        "Pooled (sum ÷ sum)",
+        "2,000",
+        "38",
+        "1.9%"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "contract",
+     "title": "Contract fixes one answer",
+     "explanation": "Written once, the contract names the grain, both halves of the ratio and how they are aggregated, so only 1.9% can be published as scrap rate.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Field",
+       "Scrap rate contract"
+      ],
+      "rows": [
+       [
+        "Grain",
+        "lot × operation"
+       ],
+       [
+        "Numerator",
+        "units with final disposition scrap at the operation"
+       ],
+       [
+        "Denominator",
+        "units started at the operation"
+       ],
+       [
+        "Aggregation",
+        "sum of numerator ÷ sum of denominator"
+       ],
+       [
+        "Time basis",
+        "operation completion, site local day"
+       ],
+       [
+        "Exclusions",
+        "engineering trial lots, reported separately"
+       ],
+       [
+        "Owner",
+        "quality engineering lead"
+       ],
+       [
+        "This week",
+        "1.9% (38 ÷ 2,000)"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-identity-visual",
+   "kind": "table",
+   "title": "Five arrivals, four events, three inspections",
+   "alt": "Five arrivals, four events, three inspections. Keying inspection events on source system, inspection id and revision collapses a resend, keeps a correction as history and separates two plants' colliding numbers.",
+   "caption": "A resend repeats the whole identity; a correction raises the revision; a number reused by another system is a different event. Synthetic teaching example.",
+   "textEquivalent": "Five arrivals: What landed from two MES systems in one hour, in arrival order. Table columns: Source | Inspection | Revision | Result | Received (UTC). Rows: MES-A | INS-4471 | 1 | PASS | 10:02:05 / MES-A | INS-4471 | 1 | PASS | 10:02:09 / MES-A | INS-4472 | 1 | FAIL | 10:05:40 / MES-B | INS-4471 | 1 | FAIL | 10:07:00 / MES-A | INS-4472 | 2 | PASS | 11:20:00.\n\nKeyed on source, id and revision: The resend collapses, revision 1 of INS-4472 is kept as history, and plant B's INS-4471 stays separate: four events, three current inspections. Table columns: Identity (source, id, rev) | Kept as | Why. Rows: MES-A, INS-4471, 1 | current (one event) | second arrival repeats the identity and payload / MES-A, INS-4472, 1 | history | superseded by a correction, not deleted / MES-A, INS-4472, 2 | current | inspector corrected a mis-keyed result / MES-B, INS-4471, 1 | current | another system; the same number is a collision.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction",
+    "dbxfe-fact-merge"
+   ],
+   "states": [
+    {
+     "id": "arrivals",
+     "title": "Five arrivals",
+     "explanation": "What landed from two MES systems in one hour, in arrival order.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Source",
+       "Inspection",
+       "Revision",
+       "Result",
+       "Received (UTC)"
+      ],
+      "rows": [
+       [
+        "MES-A",
+        "INS-4471",
+        "1",
+        "PASS",
+        "10:02:05"
+       ],
+       [
+        "MES-A",
+        "INS-4471",
+        "1",
+        "PASS",
+        "10:02:09"
+       ],
+       [
+        "MES-A",
+        "INS-4472",
+        "1",
+        "FAIL",
+        "10:05:40"
+       ],
+       [
+        "MES-B",
+        "INS-4471",
+        "1",
+        "FAIL",
+        "10:07:00"
+       ],
+       [
+        "MES-A",
+        "INS-4472",
+        "2",
+        "PASS",
+        "11:20:00"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "keyed",
+     "title": "Keyed on source, id and revision",
+     "explanation": "The resend collapses, revision 1 of INS-4472 is kept as history, and plant B's INS-4471 stays separate: four events, three current inspections.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Identity (source, id, rev)",
+       "Kept as",
+       "Why"
+      ],
+      "rows": [
+       [
+        "MES-A, INS-4471, 1",
+        "current (one event)",
+        "second arrival repeats the identity and payload"
+       ],
+       [
+        "MES-A, INS-4472, 1",
+        "history",
+        "superseded by a correction, not deleted"
+       ],
+       [
+        "MES-A, INS-4472, 2",
+        "current",
+        "inspector corrected a mis-keyed result"
+       ],
+       [
+        "MES-B, INS-4471, 1",
+        "current",
+        "another system; the same number is a collision"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-time-visual",
+   "kind": "table",
+   "title": "Units and timestamps pitfalls",
+   "alt": "Units and timestamps pitfalls. A table of six pitfalls and guards, a mixed-unit average that is meaningless until converted, and two readings labelled 01:30 local that are an hour apart as instants.",
+   "caption": "Carry the unit and the zone as data: the naive mean of 118.3 and the lost reading at the clock change both come from dropping them. Synthetic teaching example.",
+   "textEquivalent": "Pitfalls and guards: Six ways a unit or a clock goes wrong between the plant and the governed table, each with the guard that keeps it checkable. Table columns: Pitfall | Symptom | Guard. Rows: Mixed units in one column | line average far from every machine | unit column; convert once, keep the source unit / Unit implied by the source | bar and psi gauges share a tag name | unit in the source contract; reject unknown units / Local time without zone | 01:30 appears twice at the clock change | store the UTC instant plus the site time zone / Device clock drift | a PLC stamps events 4 minutes early | keep device and receive times; measure the offset / Event time vs ingestion time | late batch lands in the next day | window on event time with a lateness bound; count late rows / Session time zone | one TIMESTAMP, different displayed hours | TIMESTAMP for instants, TIMESTAMP_NTZ for wall clock, chosen on purpose.\n\nMixed units averaged: A retrofitted machine reports °F into a °C column: the naive mean is 118.3, the converted mean 85.0 °C. Table columns: Machine | Reported | Unit | In °C. Rows: DC-05 | 85 | °C | 85.0 / DC-06 | 85 | °C | 85.0 / DC-07 (retrofit) | 185 | °F | 85.0 / Naive mean | 118.3 | mixed | — / Converted mean | — | — | 85.0.\n\nClock change: At a site in America/Chicago on 1 November 2026, local 01:30 occurs twice. Keyed on local text the second reading is dropped; as UTC instants both are kept. Table columns: Reading | Local (no zone) | UTC instant | Offset. Rows: R-1 | 2026-11-01 01:30 | 06:30Z | −05:00 (daylight) / R-2 | 2026-11-01 01:30 | 07:30Z | −06:00 (standard) / Keyed on local | 1 row | — | reading lost / Keyed on UTC | 2 rows | one hour apart | both kept.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-claim-timestamp",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "pitfalls",
+     "title": "Pitfalls and guards",
+     "explanation": "Six ways a unit or a clock goes wrong between the plant and the governed table, each with the guard that keeps it checkable.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Pitfall",
+       "Symptom",
+       "Guard"
+      ],
+      "rows": [
+       [
+        "Mixed units in one column",
+        "line average far from every machine",
+        "unit column; convert once, keep the source unit"
+       ],
+       [
+        "Unit implied by the source",
+        "bar and psi gauges share a tag name",
+        "unit in the source contract; reject unknown units"
+       ],
+       [
+        "Local time without zone",
+        "01:30 appears twice at the clock change",
+        "store the UTC instant plus the site time zone"
+       ],
+       [
+        "Device clock drift",
+        "a PLC stamps events 4 minutes early",
+        "keep device and receive times; measure the offset"
+       ],
+       [
+        "Event time vs ingestion time",
+        "late batch lands in the next day",
+        "window on event time with a lateness bound; count late rows"
+       ],
+       [
+        "Session time zone",
+        "one TIMESTAMP, different displayed hours",
+        "TIMESTAMP for instants, TIMESTAMP_NTZ for wall clock, chosen on purpose"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "units",
+     "title": "Mixed units averaged",
+     "explanation": "A retrofitted machine reports °F into a °C column: the naive mean is 118.3, the converted mean 85.0 °C.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Machine",
+       "Reported",
+       "Unit",
+       "In °C"
+      ],
+      "rows": [
+       [
+        "DC-05",
+        "85",
+        "°C",
+        "85.0"
+       ],
+       [
+        "DC-06",
+        "85",
+        "°C",
+        "85.0"
+       ],
+       [
+        "DC-07 (retrofit)",
+        "185",
+        "°F",
+        "85.0"
+       ],
+       [
+        "Naive mean",
+        "118.3",
+        "mixed",
+        "—"
+       ],
+       [
+        "Converted mean",
+        "—",
+        "—",
+        "85.0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "clock",
+     "title": "Clock change",
+     "explanation": "At a site in America/Chicago on 1 November 2026, local 01:30 occurs twice. Keyed on local text the second reading is dropped; as UTC instants both are kept.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Reading",
+       "Local (no zone)",
+       "UTC instant",
+       "Offset"
+      ],
+      "rows": [
+       [
+        "R-1",
+        "2026-11-01 01:30",
+        "06:30Z",
+        "−05:00 (daylight)"
+       ],
+       [
+        "R-2",
+        "2026-11-01 01:30",
+        "07:30Z",
+        "−06:00 (standard)"
+       ],
+       [
+        "Keyed on local",
+        "1 row",
+        "—",
+        "reading lost"
+       ],
+       [
+        "Keyed on UTC",
+        "2 rows",
+        "one hour apart",
+        "both kept"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-hierarchy-visual",
+   "kind": "table",
+   "title": "An asset hierarchy with dated parents",
+   "alt": "An asset hierarchy with dated parents. Each level from site to sensor carries a key and a grain; sensor S-118 has two dated mounts, so readings join to the machine that held it at the time.",
+   "caption": "The tree is a simplified reading of ISA-95's equipment levels; the second state shows why the sensor's parent needs valid-from and valid-to dates. Synthetic teaching example.",
+   "textEquivalent": "Levels, keys and grain: Each level has its own key and carries its own grain of facts; the last column is an approximate ISA-95 counterpart. Table columns: Level | Cinderline example | Key | Grain it carries | ISA-95 level (approx.). Rows: Site | Harwick plant | site_id | shifts, calendar, time zone | Site / Area (optional) | Casting hall | area_id | shared utilities | Area / Line | Line 3 die casting | line_id | throughput and OEE per shift | Work center (production line) / Machine | Cell DC-07 | asset_id | cycles, downtime events | Work unit / Sensor | S-118 hydraulic pressure | sensor_id + mount period | readings | Attached instrument, below work unit.\n\nSensor re-mounted: S-118 moved from DC-07 to DC-09 on 15 June. With dated mounts, the 10 June reading joins DC-07; a current-parent join files it under DC-09. Table columns: Record | Sensor | Machine | Period or time | Note. Rows: Mount 1 | S-118 | DC-07 | 2025-02-01 to 2026-06-15 | closed / Mount 2 | S-118 | DC-09 | 2026-06-15 onward | open / Reading | S-118 | DC-07 | 2026-06-10 14:00Z | joins mount 1 / Reading | S-118 | DC-09 | 2026-06-20 09:00Z | joins mount 2 / Current-parent join | S-118 | DC-09 | both readings | wrong for 10 June.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-claim-isa95",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "levels",
+     "title": "Levels, keys and grain",
+     "explanation": "Each level has its own key and carries its own grain of facts; the last column is an approximate ISA-95 counterpart.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Level",
+       "Cinderline example",
+       "Key",
+       "Grain it carries",
+       "ISA-95 level (approx.)"
+      ],
+      "rows": [
+       [
+        "Site",
+        "Harwick plant",
+        "site_id",
+        "shifts, calendar, time zone",
+        "Site"
+       ],
+       [
+        "Area (optional)",
+        "Casting hall",
+        "area_id",
+        "shared utilities",
+        "Area"
+       ],
+       [
+        "Line",
+        "Line 3 die casting",
+        "line_id",
+        "throughput and OEE per shift",
+        "Work center (production line)"
+       ],
+       [
+        "Machine",
+        "Cell DC-07",
+        "asset_id",
+        "cycles, downtime events",
+        "Work unit"
+       ],
+       [
+        "Sensor",
+        "S-118 hydraulic pressure",
+        "sensor_id + mount period",
+        "readings",
+        "Attached instrument, below work unit"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "moved",
+     "title": "Sensor re-mounted",
+     "explanation": "S-118 moved from DC-07 to DC-09 on 15 June. With dated mounts, the 10 June reading joins DC-07; a current-parent join files it under DC-09.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Record",
+       "Sensor",
+       "Machine",
+       "Period or time",
+       "Note"
+      ],
+      "rows": [
+       [
+        "Mount 1",
+        "S-118",
+        "DC-07",
+        "2025-02-01 to 2026-06-15",
+        "closed"
+       ],
+       [
+        "Mount 2",
+        "S-118",
+        "DC-09",
+        "2026-06-15 onward",
+        "open"
+       ],
+       [
+        "Reading",
+        "S-118",
+        "DC-07",
+        "2026-06-10 14:00Z",
+        "joins mount 1"
+       ],
+       [
+        "Reading",
+        "S-118",
+        "DC-09",
+        "2026-06-20 09:00Z",
+        "joins mount 2"
+       ],
+       [
+        "Current-parent join",
+        "S-118",
+        "DC-09",
+        "both readings",
+        "wrong for 10 June"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-quality-visual",
+   "kind": "equation",
+   "title": "Three yields from one set of inspections",
+   "alt": "Three yields from one set of inspections. Final yield 97.0%, first-pass yield 88.0% with a 9.0% rework load, and a sampled defect rate that must be divided by the units inspected.",
+   "caption": "Same 500 castings, three answers to three questions; the sampled rate is an estimate over the inspected units only. Synthetic teaching example.",
+   "textEquivalent": "Final yield: Counting every unit that eventually passes, including those reworked, gives a healthy-looking number. Equation: final yield = (440 + 45) ÷ 500 = 485 ÷ 500 = 97.0%\n\nFirst-pass yield: Counting only units that pass first time exposes the rework the line absorbs. Equation: first-pass yield = 440 ÷ 500 = 88.0%; rework load = 45 ÷ 500 = 9.0%; scrap = 15 ÷ 500 = 3.0%\n\nSampled inspection: Only 100 of the 500 castings were X-rayed and 6 showed porosity. Dividing by all 500 treats uninspected castings as clean. Equation: wrong: 6 ÷ 500 = 1.2%; estimate: 6 ÷ 100 X-rayed = 6.0% of castings, with a wide interval at n = 100",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-claim-manufacturing",
+    "dbxfe-fact-expectations",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "final",
+     "title": "Final yield",
+     "explanation": "Counting every unit that eventually passes, including those reworked, gives a healthy-looking number.",
+     "nodes": [],
+     "connections": [],
+     "equation": "final yield = (440 + 45) ÷ 500 = 485 ÷ 500 = 97.0%"
+    },
+    {
+     "id": "fpy",
+     "title": "First-pass yield",
+     "explanation": "Counting only units that pass first time exposes the rework the line absorbs.",
+     "nodes": [],
+     "connections": [],
+     "equation": "first-pass yield = 440 ÷ 500 = 88.0%; rework load = 45 ÷ 500 = 9.0%; scrap = 15 ÷ 500 = 3.0%"
+    },
+    {
+     "id": "sampled",
+     "title": "Sampled inspection",
+     "explanation": "Only 100 of the 500 castings were X-rayed and 6 showed porosity. Dividing by all 500 treats uninspected castings as clean.",
+     "nodes": [],
+     "connections": [],
+     "equation": "wrong: 6 ÷ 500 = 1.2%; estimate: 6 ÷ 100 X-rayed = 6.0% of castings, with a wide interval at n = 100"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-genealogy-visual",
+   "kind": "nodes",
+   "title": "Forward and backward over lot genealogy",
+   "alt": "Forward and backward over lot genealogy. Two ingot lots feed three casting lots, which feed two assembly lots; one assembly lot mixed two casting lots and one assembly lot shipped.",
+   "caption": "Forward from AL-5521 reaches both assembly lots and SH-77; backward from A-802 reaches both ingot lots because A-802 mixed its inputs. Synthetic teaching example.",
+   "textEquivalent": "Consumption edges: Each arrow is a recorded consumption event with its own identity and time; A-802 is the one lot with two inputs. Nodes: Ingot lot AL-5521: Aluminium ingot from supplier lot 5521. (context); Ingot lot AL-5522: Aluminium ingot from supplier lot 5522. (context); Casting lot C-3301: Cast from AL-5521 only. (context); Casting lot C-3302: Cast from AL-5521 only. (context); Casting lot C-3303: Cast from AL-5522 only. (context); Assembly lot A-801: Consumed C-3301. (context); Assembly lot A-802: Consumed C-3302 and C-3303: mixed. (selected); Shipment SH-77: Carries A-801 to a customer; A-802 is still in stock. (context). Relationships: Ingot lot AL-5521 → Casting lot C-3301: consumed by; Ingot lot AL-5521 → Casting lot C-3302: consumed by; Ingot lot AL-5522 → Casting lot C-3303: consumed by; Casting lot C-3301 → Assembly lot A-801: consumed by; Casting lot C-3302 → Assembly lot A-802: consumed by; Casting lot C-3303 → Assembly lot A-802: consumed by; Assembly lot A-801 → Shipment SH-77: shipped in.\n\nForward from AL-5521: Where-used from the suspect ingot lot reaches both casting lots it fed, both assembly lots and shipment SH-77; AL-5522 and C-3303 are outside the trace. Nodes: Ingot lot AL-5521: Aluminium ingot from supplier lot 5521. (warning); Ingot lot AL-5522: Aluminium ingot from supplier lot 5522. (excluded); Casting lot C-3301: Cast from AL-5521 only. (selected); Casting lot C-3302: Cast from AL-5521 only. (selected); Casting lot C-3303: Cast from AL-5522 only. (excluded); Assembly lot A-801: Consumed C-3301. (selected); Assembly lot A-802: Consumed C-3302 and C-3303: mixed. (selected); Shipment SH-77: Carries A-801 to a customer; A-802 is still in stock. (selected). Relationships: Ingot lot AL-5521 → Casting lot C-3301: consumed by; Ingot lot AL-5521 → Casting lot C-3302: consumed by; Ingot lot AL-5522 → Casting lot C-3303: consumed by; Casting lot C-3301 → Assembly lot A-801: consumed by; Casting lot C-3302 → Assembly lot A-802: consumed by; Casting lot C-3303 → Assembly lot A-802: consumed by; Assembly lot A-801 → Shipment SH-77: shipped in.\n\nBackward from A-802: Where-from for a complaint on A-802 climbs through C-3302 and C-3303 to both ingot lots; the other branch is outside the trace. Nodes: Ingot lot AL-5521: Aluminium ingot from supplier lot 5521. (selected); Ingot lot AL-5522: Aluminium ingot from supplier lot 5522. (selected); Casting lot C-3301: Cast from AL-5521 only. (excluded); Casting lot C-3302: Cast from AL-5521 only. (selected); Casting lot C-3303: Cast from AL-5522 only. (selected); Assembly lot A-801: Consumed C-3301. (excluded); Assembly lot A-802: Consumed C-3302 and C-3303: mixed. (warning); Shipment SH-77: Carries A-801 to a customer; A-802 is still in stock. (excluded). Relationships: Ingot lot AL-5521 → Casting lot C-3301: consumed by; Ingot lot AL-5521 → Casting lot C-3302: consumed by; Ingot lot AL-5522 → Casting lot C-3303: consumed by; Casting lot C-3301 → Assembly lot A-801: consumed by; Casting lot C-3302 → Assembly lot A-802: consumed by; Casting lot C-3303 → Assembly lot A-802: consumed by; Assembly lot A-801 → Shipment SH-77: shipped in.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-claim-lineage",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "edges",
+     "title": "Consumption edges",
+     "explanation": "Each arrow is a recorded consumption event with its own identity and time; A-802 is the one lot with two inputs.",
+     "nodes": [
+      {
+       "id": "al5521",
+       "label": "Ingot lot AL-5521",
+       "detail": "Aluminium ingot from supplier lot 5521.",
+       "status": "context"
+      },
+      {
+       "id": "al5522",
+       "label": "Ingot lot AL-5522",
+       "detail": "Aluminium ingot from supplier lot 5522.",
+       "status": "context"
+      },
+      {
+       "id": "c3301",
+       "label": "Casting lot C-3301",
+       "detail": "Cast from AL-5521 only.",
+       "status": "context"
+      },
+      {
+       "id": "c3302",
+       "label": "Casting lot C-3302",
+       "detail": "Cast from AL-5521 only.",
+       "status": "context"
+      },
+      {
+       "id": "c3303",
+       "label": "Casting lot C-3303",
+       "detail": "Cast from AL-5522 only.",
+       "status": "context"
+      },
+      {
+       "id": "a801",
+       "label": "Assembly lot A-801",
+       "detail": "Consumed C-3301.",
+       "status": "context"
+      },
+      {
+       "id": "a802",
+       "label": "Assembly lot A-802",
+       "detail": "Consumed C-3302 and C-3303: mixed.",
+       "status": "selected"
+      },
+      {
+       "id": "sh77",
+       "label": "Shipment SH-77",
+       "detail": "Carries A-801 to a customer; A-802 is still in stock.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "al5521",
+       "to": "c3301",
+       "label": "consumed by"
+      },
+      {
+       "from": "al5521",
+       "to": "c3302",
+       "label": "consumed by"
+      },
+      {
+       "from": "al5522",
+       "to": "c3303",
+       "label": "consumed by"
+      },
+      {
+       "from": "c3301",
+       "to": "a801",
+       "label": "consumed by"
+      },
+      {
+       "from": "c3302",
+       "to": "a802",
+       "label": "consumed by"
+      },
+      {
+       "from": "c3303",
+       "to": "a802",
+       "label": "consumed by"
+      },
+      {
+       "from": "a801",
+       "to": "sh77",
+       "label": "shipped in"
+      }
+     ]
+    },
+    {
+     "id": "forward",
+     "title": "Forward from AL-5521",
+     "explanation": "Where-used from the suspect ingot lot reaches both casting lots it fed, both assembly lots and shipment SH-77; AL-5522 and C-3303 are outside the trace.",
+     "nodes": [
+      {
+       "id": "al5521",
+       "label": "Ingot lot AL-5521",
+       "detail": "Aluminium ingot from supplier lot 5521.",
+       "status": "warning"
+      },
+      {
+       "id": "al5522",
+       "label": "Ingot lot AL-5522",
+       "detail": "Aluminium ingot from supplier lot 5522.",
+       "status": "excluded"
+      },
+      {
+       "id": "c3301",
+       "label": "Casting lot C-3301",
+       "detail": "Cast from AL-5521 only.",
+       "status": "selected"
+      },
+      {
+       "id": "c3302",
+       "label": "Casting lot C-3302",
+       "detail": "Cast from AL-5521 only.",
+       "status": "selected"
+      },
+      {
+       "id": "c3303",
+       "label": "Casting lot C-3303",
+       "detail": "Cast from AL-5522 only.",
+       "status": "excluded"
+      },
+      {
+       "id": "a801",
+       "label": "Assembly lot A-801",
+       "detail": "Consumed C-3301.",
+       "status": "selected"
+      },
+      {
+       "id": "a802",
+       "label": "Assembly lot A-802",
+       "detail": "Consumed C-3302 and C-3303: mixed.",
+       "status": "selected"
+      },
+      {
+       "id": "sh77",
+       "label": "Shipment SH-77",
+       "detail": "Carries A-801 to a customer; A-802 is still in stock.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "al5521",
+       "to": "c3301",
+       "label": "consumed by"
+      },
+      {
+       "from": "al5521",
+       "to": "c3302",
+       "label": "consumed by"
+      },
+      {
+       "from": "al5522",
+       "to": "c3303",
+       "label": "consumed by"
+      },
+      {
+       "from": "c3301",
+       "to": "a801",
+       "label": "consumed by"
+      },
+      {
+       "from": "c3302",
+       "to": "a802",
+       "label": "consumed by"
+      },
+      {
+       "from": "c3303",
+       "to": "a802",
+       "label": "consumed by"
+      },
+      {
+       "from": "a801",
+       "to": "sh77",
+       "label": "shipped in"
+      }
+     ]
+    },
+    {
+     "id": "backward",
+     "title": "Backward from A-802",
+     "explanation": "Where-from for a complaint on A-802 climbs through C-3302 and C-3303 to both ingot lots; the other branch is outside the trace.",
+     "nodes": [
+      {
+       "id": "al5521",
+       "label": "Ingot lot AL-5521",
+       "detail": "Aluminium ingot from supplier lot 5521.",
+       "status": "selected"
+      },
+      {
+       "id": "al5522",
+       "label": "Ingot lot AL-5522",
+       "detail": "Aluminium ingot from supplier lot 5522.",
+       "status": "selected"
+      },
+      {
+       "id": "c3301",
+       "label": "Casting lot C-3301",
+       "detail": "Cast from AL-5521 only.",
+       "status": "excluded"
+      },
+      {
+       "id": "c3302",
+       "label": "Casting lot C-3302",
+       "detail": "Cast from AL-5521 only.",
+       "status": "selected"
+      },
+      {
+       "id": "c3303",
+       "label": "Casting lot C-3303",
+       "detail": "Cast from AL-5522 only.",
+       "status": "selected"
+      },
+      {
+       "id": "a801",
+       "label": "Assembly lot A-801",
+       "detail": "Consumed C-3301.",
+       "status": "excluded"
+      },
+      {
+       "id": "a802",
+       "label": "Assembly lot A-802",
+       "detail": "Consumed C-3302 and C-3303: mixed.",
+       "status": "warning"
+      },
+      {
+       "id": "sh77",
+       "label": "Shipment SH-77",
+       "detail": "Carries A-801 to a customer; A-802 is still in stock.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "al5521",
+       "to": "c3301",
+       "label": "consumed by"
+      },
+      {
+       "from": "al5521",
+       "to": "c3302",
+       "label": "consumed by"
+      },
+      {
+       "from": "al5522",
+       "to": "c3303",
+       "label": "consumed by"
+      },
+      {
+       "from": "c3301",
+       "to": "a801",
+       "label": "consumed by"
+      },
+      {
+       "from": "c3302",
+       "to": "a802",
+       "label": "consumed by"
+      },
+      {
+       "from": "c3303",
+       "to": "a802",
+       "label": "consumed by"
+      },
+      {
+       "from": "a801",
+       "to": "sh77",
+       "label": "shipped in"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-engineering-visual",
+   "kind": "table",
+   "title": "As-designed by effectivity, as-built by genealogy",
+   "alt": "As-designed by effectivity, as-built by genealogy. Pump housing PH-200 changes seal from S-10 to S-12 at serial 1061; serial 1063 consumed S-10 anyway, which is reported as a deviation.",
+   "caption": "The BOM revision says what should be in each serial; the consumption record says what is; a mismatch is a finding for engineering, never a row to overwrite. Synthetic teaching example.",
+   "textEquivalent": "Revisions with effectivity: Revision A governs serials 1001 to 1060 and revision B governs 1061 onward; only the seal changes. Table columns: Parent | Revision | Component | Qty | Effective serials. Rows: PH-200 | A | Seal S-10 | 2 | 1001–1060 / PH-200 | A | Bolt B-4 | 6 | 1001–1060 / PH-200 | B | Seal S-12 | 2 | 1061 onward / PH-200 | B | Bolt B-4 | 6 | 1061 onward.\n\nAs-designed against as-built: Joining effectivity to the consumption records: serial 1063 should carry S-12 but consumed S-10 from lot S10-L44. Table columns: Serial | Designed revision | Designed seal | Consumed seal (genealogy) | Finding. Rows: 1058 | A | S-10 | S-10 | matches / 1061 | B | S-12 | S-12 | matches / 1063 | B | S-12 | S-10 (lot S10-L44) | deviation: route to engineering / 1064 | B | S-12 | S-12 | matches.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "revisions",
+     "title": "Revisions with effectivity",
+     "explanation": "Revision A governs serials 1001 to 1060 and revision B governs 1061 onward; only the seal changes.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Parent",
+       "Revision",
+       "Component",
+       "Qty",
+       "Effective serials"
+      ],
+      "rows": [
+       [
+        "PH-200",
+        "A",
+        "Seal S-10",
+        "2",
+        "1001–1060"
+       ],
+       [
+        "PH-200",
+        "A",
+        "Bolt B-4",
+        "6",
+        "1001–1060"
+       ],
+       [
+        "PH-200",
+        "B",
+        "Seal S-12",
+        "2",
+        "1061 onward"
+       ],
+       [
+        "PH-200",
+        "B",
+        "Bolt B-4",
+        "6",
+        "1061 onward"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "asbuilt",
+     "title": "As-designed against as-built",
+     "explanation": "Joining effectivity to the consumption records: serial 1063 should carry S-12 but consumed S-10 from lot S10-L44.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Serial",
+       "Designed revision",
+       "Designed seal",
+       "Consumed seal (genealogy)",
+       "Finding"
+      ],
+      "rows": [
+       [
+        "1058",
+        "A",
+        "S-10",
+        "S-10",
+        "matches"
+       ],
+       [
+        "1061",
+        "B",
+        "S-12",
+        "S-12",
+        "matches"
+       ],
+       [
+        "1063",
+        "B",
+        "S-12",
+        "S-10 (lot S10-L44)",
+        "deviation: route to engineering"
+       ],
+       [
+        "1064",
+        "B",
+        "S-12",
+        "S-12",
+        "matches"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-maintenance-visual",
+   "kind": "timeline",
+   "title": "Prediction time, label window and leakage",
+   "alt": "Prediction time, label window and leakage. Features use data up to the prediction time; the label is a failure-coded work order within 14 days; teardown notes and post-failure readings are excluded.",
+   "caption": "The horizon must exceed the parts lead time, and anything recorded after the prediction time can only be the label, never a feature. Synthetic teaching example.",
+   "textEquivalent": "Label window: The model scores on day −14. A failure-coded work order within the next 14 days makes the label 1; the planner needs at least 7 days to get parts. Nodes: Day −30: vibration trend begins: Features may use readings up to the prediction time. (context); Day −14: prediction time: Model scores spindle SP-06. (selected); Day −7: last useful warning: Replacement bearings take 7 days to arrive. (selected); Day 0: spindle seizes: Unplanned stop on the CNC line. (warning); Day 1: work order closed: WO-9312. Failure code BRG-01 recorded; the label comes from here. (selected). Relationships: Day −14: prediction time → Day 0: spindle seizes: label: failure within 14 days; Day −7: last useful warning → Day 0: spindle seizes: 7-day parts lead time.\n\nLeakage: Teardown notes and post-failure readings exist only after the event. Used as features they make testing look excellent and fail in use. Nodes: Day −14: prediction time: Only data up to here may become a feature. (selected); Day 0: spindle seizes: The outcome being predicted. (warning); Day 1: post-failure readings: Recorded after the event; excluded from features. (excluded); Day 1: work order closed: WO-9312. Used only to build the label. (selected); Day 2: teardown notes: Bearing damage described; not known at prediction time. (excluded). Relationships: Day 1: work order closed → Day −14: prediction time: label only; Day 2: teardown notes → Day −14: prediction time: cannot feed back; Day 1: post-failure readings → Day −14: prediction time: cannot feed back.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-claim-ml",
+    "dbxfe-fact-leakage",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "window",
+     "title": "Label window",
+     "explanation": "The model scores on day −14. A failure-coded work order within the next 14 days makes the label 1; the planner needs at least 7 days to get parts.",
+     "nodes": [
+      {
+       "id": "trend",
+       "label": "Day −30: vibration trend begins",
+       "detail": "Features may use readings up to the prediction time.",
+       "status": "context"
+      },
+      {
+       "id": "predict",
+       "label": "Day −14: prediction time",
+       "detail": "Model scores spindle SP-06.",
+       "status": "selected"
+      },
+      {
+       "id": "lead",
+       "label": "Day −7: last useful warning",
+       "detail": "Replacement bearings take 7 days to arrive.",
+       "status": "selected"
+      },
+      {
+       "id": "failure",
+       "label": "Day 0: spindle seizes",
+       "detail": "Unplanned stop on the CNC line.",
+       "status": "warning"
+      },
+      {
+       "id": "workorder",
+       "label": "Day 1: work order closed",
+       "value": "WO-9312",
+       "detail": "Failure code BRG-01 recorded; the label comes from here.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "predict",
+       "to": "failure",
+       "label": "label: failure within 14 days"
+      },
+      {
+       "from": "lead",
+       "to": "failure",
+       "label": "7-day parts lead time"
+      }
+     ]
+    },
+    {
+     "id": "leak",
+     "title": "Leakage",
+     "explanation": "Teardown notes and post-failure readings exist only after the event. Used as features they make testing look excellent and fail in use.",
+     "nodes": [
+      {
+       "id": "predict",
+       "label": "Day −14: prediction time",
+       "detail": "Only data up to here may become a feature.",
+       "status": "selected"
+      },
+      {
+       "id": "failure",
+       "label": "Day 0: spindle seizes",
+       "detail": "The outcome being predicted.",
+       "status": "warning"
+      },
+      {
+       "id": "post",
+       "label": "Day 1: post-failure readings",
+       "detail": "Recorded after the event; excluded from features.",
+       "status": "excluded"
+      },
+      {
+       "id": "workorder",
+       "label": "Day 1: work order closed",
+       "value": "WO-9312",
+       "detail": "Used only to build the label.",
+       "status": "selected"
+      },
+      {
+       "id": "teardown",
+       "label": "Day 2: teardown notes",
+       "detail": "Bearing damage described; not known at prediction time.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "workorder",
+       "to": "predict",
+       "label": "label only"
+      },
+      {
+       "from": "teardown",
+       "to": "predict",
+       "label": "cannot feed back"
+      },
+      {
+       "from": "post",
+       "to": "predict",
+       "label": "cannot feed back"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-demand-visual",
+   "kind": "table",
+   "title": "Shipments recorded, censoring flagged",
+   "alt": "Shipments recorded, censoring flagged. Week 2 shipped 80 units during a three-day stock-out, so it is a lower bound on demand, not a demand observation.",
+   "caption": "Reading shipments as demand pulls the baseline down to 110; excluding the censored week gives 125 as a starting point, not an answer. Synthetic teaching example.",
+   "textEquivalent": "Shipments as recorded: Three weeks of a fast-moving spare part at one distribution centre, read naively as demand. Table columns: Week | Shipped | Stock-out days | Read as demand. Rows: W1 | 120 | 0 | 120 / W2 | 80 | 3 | 80 / W3 | 130 | 0 | 130 / Mean | 110 | — | 110.\n\nCensoring flagged: Week 2 is marked censored: demand was at least 80. The uncensored weeks average 125, a planning baseline that still needs a proper forecast. Table columns: Week | Shipped | Censored | Usable as. Rows: W1 | 120 | no | demand observation / W2 | 80 | yes (out Wed–Fri) | lower bound: demand ≥ 80 / W3 | 130 | no | demand observation / Mean of uncensored | 125 | — | baseline, not the answer.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-claim-manufacturing",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "shipped",
+     "title": "Shipments as recorded",
+     "explanation": "Three weeks of a fast-moving spare part at one distribution centre, read naively as demand.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Week",
+       "Shipped",
+       "Stock-out days",
+       "Read as demand"
+      ],
+      "rows": [
+       [
+        "W1",
+        "120",
+        "0",
+        "120"
+       ],
+       [
+        "W2",
+        "80",
+        "3",
+        "80"
+       ],
+       [
+        "W3",
+        "130",
+        "0",
+        "130"
+       ],
+       [
+        "Mean",
+        "110",
+        "—",
+        "110"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "censored",
+     "title": "Censoring flagged",
+     "explanation": "Week 2 is marked censored: demand was at least 80. The uncensored weeks average 125, a planning baseline that still needs a proper forecast.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Week",
+       "Shipped",
+       "Censored",
+       "Usable as"
+      ],
+      "rows": [
+       [
+        "W1",
+        "120",
+        "no",
+        "demand observation"
+       ],
+       [
+        "W2",
+        "80",
+        "yes (out Wed–Fri)",
+        "lower bound: demand ≥ 80"
+       ],
+       [
+        "W3",
+        "130",
+        "no",
+        "demand observation"
+       ],
+       [
+        "Mean of uncensored",
+        "125",
+        "—",
+        "baseline, not the answer"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-schedule-visual",
+   "kind": "table",
+   "title": "Due-date order against material availability",
+   "alt": "Due-date order against material availability. Sorting four orders by due date looks on time; checking material moves O-3 to Wednesday, one day late, and leaves that trade-off to the planner.",
+   "caption": "Line 3 runs one order a day at up to 400 units; the feasible schedule is honest about the one late order. Synthetic teaching example.",
+   "textEquivalent": "Due-date order: Earliest due date first, ignoring material: every order appears on time. Table columns: Day | Order | Qty | Due | On time on paper. Rows: Mon | O-1 | 300 | Mon | yes / Tue | O-3 | 350 | Tue | yes / Wed | O-2 | 400 | Wed | yes / Thu | O-4 | 250 | Thu | yes.\n\nMaterial checked: O-3's alloy arrives Wednesday, so Tuesday runs O-2 instead. The feasible schedule makes O-3 one day late; no sequence avoids it. Table columns: Day | Order | Material ready | Due | Result. Rows: Mon | O-1 | Mon | Mon | on time / Tue | O-2 | Mon | Wed | one day early / Wed | O-3 | Wed | Tue | one day late: planner decides / Thu | O-4 | Tue | Thu | on time.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "edd",
+     "title": "Due-date order",
+     "explanation": "Earliest due date first, ignoring material: every order appears on time.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Day",
+       "Order",
+       "Qty",
+       "Due",
+       "On time on paper"
+      ],
+      "rows": [
+       [
+        "Mon",
+        "O-1",
+        "300",
+        "Mon",
+        "yes"
+       ],
+       [
+        "Tue",
+        "O-3",
+        "350",
+        "Tue",
+        "yes"
+       ],
+       [
+        "Wed",
+        "O-2",
+        "400",
+        "Wed",
+        "yes"
+       ],
+       [
+        "Thu",
+        "O-4",
+        "250",
+        "Thu",
+        "yes"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "material",
+     "title": "Material checked",
+     "explanation": "O-3's alloy arrives Wednesday, so Tuesday runs O-2 instead. The feasible schedule makes O-3 one day late; no sequence avoids it.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Day",
+       "Order",
+       "Material ready",
+       "Due",
+       "Result"
+      ],
+      "rows": [
+       [
+        "Mon",
+        "O-1",
+        "Mon",
+        "Mon",
+        "on time"
+       ],
+       [
+        "Tue",
+        "O-2",
+        "Mon",
+        "Wed",
+        "one day early"
+       ],
+       [
+        "Wed",
+        "O-3",
+        "Wed",
+        "Tue",
+        "one day late: planner decides"
+       ],
+       [
+        "Thu",
+        "O-4",
+        "Tue",
+        "Thu",
+        "on time"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-documents-visual",
+   "kind": "nodes",
+   "title": "Answering from the revision in force",
+   "alt": "Answering from the revision in force. A technician's question is answered from the current revision of a work instruction with a citation; without revision metadata a superseded revision ranks first and the technician's check catches the mismatch.",
+   "caption": "Status and effective date on every chunk decide which revision an answer may cite; the controlled copy remains the authority. Synthetic teaching example.",
+   "textEquivalent": "Current revision cited: Chunks carry document id, revision, status and effective date. Retrieval filters to the current revision and the answer cites it for the technician to check. Nodes: Technician question: Clamp bolt torque for DC-07's die? (selected); Search index: Chunks carry doc id, revision, status, effective date, site. (selected); WI-114 rev C: current. Current from 2026-05-01; states 95 N·m. (selected); WI-114 rev B: superseded. Superseded; states 80 N·m. (excluded); Answer with citation: Quotes WI-114 rev C section 4 and links the controlled copy. (selected); Technician check: Compares with the posted controlled instruction before work. (selected). Relationships: Technician question → Search index: query; Search index → WI-114 rev C: status = current; Search index → WI-114 rev B: filtered out; WI-114 rev C → Answer with citation: cited; Answer with citation → Technician check: verified against.\n\nRevision metadata missing: The chunks carry text only. Revision B's older wording matches the question best, the answer quotes 80 N·m, and only the technician's check against the controlled copy catches it. Nodes: Technician question: Same question. (selected); Search index: Chunks carry text only; no status or date. (warning); WI-114 rev C: current. Ranked third; wording differs from the question. (context); WI-114 rev B: superseded. Ranked first; superseded text. (warning); Answer with citation: Quotes 80 N·m from rev B. (warning); Technician check: Controlled copy says 95 N·m; mismatch reported. (selected). Relationships: Technician question → Search index: query; Search index → WI-114 rev B: best text match; Search index → WI-114 rev C: lower match; WI-114 rev B → Answer with citation: cited; Answer with citation → Technician check: mismatch found.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "current",
+     "title": "Current revision cited",
+     "explanation": "Chunks carry document id, revision, status and effective date. Retrieval filters to the current revision and the answer cites it for the technician to check.",
+     "nodes": [
+      {
+       "id": "question",
+       "label": "Technician question",
+       "detail": "Clamp bolt torque for DC-07's die?",
+       "status": "selected"
+      },
+      {
+       "id": "index",
+       "label": "Search index",
+       "detail": "Chunks carry doc id, revision, status, effective date, site.",
+       "status": "selected"
+      },
+      {
+       "id": "revc",
+       "label": "WI-114 rev C",
+       "value": "current",
+       "detail": "Current from 2026-05-01; states 95 N·m.",
+       "status": "selected"
+      },
+      {
+       "id": "revb",
+       "label": "WI-114 rev B",
+       "value": "superseded",
+       "detail": "Superseded; states 80 N·m.",
+       "status": "excluded"
+      },
+      {
+       "id": "answer",
+       "label": "Answer with citation",
+       "detail": "Quotes WI-114 rev C section 4 and links the controlled copy.",
+       "status": "selected"
+      },
+      {
+       "id": "tech",
+       "label": "Technician check",
+       "detail": "Compares with the posted controlled instruction before work.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "question",
+       "to": "index",
+       "label": "query"
+      },
+      {
+       "from": "index",
+       "to": "revc",
+       "label": "status = current"
+      },
+      {
+       "from": "index",
+       "to": "revb",
+       "label": "filtered out"
+      },
+      {
+       "from": "revc",
+       "to": "answer",
+       "label": "cited"
+      },
+      {
+       "from": "answer",
+       "to": "tech",
+       "label": "verified against"
+      }
+     ]
+    },
+    {
+     "id": "missing",
+     "title": "Revision metadata missing",
+     "explanation": "The chunks carry text only. Revision B's older wording matches the question best, the answer quotes 80 N·m, and only the technician's check against the controlled copy catches it.",
+     "nodes": [
+      {
+       "id": "question",
+       "label": "Technician question",
+       "detail": "Same question.",
+       "status": "selected"
+      },
+      {
+       "id": "index",
+       "label": "Search index",
+       "detail": "Chunks carry text only; no status or date.",
+       "status": "warning"
+      },
+      {
+       "id": "revc",
+       "label": "WI-114 rev C",
+       "value": "current",
+       "detail": "Ranked third; wording differs from the question.",
+       "status": "context"
+      },
+      {
+       "id": "revb",
+       "label": "WI-114 rev B",
+       "value": "superseded",
+       "detail": "Ranked first; superseded text.",
+       "status": "warning"
+      },
+      {
+       "id": "answer",
+       "label": "Answer with citation",
+       "detail": "Quotes 80 N·m from rev B.",
+       "status": "warning"
+      },
+      {
+       "id": "tech",
+       "label": "Technician check",
+       "detail": "Controlled copy says 95 N·m; mismatch reported.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "question",
+       "to": "index",
+       "label": "query"
+      },
+      {
+       "from": "index",
+       "to": "revb",
+       "label": "best text match"
+      },
+      {
+       "from": "index",
+       "to": "revc",
+       "label": "lower match"
+      },
+      {
+       "from": "revb",
+       "to": "answer",
+       "label": "cited"
+      },
+      {
+       "from": "answer",
+       "to": "tech",
+       "label": "mismatch found"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-transfer-visual",
+   "kind": "table",
+   "title": "Cross-industry transfer comparison",
+   "alt": "Cross-industry transfer comparison. Event identity, grain, hierarchy and traceability analogue compared for manufacturing, retail, financial services and healthcare, then clock pitfalls, decision owners and where qualified specialists decide.",
+   "caption": "The questions transfer; the answers and the stakes change. The table names data shapes and owners only and gives no compliance, clinical or safety advice. Synthetic teaching example.",
+   "textEquivalent": "Identity, grain and hierarchy: The same four data questions, answered for each industry. Table columns: Question | Manufacturing | Retail | Financial services | Healthcare. Rows: Event identity | source, inspection id, revision | store, transaction id, line; a return links to its sale | transaction id; a reversal is a new event | supply scan id with item lot and location / Business grain | lot × operation; serial | store × SKU × day | account × day; transaction | supply item × location × day / Hierarchy | site → line → machine → sensor | chain → region → store → shelf | entity → business line → branch → account | organization → facility → department → storage location / Traceability analogue | lot genealogy | supplier lot → distribution centre → store | funds flow between accounts | supply lot → location → consumption record.\n\nClock, decision and stakes: Clocks, owners and the decisions a model must not take alone differ most; each brief names the qualified owner rather than deciding for them. Table columns: Question | Manufacturing | Retail | Financial services | Healthcare. Rows: Clock pitfall | PLC drift; clock change | trading day ends after midnight | posting date vs value date; cut-offs | shift boundaries across facilities / Person who acts | quality engineer, planner | replenishment planner | analyst reviewing an alert | operations or supply manager / Not decided by a model alone | releasing a held lot | product withdrawal scope | outcomes for a customer's account | anything clinical or patient-facing / Named in the brief | quality and safety owners | product safety and legal owners | compliance and model-risk owners | clinical and privacy owners.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-claim-industries",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "shape",
+     "title": "Identity, grain and hierarchy",
+     "explanation": "The same four data questions, answered for each industry.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Question",
+       "Manufacturing",
+       "Retail",
+       "Financial services",
+       "Healthcare"
+      ],
+      "rows": [
+       [
+        "Event identity",
+        "source, inspection id, revision",
+        "store, transaction id, line; a return links to its sale",
+        "transaction id; a reversal is a new event",
+        "supply scan id with item lot and location"
+       ],
+       [
+        "Business grain",
+        "lot × operation; serial",
+        "store × SKU × day",
+        "account × day; transaction",
+        "supply item × location × day"
+       ],
+       [
+        "Hierarchy",
+        "site → line → machine → sensor",
+        "chain → region → store → shelf",
+        "entity → business line → branch → account",
+        "organization → facility → department → storage location"
+       ],
+       [
+        "Traceability analogue",
+        "lot genealogy",
+        "supplier lot → distribution centre → store",
+        "funds flow between accounts",
+        "supply lot → location → consumption record"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "stakes",
+     "title": "Clock, decision and stakes",
+     "explanation": "Clocks, owners and the decisions a model must not take alone differ most; each brief names the qualified owner rather than deciding for them.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Question",
+       "Manufacturing",
+       "Retail",
+       "Financial services",
+       "Healthcare"
+      ],
+      "rows": [
+       [
+        "Clock pitfall",
+        "PLC drift; clock change",
+        "trading day ends after midnight",
+        "posting date vs value date; cut-offs",
+        "shift boundaries across facilities"
+       ],
+       [
+        "Person who acts",
+        "quality engineer, planner",
+        "replenishment planner",
+        "analyst reviewing an alert",
+        "operations or supply manager"
+       ],
+       [
+        "Not decided by a model alone",
+        "releasing a held lot",
+        "product withdrawal scope",
+        "outcomes for a customer's account",
+        "anything clinical or patient-facing"
+       ],
+       [
+        "Named in the brief",
+        "quality and safety owners",
+        "product safety and legal owners",
+        "compliance and model-risk owners",
+        "clinical and privacy owners"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-industry-evaluate-visual",
+   "kind": "table",
+   "title": "Use-case evaluation: promise against evidence",
+   "alt": "Use-case evaluation: promise against evidence. Four candidates all look worth doing when scored on value and excitement; scored on owner, data evidence and outcome evidence, the last one ends in not enough evidence yet.",
+   "caption": "The verdict column changes when evidence replaces enthusiasm; the spindle row names what is missing rather than saying no. Synthetic teaching example.",
+   "textEquivalent": "Scored on promise: Value stories and excitement send every candidate forward. Table columns: Use case | Value story | Excitement | Verdict. Rows: Supplier-lot trace | narrower, faster quality holds | medium | go / Scrap Pareto by line | fewer repeat defects | low | go / Spare-parts demand | less stock, fewer stock-outs | medium | go / Spindle failure prediction | no unplanned stops | high | go.\n\nScored on evidence: Each row asks who acts, whether the data meets its contract, and whether outcomes exist to evaluate against. Table columns: Use case | Decision owner | Data evidence | Outcome evidence | Verdict. Rows: Supplier-lot trace | quality engineer | 97.9% of consumption events carry a lot id | two past holds replayed; scope matched | pilot / Scrap Pareto by line | shift lead | complete inspection records under one contract | descriptive; no model to validate | proceed / Spare-parts demand | parts planner | shipments only; stock-outs not recorded | backtest biased low | fix data, then pilot / Spindle failure prediction | maintenance planner | vibration since 2025; sensors moved without dates | 6 labelled failures; codes missing before 2025 | not enough evidence yet.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-industry-claim-pillars",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "states": [
+    {
+     "id": "promise",
+     "title": "Scored on promise",
+     "explanation": "Value stories and excitement send every candidate forward.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Use case",
+       "Value story",
+       "Excitement",
+       "Verdict"
+      ],
+      "rows": [
+       [
+        "Supplier-lot trace",
+        "narrower, faster quality holds",
+        "medium",
+        "go"
+       ],
+       [
+        "Scrap Pareto by line",
+        "fewer repeat defects",
+        "low",
+        "go"
+       ],
+       [
+        "Spare-parts demand",
+        "less stock, fewer stock-outs",
+        "medium",
+        "go"
+       ],
+       [
+        "Spindle failure prediction",
+        "no unplanned stops",
+        "high",
+        "go"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "evidence",
+     "title": "Scored on evidence",
+     "explanation": "Each row asks who acts, whether the data meets its contract, and whether outcomes exist to evaluate against.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Use case",
+       "Decision owner",
+       "Data evidence",
+       "Outcome evidence",
+       "Verdict"
+      ],
+      "rows": [
+       [
+        "Supplier-lot trace",
+        "quality engineer",
+        "97.9% of consumption events carry a lot id",
+        "two past holds replayed; scope matched",
+        "pilot"
+       ],
+       [
+        "Scrap Pareto by line",
+        "shift lead",
+        "complete inspection records under one contract",
+        "descriptive; no model to validate",
+        "proceed"
+       ],
+       [
+        "Spare-parts demand",
+        "parts planner",
+        "shipments only; stock-outs not recorded",
+        "backtest biased low",
+        "fix data, then pilot"
+       ],
+       [
+        "Spindle failure prediction",
+        "maintenance planner",
+        "vibration since 2025; sensors moved without dates",
+        "6 labelled failures; codes missing before 2025",
+        "not enough evidence yet"
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-industry-contract-question",
+   "revision": "1",
+   "prompt": "The plant dashboard reports 1.9% scrap for the week; a line manager's spreadsheet reports 4.0% for the same three lots. Both read the same governed table. What most likely explains the difference?",
+   "options": [
+    {
+     "id": "dbxfe-industry-contract-question-a",
+     "text": "The dashboard excludes lot L-2 as an outlier.",
+     "rationale": "Excluding L-2 would give 18 ÷ 1,800 = 1.0%, not 1.9%, so this does not reproduce the dashboard figure."
+    },
+    {
+     "id": "dbxfe-industry-contract-question-b",
+     "text": "The spreadsheet counts reworked units as scrap.",
+     "rationale": "The numerators already match (10, 20 and 8 scrapped), so the gap comes from how rates are combined, not from classification."
+    },
+    {
+     "id": "dbxfe-industry-contract-question-c",
+     "text": "The spreadsheet averages the three lot rates; the dashboard divides total scrapped by total started.",
+     "rationale": "Correct: (1.0 + 10.0 + 1.0) ÷ 3 = 4.0%, while 38 ÷ 2,000 = 1.9%; the small, bad lot dominates an unweighted mean."
+    },
+    {
+     "id": "dbxfe-industry-contract-question-d",
+     "text": "The spreadsheet read a stale snapshot of the table.",
+     "rationale": "Both read the same rows, and 4.0% is exactly the unweighted mean of those rows' rates, which staleness would not produce."
+    }
+   ],
+   "correctOptionId": "dbxfe-industry-contract-question-c",
+   "conceptIds": [
+    "dbxfe-industry-grain-concept",
+    "dbxfe-industry-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-identity-question",
+   "revision": "1",
+   "prompt": "A pipeline deduplicates these five arrivals on inspection_id alone, keeping the latest received row. What does its current view show?",
+   "options": [
+    {
+     "id": "dbxfe-industry-identity-question-a",
+     "text": "Three rows: plant A's INS-4471 PASS, INS-4472 PASS and plant B's INS-4471 FAIL.",
+     "rationale": "That is the correct current view, but it needs the source system in the key; inspection_id alone cannot keep two INS-4471 rows."
+    },
+    {
+     "id": "dbxfe-industry-identity-question-b",
+     "text": "Four rows, including revision 1 of INS-4472 as history.",
+     "rationale": "Four rows is the event history under the full identity; deduplicating on inspection_id alone can only ever return two rows here."
+    },
+    {
+     "id": "dbxfe-industry-identity-question-c",
+     "text": "Two rows: INS-4471 FAIL, taken from plant B, and INS-4472 PASS; plant A's passing inspection has vanished.",
+     "rationale": "Correct: the latest INS-4471 arrival is MES-B's FAIL at 10:07:00, which overwrites plant A's PASS, and the latest INS-4472 is revision 2."
+    },
+    {
+     "id": "dbxfe-industry-identity-question-d",
+     "text": "Two rows: INS-4471 PASS and INS-4472 PASS.",
+     "rationale": "That would need the earliest row for INS-4471 but the latest for INS-4472; the stated rule keeps the latest received row for both."
+    }
+   ],
+   "correctOptionId": "dbxfe-industry-identity-question-c",
+   "conceptIds": [
+    "dbxfe-industry-identity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction",
+    "dbxfe-fact-merge"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-time-question",
+   "revision": "1",
+   "prompt": "A Cinderline site in the America/Chicago zone stores sensor readings as local timestamp strings without an offset and deduplicates on (sensor_id, local_time). What happens to readings taken between 01:00 and 02:00 local on 1 November 2026?",
+   "options": [
+    {
+     "id": "dbxfe-industry-time-question-a",
+     "text": "Nothing is lost, because the platform converts local strings to UTC with the session time zone.",
+     "rationale": "A string without an offset does not say which of the two 01:30s it was, so any conversion has to guess, and the default session zone is UTC anyway."
+    },
+    {
+     "id": "dbxfe-industry-time-question-b",
+     "text": "The readings are shifted by one hour but all of them are kept.",
+     "rationale": "Deduplication on an identical key drops rows rather than shifting them; the repeated hour produces identical keys."
+    },
+    {
+     "id": "dbxfe-industry-time-question-c",
+     "text": "Only a reading stamped exactly 01:30 is affected.",
+     "rationale": "The whole hour from 01:00 to 02:00 repeats, so every minute in it can collide, not one instant."
+    },
+    {
+     "id": "dbxfe-industry-time-question-d",
+     "text": "Readings from the repeated hour collide with the first hour's readings and one of each pair is dropped as a duplicate.",
+     "rationale": "Correct: both hours produce identical local strings, so the dedupe key treats two real readings as one resend."
+    }
+   ],
+   "correctOptionId": "dbxfe-industry-time-question-d",
+   "conceptIds": [
+    "dbxfe-industry-time-concept",
+    "dbxfe-industry-unit-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-timestamp",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-quality-question",
+   "revision": "1",
+   "prompt": "Line 2 starts 800 housings in a week. 720 pass first inspection; 60 fail, are reworked and then pass; 20 are scrapped. What is the first-pass yield?",
+   "options": [
+    {
+     "id": "dbxfe-industry-quality-question-a",
+     "text": "97.5%, because 780 of 800 housings eventually passed.",
+     "rationale": "That is final yield: it counts the 60 reworked housings as passes and hides the rework load."
+    },
+    {
+     "id": "dbxfe-industry-quality-question-b",
+     "text": "90.0%, because 720 of the 800 housings started passed first time.",
+     "rationale": "Correct: first-pass yield divides first-time passes by all units entering the operation, 720 ÷ 800."
+    },
+    {
+     "id": "dbxfe-industry-quality-question-c",
+     "text": "92.3%, because 720 of the 780 that finished passed first time.",
+     "rationale": "Dropping the 20 scrapped housings from the denominator makes the line look better than it is."
+    },
+    {
+     "id": "dbxfe-industry-quality-question-d",
+     "text": "2.5%, because 20 of 800 housings were scrapped.",
+     "rationale": "That is the scrap rate, a different metric; it ignores the 60 housings that needed rework."
+    }
+   ],
+   "correctOptionId": "dbxfe-industry-quality-question-b",
+   "conceptIds": [
+    "dbxfe-industry-fpy-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-manufacturing",
+    "dbxfe-fact-expectations",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-genealogy-question",
+   "revision": "1",
+   "prompt": "A supplier now reports that ingot lot AL-5522 may be out of specification. Using the genealogy in this beat, which produced lots and shipments does a forward trace from AL-5522 reach?",
+   "options": [
+    {
+     "id": "dbxfe-industry-genealogy-question-a",
+     "text": "Casting lot C-3303 only.",
+     "rationale": "The walk stops one level early: A-802 consumed C-3303, so it is reached too."
+    },
+    {
+     "id": "dbxfe-industry-genealogy-question-b",
+     "text": "Casting lot C-3303 and assembly lot A-802; shipment SH-77 is not reached.",
+     "rationale": "Correct: AL-5522 fed only C-3303, which went into A-802; SH-77 carries A-801, which consumed C-3301 from AL-5521."
+    },
+    {
+     "id": "dbxfe-industry-genealogy-question-c",
+     "text": "C-3303, A-802 and shipment SH-77.",
+     "rationale": "SH-77 carries only A-801, and no path leads from AL-5522 to A-801."
+    },
+    {
+     "id": "dbxfe-industry-genealogy-question-d",
+     "text": "Every lot in the graph, because A-802 mixed two casting lots.",
+     "rationale": "Mixing widens a backward trace from A-802; it does not create a forward path from AL-5522 to C-3301 or A-801."
+    }
+   ],
+   "correctOptionId": "dbxfe-industry-genealogy-question-b",
+   "conceptIds": [
+    "dbxfe-industry-genealogy-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-lineage",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-engineering-question",
+   "revision": "1",
+   "prompt": "A field complaint names pump housing serial 1063. To start a backward trace of its seal, which record do you use?",
+   "options": [
+    {
+     "id": "dbxfe-industry-engineering-question-a",
+     "text": "BOM revision B, so the trace starts from seal S-12.",
+     "rationale": "The BOM states intent for serials from 1061; serial 1063 deviated, so tracing S-12 would search the wrong lots."
+    },
+    {
+     "id": "dbxfe-industry-engineering-question-b",
+     "text": "BOM revision A, because S-10 was consumed.",
+     "rationale": "Effectivity is by serial and 1063 falls under revision B; what was consumed does not change which revision applies, it makes a deviation."
+    },
+    {
+     "id": "dbxfe-industry-engineering-question-c",
+     "text": "The engineering change order that introduced revision B.",
+     "rationale": "The change order explains why the design changed; it does not record which physical lot went into serial 1063."
+    },
+    {
+     "id": "dbxfe-industry-engineering-question-d",
+     "text": "The as-built consumption record, which shows seal lot S10-L44.",
+     "rationale": "Correct: genealogy records what was actually built, so the backward trace starts from S10-L44, and the deviation from revision B is reported separately."
+    }
+   ],
+   "correctOptionId": "dbxfe-industry-engineering-question-d",
+   "conceptIds": [
+    "dbxfe-industry-bom-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-maintenance-question",
+   "revision": "1",
+   "prompt": "Cinderline scores each spindle at a prediction time and asks whether a failure-coded work order opens in the next 14 days. Which candidate feature leaks the outcome?",
+   "options": [
+    {
+     "id": "dbxfe-industry-maintenance-question-a",
+     "text": "Mean vibration RMS over the 7 days before the prediction time.",
+     "rationale": "Every reading in that window exists before the prediction time, so the feature is available when the model scores."
+    },
+    {
+     "id": "dbxfe-industry-maintenance-question-b",
+     "text": "Hours since the last planned bearing replacement, as of the prediction time.",
+     "rationale": "It is computed from past maintenance records up to the prediction time, so it is legitimate."
+    },
+    {
+     "id": "dbxfe-industry-maintenance-question-c",
+     "text": "Number of maintenance work orders opened on the machine in the 14 days after the prediction time.",
+     "rationale": "Correct: it counts events inside the label window, including the failure work order itself, which the model cannot know when it scores."
+    },
+    {
+     "id": "dbxfe-industry-maintenance-question-d",
+     "text": "Average spindle load over the previous 30 shifts.",
+     "rationale": "It summarizes history before the prediction time, so it does not leak."
+    }
+   ],
+   "correctOptionId": "dbxfe-industry-maintenance-question-c",
+   "conceptIds": [
+    "dbxfe-industry-label-concept",
+    "dbxfe-industry-leadtime-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-ml",
+    "dbxfe-fact-leakage",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-demand-question",
+   "revision": "1",
+   "prompt": "A spare-parts forecast trained on weekly shipments consistently under-forecasts the fastest-moving parts, and those parts had frequent stock-outs. What is the most likely cause and the first fix?",
+   "options": [
+    {
+     "id": "dbxfe-industry-demand-question-a",
+     "text": "Stock-out weeks record shipments below true demand; flag censored periods and exclude or model them before re-evaluating.",
+     "rationale": "Correct: censored weeks bias the target downward exactly where stock-outs were frequent, which matches the pattern described."
+    },
+    {
+     "id": "dbxfe-industry-demand-question-b",
+     "text": "The model needs more features, such as holidays and promotions.",
+     "rationale": "Extra features fit the censored target more precisely; they cannot recover demand that was never recorded."
+    },
+    {
+     "id": "dbxfe-industry-demand-question-c",
+     "text": "The forecast grain is too coarse and should move to daily.",
+     "rationale": "A grain mismatch scatters errors both ways; it does not explain a consistent low bias concentrated in parts that stocked out."
+    },
+    {
+     "id": "dbxfe-industry-demand-question-d",
+     "text": "Add 10% to every forecast.",
+     "rationale": "A flat uplift hides a bias of unknown size and overstocks slow movers that never stocked out."
+    }
+   ],
+   "correctOptionId": "dbxfe-industry-demand-question-a",
+   "conceptIds": [
+    "dbxfe-industry-censored-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-manufacturing",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-industry-chain-self",
+   "revision": "1",
+   "prompt": "Cinderline's maintenance team has a dashboard ranking machines by rising vibration. In three months nobody has changed a maintenance plan because of it. Using the four links of the chain, diagnose where it is broken and say what you would add before building anything new.",
+   "modelAnswer": "The first three links exist: historian readings, governed vibration tables and a ranking. The fourth is missing: no named person owns acting on the ranking, there is no defined action (schedule an inspection, adjust an interval) and no outcome record. I would name the maintenance planner as owner, agree the action set and a weekly review slot, and add a table recording each ranked machine, the planner's decision and what the inspection found. Only then can the ranking be evaluated.",
+   "reasoning": "The fault sits at the last link, so a better model would change nothing. An acceptable alternative is to retire the dashboard if no one is willing to own an action; that is also an honest outcome.",
+   "conceptIds": [
+    "dbxfe-industry-chain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-manufacturing",
+    "dbxfe-fact-unity",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-hierarchy-self",
+   "revision": "1",
+   "prompt": "Cinderline's vibration history for machine DC-09 shows a spike in early June, but DC-09 was idle for a rebuild until 12 June. The sensor-to-machine table holds only each sensor's current machine. Explain what happened, what you would change in the hierarchy table, and how the reading join should be written.",
+   "modelAnswer": "The spike was measured by a sensor such as S-118 while it was mounted on DC-07; because the table holds only the current parent, every historical reading is filed under DC-09. I would replace the table with one row per mount carrying valid_from and valid_to, backfilled from the maintenance work orders that moved the sensor, and join readings on sensor_id with event_ts at or after valid_from and before valid_to (or valid_to null). A test should confirm every reading joins exactly one mount.",
+   "reasoning": "Effective dating moves the time dimension into the join, so history keeps the parent that was true. Snapshotting the whole hierarchy daily is an acceptable alternative when moves are frequent and storage is cheap.",
+   "conceptIds": [
+    "dbxfe-industry-hierarchy-concept",
+    "dbxfe-industry-effective-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-isa95",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-schedule-self",
+   "revision": "1",
+   "prompt": "Cinderline's planner asks for 'an AI schedule that is never late'. Using the two states of this beat, explain what a scheduling tool can and cannot promise, and list what the planner's decision record should contain for order O-3.",
+   "modelAnswer": "A tool can promise a feasible schedule against the capacity, changeover, material and maintenance data it was given, and it can minimize lateness within those constraints. It cannot remove lateness that the constraints force: O-3's alloy arrives Wednesday, so O-3 is one day late in every feasible sequence. The decision record should hold the material snapshot time, the options considered (expedite alloy, split the order, notify the customer), the option chosen, who chose it and why, and whether O-3 actually shipped late.",
+   "reasoning": "Separating feasibility from preference keeps the tool honest and puts the trade-off with the accountable person. Adding an overtime or split-order option to the tool is a valid extension, as long as the choice among them stays recorded.",
+   "conceptIds": [
+    "dbxfe-industry-feasible-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-documents-self",
+   "revision": "1",
+   "prompt": "Write the metadata and retrieval rules that would have prevented the second state of this beat, and say what the assistant should do when no current revision of a relevant document is found.",
+   "modelAnswer": "Every chunk carries document id, revision, status (current, superseded, draft), effective-from date, site, asset class and access group, copied from the controlled document system at indexing time. Retrieval filters to status current and effective date on or before today for the asker's site and permissions before ranking. Every answer cites document, revision and section and links the controlled copy. When no current revision matches, the assistant says it found none and points to the document owner instead of quoting a superseded one.",
+   "reasoning": "Filtering before ranking removes superseded text from consideration rather than hoping it ranks lower, and the refusal keeps the controlled system as the authority. Re-indexing on each document release is an acceptable alternative to date filtering.",
+   "conceptIds": [
+    "dbxfe-industry-revision-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-transfer-self",
+   "revision": "1",
+   "prompt": "Transfer Cinderline's scrap-rate metric contract to a grocery retailer's shrink metric (stock lost to damage, expiry or theft). Name the grain, the event identity, the hierarchy, one clock pitfall and the person who acts, and name one thing that does not transfer.",
+   "modelAnswer": "Grain: store × SKU × trading day. Numerator: units written off with a reason code; denominator: units available (opening stock plus receipts). Event identity: store, write-off document id and line, with a correction as a new revision. Hierarchy: chain → region → store → department → shelf, effective-dated when stores change regions. Clock pitfall: the trading day ends after midnight, so late sales and write-offs belong to the previous trading day. The store manager acts. What does not transfer: a physical inspection result; shrink reasons such as theft are inferred, and staffing or security responses belong to the retailer's own policy owners.",
+   "reasoning": "The answer re-derives each element rather than renaming Cinderline's columns, and it names a boundary where the retailer's owners decide. A units-at-cost or value-based shrink rate is an acceptable alternative numerator if the contract says so.",
+   "conceptIds": [
+    "dbxfe-industry-transfer-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-industries",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-industry-evaluate-self",
+   "revision": "1",
+   "prompt": "Write the verdict paragraph for the spindle failure prediction row: what evidence exists, what is missing, what would change the verdict, and when you would look again.",
+   "modelAnswer": "Not enough evidence yet. We have vibration readings since 2025 on 14 spindles and six labelled failures in two years; failure codes exist only from 2025 and two sensors were moved without dated mounts, so some history belongs to the wrong spindle. A model trained now could not be evaluated honestly. To change the verdict: code every failure and planned replacement from now on, reconstruct mount dates from work orders, and review in six months, or earlier if labelled failures reach a count the maintenance lead agrees can support a time-based test.",
+   "reasoning": "The paragraph separates what exists from what is missing and turns 'not yet' into named evidence, an owner and a review date. Recommending a simple vibration-threshold alert meanwhile is an acceptable addition if it is evaluated the same way.",
+   "conceptIds": [
+    "dbxfe-industry-verdict-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-pillars",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-industry-chain",
+   "version": "1.0.0",
+   "title": "A use case ends with a person who acts",
+   "outcome": "Trace a manufacturing use case from its operational source to the responsible human action and name the link that is missing.",
+   "explanation": "Every pattern in this module is one [[dbxfe-industry-chain-concept|decision chain]] with four links: an operational source such as the MES or a sensor historian, governed data with a declared grain and owner, an analytical or model decision, and a named person who acts and records what happened. Notice in the first state that the quality engineer's decision writes an outcome row back. In the second state nobody owns the recommendation: the dashboard refreshes, no lot is held, and nothing can ever be evaluated.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-chain",
+   "conceptIds": [
+    "dbxfe-industry-chain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-manufacturing",
+    "dbxfe-fact-unity",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-chain-visual",
+   "questionIds": [
+    "dbxfe-industry-chain-self"
+   ],
+   "handbook": {
+    "markdown": "Start every use case by drawing the chain, because the chain tells you what has to exist before any model does.\n\n**Operational source.** Manufacturing data arrives from systems built to run the plant, not to analyse it: the MES (manufacturing execution system) for orders, operations, consumption and inspections; historians and SCADA for sensor readings; the ERP for orders, inventory and bills of materials; PLM for engineering data; document systems for instructions. Databricks' manufacturing page names MES, ERP, historians, SCADA, MQTT and vision systems as the sources it ingests. For each source, record what identifies an event, what clock stamps it and who owns the system.\n\n**Governed data.** Tables in Unity Catalog with an owner, grants, a declared grain, units and a time basis. Governance is what lets a quality engineer trust that `scrap_by_lot_operation` means the same thing tomorrow.\n\n**Decision.** A rule, a statistical test or a model that produces one of a fixed set of actions: hold, release, inspect, reorder, reschedule. A score with no action set is a number, not a decision.\n\n**Responsible human action.** A named role that acts within a stated time and writes an outcome row: what was decided, when, why, and later what was found. That row is the only evidence that will ever show whether the use case worked.\n\nWhat to inspect in an existing system: who is notified, what they are allowed to do, and whether their decisions are recorded anywhere a query can reach. The commonest failure is not a bad model but an orphaned output. Scores in the visual are synthetic.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-chain"
+    ]
+   },
+   "recap": "Source, governed data, decision, person: a use case without the last link cannot be evaluated.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-contract",
+   "version": "1.0.0",
+   "title": "A metric means nothing until its grain is written down",
+   "outcome": "Write a metric contract that fixes grain, numerator, denominator and aggregation, and predict how a different aggregation changes the number.",
+   "explanation": "[[dbxfe-industry-grain-concept|Business grain]] is what one row represents: one lot at one operation, one serial, one inspection. Scrap rate computed per lot and then averaged treats a 200-unit lot like a 1,000-unit lot. Notice in the first state that the mean of lot rates is 4.0% while the pooled rate over the same 2,000 units is 1.9%. The second state is a [[dbxfe-industry-contract-concept|metric contract]]: grain, numerator, denominator, aggregation, time basis, exclusions and owner, written once so only one number is published as scrap rate.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-contract",
+   "conceptIds": [
+    "dbxfe-industry-grain-concept",
+    "dbxfe-industry-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-contract-visual",
+   "samajh": {
+    "text": "Socho school mein do sections hain: A mein 10 bachche, B mein 40. Section A ka average 90 aaya, B ka 60. Principal sahab announce karte hain ki school ka average 75 hai, yaani dono averages ka average. Par asli average (10 × 90 + 40 × 60) ÷ 50 = 66 hai, kyunki B mein zyada bachche hain. Pehle tay karo ki ek row kya hai, bachcha ya section, phir average lo.",
+    "mapping": "Each child is a unit and each section is a lot; averaging section averages is averaging lot rates, while the whole-school figure is the pooled rate over all units.",
+    "boundary": "Marks are one number per child; a scrap rate also needs a defined numerator, time basis and exclusions, which the school example does not show."
+   },
+   "questionIds": [
+    "dbxfe-industry-contract-question"
+   ],
+   "handbook": {
+    "markdown": "A metric contract is the first section of every use-case brief, because every later argument (is the model better, did the change help) compares values of it.\n\n**Fields.** Name; grain (what one row of the base table is); numerator and denominator, each defined as a count or sum at that grain; aggregation (sum then divide, never average ratios unless you mean it); time basis (which clock and which day boundary: operation completion in site local time is not the same as MES posting time in UTC); exclusions and how they are reported; owner who approves changes; version.\n\n**Worked example.** Lots L-1, L-2, L-3 start 1,000, 200 and 800 units and scrap 10, 20 and 8. The pooled rate is 38 ÷ 2,000 = 1.9%. `AVG(units_scrapped / units_started)` gives (1.0 + 10.0 + 1.0) ÷ 3 = 4.0%. Neither is arithmetically wrong; they answer different questions (what fraction of units was lost, versus how a typical lot performed). The contract decides which one is called scrap rate.\n\n```sql\n-- Contract: pooled scrap rate at lot x operation grain\nSELECT operation_id,\n       SUM(units_scrapped) / SUM(units_started) AS scrap_rate,\n       COUNT(*)                                 AS lots\nFROM quality.scrap_by_lot_operation\nWHERE lot_type IS DISTINCT FROM 'engineering_trial'   -- <> would also drop NULL lot_type\nGROUP BY operation_id;\n```\n\n**What fails.** Joining a lot-grain table to an operation-grain table duplicates units; mixing a lot that spans two days into daily totals double-counts it unless the time basis says which day owns it; rework counted as a new start inflates the denominator.\n\n**What to inspect.** The grain statement on the table, a test that the key is unique at that grain, a count of rows whose lot_type is NULL, and two independent calculations of this week's value that agree. The data modeling module teaches grain in depth; here the point is that a use case cannot be evaluated until its metric is fixed.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-contract"
+    ]
+   },
+   "recap": "Name the grain, both halves of the ratio and the aggregation before anyone quotes a scrap rate.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-identity",
+   "version": "1.0.0",
+   "title": "An event needs an identity that survives a resend",
+   "outcome": "Choose an event identity that collapses resends, keeps corrections as revisions and separates colliding numbers from two systems.",
+   "explanation": "Plant networks resend: an MQTT client reconnecting or an MES export re-run can deliver the same inspection twice. [[dbxfe-industry-identity-concept|Event identity]] is the set of fields naming one real occurrence, here source system, inspection id and revision. Notice five arrivals in the first state. In the second the resend collapses, the corrected result for INS-4472 becomes revision 2 while revision 1 stays as history, and plant B's INS-4471 stays separate, because a number alone is not an identity.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-identity",
+   "conceptIds": [
+    "dbxfe-industry-identity-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction",
+    "dbxfe-fact-merge"
+   ],
+   "visualId": "dbxfe-industry-identity-visual",
+   "samajh": {
+    "text": "Online order kiya aur courier ka SMS do baar aaya: 'Out for delivery'. Tracking number aur update number dono same hain, toh yeh ek hi update hai jo dobara bheja gaya. Phir naya SMS aata hai: 'Address sudhara gaya'. Yeh naya update hai jo purane ko theek karta hai, par purana bhi history mein rehta hai. Aur agar kisi doosri courier company ka tracking number same nikle, toh woh bilkul alag parcel hai.",
+    "mapping": "The courier company is the source system, the tracking number is the event id and the update number is the revision; a resend repeats all three.",
+    "boundary": "Couriers usually issue globally unique tracking numbers; plant systems often reuse numbers, which is why the source system must be part of the key."
+   },
+   "questionIds": [
+    "dbxfe-industry-identity-question"
+   ],
+   "handbook": {
+    "markdown": "Decide the identity before the first MERGE, because every later count depends on it.\n\n**Three cases to separate.**\n- *Resend*: the same occurrence delivered again (a reconnecting MQTT client, a re-run export, a retried API page). Identity and payload repeat. Collapse it.\n- *Correction*: the same occurrence with a changed payload (an inspector fixes a mis-keyed result). Keep both, raise the revision, and mark the newest as current. Deleting the old row destroys the audit of what was believed when.\n- *New occurrence*: re-inspection after rework is a new inspection with its own id, not a revision. First-pass yield depends on keeping this distinction.\n\n**Choosing fields.** Prefer the source's own id plus the source system, plus a revision or sequence the source increments. A payload hash detects resends but is not an identity: a correction changes the hash and looks like a new event. A device sequence number per sensor works for telemetry when the device guarantees it.\n\n```sql\n-- Stage: collapse resends first; an insert-only MERGE would insert both copies\nCREATE OR REPLACE TEMP VIEW staged AS\nSELECT * FROM landing.inspections\nQUALIFY ROW_NUMBER() OVER (\n  PARTITION BY source_system, inspection_id, revision\n  ORDER BY received_at) = 1;\n\nMERGE INTO quality.inspection_events t\nUSING staged s\nON  t.source_system = s.source_system\nAND t.inspection_id = s.inspection_id\nAND t.revision      = s.revision\nWHEN NOT MATCHED THEN INSERT *;\n```\n\nThe current view takes the highest revision per `(source_system, inspection_id)`. Deduplicate first: an insert-only MERGE inserts every unmatched source row, so a resend inside one batch would be inserted twice without any error (a MERGE that also updates on match fails instead, with DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE).\n\n**What to inspect.** Counts per step (5 arrived, 4 events, 3 current here), a uniqueness test on the identity, and a sample of ids that appear in two source systems.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-identity"
+    ]
+   },
+   "recap": "Source, id and revision: collapse resends, keep corrections, never merge two systems' numbers.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-time",
+   "version": "1.0.0",
+   "title": "Units and timestamps are data, not formatting",
+   "outcome": "Spot unit and timestamp pitfalls in sensor and MES data and choose the stored form that keeps them checkable.",
+   "explanation": "A reading without its [[dbxfe-industry-unit-concept|unit of measure]], or an [[dbxfe-industry-time-concept|event time]] without its zone, looks fine until two sources meet. Notice in the first state six pitfalls with their guards. In the second, a retrofitted machine sends °F: the naive mean of 85, 85 and 185 is 118.3, while converted values average 85.0 °C. In the third, the autumn clock change gives local 01:30 twice; stored as local text the readings collide, stored as UTC instants with the site's zone they stay an hour apart.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-identity",
+   "conceptIds": [
+    "dbxfe-industry-unit-concept",
+    "dbxfe-industry-time-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-timestamp",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-time-visual",
+   "questionIds": [
+    "dbxfe-industry-time-question"
+   ],
+   "handbook": {
+    "markdown": "Store what the source said, what it meant and when you learned it, as separate columns.\n\n```sql\nCREATE TABLE sensors.readings (\n  sensor_id      STRING,\n  event_ts       TIMESTAMP,   -- the instant it happened; stored normalized to UTC\n  site_tz        STRING,      -- e.g. 'America/Chicago', for shifts and local days\n  device_ts_raw  STRING,      -- exactly what the PLC sent\n  received_ts    TIMESTAMP,   -- when the platform received it\n  value_raw      DOUBLE,\n  unit_raw       STRING,      -- 'degC', 'degF', 'bar', 'psi'\n  value_si       DOUBLE       -- converted once; unit_raw kept beside it\n);\n```\n\n**Units.** Convert once, in the conforming step, from an explicit unit column: 185 °F is (185 − 32) × 5 ÷ 9 = 85.0 °C. Reject a row whose unit is unknown rather than guessing from the tag name; count the rejects. Quantities in bills of materials need the same care: *each*, *kg* and *m* do not add.\n\n**Timestamps.** In Databricks SQL a `TIMESTAMP` is normalized to UTC and displayed or extracted in the session time zone, which defaults to UTC; `TIMESTAMP_NTZ` stores wall-clock fields with no zone and ignores the session zone. Use `TIMESTAMP` for instants you order and window across sites; keep the raw device string or an NTZ value only beside the site's zone name. Derive shifts and local days from the instant plus `site_tz`, so a night shift on the clock-change date correctly lasts one hour longer.\n\n**Clock drift and lateness.** PLC clocks drift and are reset at shutdowns. Keep both device and receive times, trend their difference per device, and correct only with a recorded offset. Window on event time with a stated lateness bound and report how many rows arrived after it.\n\n**What to inspect.** Distinct `unit_raw` values per tag, the distribution of `received_ts − event_ts` per device, and row counts per hour on clock-change days.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-identity"
+    ]
+   },
+   "recap": "Carry the unit and the instant as data; derive local days and shifts, never key on local text.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-hierarchy",
+   "version": "1.0.0",
+   "title": "An asset hierarchy needs dates as well as parents",
+   "outcome": "Model a site, line, machine and sensor hierarchy with effective dates so history rolls up to the parent that was true at the time.",
+   "explanation": "An [[dbxfe-industry-hierarchy-concept|asset hierarchy]] places each asset under the one that contains it, so readings roll up from sensor to machine, line and site. Notice in the first state that each level carries its own key and grain, and that the tree simplifies ISA-95's equipment levels. The second state shows why a parent needs [[dbxfe-industry-effective-concept|effective dating]]: sensor S-118 moved from DC-07 to DC-09 on 15 June, so a reading from 10 June belongs to DC-07, not to the sensor's current machine.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-hierarchy",
+   "conceptIds": [
+    "dbxfe-industry-hierarchy-concept",
+    "dbxfe-industry-effective-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-isa95",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-hierarchy-visual",
+   "samajh": {
+    "text": "Chitthi pe pata likhte ho: shehar, mohalla, ghar, kamra. Sharma parivar June mein naye ghar mein shift ho gaya. May ki chitthiyan purane ghar pe hi aayi thi. Agar aap aaj ka naya pata saari purani chitthiyon pe chipka do, toh May ki saari baatein naye ghar ke naam ho jayengi, jo galat hai. Isliye pate ke saath 'kab se kab tak' bhi likhna padta hai.",
+    "mapping": "City, neighbourhood, house and room map to site, line, machine and sensor; the moving date is the valid-from of a new parent row, and relabelling old letters is a current-parent join.",
+    "boundary": "Assets often sit in several hierarchies at once, such as production and maintenance, which a single postal address does not capture."
+   },
+   "questionIds": [
+    "dbxfe-industry-hierarchy-self"
+   ],
+   "handbook": {
+    "markdown": "The hierarchy is how a reading becomes a business fact: a pressure value becomes machine downtime evidence, then line availability, then a site's output.\n\n**Levels.** ISA-95 (IEC 62264), the standard for integrating enterprise and control systems, names nested equipment levels: enterprise, site, area, work center and work unit. The site → line → machine → sensor tree in this module is a simplified reading: a production line is a kind of work center, a machine cell is a work unit, and a sensor is an instrument attached below it. Use the standard's names when aligning MES and ERP vocabulary; do not claim conformance from a simplified tree.\n\n**Several hierarchies.** Production groups machines by line; maintenance groups them by asset class and criticality; finance by cost centre. Model each as its own parent-child table rather than forcing one tree.\n\n**Effective dating.** Assets move: sensors are re-mounted, machines are relocated between lines, lines are split. Store one row per relationship period.\n\n```sql\nSELECT r.sensor_id, r.event_ts, m.asset_id, a.line_id, r.value_si\nFROM sensors.readings r\nJOIN assets.sensor_mounts m\n  ON  r.sensor_id = m.sensor_id\n  AND r.event_ts >= m.valid_from\n  AND (r.event_ts < m.valid_to OR m.valid_to IS NULL)\nJOIN assets.machines a\n  ON  a.asset_id = m.asset_id;\n```\n\nIf machines can also move between lines, date that relationship too, or the line roll-up has the same error one level up.\n\n**Tests.** Every reading joins exactly one mount (zero means a gap in mount history, two means overlapping periods); periods for one sensor never overlap; the count of readings per machine per day is stable across a re-mount date. Backfill mount history from the work orders that record sensor replacements.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-hierarchy"
+    ]
+   },
+   "recap": "Give every parent link a period, or history rolls up to today's tree.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-quality",
+   "version": "1.0.0",
+   "title": "First-pass yield counts the rework that final yield hides",
+   "outcome": "Compute first-pass yield, final yield and a sampled defect rate from the same inspection records and say which question each answers.",
+   "explanation": "Quality analytics starts with the denominator. Of 500 castings, 440 pass first inspection, 45 pass after rework and 15 are scrapped. Notice in the first state that final yield reads 97.0% and looks healthy; the second state's [[dbxfe-industry-fpy-concept|first-pass yield]] of 88.0% exposes a 9.0% rework load that consumes line time. The third state is a common trap: when only 100 of the 500 were X-rayed, 6 porosity findings estimate about 6% of castings, not 6 ÷ 500 = 1.2%.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-quality",
+   "conceptIds": [
+    "dbxfe-industry-fpy-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-manufacturing",
+    "dbxfe-fact-expectations",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-quality-visual",
+   "questionIds": [
+    "dbxfe-industry-quality-question"
+   ],
+   "handbook": {
+    "markdown": "Each quality metric answers one question, and the contract says which.\n\n- **Final yield**: what fraction of started units ship? (440 + 45) ÷ 500 = 97.0%.\n- **First-pass yield (FPY)**: what fraction pass without rework? 440 ÷ 500 = 88.0%. Databricks' manufacturing page names first-pass yield among the outcomes manufacturers track, which is a reason to define it carefully, not evidence about any line.\n- **Rolled throughput yield**: the product of FPY across operations. Three operations at 95%, 90% and 98% give 0.95 × 0.90 × 0.98 ≈ 83.8% of units passing every step first time.\n- **Defect Pareto**: counts of defect codes at the inspection grain, compared within one product family and one inspection method.\n\n**Rework and revisions.** A re-inspection after rework is a new inspection event; a corrected result is a revision of the same one (see event identity). If rework passes are stored as revisions, FPY silently becomes final yield.\n\n**Sampling.** When inspection is sampled, a defect rate is an estimate over inspected units: 6 of 100 X-rayed is 6.0%, and at n = 100 its interval is wide. Record the sampling plan with the data. A change of plan (1 in 20 to 100%) changes what the history can support; compare periods only within one plan.\n\n**Data quality is not product quality.** A pipeline expectation can drop records that fail a check, such as a missing lot id. For quality analytics a dropped record shrinks the denominator without anyone seeing it, so quarantine failing records, count them, and publish the count beside the metric.\n\n**What to inspect.** Units started versus units inspected per operation, the share of rework recorded as new inspections, and whether the sampling plan changed in the period.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-quality"
+    ]
+   },
+   "recap": "Final yield, first-pass yield and sampled rates answer different questions; the denominator decides which.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-genealogy",
+   "version": "1.0.0",
+   "title": "Traceability walks the genealogy both ways",
+   "outcome": "Run a forward trace from a suspect input lot and a backward trace from a complaint, and explain why mixed consumption widens the scope.",
+   "explanation": "[[dbxfe-industry-genealogy-concept|Lot genealogy]] is a set of consumption edges: this input lot went into that produced lot. Notice in the first state that assembly lot A-802 consumed two casting lots. A forward trace from suspect ingot lot AL-5521, in the second state, reaches both assembly lots and shipment SH-77 but not C-3303. A backward trace from a complaint on A-802, in the third, climbs to both ingot lots because the consumption was mixed. Every edge needs an event identity and a time, or the trace silently shrinks.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-trace",
+   "conceptIds": [
+    "dbxfe-industry-genealogy-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-lineage",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-genealogy-visual",
+   "samajh": {
+    "text": "Ek cotton ki gaanth se dhaage ke do batch bane, aur ek batch mein doosri gaanth ka cotton bhi mila. Un batch se kapde ke thaan bane jo dukaanon mein gaye. Agar pehli gaanth mein kami nikli, toh aage chalke saare thaan aur dukaanein dhoondhni padengi. Agar kisi dukaan pe mixed batch ka thaan kamzor nikla, toh peeche chalke dono gaanthon pe shak jayega.",
+    "mapping": "Bales are input lots, yarn batches and cloth rolls are produced lots, and shops are shipments; going ahead is a forward trace and going back is a backward trace.",
+    "boundary": "A real genealogy is only as complete as its recorded consumption events, and blending in a hopper may need a time window rather than exact links."
+   },
+   "questionIds": [
+    "dbxfe-industry-genealogy-question"
+   ],
+   "handbook": {
+    "markdown": "Traceability answers two questions: *where did this go?* (forward, where-used) and *where did this come from?* (backward, where-from). Both walk the same edges.\n\n**Data model.** One row per consumption event: `parent_lot`, `child_lot`, `quantity`, `unit`, `consumed_at`, `operation_id`, `source_system`, `event_id`. Serial numbers are children of lots; shipments are children of lots or serials. The event identity rules apply: a re-posted consumption must not create a second edge.\n\n**Walking it.** Repeat one level at a time until no new lots appear. A schematic in pandas-style Python:\n\n```python\nreached, frontier = set(), {\"AL-5521\"}\nwhile frontier:\n    step = edges[edges[\"parent_lot\"].isin(frontier)]   # one level of where-used\n    children = set(step[\"child_lot\"]) - reached\n    reached |= children\n    frontier = children\n# reached: C-3301, C-3302, A-801, A-802, SH-77\n```\n\nIn SQL the same walk is a loop of joins in a job, one level per iteration; check the current SQL reference before relying on recursive query syntax.\n\n**Mixing.** Hoppers, silos and melt furnaces blend lots. When exact edges are not recorded, a time window stands in (every casting lot poured while AL-5521 was in the furnace), which widens scope. Record which edges are exact and which are windowed.\n\n**Completeness is the metric.** A trace is only as complete as its edges. Publish the share of consumption events carrying a lot id (for example, 97.9%) beside every trace result, and list the gaps in the traced period.\n\n**Lineage is not genealogy.** Unity Catalog lineage records which tables and columns were read to build others. It can show that `genealogy_edges` was built from the MES landing table, which is useful provenance, but it cannot say which ingot went into which shipment.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-trace"
+    ]
+   },
+   "recap": "Forward for where it went, backward for where it came from; mixing widens both, gaps shrink both silently.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-engineering",
+   "version": "1.0.0",
+   "title": "A BOM says what should be built; genealogy says what was",
+   "outcome": "Resolve which BOM revision applies to a serial by effectivity and treat a mismatch with the as-built record as an engineering finding.",
+   "explanation": "Engineering data is versioned structure. A bill of materials lists each parent's components and quantities, and each revision carries [[dbxfe-industry-bom-concept|BOM effectivity]]: the dates or serial ranges it governs. Notice in the first state that pump housing PH-200 switches from seal S-10 to S-12 at serial 1061. The second state joins the as-built genealogy: serial 1063 should carry S-12 but consumed S-10 from old stock. The analysis reports that deviation to engineering; it never edits either record so that they agree.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-trace",
+   "conceptIds": [
+    "dbxfe-industry-bom-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-engineering-visual",
+   "questionIds": [
+    "dbxfe-industry-engineering-question"
+   ],
+   "handbook": {
+    "markdown": "Engineering data describes intended structure; it changes by controlled revision.\n\n**Shapes.** A BOM line is `(parent_item, revision, component_item, qty_per, unit, eff_from, eff_to)`, where effectivity is either a date range or a serial range. Multi-level BOMs nest: a housing contains a seal kit that contains seals. An engineering change order (ECO) records why a revision was created and when it takes effect; PLM usually owns engineering BOMs and the ERP a manufacturing BOM derived from them.\n\n**Four views of one product.** As-designed (engineering BOM), as-planned (manufacturing BOM and routing), as-built (genealogy: what was consumed) and as-maintained (what service replaced later). They differ legitimately; analysis must say which one it uses.\n\n```sql\n-- Which revision governs serial 1063, and what did it actually consume?\nSELECT s.serial_no, b.revision, b.component_item AS designed,\n       g.component_item AS consumed, g.component_lot\nFROM production.serials s\nJOIN engineering.bom_lines b\n  ON  b.parent_item = s.item_id\n  AND s.serial_no BETWEEN b.eff_serial_from AND COALESCE(b.eff_serial_to, 999999999)\n  AND b.component_class = 'seal'\nLEFT JOIN production.genealogy g\n  ON  g.serial_no = s.serial_no AND g.component_class = 'seal'\nWHERE s.serial_no = 1063;\n```\n\n**Pitfalls.** Serial numbers stored as strings sort as text ('10630' before '1064'), so range effectivity breaks; compare as numbers only when they truly are. Quantities carry units (each, kg, m) that must match before a roll-up. A revision with no effectivity is not a revision in force.\n\n**Treat mismatches as findings.** A consumed component that differs from the governing revision may be an approved deviation, a substitution or an error. Report it with both records to the engineering owner; never correct the BOM to match what was built, or the genealogy to match the BOM, inside an analytics pipeline.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-trace"
+    ]
+   },
+   "recap": "Effectivity picks the revision that should apply; genealogy shows what did; the gap goes to engineering.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-maintenance",
+   "version": "1.0.0",
+   "title": "Predictive maintenance learns from labelled failures, not from sensors alone",
+   "outcome": "Define a failure label, a prediction time and a horizon that fits the planner's lead time, and exclude features that leak the outcome.",
+   "explanation": "Sensors supply features; the outcome comes from maintenance records. A [[dbxfe-industry-label-concept|failure label]] might read: a failure-coded work order within 14 days after the prediction time. Notice in the first state that the horizon starts at the prediction time and must exceed the [[dbxfe-industry-leadtime-concept|actionable lead time]]: bearings take 7 days to arrive, so a 3-day warning is useless to the planner. The second state shows leakage: teardown notes and post-failure readings exist only after the event, so a model using them tests well and fails in use.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-maintenance",
+   "conceptIds": [
+    "dbxfe-industry-label-concept",
+    "dbxfe-industry-leadtime-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-ml",
+    "dbxfe-fact-leakage",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-maintenance-visual",
+   "questionIds": [
+    "dbxfe-industry-maintenance-question"
+   ],
+   "hint": "Ask of each feature: could it be computed at the moment the model scores?",
+   "handbook": {
+    "markdown": "Predictive maintenance is a supervised problem whose hardest part is the label.\n\n**Label.** Built from work orders: a failure code (BRG-01, bearing), the asset, and the open time. Check the codes before anything else: planned replacements, inspections that found nothing, and failures logged as \"other\" all distort the target. If codes exist only from 2025, earlier failures are unlabelled, not absent.\n\n**Prediction time and horizon.** Score at a regular time (for example, each Monday). The label is 1 when a coded failure opens within the horizon after that time. The horizon must exceed the actionable lead time (parts, planning, a maintenance window) and not be so long that every machine is positive.\n\n**Features.** Only data available at the prediction time: rolling vibration statistics, temperature, load, hours since last replacement. Anything recorded after, including teardown notes, post-failure readings and later work orders, is leakage, which makes evaluation look better than use.\n\n**Evaluation.** Split by time (train on earlier months, test on later ones) and keep a machine's history together. With 6 failures among 14 spindles over two years, accuracy is meaningless (predicting \"never fails\" is almost always right); report how many failures were caught with enough lead time at the planner's capacity, say the top 3 alerts a week, against the current fixed-interval plan.\n\n**Platform.** Databricks documents the lifecycle this needs, from data preparation and experiment tracking to serving and monitoring, but no platform supplies missing labels.\n\n**The human action.** The planner decides whether to inspect; the outcome of each inspection is recorded as evidence. Alerts inform an inspection plan; lockout and other safety procedures are owned by the site's safety function and are not changed by a model.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-maintenance"
+    ]
+   },
+   "recap": "No coded failures, no label; no lead time, no action; anything after the prediction time is leakage.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-demand",
+   "version": "1.0.0",
+   "title": "Shipments are not demand when the shelf ran empty",
+   "outcome": "Recognize censored demand in shipment history and align the forecast's grain with the decision the planner makes.",
+   "explanation": "A demand forecast learns from history, and history records what was shipped, not what was wanted. Notice in the first state that week 2 shows 80 units because the part ran out on Wednesday: that week is [[dbxfe-industry-censored-concept|censored demand]], a lower bound. The second state flags it, and the uncensored mean of 125 replaces the naive 110 as a baseline. Then match the planner's grain: reorders are decided per part, per distribution centre, per week, so accuracy is judged at that grain.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-planning",
+   "conceptIds": [
+    "dbxfe-industry-censored-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-manufacturing",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-demand-visual",
+   "questionIds": [
+    "dbxfe-industry-demand-question"
+   ],
+   "handbook": {
+    "markdown": "Demand forecasting appears on Databricks' manufacturing page among its solution accelerators; the questions that decide whether one is useful are about the target and the grain.\n\n**Censoring.** Sales, shipments and consumption are demand only when supply was available. Record stock-out periods (on-hand at zero, back-orders, unfilled order lines) and mark affected periods. Then either exclude them from training and evaluation, or use methods that treat them as lower bounds. Back-orders and unfilled order lines are often the best evidence of the demand that was turned away.\n\n**Grain and hierarchy.** Forecast at the grain the decision uses: part × distribution centre × week for replenishment, product family × plant × month for capacity. Forecasts at finer grains are noisy; coarser ones cannot place stock. When several levels are needed, reconcile them so the parts add up to the family.\n\n**Evaluation.** Backtest with a rolling origin: fit up to week t, forecast t + 1 to t + h, move on. Compare with a naive baseline (same week last year, or the last 4-week mean). Report error at the decision grain, and separately for intermittent parts, where most weeks are zero and percentage errors explode.\n\n**The decision.** A forecast feeds a reorder point, a safety stock or a production plan. The planner owns it, and the outcome to record is availability and stock level, not forecast error alone. The forecasting module teaches the modelling; this beat is about whether the history can support it.\n\n**What to inspect.** The share of periods flagged censored per part, forecast bias by part group, and whether stock-outs cluster in the parts with the largest errors.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-planning"
+    ]
+   },
+   "recap": "Mark stock-out periods as censored before training or judging any demand forecast.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-schedule",
+   "version": "1.0.0",
+   "title": "A schedule is feasible first and optimal second",
+   "outcome": "Apply capacity and material constraints to a demand-driven sequence and hand the unavoidable trade-off to the planner.",
+   "explanation": "Scheduling turns demand into line time under supply constraints: capacity, changeovers, material availability and maintenance windows. Notice in the first state that sorting four orders by due date puts O-3 on Tuesday, which looks on time. The second state checks material: O-3's alloy arrives Wednesday, so the [[dbxfe-industry-feasible-concept|feasible schedule]] runs O-2 on Tuesday and O-3 on Wednesday, one day late. No algorithm removes that lateness; the planner decides whether to expedite the alloy or tell the customer.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-planning",
+   "conceptIds": [
+    "dbxfe-industry-feasible-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-schedule-visual",
+   "questionIds": [
+    "dbxfe-industry-schedule-self"
+   ],
+   "handbook": {
+    "markdown": "A schedule has to be possible before it can be good.\n\n**Constraints, as data.** Line capacity per shift (units or hours); sequence-dependent changeover times (a changeover matrix: moving from alloy A to alloy B costs 90 minutes, B to A costs 40); material availability from the ERP or MRP (what is on hand or promised, and when); labour and skills; maintenance windows from the maintenance plan; quality holds from traceability. Each constraint table needs an owner and a snapshot time, because a schedule is feasible only against the snapshot it used.\n\n**Methods.** Dispatch rules (earliest due date, shortest processing time) are fast and explainable but ignore constraints unless checked afterwards. Heuristics and mathematical optimization (mixed-integer or constraint programming) search for feasible sequences that minimize lateness, changeovers or cost. Which to use is secondary to whether the constraint data is complete and current.\n\n**Demand's role.** Forecasts set what should be made; confirmed orders set what must be made. Mixing them without labels hides which lateness matters.\n\n**The human decision.** When constraints force a trade-off (accept O-3 one day late, or pay to expedite its alloy so O-3 runs Tuesday and every order is on time), the planner chooses and records it: the snapshot used, the options, the choice, the reason. Override reasons, collected over months, show where the constraint data is wrong.\n\n**Evaluation.** Schedule adherence (did the plant run what was planned?), on-time delivery against confirmed orders, changeover hours, and the share of plans broken by material that arrived late. A schedule that ignores material scores well on paper and poorly on the floor.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-planning"
+    ]
+   },
+   "recap": "Check capacity and material first; lateness the constraints force is the planner's decision, recorded.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-documents",
+   "version": "1.0.0",
+   "title": "An answer from documents must cite the revision in force",
+   "outcome": "Design retrieval over controlled documents so answers cite a current revision and a person checks the controlled copy before acting.",
+   "explanation": "Document knowledge covers work instructions, maintenance manuals and 8D problem reports. Retrieval finds passages; it does not know which [[dbxfe-industry-revision-concept|controlled document revision]] is in force unless status and effective date are stored with every chunk. Notice in the first state that the answer cites WI-114 revision C and the technician checks the controlled copy. In the second the metadata is missing, superseded revision B ranks first, and the answer quotes a torque value that no longer applies.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-documents",
+   "conceptIds": [
+    "dbxfe-industry-revision-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-documents-visual",
+   "questionIds": [
+    "dbxfe-industry-documents-self"
+   ],
+   "handbook": {
+    "markdown": "Plants run on controlled documents: work instructions, standard operating procedures, maintenance manuals, drawings, and problem-solving records such as 8D reports. A controlled document has an owner, a revision, a status and an effective date, and the controlled copy is the authority.\n\n**Metadata on every chunk.** `doc_id`, `revision`, `status`, `effective_from`, `site`, `asset_class`, `access_group`, `section`. Copy them from the document system at indexing time; a chunk without them is not eligible to be cited.\n\n**Retrieval rules.** Filter first (status current, effective on or before today, the asker's site and permissions), then rank. Ranking alone prefers whichever wording matches the question, which is often the older revision people learned from.\n\n**Answer rules.** Cite document, revision and section; link the controlled copy; quote values verbatim rather than paraphrasing numbers. When nothing current matches, say so and name the document owner. The retrieval module covers chunking, ranking and evaluation in depth.\n\n**Evaluation.** A set of real technician questions with the expected document, revision and section, re-run on every document release. Count answers citing a superseded revision as failures regardless of whether the value happened to be unchanged.\n\n**Access.** The index must not widen access: a document restricted to one site or role stays restricted in the answers.\n\n**Boundaries.** The assistant helps a person find the right controlled text faster; it does not replace the controlled instruction, sign-offs or the site's safety procedures. The torque values and document numbers in this beat are synthetic.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-documents"
+    ]
+   },
+   "recap": "Filter to the revision in force before ranking, cite it, and let the controlled copy decide.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-transfer",
+   "version": "1.0.0",
+   "title": "The pattern transfers; identity, grain and stakes change",
+   "outcome": "Transfer a manufacturing pattern to retail, financial services or healthcare by re-deriving its identity, grain, hierarchy, clock and responsible person.",
+   "explanation": "The chain from source to responsible action transfers across industries; the tables do not. [[dbxfe-industry-transfer-concept|Pattern transfer]] means asking the same questions again. Notice in the first state that event identity, grain and hierarchy change: a retail return links to its original sale, a bank reversal is a new event, a hospital supply scan carries its own lot. The second state compares clocks, decision owners and stakes, and marks where regulated, clinical or safety judgements belong to qualified owners, which this course does not replace.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-transfer",
+   "conceptIds": [
+    "dbxfe-industry-transfer-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-industries",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-transfer-visual",
+   "questionIds": [
+    "dbxfe-industry-transfer-self"
+   ],
+   "handbook": {
+    "markdown": "Databricks publishes industry pages that frame the same platform around each industry's use cases: fine-grained demand forecasting and pricing for retail and consumer goods; fraud detection, risk and customer engagement for financial services; unifying clinical, claims and research data for healthcare and life sciences. They are vendor framing, useful for vocabulary and not evidence about any organization.\n\n**The transfer procedure.** For a pattern that works in manufacturing, re-derive five things in the new setting:\n1. *Event identity*: what names one occurrence, and how are corrections and reversals represented? A retail return should reference its original sale; a financial reversal is a new event that offsets an earlier one, not an update.\n2. *Grain*: what one row is at the decision point (store × SKU × day, account × day).\n3. *Hierarchy*: what contains what, and how it changes (stores move between regions, accounts between branches), effective-dated as before.\n4. *Clock*: which calendar and cut-off apply (a trading day past midnight, posting date versus value date, shifts spanning facilities).\n5. *Responsible person*: who acts on the decision and records the outcome.\n\n**Worked transfer.** Lot genealogy becomes, in grocery retail, supplier lot → distribution centre receipt → store receipt, so a supplier's recall notice can be scoped to the stores and days that received that lot. The data problem is the same (completeness of lot capture at receipt); the decision and its owners are the retailer's.\n\n**Boundaries.** Financial services and healthcare carry regulatory, privacy and, in healthcare, clinical obligations. A brief names the owners of those judgements (compliance, model risk, clinical, privacy) and lists their review as a dependency. This course gives no compliance, clinical or safety advice, and healthcare examples here stay with operational data such as supplies and scheduling.",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-transfer"
+    ]
+   },
+   "recap": "Re-derive identity, grain, hierarchy, clock and owner in every new industry; name the specialists who decide what you may not.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-industry-evaluate",
+   "version": "1.0.0",
+   "title": "Score a use case on evidence, not on enthusiasm",
+   "outcome": "Evaluate candidate use cases against a decision owner, data evidence and outcome evidence, and write 'not enough evidence yet' with what would change it.",
+   "explanation": "A use-case brief ends in a verdict, and an [[dbxfe-industry-verdict-concept|evidence verdict]] may be 'not enough evidence yet'. Notice in the first state that scoring on value and excitement sends all four candidates forward. The second state scores what exists: a named decision owner, data that meets its contract, and outcome evidence. Supplier-lot trace and scrap Pareto proceed; spare-parts demand waits for stock-outs to be flagged; spindle failure prediction has six labelled failures and uncoded history, so the honest verdict is not enough evidence yet.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-evaluate",
+   "conceptIds": [
+    "dbxfe-industry-verdict-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-pillars",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "visualId": "dbxfe-industry-evaluate-visual",
+   "questionIds": [
+    "dbxfe-industry-evaluate-self"
+   ],
+   "handbook": {
+    "markdown": "The use-case brief is the practice output of this module. It has six parts.\n\n1. **Decision and owner.** What action changes, who takes it, how often, and what they do today.\n2. **Metric contract.** For the decision's outcome (scrap rate, hold scope, unplanned stops), with grain, numerator, denominator, aggregation, time basis, exclusions and owner.\n3. **Architecture.** Operational source → governed data → decision → responsible human action, naming the identity, units, clock and hierarchy rules each link needs.\n4. **Risks.** Data risks (identity, units, timestamps, hierarchy, completeness), label and leakage risks, adoption risk (will the owner act?), and dependencies on specialist review.\n5. **Evaluation criteria.** Written before building and able to fail: replay two past holds and match their scope; beat the fixed-interval plan on failures caught with 7 days' notice at 3 alerts a week.\n6. **Conclusion.** Proceed, pilot, fix data first, or not enough evidence yet.\n\n**Checking beyond accuracy.** The Databricks well-architected framework's seven pillars (data and AI governance; interoperability and usability; operational excellence; security, privacy and compliance; reliability; performance efficiency; cost optimization) are a useful list of concerns for the architecture and risk sections, not a score.\n\n**\"Not enough evidence yet\" done well.** It states what evidence exists, what is missing, how the missing evidence will be collected, by whom, and when the verdict will be reviewed. It is not a polite no: the spindle case may become strong once failures are coded and sensor mounts dated. It is also not a yes with caveats: a pilot on six failures cannot distinguish a working model from luck.\n\n**What to inspect in your own brief.** Could any evaluation criterion fail? Is every number in it traceable to a query or a named record? Is the conclusion the one the evidence supports, even if it is not the one the sponsor hoped for?",
+    "sourceSectionIds": [
+     "dbxfe-industry-l01-evaluate"
+    ]
+   },
+   "recap": "Owner, data evidence and outcome evidence decide the verdict; 'not enough evidence yet' names what would change it.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-industry-l01-card1",
+   "beatId": "dbxfe-industry-chain"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card2",
+   "beatId": "dbxfe-industry-contract"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card3",
+   "beatId": "dbxfe-industry-identity"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card4",
+   "beatId": "dbxfe-industry-time"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card5",
+   "beatId": "dbxfe-industry-hierarchy"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card6",
+   "beatId": "dbxfe-industry-quality"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card7",
+   "beatId": "dbxfe-industry-genealogy"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card8",
+   "beatId": "dbxfe-industry-engineering"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card9",
+   "beatId": "dbxfe-industry-maintenance"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card10",
+   "beatId": "dbxfe-industry-demand"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card11",
+   "beatId": "dbxfe-industry-schedule"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card12",
+   "beatId": "dbxfe-industry-documents"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card13",
+   "beatId": "dbxfe-industry-transfer"
+  },
+  {
+   "cardId": "dbxfe-industry-l01-card14",
+   "beatId": "dbxfe-industry-evaluate"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-industry-extension-lineage",
+   "revision": "1",
+   "prompt": "Can Unity Catalog lineage tell you which customer shipments contain a suspect ingot lot?",
+   "answer": "No. Lineage records which data assets were read to build others; which physical lot went into which shipment lives in genealogy rows you model and govern yourself.",
+   "explanation": "[[dbxfe-industry-extension-lineage-concept|Data lineage]] in Unity Catalog is captured down to the column level for queries on registered tables through Spark DataFrames or Databricks SQL, shown in Catalog Explorer in near real time across workspaces attached to a metastore, and its nodes are tables, views, model versions, external assets and paths. Those are data objects, so lineage can prove that `genealogy_edges` was built from the MES consumption landing table by a named pipeline, which is useful provenance for an audit of the trace itself. It cannot answer where ingot lot AL-5521 went: that needs consumption events keyed on their own identity. Use both, and do not let a lineage graph stand in for a material trace in a hold decision.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-trace",
+   "conceptIds": [
+    "dbxfe-industry-extension-lineage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-lineage",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "beatId": "dbxfe-industry-genealogy",
+   "whyItMatters": "Stops a team from citing a data lineage graph as material traceability and shows the complementary role lineage does play."
+  },
+  {
+   "id": "dbxfe-industry-extension-isa95",
+   "revision": "1",
+   "prompt": "How does the ISA-95 equipment hierarchy relate to the site, line, machine and sensor tree used in this module?",
+   "answer": "ISA-95 names nested levels (enterprise, site, area, work center, work unit); the module's tree is a simplified reading that maps a line to a work center and a machine to a work unit.",
+   "explanation": "ISA-95, published by ISA and as IEC 62264, standardizes how enterprise systems such as the ERP exchange information with manufacturing operations and control. Its [[dbxfe-industry-extension-isa95-concept|equipment hierarchy]] extended ISA-88's physical model so that discrete, continuous and logistics operations can share vocabulary: a production line, a process cell or a storage zone is a kind of work center, and the units inside them are work units. Sensors are not a named level; they are instruments attached to equipment. Using the standard's names when designing the asset tables helps MES, ERP and analytics teams agree on keys and grain, but a simplified tree is not a claim of conformance, and the standard itself is a purchased document to be read before claiming it.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-hierarchy",
+   "conceptIds": [
+    "dbxfe-industry-extension-isa95-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-isa95",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "beatId": "dbxfe-industry-hierarchy",
+   "whyItMatters": "Gives a shared, standard vocabulary for asset levels so MES, ERP and analytics teams design the same keys."
+  },
+  {
+   "id": "dbxfe-industry-extension-ntz",
+   "revision": "1",
+   "prompt": "Which Databricks SQL type keeps a PLC's wall-clock reading unchanged when the session time zone changes?",
+   "answer": "TIMESTAMP_NTZ, which stores date and time fields without a zone; a TIMESTAMP is an instant normalized to UTC and shown in the session zone.",
+   "explanation": "The two types answer different questions. A TIMESTAMP is persisted in UTC and the session time zone, UTC by default, is applied whenever it is displayed or a field such as the hour is extracted, so the same value shows different local hours in sessions set to different zones. [[dbxfe-industry-extension-ntz-concept|TIMESTAMP_NTZ]], documented for Databricks SQL and Runtime 13.3 LTS and above (check its release status for your workspace), keeps the literal fields and ignores the session zone. Use TIMESTAMP for event instants that are ordered or windowed across sites; keep a device's raw wall-clock stamp as NTZ or text only beside the site's zone name, because an NTZ value on its own cannot tell the two 01:30s of a clock-change night apart.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-identity",
+   "conceptIds": [
+    "dbxfe-industry-extension-ntz-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-timestamp",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "beatId": "dbxfe-industry-time",
+   "whyItMatters": "Choosing the wrong type makes hours shift between sessions or makes clock-change readings ambiguous in governed tables."
+  },
+  {
+   "id": "dbxfe-industry-extension-pillars",
+   "revision": "1",
+   "prompt": "Which Databricks well-architected pillars should a use-case brief check beyond model accuracy?",
+   "answer": "All seven: data and AI governance; interoperability and usability; operational excellence; security, privacy and compliance; reliability; performance efficiency; cost optimization.",
+   "explanation": "The [[dbxfe-industry-extension-pillars-concept|well-architected pillars]] are areas of concern rather than a score, and they map naturally onto a brief's architecture and risk sections. Governance: who owns and may read the genealogy tables. Interoperability and usability: can the quality engineer use the hold list where they already work? Operational excellence: who is alerted when the trace job fails? Security, privacy and compliance: which grants and reviews apply, named rather than decided here. Reliability: what the hold process does when the MES feed stops for a shift. Performance efficiency: does a trace finish within the hold decision's time limit? Cost: what a nightly full trace costs against an incremental one. Five pillars align with cloud providers' frameworks and two are specific to the lakehouse.",
+   "lessonId": "dbxfe-industry-l01",
+   "sectionId": "dbxfe-industry-l01-evaluate",
+   "conceptIds": [
+    "dbxfe-industry-extension-pillars-concept"
+   ],
+   "claimIds": [
+    "dbxfe-industry-claim-pillars",
+    "dbxfe-industry-guidance",
+    "dbxfe-industry-fiction"
+   ],
+   "beatId": "dbxfe-industry-evaluate",
+   "whyItMatters": "Turns the architecture and risk sections of a brief into a complete checklist instead of an accuracy-only review."
+  }
+ ],
+ "recap": {
+  "title": "Source to person, rules before patterns, evidence before verdicts",
+  "markdown": "**Every use case is one chain: operational source, governed data, a decision with a fixed action set, and a named person who acts and records the outcome.** The chain works only when the data rules hold: a metric contract at a declared grain, event identity that collapses resends and keeps corrections, units and instants carried as data, and an asset hierarchy with dated parents. Quality, traceability, engineering data, maintenance, demand, scheduling and document knowledge are the same rules applied to different records, and the pattern transfers to retail, financial services and healthcare while the identity, clock, owners and stakes change. A brief ends in a verdict that evidence supports, and 'not enough evidence yet' is a result when it names what would change it. **Transfer challenge:** take the supplier-lot trace to a grocery retailer receiving chilled goods from three suppliers; write its event identity, grain, hierarchy, clock pitfall, decision owner and one evaluation criterion that could fail, and name the specialist owners whose review it depends on.",
+  "visualId": "dbxfe-industry-chain-visual"
+ },
+ "appliedTask": {
+  "title": "Brief a store-level replenishment forecast for a grocer",
+  "prompt": "Fictional Marrowby Grocers wants a replenishment forecast for 400 bakery items across 60 stores. Facts: 18 months of point-of-sale sales per store, item and day; stock-outs are not recorded, but evening on-hand counts exist in 20 of the 60 stores; waste is recorded per store per day, not per item; the trading day runs 06:00 to 01:00, so sales after midnight belong to the previous trading day; returns carry the original receipt number in only some stores; the replenishment planner orders per store and item by 14:00 for the next morning. Write the use-case brief: decision and owner, metric contract, architecture from operational source to responsible human action, risks with guards, evaluation criteria that could fail, and an honest conclusion.",
+  "modelAnswer": "**Decision and owner.** The replenishment planner sets each store and item's order by 14:00 for next-morning delivery. **Metric contract.** Forecast error at store × item × trading day against sales, reported only for days not censored; companion outcome metrics per store-week: availability (share of item-days with evening on-hand above zero) and waste units; owner: replenishment lead. **Architecture.** POS transactions keyed on store, transaction id and line (returns linked to the original line where the receipt number exists) → governed sales by trading day, where 00:00 to 01:00 belongs to the previous day → evening on-hand counts → forecast per store and item → planner's order, with overrides and reasons recorded → next-day availability and waste. **Risks and guards.** Censoring: flag item-days with evening on-hand at zero; possible only in the 20 counted stores. Clock: derive trading day from the instant and store zone, never from calendar date. Returns without receipts: count them and keep them out of demand. Waste per store, not per item: cannot yet evaluate waste per item. Hierarchy: stores change regions; effective-date the store table. **Evaluation.** In the 20 stores, over a 12-week time-based backtest, the forecast must beat a same-weekday-last-week baseline on uncensored error without lowering availability. **Conclusion.** Pilot in the 20 counted stores. For the other 40, not enough evidence yet: sales there are censored invisibly; start evening counts and review after 12 weeks.",
+  "reasoning": "The answer re-derives identity, clock, grain and hierarchy for retail instead of copying Cinderline's tables, treats censoring as the decisive evidence gap, and splits the verdict by where evidence exists, so the pilot's criteria can fail and the rest is honestly deferred with a named fix and review date.",
+  "beatIds": [
+   "dbxfe-industry-chain",
+   "dbxfe-industry-contract",
+   "dbxfe-industry-identity",
+   "dbxfe-industry-time",
+   "dbxfe-industry-demand",
+   "dbxfe-industry-transfer",
+   "dbxfe-industry-evaluate"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-industry-scenario"
+ ]
+}

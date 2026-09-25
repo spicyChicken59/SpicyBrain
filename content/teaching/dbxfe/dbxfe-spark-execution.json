@@ -1,0 +1,3488 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-spark-execution",
+ "title": "Distributed execution and reading Spark evidence",
+ "summary": "Predict shuffle boundaries, stages and tasks from a plan, then read what actually ran: tasks, shuffle records, a hot key that no worker count splits, and what a broadcast, a salt, adaptive execution and a cache change.",
+ "outcomes": [
+  "Assign planning, scheduling and computing to the driver and executors, and count tasks from partitions.",
+  "Predict Exchange nodes, stages and task counts from a physical plan and check them against measured stages, tasks and shuffle records.",
+  "Refute \"more workers is always faster\" with a measured skew distribution, and compare broadcast, salting and adaptive skew handling as remedies.",
+  "Read an adaptive plan before and after its action and say which runtime choices a toy run can and cannot support.",
+  "Keep results bounded at the driver and design a one-variable experiment with its limits stated."
+ ],
+ "startingAssumptions": [
+  "The transformations module has covered DataFrames, column expressions, joins and grain.",
+  "Reading a few lines of Python and a SQL GROUP BY or JOIN is comfortable."
+ ],
+ "lessonIds": [
+  "dbxfe-spark-execution-l01"
+ ],
+ "optionalBridgeLessonIds": [
+  "dbxfe-grain-joins"
+ ],
+ "editorialRationale": "Distributed execution is usually taught as vocabulary, then tuned by folklore. This module starts from the processes and the partition, makes the shuffle visible as rows and partial records crossing a boundary, and then keeps two kinds of evidence apart throughout: the plan Spark proposes and the stages, tasks and shuffle records that actually ran, all captured from a real local run. The skew counterexample, the wrong fix, salting, broadcast and adaptive execution are each read from that evidence, adaptive choices that varied between identical runs are shown as such, and the module closes on bounded one-variable experiments whose limits are stated before anyone asks.",
+ "sources": [
+  {
+   "id": "dbxfe-spark-execution-source-cluster",
+   "title": "Cluster Mode Overview (Spark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/cluster-overview.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Apache Spark 4.0.4; the generic application model on any cluster manager.",
+   "caveat": "Describes open-source Spark; a Databricks Runtime bundles its own Spark version and compute model, and local[2] hosts driver and executor in one JVM.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search returned the same-titled 4.0.0, 4.0.1 and 4.0.2 copies of this page; the 4.0.4 URL follows the versioned path this course already pins for its Spark sources. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Spark applications run as independent sets of processes coordinated by the SparkContext in the driver program; Spark acquires executors on nodes, which are processes that run computations and store data for the application, and the SparkContext sends tasks to the executors to run; each driver schedules its own tasks."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-rdd-guide",
+   "title": "RDD Programming Guide (Spark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/rdd-programming-guide.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Apache Spark 4.0.4; transformations, actions, shuffle operations, persistence and the collect() caution.",
+   "caveat": "Written for the RDD API; DataFrames add an optimizer and adaptive execution on the same execution model.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search returned the same-titled 4.0.0 and 4.0.2 copies of this page; the 4.0.4 URL follows the versioned path this course already pins for its Spark sources. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Transformations are lazy and actions return a value to the driver after running a computation; the shuffle is Spark's mechanism for re-distributing data so that it is grouped differently across partitions, typically copying data across executors and machines, which makes it a complex and costly operation; collect() fetches the entire dataset to a single machine and can make the driver run out of memory; a persisted dataset is kept in memory the first time it is computed in an action."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-quickstart",
+   "title": "Quickstart: DataFrame (PySpark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/api/python/getting_started/quickstart_df.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "PySpark 4.0.4 getting-started page; lazy evaluation and actions on DataFrames.",
+   "caveat": "An introductory page; it does not describe plan operators or runtime metrics.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search returned the latest copy of this page; this pinned 4.0.4 URL is already cited by the course. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: PySpark DataFrames are lazily evaluated: when Spark transforms data it does not immediately compute the transformation but plans how to compute later, and the computation starts when an action such as collect() is explicitly called."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-explain",
+   "title": "pyspark.sql.DataFrame.explain (PySpark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.explain.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "PySpark 4.0.4 API reference; plan printing modes.",
+   "caveat": "A printed plan is a proposal; with adaptive execution the physical plan can change after an action, and the same call then prints the final plan.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search returned the latest copy of this page; this pinned 4.0.4 URL is already cited by the course. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: explain() prints the logical and physical plans for debugging; the mode parameter, added in 3.0.0, accepts simple, extended, codegen, cost and formatted, where formatted splits the output into a physical plan outline and node details."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-tuning",
+   "title": "Tuning Spark (Spark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/tuning.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Apache Spark 4.0.4; memory tuning and the level of parallelism.",
+   "caveat": "General guidance that must be measured per workload; no number on the page is a promise for a particular job.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search returned the same-titled 4.0.0, 4.0.1 and 4.0.2 copies of this page; the 4.0.4 URL follows the versioned path this course already pins for its Spark sources. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: An OutOfMemoryError can arise not because data does not fit in memory but because the working set of one task, such as a reduce task, is too large; the simplest fix is to increase the level of parallelism so that each task's input set is smaller; Spark can efficiently support tasks as short as 200 ms, so the level of parallelism can safely exceed the number of cores; execution and storage memory share a unified region."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-sql-tuning",
+   "title": "Performance Tuning (Spark SQL, 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/sql-performance-tuning.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Apache Spark 4.0.4; caching, join strategy hints, shuffle partitions and adaptive query execution.",
+   "caveat": "Thresholds and defaults are version-specific; the lab read its skew thresholds back from local Spark 4.0.4 rather than assuming them.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search returned the same-titled 4.0.0 and 4.0.2 copies of this page; the 4.0.4 URL follows the versioned path this course already pins for its Spark sources. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Spark SQL can cache tables with spark.catalog.cacheTable or DataFrame.cache and remove them with uncacheTable or unpersist; join strategy hints BROADCAST, MERGE, SHUFFLE_HASH and SHUFFLE_REPLICATE_NL instruct the planner; spark.sql.autoBroadcastJoinThreshold (default 10 MB, -1 disables) and spark.sql.shuffle.partitions (default 200) are listed options; adaptive query execution, enabled by default since 3.2.0, coalesces post-shuffle partitions (advisory size 64 MB, minimum partition size 1 MB), converts a sort-merge join to a broadcast hash join when the runtime statistics of any join side are below the threshold, which is not as efficient as planning the broadcast in the first place but avoids sorting and can read shuffle files locally, and splits skewed partitions in sort-merge joins when a partition exceeds spark.sql.adaptive.skewJoin.skewedPartitionFactor (5) times the median and spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes (256 MB)."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-web-ui",
+   "title": "Web UI (Spark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/web-ui.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Apache Spark 4.0.4; the Jobs and Stages tabs and their task metrics.",
+   "caveat": "The lab ran with the UI disabled and read stage, task and shuffle-record counts from the status store the UI renders; duration and spill were not asserted.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search returned the same-titled 4.0.0, 4.0.2 and 4.0.3 copies of this page; the 4.0.4 URL follows the versioned path this course already pins for its Spark sources. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: The Stages tab lists every stage with its tasks, input, output, shuffle read (total shuffle bytes and records read, locally and from remote executors) and shuffle write (bytes and records written to disk to be read by a shuffle in a future stage); the stage detail page summarizes task metrics in a table and a timeline, including shuffle spill in memory and on disk."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-cache",
+   "title": "pyspark.sql.DataFrame.cache (PySpark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.cache.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "PySpark 4.0.4 API reference; cache() and its default storage level.",
+   "caveat": "The default level is the DataFrame API's; persist() chooses others, and Databricks adds a separate disk cache for Parquet reads that is not this mechanism.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search returned the latest copy of this page; the 4.0.4 URL follows the versioned path this course already pins for its Spark sources. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: cache() persists the DataFrame with the default storage level MEMORY_AND_DISK_DESER; the default changed to MEMORY_AND_DISK_DESER to match Scala in 3.0."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-configuration",
+   "title": "Configuration (Spark 4.0.4)",
+   "url": "https://spark.apache.org/docs/4.0.4/configuration.html",
+   "publisher": "Apache Software Foundation",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Apache Spark 4.0.4; application properties including spark.driver.maxResultSize.",
+   "caveat": "Defaults are per version and a platform may override them; the value is a limit on serialized result bytes, not a memory guarantee.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search returned the same-titled 4.0.0 and 4.0.2 copies of this page, but its snippet did not show this property's row; the 4.0.4 URL follows the versioned path this course already pins for its Spark sources. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: spark.driver.maxResultSize limits the total size of serialized results of all partitions for each Spark action such as collect, defaulting to 1g; jobs are aborted when the total exceeds the limit, a high limit can cause out-of-memory errors in the driver, and a proper limit can protect the driver from them."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-databricks-aqe",
+   "title": "Adaptive query execution | Databricks on AWS",
+   "url": "https://docs.databricks.com/aws/en/optimizations/aqe",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; runtime re-optimization in Databricks Runtime.",
+   "caveat": "Databricks-specific behaviour, defaults and plan names; the local lab ran open-source Spark 4.0.4, not Databricks Runtime.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). The search also returned the same page for Databricks on Google Cloud and Azure Databricks. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: AQE is query re-optimization during execution based on runtime statistics and is enabled by default; it dynamically changes sort-merge joins into broadcast hash joins, coalesces small partitions after shuffle exchanges, handles skew in sort-merge and shuffle hash joins by splitting (and replicating if needed) skewed tasks, and propagates empty relations; the most accurate statistics exist at the end of a shuffle or broadcast exchange, called a query stage; a partition counts as skewed only when it exceeds both skewedPartitionFactor times the median partition size and skewedPartitionThresholdInBytes."
+  },
+  {
+   "id": "dbxfe-spark-execution-source-databricks-optimizations",
+   "title": "Optimization recommendations on Databricks | Databricks on AWS",
+   "url": "https://docs.databricks.com/aws/en/optimizations",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; the landing page for runtime optimizations.",
+   "caveat": "Applies to Databricks Runtime, where many optimizations are automatic; it is not evidence about open-source Spark on one machine.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Databricks provides optimizations for workloads from large-scale ETL to interactive queries, many of which take place automatically; they include disk caching of Parquet data on volumes attached to compute, dynamic file pruning, the cost-based optimizer and adaptive query execution."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-spark-execution-guidance",
+   "description": "Original SpicyBrain reasoning about reading plans, choosing one-variable experiments and stating what local evidence cannot prove; not a vendor runbook or tuning rule.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "Independent curriculum; adapt to the actual runtime, data and measurements."
+  },
+  {
+   "id": "dbxfe-spark-execution-fiction",
+   "description": "Cinderline Components, its plants, lines and inspection counts, Harbourline Supplies in the applied task, and every record in the visuals and the lab feed are synthetic teaching data.",
+   "kind": "fictional",
+   "sourceIds": [],
+   "context": "Original teaching examples executed locally; no customer data and no Databricks execution claim."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-cluster",
+   "description": "A driver program's SparkContext coordinates executor processes that run tasks and store data; the driver schedules its own tasks and sends them to executors.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-cluster"
+   ],
+   "context": "Generic Spark application model; in local[2] both roles share one JVM."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-lazy",
+   "description": "Transformations are lazy and build a plan; actions such as collect() start the computation and return values to the driver.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-rdd-guide",
+    "dbxfe-spark-execution-source-quickstart"
+   ],
+   "context": "Both the RDD guide and the DataFrame quickstart state the same model."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-shuffle",
+   "description": "A shuffle re-distributes data so it is grouped differently across partitions, copying rows across executors, and is a costly operation; collect() fetches an entire dataset to one machine and can make the driver run out of memory.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-rdd-guide"
+   ],
+   "context": "RDD guide wording; DataFrame plans show the shuffle as an Exchange."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-explain",
+   "description": "DataFrame.explain prints logical and physical plans; formatted mode prints an outline plus node details, and the other modes are simple, extended, codegen and cost.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-explain"
+   ],
+   "context": "PySpark 4.0.4 reference."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-tuning",
+   "description": "A task-level out-of-memory error can come from one task's working set being too large; raising the level of parallelism makes each task's input smaller and is the simplest documented fix; short tasks are cheap to launch.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-tuning"
+   ],
+   "context": "General tuning guidance that must be measured per workload; it does not split a single hot key."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-web-ui",
+   "description": "The Stages tab lists per-stage shuffle read and write in bytes and records and summarizes task metrics, including shuffle spill.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-web-ui"
+   ],
+   "context": "Runtime evidence lives there; the lab read the same stage, task and record counts from the status store with the UI disabled."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-broadcast",
+   "description": "Join strategy hints such as BROADCAST instruct the planner; spark.sql.autoBroadcastJoinThreshold (default 10 MB, -1 disables) sets the size below which Spark broadcasts a relation automatically when it knows the size.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning"
+   ],
+   "context": "Spark SQL performance tuning page, 4.0.4."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-adaptive",
+   "description": "Adaptive query execution re-plans at query-stage boundaries from runtime statistics: it coalesces post-shuffle partitions and converts a sort-merge join to a broadcast hash join when the runtime statistics of any join side fall below the threshold, which is less efficient than planning the broadcast in the first place but avoids sorting and can read shuffle files locally.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning",
+    "dbxfe-spark-execution-source-databricks-aqe"
+   ],
+   "context": "Open-source 4.0.4 page and the Databricks on AWS page; plan node names and defaults can differ between them."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-skew-join",
+   "description": "Adaptive skew-join handling treats a partition as skewed only when it exceeds skewedPartitionFactor (default 5) times the median partition size and skewedPartitionThresholdInBytes (default 256 MB), and then splits, and if needed replicates, the skewed tasks of sort-merge and shuffle hash joins.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning",
+    "dbxfe-spark-execution-source-databricks-aqe"
+   ],
+   "context": "Open-source 4.0.4 page and the Databricks on AWS page; the lab read both defaults back locally."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-shuffle-partitions",
+   "description": "spark.sql.shuffle.partitions (default 200) sets the partitions used when shuffling data for joins or aggregations; adaptive coalescing then merges small post-shuffle partitions toward an advisory size (64 MB) while respecting a minimum partition size (1 MB) when parallelism comes first.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning"
+   ],
+   "context": "Spark SQL performance tuning page, 4.0.4; platforms may override the defaults."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-cache",
+   "description": "DataFrame.cache persists at the MEMORY_AND_DISK_DESER storage level; persisted data is stored the first time an action computes it; Spark SQL caches tables for reuse and unpersist or uncacheTable removes them.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning",
+    "dbxfe-spark-execution-source-cache",
+    "dbxfe-spark-execution-source-rdd-guide"
+   ],
+   "context": "PySpark 4.0.4 reference, the Spark SQL tuning page and the RDD guide."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-result-size",
+   "description": "spark.driver.maxResultSize caps the total serialized result bytes an action may return to the driver and aborts the job when exceeded; its documented default is 1g.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-configuration"
+   ],
+   "context": "Spark 4.0.4 configuration page; a platform may override the default."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-databricks-defaults",
+   "description": "Databricks Runtime applies many optimizations automatically, including disk caching for Parquet reads, dynamic file pruning and adaptive query execution.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-databricks-optimizations"
+   ],
+   "context": "Databricks on AWS landing page; not evidence about open-source Spark locally."
+  },
+  {
+   "id": "dbxfe-spark-execution-claim-local-run",
+   "description": "Recorded local run of lab L04: Apache Spark 4.0.4, local[2], four shuffle partitions, a 240-row synthetic feed; plans, partition membership, executed stages, task counts and shuffle records are Spark's own output; no duration is reported as a benchmark and nothing ran on Databricks.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "docs/academy/labs/lab-l04-plans-shuffle.json; evidence about this configuration only."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-spark-execution-driver-concept",
+   "term": "driver",
+   "aliases": [
+    "driver program",
+    "SparkContext",
+    "SparkSession"
+   ],
+   "definition": "The process that holds the session, builds the plan and schedules tasks onto executors.",
+   "example": "In the lab the driver split the grouped sum into two stages of four tasks and scheduled them on two local slots.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-cluster"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-executor-concept",
+   "term": "executor",
+   "aliases": [
+    "worker process",
+    "task slot"
+   ],
+   "definition": "A process that runs tasks and holds partitions of data for one application.",
+   "example": "local[2] provides one executor with two task slots inside the driver's JVM.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-cluster"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-action-concept",
+   "term": "action",
+   "aliases": [
+    "lazy evaluation",
+    "transformation"
+   ],
+   "definition": "An operation that asks Spark to compute and return or write results, triggering the lazy plan built by transformations.",
+   "example": "explain() on the grouped sum started zero jobs; the collect() after it ran one job with two stages.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-rdd-guide",
+    "dbxfe-spark-execution-source-quickstart"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-partition-concept",
+   "term": "partition",
+   "aliases": [
+    "task",
+    "split",
+    "input partition"
+   ],
+   "definition": "A subset of a DataFrame's rows processed by exactly one task within a stage.",
+   "example": "240 rows in four partitions of 60 gave four tasks for the filter.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-cluster",
+    "dbxfe-spark-execution-source-tuning"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-narrow-concept",
+   "term": "narrow dependency",
+   "aliases": [
+    "pipelined operators",
+    "map-side step"
+   ],
+   "definition": "A step whose each output partition depends on exactly one input partition, so no rows move between tasks.",
+   "example": "Filter then select ran as one stage of four tasks, and each partition kept its own 47, 48, 45 or 47 rows.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-rdd-guide"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-wide-concept",
+   "term": "wide dependency",
+   "aliases": [
+    "shuffle",
+    "Exchange",
+    "hash partitioning"
+   ],
+   "definition": "A step that needs rows from many input partitions together by key, satisfied by a shuffle that ends a stage.",
+   "example": "groupBy plant planned Exchange hashpartitioning(plant#1, 4) between two HashAggregate operators.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-rdd-guide",
+    "dbxfe-spark-execution-source-sql-tuning"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-stage-concept",
+   "term": "stage",
+   "aliases": [
+    "shuffle boundary",
+    "job",
+    "task count"
+   ],
+   "definition": "A set of tasks that run pipelined operators between two shuffle boundaries, one task per partition.",
+   "example": "The grouped sum ran a four-task map stage and a four-task reduce stage.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-cluster",
+    "dbxfe-spark-execution-source-web-ui"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-explain-concept",
+   "term": "physical plan",
+   "aliases": [
+    "explain",
+    "formatted plan",
+    "operator outline"
+   ],
+   "definition": "The operator tree Spark proposes for a query, printed by explain() before or after an action.",
+   "example": "The formatted outline listed HashAggregate, Exchange, HashAggregate, Project and Scan ExistingRDD.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-explain"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-broadcast-concept",
+   "term": "broadcast join",
+   "aliases": [
+    "BroadcastHashJoin",
+    "BROADCAST hint",
+    "sort-merge join"
+   ],
+   "definition": "A join strategy that collects the small side on the driver and ships one copy to every executor, where its tasks share it, so the large side is not shuffled.",
+   "example": "F.broadcast(plants) replaced SortMergeJoin with BroadcastHashJoin and cut shuffled records from 243 to 8.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-skew-concept",
+   "term": "data skew",
+   "aliases": [
+    "hot key",
+    "straggler task",
+    "uneven partitions"
+   ],
+   "definition": "A key distribution in which one key's rows dominate one partition, so one task carries most of a stage's work.",
+   "example": "North's 180 rows stayed in one partition at 4, 8 and 16 partitions.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning",
+    "dbxfe-spark-execution-source-databricks-aqe"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-salt-concept",
+   "term": "salting",
+   "aliases": [
+    "key salting",
+    "replicated join",
+    "salted key"
+   ],
+   "definition": "Adding a deterministic sub-key to a hot join key so its rows spread across partitions, while the other side is replicated once per salt value.",
+   "example": "crc32(event_id) % 4 split North into groups of 47, 41, 47 and 45 rows.",
+   "sourceIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-adaptive-concept",
+   "term": "adaptive query execution",
+   "aliases": [
+    "AQE",
+    "AdaptiveSparkPlan",
+    "coalesced partitions",
+    "isFinalPlan"
+   ],
+   "definition": "Runtime re-planning that uses measured shuffle statistics to coalesce partitions, switch join strategies and split skewed partitions.",
+   "example": "The grouped plan read isFinalPlan=false before collect() and AQEShuffleRead coalesced with one final task after it.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning",
+    "dbxfe-spark-execution-source-databricks-aqe"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-skew-join-concept",
+   "term": "adaptive skew-join handling",
+   "aliases": [
+    "skew join",
+    "skewedPartitionThresholdInBytes",
+    "skewedPartitionFactor",
+    "SortMergeJoin(skew=true)"
+   ],
+   "definition": "The adaptive rule that splits a sort-merge or shuffle hash join partition exceeding both a factor of the median size and a byte threshold.",
+   "example": "At 1 KB thresholds the plan read SortMergeJoin(skew=true) and three tasks read 102, 106 and 37 records.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning",
+    "dbxfe-spark-execution-source-databricks-aqe"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-cache-concept",
+   "term": "caching",
+   "aliases": [
+    "persist",
+    "InMemoryRelation",
+    "unpersist"
+   ],
+   "definition": "Keeping a computed DataFrame in memory or on disk so later actions read it instead of recomputing it.",
+   "example": "north.cache() put InMemoryTableScan into the next grouped plan while the Exchange remained.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-cache",
+    "dbxfe-spark-execution-source-sql-tuning"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-collect-concept",
+   "term": "collection to the driver",
+   "aliases": [
+    "collect",
+    "toPandas",
+    "out of memory",
+    "driver memory"
+   ],
+   "definition": "Moving every row of a result into the single driver process, which is bounded only by that process's memory.",
+   "example": "bounded_collect refused the 240-row frame at a limit of 50 and returned the three-row aggregate.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-rdd-guide",
+    "dbxfe-spark-execution-source-configuration"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-experiment-concept",
+   "term": "bounded experiment",
+   "aliases": [
+    "one variable",
+    "planned versus measured",
+    "evidence ledger"
+   ],
+   "definition": "A comparison that changes exactly one setting or input and records which evidence moved, which stayed and what the run cannot show.",
+   "example": "Turning adaptive execution on changed the grouped sum's final stage from four tasks to one and nothing in the totals.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-web-ui"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-extension-result-size-concept",
+   "term": "result size limit",
+   "aliases": [
+    "spark.driver.maxResultSize",
+    "aborted job"
+   ],
+   "definition": "A configured cap on the serialized bytes an action may return to the driver before the job is aborted.",
+   "example": "A collect() whose serialized rows exceed the cap fails with an error instead of filling the driver heap.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-configuration"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-extension-shuffle-partitions-concept",
+   "term": "shuffle partitions setting",
+   "aliases": [
+    "spark.sql.shuffle.partitions",
+    "reduce stage tasks"
+   ],
+   "definition": "The configured number of partitions a shuffle writes, which sets the task count of the stage that reads it unless adaptive coalescing changes it.",
+   "example": "With the setting at 4 the reduce stage ran four tasks; adaptive execution read the same shuffle as one.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-extension-storage-level-concept",
+   "term": "storage level",
+   "aliases": [
+    "MEMORY_AND_DISK_DESER",
+    "persist",
+    "DISK_ONLY"
+   ],
+   "definition": "The policy that decides whether cached partitions live in memory, on disk or both, and in what form.",
+   "example": "The cached plan printed StorageLevel(disk, memory, deserialized, 1 replicas).",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-cache",
+    "dbxfe-spark-execution-source-rdd-guide"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-extension-static-broadcast-concept",
+   "term": "planned versus runtime broadcast",
+   "aliases": [
+    "broadcast hint",
+    "AQE join conversion",
+    "local shuffle read"
+   ],
+   "definition": "The difference between a broadcast join chosen at planning time and a sort-merge join converted to broadcast after its inputs were shuffled.",
+   "example": "The converted join still showed a ShuffleQueryStage under both inputs; the hinted one had no fact-side Exchange.",
+   "sourceIds": [
+    "dbxfe-spark-execution-source-sql-tuning",
+    "dbxfe-spark-execution-source-databricks-aqe"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-spark-execution-driver-visual",
+   "kind": "nodes",
+   "title": "The driver plans; executors run tasks",
+   "alt": "Three states: the driver holds a plan of two stages of four tasks while two executor slots wait, the slots run tasks two at a time, and three result rows return to the driver.",
+   "caption": "One coordinator, two task slots; in local[2] the slots are threads in the driver's JVM. Schematic of the lab's grouped sum; which slot ran which task is illustrative.",
+   "textEquivalent": "Plan on the driver: The driver has turned the transformations into two stages of four tasks; no task has started. Nodes: Driver: 2 stages, 8 tasks. Holds the SparkSession and the plan; schedules tasks. (selected); Slot 1: Executor task slot, idle. (pending); Slot 2: Executor task slot, idle. (pending). Relationships: Driver → Slot 1: no task yet; Driver → Slot 2: no task yet.\n\nTasks running: Two slots take tasks two at a time; the driver waits and tracks progress without computing rows. Nodes: Driver: stage 1 of 2. Waiting for stage 1; computes no row. (context); Slot 1: task 0, then task 2. Runs one task, then the next queued task. (selected); Slot 2: task 1, then task 3. Runs one task, then the next queued task. (selected). Relationships: Driver → Slot 1: sends tasks; Driver → Slot 2: sends tasks.\n\nResults return: Each task reports back; the driver receives the small final result for the caller. Nodes: Driver: 3 result rows. Receives three rows and returns them to Python. (selected); Slot 1: Finished its tasks. (context); Slot 2: Finished its tasks. (context). Relationships: Slot 1 → Driver: task results; Slot 2 → Driver: task results.",
+   "provenance": "Original SpicyBrain authored visual; a schematic of lab L04's grouped sum on local Spark 4.0.4 (two stages of four tasks, two local slots, three result rows). Which slot ran which task is illustrative, not recorded.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cluster",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "plan",
+     "title": "Plan on the driver",
+     "explanation": "The driver has turned the transformations into two stages of four tasks; no task has started.",
+     "nodes": [
+      {
+       "id": "driver",
+       "label": "Driver",
+       "detail": "Holds the SparkSession and the plan; schedules tasks.",
+       "status": "selected",
+       "value": "2 stages, 8 tasks"
+      },
+      {
+       "id": "slot-a",
+       "label": "Slot 1",
+       "detail": "Executor task slot, idle.",
+       "status": "pending"
+      },
+      {
+       "id": "slot-b",
+       "label": "Slot 2",
+       "detail": "Executor task slot, idle.",
+       "status": "pending"
+      }
+     ],
+     "connections": [
+      {
+       "from": "driver",
+       "to": "slot-a",
+       "label": "no task yet"
+      },
+      {
+       "from": "driver",
+       "to": "slot-b",
+       "label": "no task yet"
+      }
+     ]
+    },
+    {
+     "id": "run",
+     "title": "Tasks running",
+     "explanation": "Two slots take tasks two at a time; the driver waits and tracks progress without computing rows.",
+     "nodes": [
+      {
+       "id": "driver",
+       "label": "Driver",
+       "detail": "Waiting for stage 1; computes no row.",
+       "status": "context",
+       "value": "stage 1 of 2"
+      },
+      {
+       "id": "slot-a",
+       "label": "Slot 1",
+       "detail": "Runs one task, then the next queued task.",
+       "status": "selected",
+       "value": "task 0, then task 2"
+      },
+      {
+       "id": "slot-b",
+       "label": "Slot 2",
+       "detail": "Runs one task, then the next queued task.",
+       "status": "selected",
+       "value": "task 1, then task 3"
+      }
+     ],
+     "connections": [
+      {
+       "from": "driver",
+       "to": "slot-a",
+       "label": "sends tasks"
+      },
+      {
+       "from": "driver",
+       "to": "slot-b",
+       "label": "sends tasks"
+      }
+     ]
+    },
+    {
+     "id": "result",
+     "title": "Results return",
+     "explanation": "Each task reports back; the driver receives the small final result for the caller.",
+     "nodes": [
+      {
+       "id": "driver",
+       "label": "Driver",
+       "detail": "Receives three rows and returns them to Python.",
+       "status": "selected",
+       "value": "3 result rows"
+      },
+      {
+       "id": "slot-a",
+       "label": "Slot 1",
+       "detail": "Finished its tasks.",
+       "status": "context"
+      },
+      {
+       "id": "slot-b",
+       "label": "Slot 2",
+       "detail": "Finished its tasks.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "slot-a",
+       "to": "driver",
+       "label": "task results"
+      },
+      {
+       "from": "slot-b",
+       "to": "driver",
+       "label": "task results"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-lazy-visual",
+   "kind": "timeline",
+   "title": "Nothing runs until an action asks",
+   "alt": "Two states on a timeline: before the action, the grouped sum and explain() have started no job; after collect(), one job of two stages and eight tasks has run.",
+   "caption": "Transformations extend a plan; explain() prints it and starts no job; the action executes it. Counts from the recorded lab run.",
+   "textEquivalent": "Before the action: The load and the grouped sum are recorded in the plan; explain() prints the proposal and Spark starts no job. Nodes: Input, 4 partitions: Recorded in the plan; no row read yet. (pending); groupBy plant + sums: Recorded in the plan; will need a shuffle. (pending); explain(): 0 jobs. Prints the plan; the lab counted zero jobs in its job group. (context); collect(): Not called yet. (excluded). Relationships: Input, 4 partitions → groupBy plant + sums: then; groupBy plant + sums → explain(): prints.\n\nAfter collect(): The action ran the whole chain as one job of two stages; the earlier lines executed only now. Nodes: Input, 4 partitions: Read inside stage 1's four tasks. (selected); groupBy plant + sums: Partial sums in stage 1, final sums in stage 2. (selected); explain(): 0 jobs. Printed the same plan earlier; started no job. (context); collect(): 1 job. Triggered 1 job, 2 stages, 8 tasks; returned 3 rows. (selected). Relationships: Input, 4 partitions → groupBy plant + sums: stage 1; groupBy plant + sums → collect(): shuffle, stage 2, 3 rows.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-lazy",
+    "dbxfe-spark-execution-claim-explain",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "before",
+     "title": "Before the action",
+     "explanation": "The load and the grouped sum are recorded in the plan; explain() prints the proposal and Spark starts no job.",
+     "nodes": [
+      {
+       "id": "load",
+       "label": "Input, 4 partitions",
+       "detail": "Recorded in the plan; no row read yet.",
+       "status": "pending"
+      },
+      {
+       "id": "group",
+       "label": "groupBy plant + sums",
+       "detail": "Recorded in the plan; will need a shuffle.",
+       "status": "pending"
+      },
+      {
+       "id": "explain",
+       "label": "explain()",
+       "detail": "Prints the plan; the lab counted zero jobs in its job group.",
+       "status": "context",
+       "value": "0 jobs"
+      },
+      {
+       "id": "collect",
+       "label": "collect()",
+       "detail": "Not called yet.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "load",
+       "to": "group",
+       "label": "then"
+      },
+      {
+       "from": "group",
+       "to": "explain",
+       "label": "prints"
+      }
+     ]
+    },
+    {
+     "id": "after",
+     "title": "After collect()",
+     "explanation": "The action ran the whole chain as one job of two stages; the earlier lines executed only now.",
+     "nodes": [
+      {
+       "id": "load",
+       "label": "Input, 4 partitions",
+       "detail": "Read inside stage 1's four tasks.",
+       "status": "selected"
+      },
+      {
+       "id": "group",
+       "label": "groupBy plant + sums",
+       "detail": "Partial sums in stage 1, final sums in stage 2.",
+       "status": "selected"
+      },
+      {
+       "id": "explain",
+       "label": "explain()",
+       "detail": "Printed the same plan earlier; started no job.",
+       "status": "context",
+       "value": "0 jobs"
+      },
+      {
+       "id": "collect",
+       "label": "collect()",
+       "detail": "Triggered 1 job, 2 stages, 8 tasks; returned 3 rows.",
+       "status": "selected",
+       "value": "1 job"
+      }
+     ],
+     "connections": [
+      {
+       "from": "load",
+       "to": "group",
+       "label": "stage 1"
+      },
+      {
+       "from": "group",
+       "to": "collect",
+       "label": "shuffle, stage 2, 3 rows"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-partition-visual",
+   "kind": "table",
+   "title": "One partition, one task, one stage",
+   "alt": "Two tables: four input partitions of 60 rows with their plant mix and the rows each kept, then the measured evidence for the narrow chain.",
+   "caption": "Four partitions give four tasks; a narrow chain keeps each row in its partition. Counts from the recorded lab run.",
+   "textEquivalent": "Four partitions, four tasks: Each task filters and projects its own 60 rows; the rows it keeps never leave its partition. Table columns: Partition | Input rows | North / South / West | Rows kept (defects > 0). Rows: p0 | 60 | 44 / 9 / 7 | 47; p1 | 60 | 42 / 11 / 7 | 48; p2 | 60 | 45 / 10 / 5 | 45; p3 | 60 | 49 / 6 / 5 | 47.\n\nNarrow chain, measured: The plan has no Exchange, and the run confirms a single stage whose output kept four partitions. Table columns: Evidence | Value. Rows: Exchange nodes in plan | 0; Jobs | 1; Executed stages | 1; Tasks | 4; Output partitions | 4; Rows returned | 187.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cluster",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "tasks",
+     "title": "Four partitions, four tasks",
+     "explanation": "Each task filters and projects its own 60 rows; the rows it keeps never leave its partition.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Partition",
+       "Input rows",
+       "North / South / West",
+       "Rows kept (defects > 0)"
+      ],
+      "rows": [
+       [
+        "p0",
+        "60",
+        "44 / 9 / 7",
+        "47"
+       ],
+       [
+        "p1",
+        "60",
+        "42 / 11 / 7",
+        "48"
+       ],
+       [
+        "p2",
+        "60",
+        "45 / 10 / 5",
+        "45"
+       ],
+       [
+        "p3",
+        "60",
+        "49 / 6 / 5",
+        "47"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "measured",
+     "title": "Narrow chain, measured",
+     "explanation": "The plan has no Exchange, and the run confirms a single stage whose output kept four partitions.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Evidence",
+       "Value"
+      ],
+      "rows": [
+       [
+        "Exchange nodes in plan",
+        "0"
+       ],
+       [
+        "Jobs",
+        "1"
+       ],
+       [
+        "Executed stages",
+        "1"
+       ],
+       [
+        "Tasks",
+        "4"
+       ],
+       [
+        "Output partitions",
+        "4"
+       ],
+       [
+        "Rows returned",
+        "187"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-shuffle-visual",
+   "kind": "table",
+   "title": "A shuffle moves rows to where their key lives",
+   "alt": "Three tables: the mixed input partitions, the three partial rows each map task wrote, and what each reduce task read after the exchange by hash of plant.",
+   "caption": "Partial sums shrink the data first; the exchange then brings each plant's partials together. Records read and written are Spark's own metrics from the recorded lab run.",
+   "textEquivalent": "Input partitions are mixed: Every input partition holds rows of all three plants, so no task can finish North alone. Table columns: Partition | North rows | South rows | West rows. Rows: p0 | 44 | 9 | 7; p1 | 42 | 11 | 7; p2 | 45 | 10 | 5; p3 | 49 | 6 | 5.\n\nPartial sums inside each task: Stage 1 sums per plant within each partition and writes one partial record per plant. Table columns: Map task | Records written | Which plants. Rows: task 0 | 3 | North, South, West; task 1 | 3 | North, South, West; task 2 | 3 | North, South, West; task 3 | 3 | North, South, West.\n\nAfter the exchange, by hash of plant: Stage 2 reads each plant's partials in one shuffle partition; two of the four reduce tasks read nothing. Table columns: Reduce task | Records read | Plants received | Result rows. Rows: task 0 | 8 | North, West | 2; task 1 | 0 | none | 0; task 2 | 4 | South | 1; task 3 | 0 | none | 0.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "mixed",
+     "title": "Input partitions are mixed",
+     "explanation": "Every input partition holds rows of all three plants, so no task can finish North alone.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Partition",
+       "North rows",
+       "South rows",
+       "West rows"
+      ],
+      "rows": [
+       [
+        "p0",
+        "44",
+        "9",
+        "7"
+       ],
+       [
+        "p1",
+        "42",
+        "11",
+        "7"
+       ],
+       [
+        "p2",
+        "45",
+        "10",
+        "5"
+       ],
+       [
+        "p3",
+        "49",
+        "6",
+        "5"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "partial",
+     "title": "Partial sums inside each task",
+     "explanation": "Stage 1 sums per plant within each partition and writes one partial record per plant.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Map task",
+       "Records written",
+       "Which plants"
+      ],
+      "rows": [
+       [
+        "task 0",
+        "3",
+        "North, South, West"
+       ],
+       [
+        "task 1",
+        "3",
+        "North, South, West"
+       ],
+       [
+        "task 2",
+        "3",
+        "North, South, West"
+       ],
+       [
+        "task 3",
+        "3",
+        "North, South, West"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "regrouped",
+     "title": "After the exchange, by hash of plant",
+     "explanation": "Stage 2 reads each plant's partials in one shuffle partition; two of the four reduce tasks read nothing.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Reduce task",
+       "Records read",
+       "Plants received",
+       "Result rows"
+      ],
+      "rows": [
+       [
+        "task 0",
+        "8",
+        "North, West",
+        "2"
+       ],
+       [
+        "task 1",
+        "0",
+        "none",
+        "0"
+       ],
+       [
+        "task 2",
+        "4",
+        "South",
+        "1"
+       ],
+       [
+        "task 3",
+        "0",
+        "none",
+        "0"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-stage-visual",
+   "kind": "timeline",
+   "title": "A stage ends where a shuffle begins",
+   "alt": "Two states: the plan promises one boundary and therefore two stages of four tasks, then the measured run confirms 4 and 4 tasks with twelve records crossing.",
+   "caption": "Everything before the Exchange is stage 1, everything after it stage 2; the second task count comes from a setting. Counts from the recorded lab run.",
+   "textEquivalent": "Planned from the Exchange: The plan promises one boundary, so two stages; the reduce task count is the shuffle-partition setting. Nodes: Stage 1 (map): 4 tasks. Scan, Project, partial HashAggregate; one task per input partition. (pending); Exchange (4): boundary. hashpartitioning(plant#1, 4): shuffle write, then read. (warning); Stage 2 (reduce): 4 tasks. Final HashAggregate; spark.sql.shuffle.partitions tasks. (pending). Relationships: Stage 1 (map) → Exchange (4): writes partials; Exchange (4) → Stage 2 (reduce): reads by key.\n\nMeasured: 4 tasks, then 4 tasks: The status tracker confirms one job and two executed stages; the store shows two reduce tasks read nothing. Nodes: Stage 1 (map): 4 of 4 done. 4 completed tasks; each wrote 3 records. (selected); Exchange (4): 12 records. 12 records crossed. (selected); Stage 2 (reduce): 4 of 4 done. 4 completed tasks; read 8, 0, 4, 0. (selected). Relationships: Stage 1 (map) → Exchange (4): shuffle write; Exchange (4) → Stage 2 (reduce): shuffle read.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cluster",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "planned",
+     "title": "Planned from the Exchange",
+     "explanation": "The plan promises one boundary, so two stages; the reduce task count is the shuffle-partition setting.",
+     "nodes": [
+      {
+       "id": "map",
+       "label": "Stage 1 (map)",
+       "detail": "Scan, Project, partial HashAggregate; one task per input partition.",
+       "status": "pending",
+       "value": "4 tasks"
+      },
+      {
+       "id": "boundary",
+       "label": "Exchange (4)",
+       "detail": "hashpartitioning(plant#1, 4): shuffle write, then read.",
+       "status": "warning",
+       "value": "boundary"
+      },
+      {
+       "id": "reduce",
+       "label": "Stage 2 (reduce)",
+       "detail": "Final HashAggregate; spark.sql.shuffle.partitions tasks.",
+       "status": "pending",
+       "value": "4 tasks"
+      }
+     ],
+     "connections": [
+      {
+       "from": "map",
+       "to": "boundary",
+       "label": "writes partials"
+      },
+      {
+       "from": "boundary",
+       "to": "reduce",
+       "label": "reads by key"
+      }
+     ]
+    },
+    {
+     "id": "measured",
+     "title": "Measured: 4 tasks, then 4 tasks",
+     "explanation": "The status tracker confirms one job and two executed stages; the store shows two reduce tasks read nothing.",
+     "nodes": [
+      {
+       "id": "map",
+       "label": "Stage 1 (map)",
+       "detail": "4 completed tasks; each wrote 3 records.",
+       "status": "selected",
+       "value": "4 of 4 done"
+      },
+      {
+       "id": "boundary",
+       "label": "Exchange (4)",
+       "detail": "12 records crossed.",
+       "status": "selected",
+       "value": "12 records"
+      },
+      {
+       "id": "reduce",
+       "label": "Stage 2 (reduce)",
+       "detail": "4 completed tasks; read 8, 0, 4, 0.",
+       "status": "selected",
+       "value": "4 of 4 done"
+      }
+     ],
+     "connections": [
+      {
+       "from": "map",
+       "to": "boundary",
+       "label": "shuffle write"
+      },
+      {
+       "from": "boundary",
+       "to": "reduce",
+       "label": "shuffle read"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-explain-visual",
+   "kind": "nodes",
+   "title": "Read the plan bottom-up, then check what ran",
+   "alt": "A plan tree of five operators, Scan to final HashAggregate, shown first as planned and then annotated with the stage each ran in and the records it moved.",
+   "caption": "The formatted outline is a tree; the Exchange splits it into two stages. Operators and counts from the recorded lab run.",
+   "textEquivalent": "Planned operators: Read from the bottom: Scan supplies rows, Project trims columns, the partial aggregate sums, the Exchange moves, the final aggregate finishes. Nodes: Scan ExistingRDD (1): 240 rows in 4 partitions. (context); Project (2): Keeps plant, inspected_units, defective_units. (context); HashAggregate (3): partial_count, partial_sum, partial_sum per partition. (context); Exchange (4): hashpartitioning(plant#1, 4). The only boundary in the plan. (warning); HashAggregate (5): count and two sums per plant. (context). Relationships: Scan ExistingRDD (1) → Project (2): rows; Project (2) → HashAggregate (3): rows; HashAggregate (3) → Exchange (4): partials; Exchange (4) → HashAggregate (5): by key.\n\nWhat actually ran: Operators below the boundary ran in stage 1's four tasks; the final aggregate ran in stage 2's four tasks. Nodes: Scan ExistingRDD (1): stage 1. Stage 1, 4 tasks. (selected); Project (2): stage 1. Stage 1, pipelined with the scan. (selected); HashAggregate (3): stage 1. Stage 1; wrote 12 partial records, 3 per task. (selected); Exchange (4): 12 records. Shuffle write, then read; ends stage 1. (warning); HashAggregate (5): stage 2. Stage 2, 4 tasks reading 8, 0, 4, 0; 3 result rows. (selected). Relationships: Scan ExistingRDD (1) → Project (2): same task; Project (2) → HashAggregate (3): same task; HashAggregate (3) → Exchange (4): shuffle write; Exchange (4) → HashAggregate (5): shuffle read.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-explain",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "planned",
+     "title": "Planned operators",
+     "explanation": "Read from the bottom: Scan supplies rows, Project trims columns, the partial aggregate sums, the Exchange moves, the final aggregate finishes.",
+     "nodes": [
+      {
+       "id": "scan",
+       "label": "Scan ExistingRDD (1)",
+       "detail": "240 rows in 4 partitions.",
+       "status": "context"
+      },
+      {
+       "id": "project",
+       "label": "Project (2)",
+       "detail": "Keeps plant, inspected_units, defective_units.",
+       "status": "context"
+      },
+      {
+       "id": "partial",
+       "label": "HashAggregate (3)",
+       "detail": "partial_count, partial_sum, partial_sum per partition.",
+       "status": "context"
+      },
+      {
+       "id": "exchange",
+       "label": "Exchange (4)",
+       "detail": "The only boundary in the plan.",
+       "status": "warning",
+       "value": "hashpartitioning(plant#1, 4)"
+      },
+      {
+       "id": "final",
+       "label": "HashAggregate (5)",
+       "detail": "count and two sums per plant.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "scan",
+       "to": "project",
+       "label": "rows"
+      },
+      {
+       "from": "project",
+       "to": "partial",
+       "label": "rows"
+      },
+      {
+       "from": "partial",
+       "to": "exchange",
+       "label": "partials"
+      },
+      {
+       "from": "exchange",
+       "to": "final",
+       "label": "by key"
+      }
+     ]
+    },
+    {
+     "id": "ran",
+     "title": "What actually ran",
+     "explanation": "Operators below the boundary ran in stage 1's four tasks; the final aggregate ran in stage 2's four tasks.",
+     "nodes": [
+      {
+       "id": "scan",
+       "label": "Scan ExistingRDD (1)",
+       "detail": "Stage 1, 4 tasks.",
+       "status": "selected",
+       "value": "stage 1"
+      },
+      {
+       "id": "project",
+       "label": "Project (2)",
+       "detail": "Stage 1, pipelined with the scan.",
+       "status": "selected",
+       "value": "stage 1"
+      },
+      {
+       "id": "partial",
+       "label": "HashAggregate (3)",
+       "detail": "Stage 1; wrote 12 partial records, 3 per task.",
+       "status": "selected",
+       "value": "stage 1"
+      },
+      {
+       "id": "exchange",
+       "label": "Exchange (4)",
+       "detail": "Shuffle write, then read; ends stage 1.",
+       "status": "warning",
+       "value": "12 records"
+      },
+      {
+       "id": "final",
+       "label": "HashAggregate (5)",
+       "detail": "Stage 2, 4 tasks reading 8, 0, 4, 0; 3 result rows.",
+       "status": "selected",
+       "value": "stage 2"
+      }
+     ],
+     "connections": [
+      {
+       "from": "scan",
+       "to": "project",
+       "label": "same task"
+      },
+      {
+       "from": "project",
+       "to": "partial",
+       "label": "same task"
+      },
+      {
+       "from": "partial",
+       "to": "exchange",
+       "label": "shuffle write"
+      },
+      {
+       "from": "exchange",
+       "to": "final",
+       "label": "shuffle read"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-broadcast-visual",
+   "kind": "comparison",
+   "title": "Broadcast copies the small side instead of moving the big one",
+   "alt": "Two states of the same regional join: a sort-merge join that shuffles 240 fact rows and 3 dimension rows, and a broadcast join that shuffles only 8 regional partials.",
+   "caption": "Same result, two fewer exchanges; the small side travels instead of the big one. Records and operators from the recorded lab run.",
+   "textEquivalent": "Sort-merge join (broadcast off): Both inputs are shuffled by plant and sorted; three exchanges; executed stages 1, 4, 4, 4. Nodes: Facts, 240 rows: 240 shuffled. Exchange (3) hashpartitioning(plant#1, 4), then Sort. (warning); Plants, 3 rows: 3 shuffled. Exchange (8) hashpartitioning(plant#10, 4), then Sort. (warning); SortMergeJoin (10): 243 read. Read 206, 0, 37, 0 per task: one task held North and West. (selected); Regional sum: 3 partials. Exchange (13) hashpartitioning(region#11, 4), then the final sum. (context). Relationships: Facts, 240 rows → SortMergeJoin (10): shuffle by plant; Plants, 3 rows → SortMergeJoin (10): shuffle by plant; SortMergeJoin (10) → Regional sum: partial sums.\n\nBroadcast join (F.broadcast(plants)): A one-task job computes the dimension, the driver collects it and ships one copy to every executor for the fact tasks to share; one exchange remains, for the regional sum. Nodes: Facts, 240 rows: 0 shuffled. Scanned in place and joined in the same task. (selected); Plants, 3 rows: copied. BroadcastExchange (6): a separate one-task job computes it; the driver collects it and ships one copy per executor. (context); BroadcastHashJoin (7): BuildRight. Runs inside the four tasks that scanned the facts. (selected); Regional sum: 8 partials. Exchange (10) hashpartitioning(region#11, 4), then the final sum. (context). Relationships: Plants, 3 rows → BroadcastHashJoin (7): broadcast copy; Facts, 240 rows → BroadcastHashJoin (7): same task; BroadcastHashJoin (7) → Regional sum: partial sums.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-broadcast",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "merge",
+     "title": "Sort-merge join (broadcast off)",
+     "explanation": "Both inputs are shuffled by plant and sorted; three exchanges; executed stages 1, 4, 4, 4.",
+     "nodes": [
+      {
+       "id": "facts",
+       "label": "Facts, 240 rows",
+       "detail": "Exchange (3) hashpartitioning(plant#1, 4), then Sort.",
+       "status": "warning",
+       "value": "240 shuffled"
+      },
+      {
+       "id": "dim",
+       "label": "Plants, 3 rows",
+       "detail": "Exchange (8) hashpartitioning(plant#10, 4), then Sort.",
+       "status": "warning",
+       "value": "3 shuffled"
+      },
+      {
+       "id": "join",
+       "label": "SortMergeJoin (10)",
+       "detail": "Read 206, 0, 37, 0 per task: one task held North and West.",
+       "status": "selected",
+       "value": "243 read"
+      },
+      {
+       "id": "agg",
+       "label": "Regional sum",
+       "detail": "Exchange (13) hashpartitioning(region#11, 4), then the final sum.",
+       "status": "context",
+       "value": "3 partials"
+      }
+     ],
+     "connections": [
+      {
+       "from": "facts",
+       "to": "join",
+       "label": "shuffle by plant"
+      },
+      {
+       "from": "dim",
+       "to": "join",
+       "label": "shuffle by plant"
+      },
+      {
+       "from": "join",
+       "to": "agg",
+       "label": "partial sums"
+      }
+     ]
+    },
+    {
+     "id": "broadcast",
+     "title": "Broadcast join (F.broadcast(plants))",
+     "explanation": "A one-task job computes the dimension, the driver collects it and ships one copy to every executor for the fact tasks to share; one exchange remains, for the regional sum.",
+     "nodes": [
+      {
+       "id": "facts",
+       "label": "Facts, 240 rows",
+       "detail": "Scanned in place and joined in the same task.",
+       "status": "selected",
+       "value": "0 shuffled"
+      },
+      {
+       "id": "dim",
+       "label": "Plants, 3 rows",
+       "detail": "BroadcastExchange (6): a separate one-task job computes it; the driver collects it and ships one copy per executor.",
+       "status": "context",
+       "value": "copied"
+      },
+      {
+       "id": "join",
+       "label": "BroadcastHashJoin (7)",
+       "detail": "Runs inside the four tasks that scanned the facts.",
+       "status": "selected",
+       "value": "BuildRight"
+      },
+      {
+       "id": "agg",
+       "label": "Regional sum",
+       "detail": "Exchange (10) hashpartitioning(region#11, 4), then the final sum.",
+       "status": "context",
+       "value": "8 partials"
+      }
+     ],
+     "connections": [
+      {
+       "from": "dim",
+       "to": "join",
+       "label": "broadcast copy"
+      },
+      {
+       "from": "facts",
+       "to": "join",
+       "label": "same task"
+      },
+      {
+       "from": "join",
+       "to": "agg",
+       "label": "partial sums"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-skew-visual",
+   "kind": "table",
+   "title": "More partitions cannot split one hot key",
+   "alt": "Three tables of rows per partition after repartition by plant at 4, 8 and 16 partitions; the largest partition is 204, then 180, then 180.",
+   "caption": "The hot key is a floor: 204 rows at four partitions, then 180 at eight and at sixteen. Counts from the recorded lab run.",
+   "textEquivalent": "repartition(4, plant): West hashed into North's slot, so one task would carry 204 of 240 rows while two partitions stay empty. Table columns: Partition | Rows | Share. Rows: 0 | 204 (North + West) | 0.85; 2 | 36 (South) | 0.15; 1, 3 | 0 | 0.00.\n\nrepartition(8, plant): The collision is gone, but North's 180 rows are still one task's work; five partitions are empty. Table columns: Partition | Rows | Share. Rows: 0 | 180 (North) | 0.75; 2 | 36 (South) | 0.15; 4 | 24 (West) | 0.10; 5 others | 0 | 0.00.\n\nrepartition(16, plant): Sixteen partitions, thirteen of them empty; the largest still holds all 180 North rows. Table columns: Partition | Rows | Share. Rows: 0 | 180 (North) | 0.75; 10 | 36 (South) | 0.15; 12 | 24 (West) | 0.10; 13 others | 0 | 0.00. Equation: stage end = end of its longest task, whatever the slot count.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-tuning",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "four",
+     "title": "repartition(4, plant)",
+     "explanation": "West hashed into North's slot, so one task would carry 204 of 240 rows while two partitions stay empty.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Partition",
+       "Rows",
+       "Share"
+      ],
+      "rows": [
+       [
+        "0",
+        "204 (North + West)",
+        "0.85"
+       ],
+       [
+        "2",
+        "36 (South)",
+        "0.15"
+       ],
+       [
+        "1, 3",
+        "0",
+        "0.00"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "eight",
+     "title": "repartition(8, plant)",
+     "explanation": "The collision is gone, but North's 180 rows are still one task's work; five partitions are empty.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Partition",
+       "Rows",
+       "Share"
+      ],
+      "rows": [
+       [
+        "0",
+        "180 (North)",
+        "0.75"
+       ],
+       [
+        "2",
+        "36 (South)",
+        "0.15"
+       ],
+       [
+        "4",
+        "24 (West)",
+        "0.10"
+       ],
+       [
+        "5 others",
+        "0",
+        "0.00"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "sixteen",
+     "title": "repartition(16, plant)",
+     "explanation": "Sixteen partitions, thirteen of them empty; the largest still holds all 180 North rows.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Partition",
+       "Rows",
+       "Share"
+      ],
+      "rows": [
+       [
+        "0",
+        "180 (North)",
+        "0.75"
+       ],
+       [
+        "10",
+        "36 (South)",
+        "0.15"
+       ],
+       [
+        "12",
+        "24 (West)",
+        "0.10"
+       ],
+       [
+        "13 others",
+        "0",
+        "0.00"
+       ]
+      ]
+     },
+     "equation": "stage end = end of its longest task, whatever the slot count"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-salt-visual",
+   "kind": "table",
+   "title": "Change the key, not the worker count",
+   "alt": "Four tables: a round-robin repartition that doubles the shuffled records and leaves the window's 204-row task, the twelve salted groups, the salted join's partitions at four, and at eight shuffle partitions.",
+   "caption": "Spreading the input does not spread the key; salting does, and the join still returns 240 rows. Counts from the recorded lab run.",
+   "textEquivalent": "Round-robin before the window: repartition(16) adds an exchange, doubles the shuffled records and leaves the window's busiest task unchanged. Table columns: Evidence | Window alone | After repartition(16). Rows: Exchange nodes | 1 | 2; Shuffle records written | 240 | 480; Window task reads | 204, 0, 36, 0 | 204, 0, 36, 0.\n\nSalt = crc32(event_id) % 4: Each fact row gets one salt; the dimension is replicated once per salt, twelve rows instead of three. Table columns: Plant | salt 0 | salt 1 | salt 2 | salt 3. Rows: North | 47 | 41 | 47 | 45; South | 8 | 13 | 6 | 9; West | 5 | 6 | 7 | 6.\n\nJoin on (plant, salt), 4 partitions: Twelve groups hash into four partitions; the largest is 122, and rows and totals are unchanged. Table columns: Partition | Rows. Rows: 0 | 101; 1 | 11; 2 | 6; 3 | 122. Equation: largest share 0.85 → 0.51; rows 240 → 240; inland 5898 → 5898.\n\nSame salted join, 8 partitions: Once the key is split, more partitions spread the groups further: the largest falls to 100. Table columns: Partition | Rows. Rows: 0 | 88; 1 | 11; 3 | 100; 4 | 13; 6 | 6; 7 | 22.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "roundrobin",
+     "title": "Round-robin before the window",
+     "explanation": "repartition(16) adds an exchange, doubles the shuffled records and leaves the window's busiest task unchanged.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Evidence",
+       "Window alone",
+       "After repartition(16)"
+      ],
+      "rows": [
+       [
+        "Exchange nodes",
+        "1",
+        "2"
+       ],
+       [
+        "Shuffle records written",
+        "240",
+        "480"
+       ],
+       [
+        "Window task reads",
+        "204, 0, 36, 0",
+        "204, 0, 36, 0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "groups",
+     "title": "Salt = crc32(event_id) % 4",
+     "explanation": "Each fact row gets one salt; the dimension is replicated once per salt, twelve rows instead of three.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Plant",
+       "salt 0",
+       "salt 1",
+       "salt 2",
+       "salt 3"
+      ],
+      "rows": [
+       [
+        "North",
+        "47",
+        "41",
+        "47",
+        "45"
+       ],
+       [
+        "South",
+        "8",
+        "13",
+        "6",
+        "9"
+       ],
+       [
+        "West",
+        "5",
+        "6",
+        "7",
+        "6"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "salted",
+     "title": "Join on (plant, salt), 4 partitions",
+     "explanation": "Twelve groups hash into four partitions; the largest is 122, and rows and totals are unchanged.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Partition",
+       "Rows"
+      ],
+      "rows": [
+       [
+        "0",
+        "101"
+       ],
+       [
+        "1",
+        "11"
+       ],
+       [
+        "2",
+        "6"
+       ],
+       [
+        "3",
+        "122"
+       ]
+      ]
+     },
+     "equation": "largest share 0.85 → 0.51; rows 240 → 240; inland 5898 → 5898"
+    },
+    {
+     "id": "eight",
+     "title": "Same salted join, 8 partitions",
+     "explanation": "Once the key is split, more partitions spread the groups further: the largest falls to 100.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Partition",
+       "Rows"
+      ],
+      "rows": [
+       [
+        "0",
+        "88"
+       ],
+       [
+        "1",
+        "11"
+       ],
+       [
+        "3",
+        "100"
+       ],
+       [
+        "4",
+        "13"
+       ],
+       [
+        "6",
+        "6"
+       ],
+       [
+        "7",
+        "22"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-adaptive-visual",
+   "kind": "comparison",
+   "title": "Adaptive execution re-plans at a shuffle boundary",
+   "alt": "Three states: the adaptive grouped plan before its action with four planned partitions, the final plan after it with one coalesced task, and six identical join runs that all switched to a broadcast join but built different sides.",
+   "caption": "The plan printed before the action is a proposal; the one printed after shows what the runtime chose, and some choices varied between identical runs. From the recorded lab run.",
+   "textEquivalent": "Initial plan (isFinalPlan=false): Printed before collect(): the exchange still names four partitions, and the final stage would run four tasks. Nodes: Exchange: 4 planned. hashpartitioning(plant#1, 4). (pending); Final HashAggregate: 4 tasks planned. Would run 4 tasks. (pending); AdaptiveSparkPlan: isFinalPlan=false. (warning). Relationships: Exchange → Final HashAggregate: planned read; Final HashAggregate → AdaptiveSparkPlan: proposal.\n\nFinal plan (isFinalPlan=true): After the action: the map stage wrote 12 records and the runtime read the four planned partitions as one. Nodes: ShuffleQueryStage 0: 12 records. 4 map tasks ran; 789 bytes of shuffle output. (selected); AQEShuffleRead coalesced: 1 partition. 4 planned partitions read as 1. (selected); Final HashAggregate: 1 task. Ran 1 task that read all 12 records; same 3 rows. (selected); AdaptiveSparkPlan: isFinalPlan=true. (context). Relationships: ShuffleQueryStage 0 → AQEShuffleRead coalesced: statistics; AQEShuffleRead coalesced → Final HashAggregate: 1 task; Final HashAggregate → AdaptiveSparkPlan: final.\n\nJoin switched at runtime; the side varied: With the default 10 MB threshold every run replaced the sort-merge join with a broadcast join, but identical runs built different sides. Table columns: Run | Initial join | Final join | Build side. Rows: 1 | SortMergeJoin | BroadcastHashJoin | BuildLeft; 2 | SortMergeJoin | BroadcastHashJoin | BuildLeft; 3 | SortMergeJoin | BroadcastHashJoin | BuildRight; 4 | SortMergeJoin | BroadcastHashJoin | BuildRight; 5 | SortMergeJoin | BroadcastHashJoin | BuildRight; 6 | SortMergeJoin | BroadcastHashJoin | BuildRight.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-broadcast",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "initial",
+     "title": "Initial plan (isFinalPlan=false)",
+     "explanation": "Printed before collect(): the exchange still names four partitions, and the final stage would run four tasks.",
+     "nodes": [
+      {
+       "id": "exchange",
+       "label": "Exchange",
+       "detail": "hashpartitioning(plant#1, 4).",
+       "status": "pending",
+       "value": "4 planned"
+      },
+      {
+       "id": "final",
+       "label": "Final HashAggregate",
+       "detail": "Would run 4 tasks.",
+       "status": "pending",
+       "value": "4 tasks planned"
+      },
+      {
+       "id": "root",
+       "label": "AdaptiveSparkPlan",
+       "detail": "isFinalPlan=false.",
+       "status": "warning"
+      }
+     ],
+     "connections": [
+      {
+       "from": "exchange",
+       "to": "final",
+       "label": "planned read"
+      },
+      {
+       "from": "final",
+       "to": "root",
+       "label": "proposal"
+      }
+     ]
+    },
+    {
+     "id": "final",
+     "title": "Final plan (isFinalPlan=true)",
+     "explanation": "After the action: the map stage wrote 12 records and the runtime read the four planned partitions as one.",
+     "nodes": [
+      {
+       "id": "exchange",
+       "label": "ShuffleQueryStage 0",
+       "detail": "4 map tasks ran; 789 bytes of shuffle output.",
+       "status": "selected",
+       "value": "12 records"
+      },
+      {
+       "id": "read",
+       "label": "AQEShuffleRead coalesced",
+       "detail": "4 planned partitions read as 1.",
+       "status": "selected",
+       "value": "1 partition"
+      },
+      {
+       "id": "final",
+       "label": "Final HashAggregate",
+       "detail": "Ran 1 task that read all 12 records; same 3 rows.",
+       "status": "selected",
+       "value": "1 task"
+      },
+      {
+       "id": "root",
+       "label": "AdaptiveSparkPlan",
+       "detail": "isFinalPlan=true.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "exchange",
+       "to": "read",
+       "label": "statistics"
+      },
+      {
+       "from": "read",
+       "to": "final",
+       "label": "1 task"
+      },
+      {
+       "from": "final",
+       "to": "root",
+       "label": "final"
+      }
+     ]
+    },
+    {
+     "id": "join",
+     "title": "Join switched at runtime; the side varied",
+     "explanation": "With the default 10 MB threshold every run replaced the sort-merge join with a broadcast join, but identical runs built different sides.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Run",
+       "Initial join",
+       "Final join",
+       "Build side"
+      ],
+      "rows": [
+       [
+        "1",
+        "SortMergeJoin",
+        "BroadcastHashJoin",
+        "BuildLeft"
+       ],
+       [
+        "2",
+        "SortMergeJoin",
+        "BroadcastHashJoin",
+        "BuildLeft"
+       ],
+       [
+        "3",
+        "SortMergeJoin",
+        "BroadcastHashJoin",
+        "BuildRight"
+       ],
+       [
+        "4",
+        "SortMergeJoin",
+        "BroadcastHashJoin",
+        "BuildRight"
+       ],
+       [
+        "5",
+        "SortMergeJoin",
+        "BroadcastHashJoin",
+        "BuildRight"
+       ],
+       [
+        "6",
+        "SortMergeJoin",
+        "BroadcastHashJoin",
+        "BuildRight"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-skewjoin-visual",
+   "kind": "table",
+   "title": "Adaptive skew handling splits only what crosses its thresholds",
+   "alt": "Three tables for the same sort-merge join: without adaptive execution one task reads 206 records; with adaptive execution at its defaults one coalesced task reads 243; with the thresholds scaled to 1 KB three tasks read 102, 106 and 37.",
+   "caption": "The skew rule is real but gated by size: at the defaults nothing on this toy data qualifies. Operators and records from the recorded lab run.",
+   "textEquivalent": "Adaptive execution off: Four join tasks; the one holding North and West read 206 of 243 records. Table columns: Evidence | Value. Rows: Join operator | SortMergeJoin; Fact-side read | Exchange hashpartitioning(plant#1, 4); Join tasks | 4; Records read per task | 206, 0, 37, 0; Total records read | 243.\n\nAdaptive on, default thresholds: Skew threshold 256 MB and factor 5 are far above a few kilobytes, so nothing is split; the tiny shuffle is coalesced into one task instead. Table columns: Evidence | Value. Rows: Join operator | SortMergeJoin; Fact-side read | AQEShuffleRead coalesced; Join tasks | 1; Records read per task | 243; Skew settings read back | 268435456b, factor 5.0.\n\nAdaptive on, thresholds at 1 KB: With the skew threshold and advisory size scaled to toy size, the hot partition is split in two; each piece re-reads its dimension rows. Table columns: Evidence | Value. Rows: Join operator | SortMergeJoin(skew=true); Fact-side read | AQEShuffleRead coalesced and skewed; Join tasks | 3; Records read per task | 102, 106, 37; Total records read | 245; Regional totals | unchanged.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-skew-join",
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "off",
+     "title": "Adaptive execution off",
+     "explanation": "Four join tasks; the one holding North and West read 206 of 243 records.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Evidence",
+       "Value"
+      ],
+      "rows": [
+       [
+        "Join operator",
+        "SortMergeJoin"
+       ],
+       [
+        "Fact-side read",
+        "Exchange hashpartitioning(plant#1, 4)"
+       ],
+       [
+        "Join tasks",
+        "4"
+       ],
+       [
+        "Records read per task",
+        "206, 0, 37, 0"
+       ],
+       [
+        "Total records read",
+        "243"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "defaults",
+     "title": "Adaptive on, default thresholds",
+     "explanation": "Skew threshold 256 MB and factor 5 are far above a few kilobytes, so nothing is split; the tiny shuffle is coalesced into one task instead.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Evidence",
+       "Value"
+      ],
+      "rows": [
+       [
+        "Join operator",
+        "SortMergeJoin"
+       ],
+       [
+        "Fact-side read",
+        "AQEShuffleRead coalesced"
+       ],
+       [
+        "Join tasks",
+        "1"
+       ],
+       [
+        "Records read per task",
+        "243"
+       ],
+       [
+        "Skew settings read back",
+        "268435456b, factor 5.0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "toy",
+     "title": "Adaptive on, thresholds at 1 KB",
+     "explanation": "With the skew threshold and advisory size scaled to toy size, the hot partition is split in two; each piece re-reads its dimension rows.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Evidence",
+       "Value"
+      ],
+      "rows": [
+       [
+        "Join operator",
+        "SortMergeJoin(skew=true)"
+       ],
+       [
+        "Fact-side read",
+        "AQEShuffleRead coalesced and skewed"
+       ],
+       [
+        "Join tasks",
+        "3"
+       ],
+       [
+        "Records read per task",
+        "102, 106, 37"
+       ],
+       [
+        "Total records read",
+        "245"
+       ],
+       [
+        "Regional totals",
+        "unchanged"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-cache-visual",
+   "kind": "nodes",
+   "title": "A cache changes the source, not the answer",
+   "alt": "Three states of the grouped count by line over North: before caching the plan scans and filters, while cached it reads InMemoryTableScan, and after unpersist it scans again; the Exchange and the counts never change.",
+   "caption": "The input changes; the shuffle and the totals do not. Operators and counts from the recorded lab run.",
+   "textEquivalent": "Before cache(): The grouped count by line scans and filters North every time an action runs. Nodes: Scan, Filter, Project: plant = North, recomputed by every action. (context); HashAggregate (4): Partial count per line per partition. (context); Exchange (5): hashpartitioning(line#2, 4). (warning); HashAggregate (6): L1 64, L2 63, L3 53. (context). Relationships: Scan, Filter, Project → HashAggregate (4): rows; HashAggregate (4) → Exchange (5): partials; Exchange (5) → HashAggregate (6): by key.\n\nAfter cache() and count(): The next plan reads the stored partitions; the Exchange is still there. Nodes: InMemoryTableScan (1): cached. Reads InMemoryRelation (2) at StorageLevel(disk, memory, deserialized, 1 replicas); 180 rows. (selected); HashAggregate (5): Reads the cached partitions. (context); Exchange (6): unchanged. Still hashpartitioning(line#2, 4). (warning); HashAggregate (7): same. L1 64, L2 63, L3 53. (context). Relationships: InMemoryTableScan (1) → HashAggregate (5): cached rows; HashAggregate (5) → Exchange (6): partials; Exchange (6) → HashAggregate (7): by key.\n\nAfter unpersist(): A fresh plan scans and filters again; nothing else moved. Nodes: Scan, Filter, Project: Back to recomputing North. (context); HashAggregate (4): As before. (context); Exchange (5): As before. (warning); HashAggregate (6): As before. (context). Relationships: Scan, Filter, Project → HashAggregate (4): rows; HashAggregate (4) → Exchange (5): partials; Exchange (5) → HashAggregate (6): by key.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cache",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "before",
+     "title": "Before cache()",
+     "explanation": "The grouped count by line scans and filters North every time an action runs.",
+     "nodes": [
+      {
+       "id": "source",
+       "label": "Scan, Filter, Project",
+       "detail": "plant = North, recomputed by every action.",
+       "status": "context"
+      },
+      {
+       "id": "partial",
+       "label": "HashAggregate (4)",
+       "detail": "Partial count per line per partition.",
+       "status": "context"
+      },
+      {
+       "id": "exchange",
+       "label": "Exchange (5)",
+       "detail": "hashpartitioning(line#2, 4).",
+       "status": "warning"
+      },
+      {
+       "id": "final",
+       "label": "HashAggregate (6)",
+       "detail": "L1 64, L2 63, L3 53.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "source",
+       "to": "partial",
+       "label": "rows"
+      },
+      {
+       "from": "partial",
+       "to": "exchange",
+       "label": "partials"
+      },
+      {
+       "from": "exchange",
+       "to": "final",
+       "label": "by key"
+      }
+     ]
+    },
+    {
+     "id": "cached",
+     "title": "After cache() and count()",
+     "explanation": "The next plan reads the stored partitions; the Exchange is still there.",
+     "nodes": [
+      {
+       "id": "source",
+       "label": "InMemoryTableScan (1)",
+       "detail": "Reads InMemoryRelation (2) at StorageLevel(disk, memory, deserialized, 1 replicas); 180 rows.",
+       "status": "selected",
+       "value": "cached"
+      },
+      {
+       "id": "partial",
+       "label": "HashAggregate (5)",
+       "detail": "Reads the cached partitions.",
+       "status": "context"
+      },
+      {
+       "id": "exchange",
+       "label": "Exchange (6)",
+       "detail": "Still hashpartitioning(line#2, 4).",
+       "status": "warning",
+       "value": "unchanged"
+      },
+      {
+       "id": "final",
+       "label": "HashAggregate (7)",
+       "detail": "L1 64, L2 63, L3 53.",
+       "status": "context",
+       "value": "same"
+      }
+     ],
+     "connections": [
+      {
+       "from": "source",
+       "to": "partial",
+       "label": "cached rows"
+      },
+      {
+       "from": "partial",
+       "to": "exchange",
+       "label": "partials"
+      },
+      {
+       "from": "exchange",
+       "to": "final",
+       "label": "by key"
+      }
+     ]
+    },
+    {
+     "id": "released",
+     "title": "After unpersist()",
+     "explanation": "A fresh plan scans and filters again; nothing else moved.",
+     "nodes": [
+      {
+       "id": "source",
+       "label": "Scan, Filter, Project",
+       "detail": "Back to recomputing North.",
+       "status": "context"
+      },
+      {
+       "id": "partial",
+       "label": "HashAggregate (4)",
+       "detail": "As before.",
+       "status": "context"
+      },
+      {
+       "id": "exchange",
+       "label": "Exchange (5)",
+       "detail": "As before.",
+       "status": "warning"
+      },
+      {
+       "id": "final",
+       "label": "HashAggregate (6)",
+       "detail": "As before.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "source",
+       "to": "partial",
+       "label": "rows"
+      },
+      {
+       "from": "partial",
+       "to": "exchange",
+       "label": "partials"
+      },
+      {
+       "from": "exchange",
+       "to": "final",
+       "label": "by key"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-collect-visual",
+   "kind": "nodes",
+   "title": "collect() moves every row into one process",
+   "alt": "Three states: count() returns one number, collect() on the raw frame would ship all 240 rows to the driver and is refused by a guard, and collect() on the aggregate ships three rows.",
+   "caption": "The driver is one process with one heap; what you collect decides whether it survives. Counts from the recorded lab run.",
+   "textEquivalent": "count() returns one number: Each task counts its partition; the partial counts meet in one partition and a single number reaches the driver. Nodes: 4 tasks: 60 each. Each counts its 60 rows; partial counts cross an Exchange SinglePartition. (selected); Driver: 1 number. Receives one number: 240. (selected). Relationships: 4 tasks → Driver: one small result.\n\ncollect() on the raw frame: Every task would serialize all its rows to the driver; at scale this is the ordinary way a driver runs out of memory. Nodes: 4 tasks: 240 rows out. Would ship all 240 rows. (warning); Driver: memory risk. One heap must hold every row. (warning); bounded_collect(df, 50): refused. Counted limit(51) first and raised ValueError. (excluded). Relationships: 4 tasks → Driver: all rows; bounded_collect(df, 50) → Driver: protects.\n\ncollect() on the aggregate: Spark computes the sums; only three rows reach the driver. Nodes: 4 tasks: 12 partials. Partial sums, then a four-task reduce stage. (selected); Driver: 3 rows. Receives 3 rows. (selected); bounded_collect(df, 50): allowed. Returned the rows. (context). Relationships: 4 tasks → Driver: 3 rows; bounded_collect(df, 50) → Driver: allows.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-result-size",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "count",
+     "title": "count() returns one number",
+     "explanation": "Each task counts its partition; the partial counts meet in one partition and a single number reaches the driver.",
+     "nodes": [
+      {
+       "id": "tasks",
+       "label": "4 tasks",
+       "detail": "Each counts its 60 rows; partial counts cross an Exchange SinglePartition.",
+       "status": "selected",
+       "value": "60 each"
+      },
+      {
+       "id": "driver",
+       "label": "Driver",
+       "detail": "Receives one number: 240.",
+       "status": "selected",
+       "value": "1 number"
+      }
+     ],
+     "connections": [
+      {
+       "from": "tasks",
+       "to": "driver",
+       "label": "one small result"
+      }
+     ]
+    },
+    {
+     "id": "raw",
+     "title": "collect() on the raw frame",
+     "explanation": "Every task would serialize all its rows to the driver; at scale this is the ordinary way a driver runs out of memory.",
+     "nodes": [
+      {
+       "id": "tasks",
+       "label": "4 tasks",
+       "detail": "Would ship all 240 rows.",
+       "status": "warning",
+       "value": "240 rows out"
+      },
+      {
+       "id": "driver",
+       "label": "Driver",
+       "detail": "One heap must hold every row.",
+       "status": "warning",
+       "value": "memory risk"
+      },
+      {
+       "id": "guard",
+       "label": "bounded_collect(df, 50)",
+       "detail": "Counted limit(51) first and raised ValueError.",
+       "status": "excluded",
+       "value": "refused"
+      }
+     ],
+     "connections": [
+      {
+       "from": "tasks",
+       "to": "driver",
+       "label": "all rows"
+      },
+      {
+       "from": "guard",
+       "to": "driver",
+       "label": "protects"
+      }
+     ]
+    },
+    {
+     "id": "aggregate",
+     "title": "collect() on the aggregate",
+     "explanation": "Spark computes the sums; only three rows reach the driver.",
+     "nodes": [
+      {
+       "id": "tasks",
+       "label": "4 tasks",
+       "detail": "Partial sums, then a four-task reduce stage.",
+       "status": "selected",
+       "value": "12 partials"
+      },
+      {
+       "id": "driver",
+       "label": "Driver",
+       "detail": "Receives 3 rows.",
+       "status": "selected",
+       "value": "3 rows"
+      },
+      {
+       "id": "guard",
+       "label": "bounded_collect(df, 50)",
+       "detail": "Returned the rows.",
+       "status": "context",
+       "value": "allowed"
+      }
+     ],
+     "connections": [
+      {
+       "from": "tasks",
+       "to": "driver",
+       "label": "3 rows"
+      },
+      {
+       "from": "guard",
+       "to": "driver",
+       "label": "allows"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-experiment-visual",
+   "kind": "table",
+   "title": "Change one variable and say what the evidence can carry",
+   "alt": "A ledger of seven one-change experiments from the lab, each with the evidence that moved, the evidence that stayed and what the run cannot show.",
+   "caption": "Every row changed one thing in one configuration; none of them is a benchmark. Evidence from the recorded lab run.",
+   "textEquivalent": "Experiment ledger: Read each row as one change, two kinds of evidence and one honest limit. Table columns: Change | Evidence that moved | Evidence that stayed | Cannot show. Rows: F.broadcast(plants) | join strategy changed; exchanges 3 → 1; records shuffled 246 → 8 | regional totals | duration at real size; adaptive execution on, grouped sum | isFinalPlan false → true; final stage 4 tasks → 1 | plant totals | whether coalescing helps at real size; adaptive execution on, join at 10 MB | broadcast join in every run; build side varied | regional totals | which side real sizes favour; skew threshold and advisory size → 1 KB | join marked skew=true; busiest task 243 → 106 records | regional totals | a sensible production threshold; salt on the join key | largest partition 204 → 122 | 240 rows; regional totals | whether four salts suffice for real skew; repartition 4 → 8 → 16 by plant | empty partitions 2 → 5 → 13 | largest partition ≥ 180 | any wall-clock effect; balanced feed instead of skewed | largest share 0.75 → 0.33 | operator outline of the plan | that a plan can ever reveal skew.",
+   "provenance": "Original SpicyBrain authored visual; every count, operator name and plan line is read from the recorded run of lab L04 on local Apache Spark 4.0.4 in local[2] mode (docs/academy/labs/lab-l04-plans-shuffle.json); no product screenshot, no cloud execution and no timing.",
+   "claimIds": [
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-broadcast",
+    "dbxfe-spark-execution-claim-skew-join",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "states": [
+    {
+     "id": "ledger",
+     "title": "Experiment ledger",
+     "explanation": "Read each row as one change, two kinds of evidence and one honest limit.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "Change",
+       "Evidence that moved",
+       "Evidence that stayed",
+       "Cannot show"
+      ],
+      "rows": [
+       [
+        "F.broadcast(plants)",
+        "join strategy changed; exchanges 3 → 1; records shuffled 246 → 8",
+        "regional totals",
+        "duration at real size"
+       ],
+       [
+        "adaptive execution on, grouped sum",
+        "isFinalPlan false → true; final stage 4 tasks → 1",
+        "plant totals",
+        "whether coalescing helps at real size"
+       ],
+       [
+        "adaptive execution on, join at 10 MB",
+        "broadcast join in every run; build side varied",
+        "regional totals",
+        "which side real sizes favour"
+       ],
+       [
+        "skew threshold and advisory size → 1 KB",
+        "join marked skew=true; busiest task 243 → 106 records",
+        "regional totals",
+        "a sensible production threshold"
+       ],
+       [
+        "salt on the join key",
+        "largest partition 204 → 122",
+        "240 rows; regional totals",
+        "whether four salts suffice for real skew"
+       ],
+       [
+        "repartition 4 → 8 → 16 by plant",
+        "empty partitions 2 → 5 → 13",
+        "largest partition ≥ 180",
+        "any wall-clock effect"
+       ],
+       [
+        "balanced feed instead of skewed",
+        "largest share 0.75 → 0.33",
+        "operator outline of the plan",
+        "that a plan can ever reveal skew"
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-spark-execution-driver-question",
+   "revision": "1",
+   "prompt": "The lab ran entirely inside one JVM in local[2]. Which statement about the driver and executor roles still holds there?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-driver-question-b",
+     "text": "There is no driver in local mode; each thread plans and runs its own share of the work independently.",
+     "rationale": "Local mode merges processes, not responsibilities; one scheduler still builds stages and hands out tasks."
+    },
+    {
+     "id": "dbxfe-spark-execution-driver-question-a",
+     "text": "The driver still builds the plan, splits it into stages and tasks, and schedules them onto two task slots; only the processes are merged.",
+     "rationale": "Roles are the same in every deployment; local[2] just hosts the executor's two slots as threads in the driver's JVM."
+    },
+    {
+     "id": "dbxfe-spark-execution-driver-question-c",
+     "text": "local[2] starts two executor machines and the driver runs on a third.",
+     "rationale": "local[2] means two task slots in one process on one machine; no other machine is involved."
+    },
+    {
+     "id": "dbxfe-spark-execution-driver-question-d",
+     "text": "In local mode actions run immediately on the driver without tasks, so stages do not exist.",
+     "rationale": "The recorded run shows two stages of four tasks for a grouped sum in local[2]; tasks and stages exist regardless of mode."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-driver-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-driver-concept",
+    "dbxfe-spark-execution-executor-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cluster",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-lazy-question",
+   "revision": "1",
+   "prompt": "You write groupBy(\"plant\") with three sums over the fact frame and call explain(). What has Spark computed at that point?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-lazy-question-a",
+     "text": "Nothing: explain() printed the proposed plan and no job has run; the first action will execute the whole chain.",
+     "rationale": "Transformations only extend the lazy plan and explain() only prints it; the lab counted zero jobs in explain()'s own job group."
+    },
+    {
+     "id": "dbxfe-spark-execution-lazy-question-b",
+     "text": "The scan ran when the frame was created; only the grouping is still pending because it needs a shuffle.",
+     "rationale": "Every step is equally lazy; laziness is about actions, not about whether a step shuffles."
+    },
+    {
+     "id": "dbxfe-spark-execution-lazy-question-c",
+     "text": "explain() is itself an action, so the full result was computed in order to print the plan.",
+     "rationale": "explain() prints logical and physical plans without executing them; a plan is a proposal, not a result."
+    },
+    {
+     "id": "dbxfe-spark-execution-lazy-question-d",
+     "text": "The partial sums ran so that explain() could show real partition sizes.",
+     "rationale": "The printed plan carries no partition sizes at all; sizes and task counts only exist after an action runs."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-lazy-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-action-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-lazy",
+    "dbxfe-spark-execution-claim-explain",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-partition-question",
+   "revision": "1",
+   "prompt": "240 rows sit in four partitions and you run a filter followed by a select. How many tasks and stages does the action produce?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-partition-question-c",
+     "text": "Two tasks in one stage, because local[2] has two slots.",
+     "rationale": "Slots decide how many tasks run at once, not how many tasks exist; four partitions still mean four tasks."
+    },
+    {
+     "id": "dbxfe-spark-execution-partition-question-a",
+     "text": "Four tasks in one stage: one task per partition, and no step needs rows from another partition.",
+     "rationale": "Filter and projection are narrow, so the chain is pipelined in one stage; the recorded run measured one stage of four tasks."
+    },
+    {
+     "id": "dbxfe-spark-execution-partition-question-b",
+     "text": "Four tasks in two stages, because the select must redistribute the trimmed rows.",
+     "rationale": "A projection changes columns inside each partition; it never needs a shuffle."
+    },
+    {
+     "id": "dbxfe-spark-execution-partition-question-d",
+     "text": "240 tasks, one per row, in one stage.",
+     "rationale": "Tasks are per partition, not per row; 240 rows in four partitions give four tasks."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-partition-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-partition-concept",
+    "dbxfe-spark-execution-narrow-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cluster",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-shuffle-question",
+   "revision": "1",
+   "prompt": "A grouped sum by plant runs over four input partitions that each hold all three plants. Where do North's rows finally meet?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-shuffle-question-b",
+     "text": "In the driver, which receives every North row and adds them up.",
+     "rationale": "The driver receives only the final three-row result; executors do the summing on both sides of the shuffle."
+    },
+    {
+     "id": "dbxfe-spark-execution-shuffle-question-c",
+     "text": "Nowhere: each input partition returns its own North total and the caller sees four North rows.",
+     "rationale": "The final HashAggregate after the Exchange merges the partials, so the caller sees exactly one North row."
+    },
+    {
+     "id": "dbxfe-spark-execution-shuffle-question-a",
+     "text": "In one shuffle partition chosen by the hash of the key, where the four North partials written by the map tasks are read together.",
+     "rationale": "Each map task wrote one partial per plant, three records each; the Exchange routed all four North partials to one reduce task, which read eight records including West's."
+    },
+    {
+     "id": "dbxfe-spark-execution-shuffle-question-d",
+     "text": "In every shuffle partition, because the Exchange copies each key everywhere.",
+     "rationale": "Hash partitioning sends each key to exactly one partition; copying to all is what a broadcast does to a small side."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-shuffle-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-wide-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-stage-question",
+   "revision": "1",
+   "prompt": "With spark.sql.shuffle.partitions = 4 and adaptive execution off, the grouped sum measured stages of 4 and then 4 tasks, and two reduce tasks read nothing. What set the second four?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-stage-question-a",
+     "text": "The shuffle-partition setting: a stage that reads a shuffle has that many tasks unless adaptive execution coalesces them.",
+     "rationale": "The setting fixed the reduce task count; with adaptive execution on, the same shuffle was read as one partition by one task."
+    },
+    {
+     "id": "dbxfe-spark-execution-stage-question-b",
+     "text": "The number of distinct plants, three, rounded up to the next even number.",
+     "rationale": "Key cardinality does not set the task count; that is why two of the four reduce tasks had nothing to read."
+    },
+    {
+     "id": "dbxfe-spark-execution-stage-question-c",
+     "text": "The number of input partitions, because a reduce stage mirrors the map stage.",
+     "rationale": "The map stage follows input partitions; the reduce stage follows the shuffle-partition setting, which only coincidentally equals four here."
+    },
+    {
+     "id": "dbxfe-spark-execution-stage-question-d",
+     "text": "The number of CPU cores on the machine.",
+     "rationale": "local[2] offers two slots, yet the stage still had four tasks that ran two at a time."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-stage-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-stage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cluster",
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-explain-question",
+   "revision": "1",
+   "prompt": "The formatted outline reads HashAggregate (5), Exchange (4), HashAggregate (3), Project (2), Scan ExistingRDD (1). Where is the stage boundary, and in which stage does Project run?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-explain-question-b",
+     "text": "HashAggregate (5) is the boundary, and Project runs in the second stage with it.",
+     "rationale": "The final aggregate consumes the shuffle; the boundary is the Exchange below it, and Project sits below that."
+    },
+    {
+     "id": "dbxfe-spark-execution-explain-question-a",
+     "text": "Exchange (4) is the boundary; Project runs in the first stage, pipelined with the scan and the partial HashAggregate.",
+     "rationale": "Everything below an Exchange runs in one stage per input partition; the recorded run placed scan, project and partial aggregate in stage 1's four tasks."
+    },
+    {
+     "id": "dbxfe-spark-execution-explain-question-c",
+     "text": "Scan ExistingRDD (1) is the boundary because reading input always starts a stage; Project runs alone in a stage of its own.",
+     "rationale": "A scan starts a stage but is not a boundary between two; Project is pipelined with its neighbours."
+    },
+    {
+     "id": "dbxfe-spark-execution-explain-question-d",
+     "text": "Formatted mode hides boundaries, so the question needs the web UI.",
+     "rationale": "The Exchange node is the boundary and formatted mode names it explicitly; the UI adds measured metrics, not the boundary itself."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-explain-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-explain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-explain",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-broadcast-question",
+   "revision": "1",
+   "prompt": "The plant dimension has three rows and the fact side is large. Which single change removes the fact-side Exchange from the join plan?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-broadcast-question-c",
+     "text": "Raise spark.sql.shuffle.partitions so the fact-side shuffle is spread thinner.",
+     "rationale": "More partitions still shuffle every fact row; only the number of destination buckets changes."
+    },
+    {
+     "id": "dbxfe-spark-execution-broadcast-question-a",
+     "text": "Broadcast the dimension, so each fact task receives a copy and joins in place.",
+     "rationale": "In the recorded run the plan went from SortMergeJoin with three exchanges to BroadcastHashJoin with one, and shuffled records fell from 243 plus 3 partials to 8 partials."
+    },
+    {
+     "id": "dbxfe-spark-execution-broadcast-question-b",
+     "text": "Broadcast the fact side, because the larger side benefits most from being copied.",
+     "rationale": "A broadcast side is collected on the driver and copied to every executor, so the large side would exhaust memory; broadcasting is for the side small enough to fit in driver and executor memory."
+    },
+    {
+     "id": "dbxfe-spark-execution-broadcast-question-d",
+     "text": "Cache the fact frame before the join.",
+     "rationale": "A cache changes where the facts are read from; the join still needs them redistributed by key unless the other side is broadcast."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-broadcast-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-broadcast-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-broadcast",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-skew-question",
+   "revision": "1",
+   "prompt": "A stage has partitions of 204, 36, 0 and 0 rows and runs on two slots. A colleague adds two more slots. What happens to the time the stage takes?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-skew-question-a",
+     "text": "It stays about the same: the stage still waits for the task holding 204 rows, and the new slots have nothing to do.",
+     "rationale": "A stage ends with its longest task; hash partitioning keeps every North row in that one task, so extra slots idle."
+    },
+    {
+     "id": "dbxfe-spark-execution-skew-question-b",
+     "text": "It roughly halves, because four slots do the work of two.",
+     "rationale": "That holds only when the work is divisible; the 204-row task cannot be shared between slots."
+    },
+    {
+     "id": "dbxfe-spark-execution-skew-question-c",
+     "text": "It drops to a quarter, because four partitions now each get a slot.",
+     "rationale": "Two of the four partitions are empty; giving them slots does nothing."
+    },
+    {
+     "id": "dbxfe-spark-execution-skew-question-d",
+     "text": "It depends only on CPU speed, since partition sizes do not affect stage time.",
+     "rationale": "Partition sizes are exactly what decide the longest task and therefore when the stage ends."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-skew-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-skew-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-tuning",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-salt-question",
+   "revision": "1",
+   "prompt": "After salting the join key with four salts, the join still returned exactly 240 rows and the same regional totals. Why did the row count not multiply?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-salt-question-b",
+     "text": "Spark removed the duplicates automatically after the join.",
+     "rationale": "No deduplication ran; the plan shows a join and nothing else, and none was needed."
+    },
+    {
+     "id": "dbxfe-spark-execution-salt-question-c",
+     "text": "crossJoin only replicates the dimension when it detects skewed partitions.",
+     "rationale": "crossJoin always produces every pairing; the twelve-row dimension existed regardless of skew."
+    },
+    {
+     "id": "dbxfe-spark-execution-salt-question-a",
+     "text": "Each fact row carries exactly one salt value and matches exactly one replica of its plant, so every row joins once.",
+     "rationale": "The salt is a function of event_id, so a row has one (plant, salt) key and meets the single replica that carries it."
+    },
+    {
+     "id": "dbxfe-spark-execution-salt-question-d",
+     "text": "The totals were recomputed from the unsalted frame after the join finished.",
+     "rationale": "The lab summed the salted join's own rows and compared them with the independent derivation."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-salt-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-salt-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-adaptive-question",
+   "revision": "1",
+   "prompt": "With adaptive execution on, the grouped plan printed before the action showed hashpartitioning(plant#1, 4), yet the result had one partition afterwards. What happened?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-adaptive-question-a",
+     "text": "The runtime measured a tiny shuffle output and read the four planned shuffle partitions as one coalesced partition.",
+     "rationale": "The final plan shows AQEShuffleRead coalesced over the same Exchange; the map stage still ran four tasks and one task read all twelve records."
+    },
+    {
+     "id": "dbxfe-spark-execution-adaptive-question-b",
+     "text": "Adaptive execution removed the Exchange entirely because the data was small.",
+     "rationale": "The Exchange and its four map tasks still ran and wrote twelve records; only how the output was read changed."
+    },
+    {
+     "id": "dbxfe-spark-execution-adaptive-question-c",
+     "text": "The action changed spark.sql.shuffle.partitions to one for the rest of the session.",
+     "rationale": "The setting stayed at four: the lab read spark.sql.shuffle.partitions back as 4 after the action."
+    },
+    {
+     "id": "dbxfe-spark-execution-adaptive-question-d",
+     "text": "The frame was cached during the action, and cached frames have one partition.",
+     "rationale": "No cache was involved, and caching keeps the partitioning the frame already had."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-adaptive-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-adaptive-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-skewjoin-question",
+   "revision": "1",
+   "prompt": "Adaptive execution was on at its default settings, yet the 204-row join partition was not split. Which explanation fits the recorded evidence?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-skewjoin-question-b",
+     "text": "Skew handling applies only to broadcast joins, and this was a sort-merge join.",
+     "rationale": "It is the other way round: adaptive skew handling applies to shuffle-based joins, sort-merge and shuffle hash."
+    },
+    {
+     "id": "dbxfe-spark-execution-skewjoin-question-c",
+     "text": "Adaptive execution cannot see partition sizes until the whole job has finished.",
+     "rationale": "It measures at every query-stage boundary; the same run coalesced the join's shuffle from measured sizes."
+    },
+    {
+     "id": "dbxfe-spark-execution-skewjoin-question-a",
+     "text": "A partition counts as skewed only above both 256 MB and five times the median, and this one held a few kilobytes.",
+     "rationale": "The lab read the threshold back as 268435456b and the factor as 5.0; scaled to 1 KB, the same join was split."
+    },
+    {
+     "id": "dbxfe-spark-execution-skewjoin-question-d",
+     "text": "Skew-join handling is switched off by default in Spark 4.0.4.",
+     "rationale": "The lab read spark.sql.adaptive.skewJoin.enabled back as true before changing anything."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-skewjoin-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-skew-join-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-skew-join",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-cache-question",
+   "revision": "1",
+   "prompt": "After north.cache() and north.count(), the plan of north.groupBy(\"line\").count() shows InMemoryTableScan. Which statement is correct?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-cache-question-c",
+     "text": "The grouped count is now served from the cache without running any task.",
+     "rationale": "The cache holds the filtered rows, not the grouped result; the aggregate and its Exchange still run."
+    },
+    {
+     "id": "dbxfe-spark-execution-cache-question-a",
+     "text": "The input now comes from the cached partitions, the grouping Exchange is still there, and unpersist() returns the plan to a scan.",
+     "rationale": "The recorded plans show InMemoryRelation replacing the scan and filter while the Exchange and the L1, L2 and L3 counts are unchanged."
+    },
+    {
+     "id": "dbxfe-spark-execution-cache-question-b",
+     "text": "The Exchange disappears because cached data is already grouped by line.",
+     "rationale": "Caching stores partitions as they were; grouping by a new key still needs a shuffle."
+    },
+    {
+     "id": "dbxfe-spark-execution-cache-question-d",
+     "text": "cache() computed and stored the rows immediately when it was called, before count().",
+     "rationale": "Persisted data is stored the first time an action computes it; the count() was that action."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-cache-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-cache-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cache",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-spark-execution-collect-question",
+   "revision": "1",
+   "prompt": "Which of these actions returns a bounded result to the driver no matter how large the frame is?",
+   "options": [
+    {
+     "id": "dbxfe-spark-execution-collect-question-b",
+     "text": "df.collect(), because Spark serializes rows efficiently.",
+     "rationale": "Efficient or not, every row still arrives in one process; that is the out-of-memory path."
+    },
+    {
+     "id": "dbxfe-spark-execution-collect-question-c",
+     "text": "df.toPandas(), because pandas stores data compactly.",
+     "rationale": "toPandas() collects every row into the driver as well, then builds a pandas frame from them."
+    },
+    {
+     "id": "dbxfe-spark-execution-collect-question-a",
+     "text": "df.count(), which returns one number computed by the tasks.",
+     "rationale": "Each task counts its partition, the partial counts meet in a single partition, and one number reaches the driver; no row moves there."
+    },
+    {
+     "id": "dbxfe-spark-execution-collect-question-d",
+     "text": "df.rdd.collect(), because the RDD API avoids the driver.",
+     "rationale": "It collects the same rows through a different API; the destination is still the driver."
+    }
+   ],
+   "correctOptionId": "dbxfe-spark-execution-collect-question-a",
+   "conceptIds": [
+    "dbxfe-spark-execution-collect-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-result-size",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-spark-execution-experiment-self",
+   "revision": "1",
+   "prompt": "A fourth plant, East, adds 600 rows to the skewed feed. Design one bounded experiment on the regional join: name the single variable you change, the evidence you expect to move, the evidence you expect to stay, and one thing the local run cannot tell you.",
+   "modelAnswer": "Change one thing: add F.broadcast(plants) to the regional join and leave every setting as it was. Expect the join operator to change from SortMergeJoin to BroadcastHashJoin, the Exchange count to fall from three to one, the executed stages from four in one job to a one-task broadcast job plus two stages, and the shuffled records from all 840 fact rows plus the dimension to a handful of regional partials. Expect the regional totals and the 840-row count to stay identical. The local run cannot say how long either version takes at production size, or whether the regional aggregate becomes the next skewed step once East dominates.",
+   "reasoning": "One variable makes the moved evidence attributable; separating moved from unchanged evidence proves the change did not alter the answer; naming the limit keeps an 840-row run from being quoted as a benchmark. Salting the key or switching adaptive execution on are acceptable alternatives if stated the same way.",
+   "conceptIds": [
+    "dbxfe-spark-execution-experiment-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-claim-broadcast",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-spark-execution-driver",
+   "version": "1.0.0",
+   "title": "The driver plans; executors run tasks",
+   "outcome": "Assign planning, scheduling and computing to the right process in a Spark application.",
+   "explanation": "One [[dbxfe-spark-execution-driver-concept|driver]] holds the session, turns your transformations into stages of tasks and hands those tasks to [[dbxfe-spark-execution-executor-concept|executors]], which compute and hold data. In the visual, notice that the driver computes no row: it schedules eight tasks onto two slots and receives only the three result rows. In local[2] the two slots are threads inside the driver's own JVM, so a local run shows every mechanism and no realistic speed.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-model",
+   "conceptIds": [
+    "dbxfe-spark-execution-driver-concept",
+    "dbxfe-spark-execution-executor-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cluster",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-driver-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-driver-question"
+   ],
+   "hint": "Ask which process would run out of memory if you collected everything: that process is the driver.",
+   "handbook": {
+    "markdown": "The Cluster Mode Overview describes a Spark application as a driver program whose SparkContext coordinates executor processes; executors run computations and store data for one application, and each driver schedules its own tasks. Keep three responsibilities apart when you explain a job: the driver plans and schedules, executors compute, and storage holds inputs and outputs.\n\nThe lab's session is built with `SparkSession.builder.master(\"local[2]\")`, the web UI disabled and the driver bound to the loopback address. `local[2]` means one executor with two task slots inside the driver's JVM. That is why `spark.sparkContext.defaultParallelism` read 2 while the grouped sum still ran stages of four tasks: tasks are per partition and slots decide how many run at once, so each stage's four tasks ran two at a time. On a cluster the same arithmetic applies per executor, whose cores are its slots.\n\nWhat to inspect: the number of tasks in each stage against the slots available, because a stage with more tasks than slots runs in rounds, and a stage with one huge task runs at the speed of that task. What fails: reading `local[2]` timings as cluster timings, or asking the driver to hold data that belongs on executors, which the collection beat returns to.\n\nHow to demonstrate honestly: print `defaultParallelism`, run one grouped sum, read the stage list back from `SparkContext.statusTracker()`, and say that every number comes from one machine.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-model"
+    ]
+   },
+   "recap": "The driver plans and schedules; executors compute; slots decide how many tasks run at once.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-lazy",
+   "version": "1.0.0",
+   "title": "Nothing runs until an action asks",
+   "outcome": "Predict when a chain of transformations actually executes and what printing its plan costs.",
+   "explanation": "Transformations such as groupBy and agg only extend a plan; an [[dbxfe-spark-execution-action-concept|action]] such as collect, count or a write starts execution. In the timeline, notice that explain() sits before the action: the lab ran it inside its own job group and Spark started zero jobs. The collect() that followed ran one job of two stages and eight tasks and returned three rows. That gap is why you can read and predict cost before paying for it.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-model",
+   "conceptIds": [
+    "dbxfe-spark-execution-action-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-lazy",
+    "dbxfe-spark-execution-claim-explain",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-lazy-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-lazy-question"
+   ],
+   "handbook": {
+    "markdown": "The RDD guide states that transformations are lazy and that actions return a value to the driver after running a computation; the DataFrame quickstart says the same for DataFrames. The lab made that measurable: it ran `explain()` inside its own job group and asked the status tracker how many jobs the group had started. The answer was zero; the `collect()` that followed started one job with two stages.\n\n```python\nsc = spark.sparkContext\nsc.setJobGroup(\"explain-only\", \"explain-only\")\ntotals.explain(mode=\"formatted\")        # prints the proposal\nsc.setJobGroup(\"\", \"\")\nprint(len(sc.statusTracker().getJobIdsForGroup(\"explain-only\")))  # 0 in the recorded run\nrows = totals.collect()                  # one job, two stages, eight tasks\n```\n\nWhy it matters: every action re-runs the chain unless the input is cached (a later beat), so a `count()` for a log line followed by `collect()` for the result scans and shuffles twice. `count()` is an action with a plan of its own; the lab printed it as a final `HashAggregate` over `Exchange SinglePartition, ENSURE_REQUIREMENTS` over a partial `HashAggregate`: one tiny shuffle to a single partition.\n\nWhat fails: assuming the slow line is the slow step. The line that takes time is the action; the cost belongs to every transformation before it. What to inspect: how many jobs an action produced and which stages each ran. With adaptive execution on, one action can appear as several jobs: the lab's adaptive grouped sum ran two jobs with one skipped stage, because Spark materializes a shuffle, measures it and then plans the rest.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-model"
+    ]
+   },
+   "recap": "Transformations describe; the action executes; explain() shows the proposal and starts no job.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-partition",
+   "version": "1.0.0",
+   "title": "A partition is the unit of parallel work",
+   "outcome": "Count tasks and stages for a narrow chain from the partition count, and show that no row moved.",
+   "explanation": "A DataFrame is split into [[dbxfe-spark-execution-partition-concept|partitions]], and a stage runs one task per partition. The lab loads 240 rows into four partitions of 60, so filter-then-select runs four tasks. Each output partition comes from exactly one input partition, a [[dbxfe-spark-execution-narrow-concept|narrow dependency]]: the plan shows no Exchange and the run measured one stage. In the table, notice that the rows kept per partition, 47, 48, 45 and 47, are exactly each input slice's defective rows.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-model",
+   "conceptIds": [
+    "dbxfe-spark-execution-partition-concept",
+    "dbxfe-spark-execution-narrow-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cluster",
+    "dbxfe-spark-execution-claim-tuning",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-partition-visual",
+   "samajh": {
+    "text": "Socho 240 answer sheets ko 4 bundles mein baant diya. Har bundle check karna ek task hai, aur free teacher ek slot. Teacher sirf apna bundle dekhta hai, kisi doosre teacher se poochne ki zaroorat nahi. Agar sirf 2 teacher free hain toh 4 bundles do rounds mein check hote hain, par bundles phir bhi 4 hi rehte hain. Aur agar ek bundle mein 200 sheets ho aur baaki mein 13, toh 40 teachers bula lo, result us ek bundle ke baad hi aayega.",
+    "mapping": "A bundle is a partition, checking one bundle is a task, a free teacher is a task slot, and checking without consulting anyone is a narrow step.",
+    "boundary": "Real tasks also write shuffle output and report metrics to the driver, and Spark's source or shuffle, not a person, decides how rows fall into partitions."
+   },
+   "questionIds": [
+    "dbxfe-spark-execution-partition-question"
+   ],
+   "handbook": {
+    "markdown": "The narrow chain in the lab:\n\n```python\nnarrow = facts.filter(F.col(\"defective_units\") > 0).select(\"event_id\", \"plant\", \"defective_units\")\nnarrow.explain(mode=\"formatted\")\n```\n\nFormatted outline printed by local Spark 4.0.4:\n\n```text\n* Project (3)\n+- * Filter (2)\n   +- * Scan ExistingRDD (1)\n```\n\nMeasured: `narrow.rdd.getNumPartitions()` returned 4, and `collect()` ran one job with one stage of four tasks and returned 187 rows. Counting rows per `spark_partition_id()` gave 47, 48, 45 and 47, the defective rows of each 60-row input slice: nothing crossed between tasks. The asterisks mark whole-stage code generation: the three operators were compiled into one loop per task, which is what pipelined means in practice.\n\nWhy partitions matter: they bound parallelism from both sides. Four partitions can never use more than four slots at once, however many the cluster has, and one oversized partition becomes one long task. The Tuning page's simplest fix for a task whose working set is too large is to raise the level of parallelism so each task's input is smaller; that works when rows can spread, and the skew beat shows when they cannot. How many partitions a frame has depends on its source: a parallelized list uses the slice count you give it, file sources split input by size, and a shuffle's output uses the shuffle-partition setting.\n\nWhat fails: a filter over a four-partition frame on a cluster with 200 slots still runs four tasks and leaves 196 slots idle. What to inspect: `df.rdd.getNumPartitions()` before an action and the task count of the first stage after it. Demonstrate honestly by showing the partition count and the task count side by side, not a timing.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-model",
+     "dbxfe-spark-execution-l01-boundaries"
+    ]
+   },
+   "recap": "One task per partition; a narrow chain keeps every row where it started and runs as one stage.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-shuffle",
+   "version": "1.0.0",
+   "title": "A shuffle moves rows to where their key lives",
+   "outcome": "Trace which records cross partitions for a grouped sum, and why only partials cross.",
+   "explanation": "A grouped sum by plant is a [[dbxfe-spark-execution-wide-concept|wide dependency]]: every North row must be counted in one place, but each input partition holds all three plants. Spark first sums inside each partition, then shuffles the partial records by hash of plant so each plant's partials meet. In the tables, notice that the map tasks wrote 3, 3, 3 and 3 records rather than 240 rows, and that one reduce task read 8 while two read nothing.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-boundaries",
+   "conceptIds": [
+    "dbxfe-spark-execution-wide-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-shuffle-visual",
+   "samajh": {
+    "text": "Post office mein chitthiyan pehle jis counter par aayi wahin ginti hoti hain, phir har chitthi apne pin code ke counter par bheji jaati hai, tabhi us pin code ka total nikalta hai. Pin code ke hisaab se counter badalna hi shuffle hai. Samajhdaar clerk pehle apne counter par pin code ke hisaab se gaddi bana leta hai, toh sirf gaddiyan bhejni padti hain, har chitthi nahi. Yahi partial aggregate hai.",
+    "mapping": "A letter is a row, the pin code is the key, the destination counter is the shuffle partition, and the pre-sorted bundle is the partial aggregate record.",
+    "boundary": "Spark chooses the destination by a hash of the key, not by geography, so two unrelated keys can land at the same counter."
+   },
+   "questionIds": [
+    "dbxfe-spark-execution-shuffle-question"
+   ],
+   "handbook": {
+    "markdown": "The RDD guide describes the shuffle as Spark's mechanism for re-distributing data so that it is grouped differently across partitions, typically copying data across executors and machines, and calls it a complex and costly operation. In a DataFrame plan the shuffle is the `Exchange` node. The lab's grouped sum printed these details for nodes 3 and 4:\n\n```text\n(3) HashAggregate [codegen id : 1]\nKeys [1]: [plant#1]\nFunctions [3]: [partial_count(1), partial_sum(inspected_units#3L), partial_sum(defective_units#4L)]\n\n(4) Exchange\nArguments: hashpartitioning(plant#1, 4), ENSURE_REQUIREMENTS, [plan_id=133]\n```\n\nRead it as three moves, each measured. First, inside each input partition (North/South/West 44/9/7, 42/11/7, 45/10/5 and 49/6/5 rows), the partial aggregate wrote one record per plant: 3, 3, 3 and 3. Second, those twelve records were routed to four shuffle partitions by the hash of `plant`. Third, each reduce task merged what it received: one read 8 records (North's and West's partials), one read 4 (South's), and two read nothing. Totals: North 180 rows / 5898, South 36 / 1391, West 24 / 961.\n\nWhy the partial aggregate matters: a grouped sum shuffles at most input partitions × keys records, so a hot key hurts it far less than a join or a window, which must move every row of the key. The lab's window stage read all 240 rows, 204 of them in one task. That distinction returns in the skew beat.\n\nWhat fails: forgetting that on a cluster a shuffle writes to disk and reads over the network, so an Exchange is the first place to look when a job is slow. What to inspect: the `hashpartitioning` arguments, meaning the key and the partition count, and in the Stages tab the shuffle write and read, in records and bytes, on each side of the boundary.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-boundaries",
+     "dbxfe-spark-execution-l01-worked"
+    ]
+   },
+   "recap": "Partial sums first, then the partials meet by hash of the key; the Exchange is that movement.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-stage",
+   "version": "1.0.0",
+   "title": "A stage ends where a shuffle begins",
+   "outcome": "Predict stage and task counts from the Exchanges in a plan and one setting, then check them.",
+   "explanation": "Every Exchange ends a [[dbxfe-spark-execution-stage-concept|stage]]: the operators below it run pipelined in one task per partition and write shuffle output, and the operators above it run in a new stage that reads it. A stage reading the input has as many tasks as input partitions; a stage reading a shuffle has spark.sql.shuffle.partitions tasks unless adaptive execution changes that. In the timeline, notice that the second stage ran four tasks although two read nothing: the setting, not the data, fixed the count.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-boundaries",
+   "conceptIds": [
+    "dbxfe-spark-execution-stage-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cluster",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-stage-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-stage-question"
+   ],
+   "hint": "Count the Exchange nodes first; the rest follows from two numbers you already know.",
+   "handbook": {
+    "markdown": "Rule for prediction: every shuffle `Exchange` closes the stage below it, so a job has one more stage than it has shuffle exchanges. Then assign task counts: input partitions for a stage that begins at a scan, `spark.sql.shuffle.partitions` for a stage that begins at a shuffle read, while adaptive execution is off.\n\nThe lab checked the rule three times. Grouped sum: one Exchange, two stages, measured 4 then 4 tasks. Sort-merge join with a regional sum: three Exchanges, four stages with 1, 4, 4 and 4 tasks, the 1 being the one-partition dimension's map stage. Broadcast join: one Exchange, so two stages of 4 and 4, plus a separate one-task job that built the broadcast.\n\nHow the lab read what ran, so the numbers are Spark's and not a guess:\n\n```python\nsc = spark.sparkContext\nsc.setJobGroup(\"grouped\", \"grouped\")\nrows = totals.collect()\nsc.setJobGroup(\"\", \"\")\ntracker = sc.statusTracker()\nfor job_id in tracker.getJobIdsForGroup(\"grouped\"):\n    for stage_id in tracker.getJobInfo(job_id).stageIds:\n        stage = tracker.getStageInfo(stage_id)\n        print(stage_id, stage.numTasks, stage.numCompletedTasks)\n```\n\nA stage with no completed tasks was skipped because its shuffle output already existed; the lab counts only executed stages. For records per task it read Spark's status store, the store the Stages tab renders: the grouped map stage wrote 3, 3, 3 and 3 records and the reduce stage read 8, 0, 4 and 0.\n\nWhat fails: assuming a task count means parallelism achieved. Two reduce tasks read nothing, so the useful parallelism was two; in the skewed join one task read 206 of 243 records. What to inspect: task count against non-empty tasks, and the busiest task against the median, before believing a stage was parallel.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-boundaries",
+     "dbxfe-spark-execution-l01-worked"
+    ]
+   },
+   "recap": "Exchanges plus one give the stages; input partitions and the shuffle setting give the tasks, until adaptive execution intervenes.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-explain",
+   "version": "1.0.0",
+   "title": "Read the plan bottom-up, then check what ran",
+   "outcome": "Turn a formatted plan into a stage prediction and a list of runtime evidence to collect.",
+   "explanation": "explain(mode=\"formatted\") prints an outline and per-node details for the [[dbxfe-spark-execution-explain-concept|physical plan]]. Read it from the scan upward: Project trims columns, the partial HashAggregate sums within partitions, the Exchange is the boundary, the final HashAggregate finishes. In the tree, notice that only the Exchange changes which stage an operator belongs to. The plan is planning evidence; the stages, tasks and shuffle records that ran are separate, runtime evidence.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-boundaries",
+   "conceptIds": [
+    "dbxfe-spark-execution-explain-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-explain",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-explain-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-explain-question"
+   ],
+   "handbook": {
+    "markdown": "The `explain` reference lists five modes: `simple` (physical plan only), `extended` (logical and physical plans), `codegen`, `cost` (logical plan with statistics when available) and `formatted` (an outline plus node details). Use `formatted` to read operators and `simple` to compare an adaptive plan before and after its action.\n\nThe grouped sum as printed by local Spark 4.0.4 in `local[2]`, the outline and then the Exchange's details:\n\n```text\n== Physical Plan ==\n* HashAggregate (5)\n+- Exchange (4)\n   +- * HashAggregate (3)\n      +- * Project (2)\n         +- * Scan ExistingRDD (1)\n\n(4) Exchange\nInput [4]: [plant#1, count#54L, sum#55L, sum#56L]\nArguments: hashpartitioning(plant#1, 4), ENSURE_REQUIREMENTS, [plan_id=133]\n```\n\nQuestions to ask each node: what does it do to row count, to columns, to distribution? The scan supplies 240 rows in four partitions; Project drops two columns; the partial aggregate reduces each partition to at most three records; the Exchange redistributes by the hash of `plant` into four partitions; the final aggregate produces three rows. Prediction: two stages of 4 and 4 tasks and twelve records crossing. Measured: exactly that.\n\nWhat the plan cannot tell you: how many rows each partition held, how long any task ran, whether a task spilled. Those come from the Stages tab (shuffle read and write, duration, spill) or, as in the lab, from the status tracker and store. A plan with three Exchanges is a reason to look, not a diagnosis, and the lab's balanced feed printed an identical outline over a very different distribution.\n\nHow to explain it to a colleague: point at the Exchange, say which key it moves and into how many partitions, then show the stage list and the records per task that ran. Avoid reciting operator names without connecting them to rows.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-boundaries",
+     "dbxfe-spark-execution-l01-worked"
+    ]
+   },
+   "recap": "The plan is the proposal: read it bottom-up, mark each Exchange, then fetch the runtime evidence separately.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-broadcast",
+   "version": "1.0.0",
+   "title": "Broadcast copies the small side instead of moving the big one",
+   "outcome": "Choose between a sort-merge and a broadcast join from the sizes of the two sides, and check the choice in the plan.",
+   "explanation": "A sort-merge join shuffles both inputs by the join key and sorts them; a [[dbxfe-spark-execution-broadcast-concept|broadcast join]] ships the small side once to every executor, where the tasks share it, so the large side is never shuffled. In the comparison, notice the shuffled records: 240 fact rows and 3 dimension rows fed the sort-merge join, while the broadcast plan shuffled only 8 regional partials. Stages went from 1, 4, 4, 4 to a one-task broadcast job plus 4 and 4, with identical totals.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-worked",
+   "conceptIds": [
+    "dbxfe-spark-execution-broadcast-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-broadcast",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-broadcast-visual",
+   "samajh": {
+    "text": "Ek chhoti price list hai aur hazaar customers. Har customer ko us ek counter par bhejna jahan list rakhi hai, woh sort-merge join jaisa hai: sab log line mein chalte hain. Price list ki photocopy har counter par rakh dena broadcast join hai: customer jahan khada hai wahin uska bill ban jata hai. Photocopy tabhi kaam karti hai jab list chhoti ho; poori customer list ki photocopy har counter par rakhna bewakoofi hogi.",
+    "mapping": "The price list is the small dimension, the customers are the fact rows, and the photocopy at each counter is the broadcast copy held once per executor and shared by its tasks.",
+    "boundary": "Spark decides the small side from known sizes or a hint, not from what a person can carry, and the list is first gathered on the driver, so it must fit in driver and executor memory."
+   },
+   "questionIds": [
+    "dbxfe-spark-execution-broadcast-question"
+   ],
+   "handbook": {
+    "markdown": "The Spark SQL tuning page documents join strategy hints (`BROADCAST`, `MERGE`, `SHUFFLE_HASH`, `SHUFFLE_REPLICATE_NL`) and `spark.sql.autoBroadcastJoinThreshold`, the size below which Spark broadcasts a relation automatically when it knows its size (default 10 MB; `-1` disables it). The lab set it to `-1` so that both strategies could be forced and compared.\n\n```python\nby_region_bc = facts.join(F.broadcast(plants), \"plant\").groupBy(\"region\").agg(\n    F.count(\"*\").alias(\"rows\"), F.sum(\"inspected_units\").alias(\"inspected\"))\n```\n\nBroadcast plan outline printed by local Spark 4.0.4:\n\n```text\n* HashAggregate (11)\n+- Exchange (10)\n   +- * HashAggregate (9)\n      +- * Project (8)\n         +- * BroadcastHashJoin Inner BuildRight (7)\n            :- * Project (2)\n            :  +- * Scan ExistingRDD (1)\n            +- BroadcastExchange (6)\n               +- * Project (5)\n                  +- * Filter (4)\n                     +- * Scan ExistingRDD (3)\n```\n\nThe sort-merge version instead had an `Exchange` and a `Sort` under each join input, then `SortMergeJoin`, then the regional `Exchange`. Measured shuffle records: the sort-merge job wrote 240 fact rows and 3 dimension rows into the join, whose tasks read 206, 0, 37 and 0, and then 3 regional partials; the broadcast job wrote only 8 regional partials, two per fact task. Both returned coastal 60 rows / 2352 and inland 180 / 5898.\n\nWhen not: the broadcast side is first collected on the driver and then held once per executor, so it must fit in driver memory and in each executor's memory; a hint on a side that is not small can run the driver out of memory or fail the job. When both sides are large, the sort-merge join is the honest plan and the question becomes skew.\n\nWhat to inspect: the join operator, which side is `Build`, and whether the large side still has an Exchange under it. What this run cannot show: which strategy is faster at production size; it shows only which one moves the fact rows.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-worked"
+    ]
+   },
+   "recap": "Copy the small side, keep the big side in place: two fewer Exchanges, 8 shuffled records instead of 246, same answer.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-skew",
+   "version": "1.0.0",
+   "title": "More workers cannot split one hot key",
+   "outcome": "Refute \"more workers is always faster\" with a measured partition distribution.",
+   "explanation": "Hash partitioning sends every row of one key to one partition, so a hot key becomes one long task: [[dbxfe-spark-execution-skew-concept|data skew]]. The lab measured rows per partition after repartition by plant: 204 and 36 at four partitions, then 180, 36 and 24 at eight and at sixteen. In the tables, notice that the largest partition never drops below North's 180 rows. A stage ends when its longest task ends, so two slots, four or forty all wait for North.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-skew",
+   "conceptIds": [
+    "dbxfe-spark-execution-skew-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-tuning",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-skew-visual",
+   "samajh": {
+    "text": "Ek hospital OPD mein teen doctor hain, par saare heart ke patients sirf Dr. Sharma ke paas jaate hain, aur aaj 180 heart patients aaye. Do aur doctor bula lo, unke paas patient hi nahi hain; Dr. Sharma ki line utni hi lambi rahegi. Line lambi patients ki ginti se nahi, unke ek hi doctor ke paas jaane se hai. Spark mein key hi tay karti hai ki row kis doctor ke paas jayegi.",
+    "mapping": "A doctor is a partition, a patient is a row, and the specialty that routes a patient is the hash of the key.",
+    "boundary": "A hospital can retrain a doctor; Spark's hash never sends one key's rows to two partitions unless the key itself changes, though adaptive skew-join handling can later split a join partition's reads across tasks."
+   },
+   "questionIds": [
+    "dbxfe-spark-execution-skew-question"
+   ],
+   "hint": "Ask where North's 180 rows are after any repartition by plant; that answers the timing question without a clock.",
+   "handbook": {
+    "markdown": "The counterexample with numbers, counted in rows rather than seconds. Two slots and four partitions of 60 rows finish in two rounds of 60. Two slots and partitions of 204, 36, 0 and 0 finish when the 204-row task finishes; the second slot is idle after 36 rows. Add two slots and the empty partitions get a slot each and do nothing. Measured in the lab with `repartition(n, \"plant\")` and rows per `spark_partition_id()`:\n\n| n | Rows per partition | Largest | Share |\n|---|---|---|---|\n| 4 | 0: 204, 2: 36 | 204 | 0.85 |\n| 8 | 0: 180, 2: 36, 4: 24 | 180 | 0.75 |\n| 16 | 0: 180, 10: 36, 12: 24 | 180 | 0.75 |\n\nThe per-task shuffle records say the same from the runtime side: the window stage's tasks read 204, 0, 36 and 0 records, and the sort-merge join's read 206, 0, 37 and 0.\n\nWhich operators suffer: those that must see every row of a key together, such as a sort-merge join on the hot key, a window partitioned by it, or `repartition(key)` before a write. A grouped sum mostly does not, because partial aggregation ships one record per partition per key.\n\nWhat the runtime shows: in the Stages tab, one task with several times the median shuffle read and duration while the rest finish early. What fails: reading a doubled duration as \"the data doubled\" when one key grew; more executors fix volume and do nothing for skew, and the Tuning page's advice to raise parallelism helps only when rows can spread. How to demonstrate honestly: show the rows-per-partition table and the per-task reads; do not show a laptop timing and call it proof.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-skew"
+    ]
+   },
+   "recap": "Under hash partitioning the hot key is a floor: one task carries it however many partitions or slots exist, unless adaptive skew-join handling splits that join partition (a later beat).",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-salt",
+   "version": "1.0.0",
+   "title": "Change the key, not the worker count",
+   "outcome": "Split a hot key with a salt while keeping the join correct, and recognize the fix that does nothing.",
+   "explanation": "A round-robin repartition(16) before a window by plant is the common wrong fix: the window adds its own hashpartitioning(plant) Exchange right after it, the job shuffled 480 records instead of 240, and the busiest window task still read 204. [[dbxfe-spark-execution-salt-concept|Salting]] changes the key instead: salt = crc32(event_id) % 4 on the facts, the dimension replicated once per salt, the join on (plant, salt). In the tables, notice North splitting into 47, 41, 47 and 45 and the largest partition falling to 122.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-skew",
+   "conceptIds": [
+    "dbxfe-spark-execution-salt-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-web-ui",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-salt-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-salt-question"
+   ],
+   "handbook": {
+    "markdown": "The wrong fix, measured. `facts.repartition(16)` followed by `row_number().over(Window.partitionBy(\"plant\").orderBy(\"event_id\"))` printed this outline; node 2's arguments read `RoundRobinPartitioning(16), REPARTITION_BY_NUM` and node 3's `hashpartitioning(plant#1, 4), ENSURE_REQUIREMENTS`:\n\n```text\nWindow (5)\n+- * Sort (4)\n   +- Exchange (3)\n      +- Exchange (2)\n         +- * Scan ExistingRDD (1)\n```\n\nThe job wrote 480 shuffle records instead of 240, the sixteen round-robin tasks each read 14 to 16 rows, and the window tasks then read 204, 0, 36 and 0 again: the window needs every North row in one task, so its own Exchange re-collects them.\n\nThe real fix for a join changes the key:\n\n```python\nfact = facts.withColumn(\"salt\", (F.crc32(F.col(\"event_id\")) % 4).cast(\"int\"))\nsalts = spark.range(4).select(F.col(\"id\").cast(\"int\").alias(\"salt\"))\njoined = fact.join(plants.crossJoin(salts), [\"plant\", \"salt\"])\n```\n\nEach fact row has one salt, so it meets exactly one of the four replicas of its plant: the join returned 240 rows and the same regional totals, and the twelve `(plant, salt)` group sizes matched the plain-Python derivation. Rows per partition became 101, 11, 6 and 122; the largest fell from 204 to 122 and not to 47, because twelve groups hashed into four partitions collide. With eight shuffle partitions the largest fell to 100: more partitions help once the key is split.\n\nCosts and limits: a twelve-row dimension instead of three, exchanges keyed by two columns, and a plan the next reader must understand. Salting a window changes its meaning, because numbering would restart per salt, so salting is a join and aggregation technique. After salting, check rows per partition again, and the row count and totals against an independent expectation, because a wrong replication silently multiplies rows.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-skew"
+    ]
+   },
+   "recap": "Spreading the input does not spread the key; salting splits the key and keeps the join correct.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-adaptive",
+   "version": "1.0.0",
+   "title": "Adaptive execution re-plans at a shuffle boundary",
+   "outcome": "Read an adaptive plan before and after its action and name what the runtime changed.",
+   "explanation": "[[dbxfe-spark-execution-adaptive-concept|Adaptive query execution]] materializes each shuffle, measures it and plans the rest. Printed before the action, the grouped plan reads isFinalPlan=false with four planned partitions; afterwards it reads isFinalPlan=true and AQEShuffleRead coalesced, and one task read all twelve partials. In the third state, notice that the join switched from sort-merge to broadcast in every run, but the side it built changed between identical runs: a runtime outcome, not a fact about the data.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-adaptive",
+   "conceptIds": [
+    "dbxfe-spark-execution-adaptive-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-broadcast",
+    "dbxfe-spark-execution-claim-databricks-defaults",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-adaptive-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-adaptive-question"
+   ],
+   "handbook": {
+    "markdown": "The Spark SQL tuning page lists what adaptive query execution does at runtime: it coalesces post-shuffle partitions, converts a sort-merge join to a broadcast hash join when the runtime statistics of any join side fall below the threshold, and splits skewed join partitions (the next beat). Databricks documents the same features for its runtime, where adaptive execution is enabled by default, and explains that it works at query-stage boundaries because that is where accurate statistics exist.\n\nThe lab's grouped sum after its action, `explain(mode=\"simple\")`, final plan:\n\n```text\nAdaptiveSparkPlan isFinalPlan=true\n+- == Final Plan ==\n   ResultQueryStage 1\n   +- *(2) HashAggregate(keys=[plant#1], functions=[count(1), sum(inspected_units#3L), sum(defective_units#4L)])\n      +- AQEShuffleRead coalesced\n         +- ShuffleQueryStage 0\n            +- Exchange hashpartitioning(plant#1, 4), ENSURE_REQUIREMENTS, [plan_id=1321]\n               +- *(1) HashAggregate(keys=[plant#1], functions=[partial_count(1), partial_sum(inspected_units#3L), partial_sum(defective_units#4L)])\n                  +- *(1) Project [plant#1, inspected_units#3L, defective_units#4L]\n                     +- *(1) Scan ExistingRDD[event_id#0,plant#1,line#2,inspected_units#3L,defective_units#4L]\n```\n\nMeasured: the map stage still ran four tasks and wrote twelve records (789 bytes), then one task read all twelve, where the non-adaptive run used four reduce tasks. `totals.rdd.getNumPartitions()` returned 1, `spark.sql.shuffle.partitions` still read 4, and the totals were identical. The tracker showed two jobs and one skipped stage: materialize, measure, continue.\n\nThe join with the default 10 MB threshold: the initial plan was a sort-merge join, because a parallelized list gives the planner no usable size estimate, and every final plan was a `BroadcastHashJoin`. The side it built was not stable: six identical runs recorded BuildLeft (the 240-row fact side) twice and BuildRight four times. The documented rule converts when any side's runtime statistics qualify, and both input shuffles ran at the same time, so the order in which they finished is the likely reason; the lab records the variation rather than proving its cause.\n\nWhat to inspect: `isFinalPlan`, the `AQEShuffleRead` markers (`coalesced`, `local`, `skewed`) and the `Build` side, always in the plan printed after the action. What fails: printing the plan before the action and reporting it as what ran, or quoting one run's build side as a property of the query.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-adaptive",
+     "dbxfe-spark-execution-l01-limits"
+    ]
+   },
+   "recap": "Before the action the plan is a proposal; after it, the final plan shows what the runtime measured and chose.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-skewjoin",
+   "version": "1.0.0",
+   "title": "Adaptive skew handling splits only what crosses its thresholds",
+   "outcome": "Decide from its thresholds whether adaptive execution will split a skewed join partition, and read the plan that shows it did.",
+   "explanation": "[[dbxfe-spark-execution-skew-join-concept|Adaptive skew-join handling]] splits a sort-merge join partition only when it is larger than five times the median partition and larger than a byte threshold, 256 MB by default. The lab's hot partition held a few kilobytes, so nothing split. In the tables, notice three runs of the same join: without adaptive execution one task read 206 records; at the defaults one coalesced task read all 243; with both size settings scaled to 1 KB, three tasks read 102, 106 and 37.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-adaptive",
+   "conceptIds": [
+    "dbxfe-spark-execution-skew-join-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-skew-join",
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-skewjoin-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-skewjoin-question"
+   ],
+   "handbook": {
+    "markdown": "The rule, as documented for open-source Spark and for Databricks: a join partition counts as skewed only when it is larger than `spark.sql.adaptive.skewJoin.skewedPartitionFactor` times the median partition size and larger than `spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes`; adaptive execution then splits it, replicating the matching side where needed, in sort-merge and shuffle hash joins. The lab read the local values back before changing anything: threshold `268435456b` (256 MB), factor `5.0`, advisory partition size `67108864b` (64 MB).\n\nThe lab's join shuffle totalled a few kilobytes, so at the defaults nothing qualified; adaptive execution instead coalesced the whole join into one task that read all 243 records. To make the mechanism visible, the lab set the skew threshold and the advisory partition size to `1KB`, on the record: the advisory size is the target size of the pieces, so a split needs it smaller than the partition. The final plan then read (excerpt, indentation trimmed):\n\n```text\n+- *(5) SortMergeJoin(skew=true) [plant#1], [plant#10], Inner\n   :- *(3) Sort [plant#1 ASC NULLS FIRST], false, 0\n   :  +- AQEShuffleRead coalesced and skewed\n   :     +- ShuffleQueryStage 0\n```\n\nMeasured: the join stage ran three tasks that read 102, 106 and 37 records instead of one task reading 206 (adaptive off) or 243 (defaults). The North-and-West partition was split in two and each piece re-read the matching dimension rows, so the total read rose from 243 to 245. Regional totals were unchanged.\n\nWhat this shows and does not show: the mechanism, its plan markers and its cost in re-read rows, but not a good production threshold. The defaults exist because splitting has overhead, and 1 KB is a toy value. On a real job, read the join stage's per-task shuffle read first: if the largest partition is not above both limits, adaptive execution will leave it alone, and salting or a broadcast remain the remedies.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-adaptive"
+    ]
+   },
+   "recap": "The skew rule needs a partition above five times the median and 256 MB; below that, the hot task stays whole.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-cache",
+   "version": "1.0.0",
+   "title": "A cache changes the source, not the answer",
+   "outcome": "Decide when caching a frame is worth its memory and what it leaves unchanged in the plan.",
+   "explanation": "[[dbxfe-spark-execution-cache-concept|Caching]] keeps a computed frame in memory or on disk so later actions read it instead of recomputing the scan and filter. After north.cache() and one count(), the grouped plan reads InMemoryTableScan over InMemoryRelation at StorageLevel(disk, memory, deserialized, 1 replicas). In the visual, notice that the Exchange is still there and the line counts are the same: the cache changed where the 180 rows came from, nothing else. After unpersist() the scan returns.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-memory",
+   "conceptIds": [
+    "dbxfe-spark-execution-cache-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cache",
+    "dbxfe-spark-execution-claim-databricks-defaults",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-cache-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-cache-question"
+   ],
+   "handbook": {
+    "markdown": "The PySpark reference says `cache()` persists a DataFrame at the default storage level, memory and disk, deserialized; the RDD guide adds that persisted data is stored the first time an action computes it, and the Spark SQL tuning page that cached tables are removed with `unpersist` or `uncacheTable`.\n\n```python\nnorth = facts.filter(F.col(\"plant\") == \"North\")\nnorth.cache()\nnorth.count()                            # the action that fills the cache: 180 rows\nnorth.groupBy(\"line\").count().explain(mode=\"formatted\")\nnorth.unpersist()\n```\n\nOutline printed by local Spark 4.0.4 while cached:\n\n```text\n* HashAggregate (7)\n+- Exchange (6)\n   +- * HashAggregate (5)\n      +- InMemoryTableScan (1)\n            +- InMemoryRelation (2)\n                  +- * Filter (4)\n                     +- * Scan ExistingRDD (3)\n```\n\nNode 2's arguments end in `StorageLevel(disk, memory, deserialized, 1 replicas)`. The line counts were L1 64, L2 63 and L3 53, summing to North's 180, before, during and after caching. After `unpersist()` a fresh plan shows the scan and filter again.\n\nWhen it helps: the same expensive input feeds several actions (a count for a log line, a write, a check), or an iterative algorithm reads it repeatedly. When not: one action reads the frame once, so the cache costs memory and gains nothing; the frame is larger than the memory available, so partitions spill or evict each other; the frame changes between actions. A timing taken after caching measures the cache, not the query.\n\nWhat to inspect: `InMemoryRelation` in the plan and the Storage tab for the fraction actually cached. What fails: caching everything by habit, then diagnosing memory pressure elsewhere. Databricks Runtime adds a separate disk cache for Parquet reads, which is not this mechanism.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-memory"
+    ]
+   },
+   "recap": "Cache when several actions share an expensive input; it changes the input node, never the shuffle or the result.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-collect",
+   "version": "1.0.0",
+   "title": "collect() moves every row into one process",
+   "outcome": "Choose actions that keep results bounded and explain how a driver runs out of memory.",
+   "explanation": "[[dbxfe-spark-execution-collect-concept|Collection to the driver]] serializes every row of a frame and sends it to one process with one heap; that is the ordinary way a driver runs out of memory. In the visual, notice the difference between count(), which returns one number, collect() on the raw frame, which would ship all 240 rows, and collect() on the aggregate, which ships three. The lab's guard counts limit(max + 1) first and refuses the raw frame at fifty.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-memory",
+   "conceptIds": [
+    "dbxfe-spark-execution-collect-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-claim-result-size",
+    "dbxfe-spark-execution-claim-tuning",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-collect-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-collect-question"
+   ],
+   "hint": "Which of your actions would return the same size for 240 rows and for 240 million?",
+   "handbook": {
+    "markdown": "The RDD guide warns that `collect()` fetches the entire dataset to a single machine and can make the driver run out of memory; the configuration reference adds `spark.driver.maxResultSize`, a cap on the serialized result bytes of each action that aborts the job when exceeded (documented default 1g). The cap is a fuse, not a design.\n\nThe lab's guard:\n\n```python\ndef bounded_collect(df, max_rows):\n    arriving = df.limit(max_rows + 1).count()\n    if arriving > max_rows:\n        raise ValueError(f\"collection bound exceeded: more than {max_rows} rows would reach the driver\")\n    return [row.asDict() for row in df.collect()]\n```\n\n`bounded_collect(facts, 50)` raised for the 240-row frame; `bounded_collect(plant_totals(facts), 50)` returned three rows; `facts.count()` returned 240 without moving a row to the driver, because the partial counts meet in one executor task and only the final number travels. The extra `limit().count()` costs one small job and is worth it in a notebook a colleague will re-run on a larger feed.\n\nArithmetic to keep in mind: rows × bytes per serialized row must fit in the driver heap alongside everything else the driver holds, and in PySpark the rows arrive in the driver's JVM before Python receives them. `toPandas()` collects the same rows and then builds a pandas frame, so it is not an escape. Bounded alternatives: aggregate in Spark and collect the aggregate, `limit(n)` for a sample, `show(n)`, or write to storage and read a slice.\n\nExecutors can run out of memory too: a task whose partition is too large, or a broadcast side that does not fit. The Tuning page's first remedy for a task-level error is more parallelism, meaning smaller partitions; for a broadcast it is not broadcasting that side. What to inspect: the row count before collecting, the driver's memory and result-size cap, and which process failed.",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-memory",
+     "dbxfe-spark-execution-l01-limits"
+    ]
+   },
+   "recap": "Ask the driver for a summary, never for the data; count, aggregate and limit are bounded, collect is not.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-spark-execution-experiment",
+   "version": "1.0.0",
+   "title": "Change one variable and say what the evidence can carry",
+   "outcome": "Design a bounded experiment and state honestly what a local toy run cannot prove.",
+   "explanation": "A [[dbxfe-spark-execution-experiment-concept|bounded experiment]] changes exactly one thing and records three kinds of evidence: what moved, what stayed and what the run cannot show. In the ledger, notice that every row names the evidence that stayed, which shows what the change did not alter, and that every last column is a limit, not a claim. The balanced feed printed an identical operator outline over a different distribution: a plan cannot see skew, only a measurement can.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-limits",
+   "conceptIds": [
+    "dbxfe-spark-execution-experiment-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-broadcast",
+    "dbxfe-spark-execution-claim-skew-join",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "visualId": "dbxfe-spark-execution-experiment-visual",
+   "questionIds": [
+    "dbxfe-spark-execution-experiment-self"
+   ],
+   "handbook": {
+    "markdown": "The lab's ledger, one change per row, all on local Spark 4.0.4 in `local[2]` with four shuffle partitions:\n\n| Change | Moved | Stayed | Cannot show |\n|---|---|---|---|\n| `F.broadcast(plants)` | join operator; exchanges 3 → 1; shuffled records 246 → 8 | regional totals | duration at real size |\n| adaptive execution on, grouped sum | final stage 4 tasks → 1 | plant totals | whether coalescing helps at real size |\n| adaptive execution on, join | strategy switched; build side varied between runs | regional totals | which side real sizes favour |\n| skew threshold and advisory size → 1 KB | busiest join task 243 → 106 records | regional totals | a sensible production threshold |\n| salt on the join key | largest partition 204 → 122 | 240 rows, totals | whether four salts suffice |\n| balanced feed | largest share 0.75 → 0.33 | operator outline | that a plan reveals skew |\n\nHow to run one honestly. Fix the configuration and the input, print the plan, run the action once, read the stage list, the records per task and the rows per partition, then change one thing and repeat on the same evidence. When a runtime choice can vary, as the adaptive build side did, repeat the run and record every outcome instead of the one you liked. Write the limit before anyone asks: one machine, 240 rows, no network, no memory pressure. Do not quote a duration; if one is needed, it must come from the real runtime, the real size and the real key distribution, repeated, with the cache state stated.\n\nWhy universal rules fail: \"always broadcast\" breaks when the small side is not small; \"always cache\" costs memory for single-use frames; \"raise shuffle partitions\" changes nothing about a hot key; \"double the cluster\" doubles idle slots under skew. Each is a hypothesis to test with one change, not a setting to apply.\n\nTransfer: for a fourth plant with 600 East rows, predict from the plan (one Exchange and two stages for the grouped sum; the broadcast still drops the join's exchanges from three to one) and measure the rest (the largest partition after `repartition(8, \"plant\")` holds at least 600 of 840 rows).",
+    "sourceSectionIds": [
+     "dbxfe-spark-execution-l01-limits",
+     "dbxfe-spark-execution-l01-solution"
+    ]
+   },
+   "recap": "One change, three columns of evidence, one honest limit; a plan predicts structure and only a measurement shows skew.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-spark-execution-l01-card1",
+   "beatId": "dbxfe-spark-execution-driver"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card2",
+   "beatId": "dbxfe-spark-execution-lazy"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card3",
+   "beatId": "dbxfe-spark-execution-partition"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card4",
+   "beatId": "dbxfe-spark-execution-explain"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card5",
+   "beatId": "dbxfe-spark-execution-shuffle"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card6",
+   "beatId": "dbxfe-spark-execution-stage"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card7",
+   "beatId": "dbxfe-spark-execution-broadcast"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card8",
+   "beatId": "dbxfe-spark-execution-skew"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card9",
+   "beatId": "dbxfe-spark-execution-salt"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card10",
+   "beatId": "dbxfe-spark-execution-salt"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card11",
+   "beatId": "dbxfe-spark-execution-adaptive"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card12",
+   "beatId": "dbxfe-spark-execution-experiment"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card13",
+   "beatId": "dbxfe-spark-execution-adaptive"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card14",
+   "beatId": "dbxfe-spark-execution-skewjoin"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card15",
+   "beatId": "dbxfe-spark-execution-cache"
+  },
+  {
+   "cardId": "dbxfe-spark-execution-l01-card16",
+   "beatId": "dbxfe-spark-execution-collect"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-spark-execution-extension-result-size",
+   "revision": "1",
+   "prompt": "What stops a runaway collect() before it fills the driver heap, and what does that setting not protect?",
+   "answer": "spark.driver.maxResultSize, documented default 1g, aborts an action whose serialized results exceed it; it does not bound the deserialized copies or the rest of the driver's memory.",
+   "explanation": "The configuration reference defines [[dbxfe-spark-execution-extension-result-size-concept|spark.driver.maxResultSize]] as a limit on the total serialized results of all partitions for each action, such as collect, and the job is aborted when the total is above it. That turns a runaway collection into a fast, named failure instead of a slow exhaustion of the heap. It is a fuse, not a guarantee: the same page warns that a high limit can still cause driver out-of-memory errors, depending on the driver's memory and the overhead of objects in the JVM, and in PySpark the rows are deserialized again in Python. The design fix is unchanged: aggregate or limit in Spark and collect a bounded result. Defaults are per version, and platforms may override them.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-memory",
+   "conceptIds": [
+    "dbxfe-spark-execution-extension-result-size-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-result-size",
+    "dbxfe-spark-execution-claim-shuffle",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "beatId": "dbxfe-spark-execution-collect",
+   "whyItMatters": "Separates the safety fuse from the design fix, so raising a limit is never mistaken for making the driver bigger."
+  },
+  {
+   "id": "dbxfe-spark-execution-extension-shuffle-partitions",
+   "revision": "1",
+   "prompt": "Why can a small grouped query on a cluster start two hundred reduce tasks, and what shrinks that number at runtime?",
+   "answer": "spark.sql.shuffle.partitions defaults to 200, so every shuffle writes 200 partitions; adaptive coalescing merges small post-shuffle partitions after measuring them.",
+   "explanation": "The lab set [[dbxfe-spark-execution-extension-shuffle-partitions-concept|spark.sql.shuffle.partitions]] to 4 so each reduce stage's task count was readable, and measured four reduce tasks with adaptive execution off. At the documented default of 200, a query over a few kilobytes schedules 200 mostly empty reduce tasks. With adaptive execution on, coalescing merges contiguous small partitions toward an advisory size, 64 MB by default, while respecting a minimum partition size of 1 MB when parallelism comes first; the lab saw four planned partitions read as one. Raising the setting never splits a hot key, and lowering it everywhere can make large shuffles too coarse, so read the stage page before changing it. Platforms may set their own defaults.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-boundaries",
+   "conceptIds": [
+    "dbxfe-spark-execution-extension-shuffle-partitions-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-shuffle-partitions",
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "beatId": "dbxfe-spark-execution-stage",
+   "whyItMatters": "Explains a common surprise in task counts and shows which part adaptive execution adjusts and which it cannot."
+  },
+  {
+   "id": "dbxfe-spark-execution-extension-storage-level",
+   "revision": "1",
+   "prompt": "What does cache() store by default, and when would persist() with another storage level fit better?",
+   "answer": "cache() persists at MEMORY_AND_DISK_DESER, printed in the lab's plan as disk, memory, deserialized, 1 replicas; persist() takes an explicit level such as disk only.",
+   "explanation": "The PySpark reference gives MEMORY_AND_DISK_DESER as cache()'s default [[dbxfe-spark-execution-extension-storage-level-concept|storage level]], changed to match Scala in 3.0, and the lab's cached plan printed StorageLevel(disk, memory, deserialized, 1 replicas) for the North rows. Deserialized objects are quick to reuse but take the most memory, and partitions that do not fit in memory are kept on disk rather than recomputed. persist() takes an explicit level when that trade is wrong for the workload, for example a large, rarely reused frame that a disk-only level keeps out of memory the job needs for shuffles and joins. Whatever the level, data is stored only when an action first computes it, and unpersist() releases it.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-memory",
+   "conceptIds": [
+    "dbxfe-spark-execution-extension-storage-level-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-cache",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-guidance",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "beatId": "dbxfe-spark-execution-cache",
+   "whyItMatters": "Makes the memory cost of a cache explicit and names the documented setting for changing it."
+  },
+  {
+   "id": "dbxfe-spark-execution-extension-static-broadcast",
+   "revision": "1",
+   "prompt": "If adaptive execution converts joins to broadcast joins anyway, why plan a broadcast yourself?",
+   "answer": "Adaptive execution converts only after the join's input shuffles have run and been measured; a broadcast chosen at planning time never shuffles the large side at all.",
+   "explanation": "The Spark SQL tuning page says a runtime conversion is not as efficient as [[dbxfe-spark-execution-extension-static-broadcast-concept|planning a broadcast hash join]] in the first place, though it beats continuing the sort-merge join because it avoids sorting and can read shuffle files locally. The lab shows the difference: the converted join's final plan still had a ShuffleQueryStage under both inputs, read through AQEShuffleRead local, and ran as five jobs, while the hinted join planned no fact-side Exchange and ran as two. The converted join's build side also varied between identical runs. Adaptive conversion is a safety net for sizes the planner could not know; when you know one side is small, a hint or a correct size estimate is the cheaper plan.",
+   "lessonId": "dbxfe-spark-execution-l01",
+   "sectionId": "dbxfe-spark-execution-l01-adaptive",
+   "conceptIds": [
+    "dbxfe-spark-execution-extension-static-broadcast-concept"
+   ],
+   "claimIds": [
+    "dbxfe-spark-execution-claim-adaptive",
+    "dbxfe-spark-execution-claim-broadcast",
+    "dbxfe-spark-execution-claim-local-run",
+    "dbxfe-spark-execution-fiction"
+   ],
+   "beatId": "dbxfe-spark-execution-adaptive",
+   "whyItMatters": "Keeps adaptive execution in its place: a runtime correction for unknown sizes, not a substitute for a known-small side."
+  }
+ ],
+ "recap": {
+  "title": "Plan, then measure; the key decides the longest task",
+  "markdown": "**A plan predicts structure; only a run shows where the rows went.** The driver plans and schedules, executors run one task per partition, and every Exchange ends a stage, so the plan alone predicts stage and task counts. What ran is separate evidence: the grouped sum shuffled 12 partial records, the sort-merge join 246 records with one task reading 206, the broadcast join 8. A hot key sets a floor that no worker or partition count moves; salting changes the key, a broadcast removes the shuffle, and adaptive execution coalesces, switches strategies and splits skew only above its thresholds, sometimes choosing differently between identical runs. Keep results bounded at the driver and change one variable at a time. **Transfer challenge:** a feed in which one supplier sends 70% of 10 million shipment rows is joined to a 50-row supplier table; predict the plan, the busiest join task's share and the single change you would test first, then list the evidence that would prove you wrong.",
+  "visualId": "dbxfe-spark-execution-experiment-visual"
+ },
+ "appliedTask": {
+  "title": "Diagnose the supplier roll-up before anyone doubles the cluster",
+  "prompt": "Fictional Harbourline Supplies runs a nightly job that joins 2,000,000 shipment rows to a 40-row supplier table and sums weight per region. One supplier now sends about 70% of the rows. The plan screenshot shows SortMergeJoin with an Exchange under each input, adaptive execution is on at its defaults, and the only other evidence is a run time that doubled. Predict what the plan and the stage page will show, choose one first experiment, and state what would change your mind.",
+  "modelAnswer": "First, establish which plan the screenshot shows. A 40-row supplier side is far below the 10 MB broadcast threshold, so a SortMergeJoin itself needs explaining. Under a header reading isFinalPlan=false it is only the initial plan, drawn without a usable size estimate; with adaptive execution on at its defaults, expect the plan printed after the action (isFinalPlan=true) to show BroadcastHashJoin with AQEShuffleRead local under both inputs. The join then runs where each map output is read, no join task holds the hot supplier, and the stage page's long tasks, if any, point elsewhere: evenly slow tasks or spill mean volume. If the final plan still shows SortMergeJoin, find out why before predicting skew: a lowered or disabled threshold, a size the runtime could not measure, or a join type that cannot build on the supplier side. Only if it really ran as a sort-merge join: three Exchanges (each join input and the regional aggregate), so four stages, and the join stage has one task per shuffle partition. Prediction for the stage page: one join task reads about 70% of the shuffled rows, roughly 1,400,000 plus the matching supplier row, several times the median, while the other tasks finish early; more executors would idle. Either way the first experiment changes one thing: broadcast the supplier table with a hint, because a planned broadcast also skips the input shuffles a runtime conversion has already paid for. Compare the plan (BroadcastHashJoin, one Exchange), the shuffled records (only regional partials), the busiest task's read and the totals, which must not change. If a task still dominates, check whether another key is now the skewed step, and whether that partition exceeds both adaptive skew thresholds, five times the median and 256 MB by default, before relying on adaptive skew handling; otherwise salt the key. What would change my mind: evenly sized, slow tasks across the join stage, which means volume rather than skew, and then more executors are justified. Unknowns to state: whether the screenshot is the final plan, actual partition bytes, spill, and whether the platform overrides the defaults.",
+  "reasoning": "The answer first establishes whether the screenshot is the plan that ran, then reads structure from the plan, predicts the runtime signature of skew from the key share only for a join that really shuffled, tests the cheapest single change with named evidence and an unchanged-total check, and names the measurement under which scaling out is the right call.",
+  "beatIds": [
+   "dbxfe-spark-execution-explain",
+   "dbxfe-spark-execution-skew",
+   "dbxfe-spark-execution-broadcast",
+   "dbxfe-spark-execution-adaptive",
+   "dbxfe-spark-execution-skewjoin",
+   "dbxfe-spark-execution-experiment"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-spark-execution-scenario"
+ ]
+}

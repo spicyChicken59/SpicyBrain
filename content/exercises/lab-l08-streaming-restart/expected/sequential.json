@@ -1,0 +1,190 @@
+{
+ "description": "Scenario S, written by hand from the documented rules before the final run: one availableNow run per arrival on ONE checkpoint, 5-minute watermark delay, 10-minute tumbling windows, append output mode, one file per micro-batch, foreachBatch into local downstream stubs. The sink fails once, after its effects, in the batch that finalizes the 09:20 windows. Watermarks are the value Spark reports for each batch. stateAfter is read with the experimental state data source at that batch.",
+ "delay": "5 minutes",
+ "window": "10 minutes",
+ "runs": [
+  {
+   "run": "arrival-01",
+   "landed": ["01.json"],
+   "batches": [
+    {"batchId": 0, "inputRows": 6, "watermark": "1970-01-01T00:00:00Z", "stateRows": 4, "updated": 4, "removed": 0, "droppedLate": 0, "emitted": []},
+    {"batchId": 1, "inputRows": 0, "watermark": "2026-09-14T09:07:40Z", "stateRows": 4, "updated": 0, "removed": 0, "droppedLate": 0, "emitted": []}
+   ],
+   "stateAfter": {
+    "0": [
+     {"window_start": "2026-09-14T09:00:00Z", "line": "L1", "units": 22, "events": 2},
+     {"window_start": "2026-09-14T09:00:00Z", "line": "L2", "units": 17, "events": 2},
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L1", "units": 7, "events": 1},
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L2", "units": 11, "events": 1}
+    ],
+    "1": [
+     {"window_start": "2026-09-14T09:00:00Z", "line": "L1", "units": 22, "events": 2},
+     {"window_start": "2026-09-14T09:00:00Z", "line": "L2", "units": 17, "events": 2},
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L1", "units": 7, "events": 1},
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L2", "units": 11, "events": 1}
+    ]
+   },
+   "offsets": [0, 1],
+   "commits": [0, 1]
+  },
+  {
+   "run": "arrival-02",
+   "landed": ["02.json"],
+   "batches": [
+    {"batchId": 2, "inputRows": 4, "watermark": "2026-09-14T09:07:40Z", "stateRows": 4, "updated": 4, "removed": 0, "droppedLate": 0, "emitted": []},
+    {"batchId": 3, "inputRows": 0, "watermark": "2026-09-14T09:13:30Z", "stateRows": 2, "updated": 0, "removed": 2, "droppedLate": 0, "emitted": [
+     {"window_start": "2026-09-14T09:00:00Z", "line": "L1", "units": 27, "events": 3},
+     {"window_start": "2026-09-14T09:00:00Z", "line": "L2", "units": 23, "events": 3}
+    ]}
+   ],
+   "stateAfter": {
+    "2": [
+     {"window_start": "2026-09-14T09:00:00Z", "line": "L1", "units": 27, "events": 3},
+     {"window_start": "2026-09-14T09:00:00Z", "line": "L2", "units": 23, "events": 3},
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L1", "units": 21, "events": 2},
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L2", "units": 15, "events": 2}
+    ],
+    "3": [
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L1", "units": 21, "events": 2},
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L2", "units": 15, "events": 2}
+    ]
+   },
+   "offsets": [0, 1, 2, 3],
+   "commits": [0, 1, 2, 3]
+  },
+  {
+   "run": "arrival-03",
+   "landed": ["03.json"],
+   "batches": [
+    {"batchId": 4, "inputRows": 4, "watermark": "2026-09-14T09:13:30Z", "stateRows": 4, "updated": 3, "removed": 0, "droppedLate": 1, "emitted": []},
+    {"batchId": 5, "inputRows": 0, "watermark": "2026-09-14T09:22:00Z", "stateRows": 2, "updated": 0, "removed": 2, "droppedLate": 0, "emitted": [
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L1", "units": 21, "events": 2},
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L2", "units": 18, "events": 3}
+    ]}
+   ],
+   "stateAfter": {
+    "4": [
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L1", "units": 21, "events": 2},
+     {"window_start": "2026-09-14T09:10:00Z", "line": "L2", "units": 18, "events": 3},
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L1", "units": 6, "events": 1},
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L3", "units": 2, "events": 1}
+    ],
+    "5": [
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L1", "units": 6, "events": 1},
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L3", "units": 2, "events": 1}
+    ]
+   },
+   "offsets": [0, 1, 2, 3, 4, 5],
+   "commits": [0, 1, 2, 3, 4, 5]
+  },
+  {
+   "run": "arrival-04-failure",
+   "landed": ["04.json"],
+   "failOnWindow": "2026-09-14T09:20:00Z",
+   "failure": {"condition": "STREAM_FAILED", "messageContains": ["FOREACH_BATCH_USER_FUNCTION_ERROR", "injected failure after downstream effects"]},
+   "batches": [
+    {"batchId": 6, "inputRows": 2, "watermark": "2026-09-14T09:22:00Z", "stateRows": 4, "updated": 2, "removed": 0, "droppedLate": 0, "emitted": []}
+   ],
+   "sinkCalls": [
+    {"batchId": 6, "rows": []},
+    {"batchId": 7, "rows": [
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L1", "units": 6, "events": 1},
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L2", "units": 4, "events": 1},
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L3", "units": 2, "events": 1}
+    ]}
+   ],
+   "stateAfter": {
+    "6": [
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L1", "units": 6, "events": 1},
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L2", "units": 4, "events": 1},
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L3", "units": 2, "events": 1},
+     {"window_start": "2026-09-14T09:30:00Z", "line": "L3", "units": 5, "events": 1}
+    ]
+   },
+   "offsets": [0, 1, 2, 3, 4, 5, 6, 7],
+   "commits": [0, 1, 2, 3, 4, 5, 6],
+   "plannedNotCommitted": {"batchId": 7, "batchWatermark": "2026-09-14T09:33:00Z", "sourceOffset": 3},
+   "outboxAfter": {"naive": 7, "keyed": 7}
+  },
+  {
+   "run": "restart-after-failure",
+   "landed": [],
+   "batches": [
+    {"batchId": 7, "inputRows": 0, "watermark": "2026-09-14T09:33:00Z", "stateRows": 1, "updated": 0, "removed": 3, "droppedLate": 0, "emitted": [
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L1", "units": 6, "events": 1},
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L2", "units": 4, "events": 1},
+     {"window_start": "2026-09-14T09:20:00Z", "line": "L3", "units": 2, "events": 1}
+    ]}
+   ],
+   "stateAfter": {
+    "7": [
+     {"window_start": "2026-09-14T09:30:00Z", "line": "L3", "units": 5, "events": 1}
+    ]
+   },
+   "offsets": [0, 1, 2, 3, 4, 5, 6, 7],
+   "commits": [0, 1, 2, 3, 4, 5, 6, 7],
+   "outboxAfter": {"naive": 10, "keyed": 7}
+  },
+  {
+   "run": "restart-nothing-new",
+   "landed": [],
+   "batches": [],
+   "stateAfter": {},
+   "offsets": [0, 1, 2, 3, 4, 5, 6, 7],
+   "commits": [0, 1, 2, 3, 4, 5, 6, 7],
+   "outboxAfter": {"naive": 10, "keyed": 7}
+  },
+  {
+   "run": "arrival-05",
+   "landed": ["05.json"],
+   "batches": [
+    {"batchId": 8, "inputRows": 2, "watermark": "2026-09-14T09:33:00Z", "stateRows": 3, "updated": 2, "removed": 0, "droppedLate": 0, "emitted": []},
+    {"batchId": 9, "inputRows": 0, "watermark": "2026-09-14T09:41:00Z", "stateRows": 1, "updated": 0, "removed": 2, "droppedLate": 0, "emitted": [
+     {"window_start": "2026-09-14T09:30:00Z", "line": "L2", "units": 3, "events": 1},
+     {"window_start": "2026-09-14T09:30:00Z", "line": "L3", "units": 5, "events": 1}
+    ]}
+   ],
+   "stateAfter": {
+    "8": [
+     {"window_start": "2026-09-14T09:30:00Z", "line": "L2", "units": 3, "events": 1},
+     {"window_start": "2026-09-14T09:30:00Z", "line": "L3", "units": 5, "events": 1},
+     {"window_start": "2026-09-14T09:40:00Z", "line": "L1", "units": 8, "events": 1}
+    ],
+    "9": [
+     {"window_start": "2026-09-14T09:40:00Z", "line": "L1", "units": 8, "events": 1}
+    ]
+   },
+   "offsets": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+   "commits": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+   "outboxAfter": {"naive": 12, "keyed": 9}
+  }
+ ],
+ "checkpoint": {
+  "sourceFiles": {"0": ["01.json"], "1": ["02.json"], "2": ["03.json"], "3": ["04.json"], "4": ["05.json"]},
+  "batchSourceOffset": {"0": 0, "1": 0, "2": 1, "3": 1, "4": 2, "5": 2, "6": 3, "7": 3, "8": 4, "9": 4},
+  "batchWatermark": {"0": "1970-01-01T00:00:00Z", "1": "2026-09-14T09:07:40Z", "2": "2026-09-14T09:07:40Z", "3": "2026-09-14T09:13:30Z", "4": "2026-09-14T09:13:30Z", "5": "2026-09-14T09:22:00Z", "6": "2026-09-14T09:22:00Z", "7": "2026-09-14T09:33:00Z", "8": "2026-09-14T09:33:00Z", "9": "2026-09-14T09:41:00Z"},
+  "nextBatchWatermark": {"0": "2026-09-14T09:07:40Z", "1": "2026-09-14T09:07:40Z", "2": "2026-09-14T09:13:30Z", "3": "2026-09-14T09:13:30Z", "4": "2026-09-14T09:22:00Z", "5": "2026-09-14T09:22:00Z", "6": "2026-09-14T09:33:00Z", "7": "2026-09-14T09:33:00Z", "8": "2026-09-14T09:41:00Z", "9": "2026-09-14T09:41:00Z"}
+ },
+ "sink": {
+  "callBatchIds": [0, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9],
+  "table": [
+   {"window_start": "2026-09-14T09:00:00Z", "line": "L1", "units": 27, "events": 3},
+   {"window_start": "2026-09-14T09:00:00Z", "line": "L2", "units": 23, "events": 3},
+   {"window_start": "2026-09-14T09:10:00Z", "line": "L1", "units": 21, "events": 2},
+   {"window_start": "2026-09-14T09:10:00Z", "line": "L2", "units": 18, "events": 3},
+   {"window_start": "2026-09-14T09:20:00Z", "line": "L1", "units": 6, "events": 1},
+   {"window_start": "2026-09-14T09:20:00Z", "line": "L2", "units": 4, "events": 1},
+   {"window_start": "2026-09-14T09:20:00Z", "line": "L3", "units": 2, "events": 1},
+   {"window_start": "2026-09-14T09:30:00Z", "line": "L2", "units": 3, "events": 1},
+   {"window_start": "2026-09-14T09:30:00Z", "line": "L3", "units": 5, "events": 1}
+  ],
+  "naiveOutbox": 12,
+  "keyedOutbox": 9,
+  "duplicatedKeys": ["2026-09-14T09:20:00Z|L1", "2026-09-14T09:20:00Z|L2", "2026-09-14T09:20:00Z|L3"]
+ },
+ "lateEvents": {
+  "acceptedOlderThanWatermark": {"event_id": "e008", "event_time": "2026-09-14T09:05:00Z", "batchId": 2, "watermark": "2026-09-14T09:07:40Z", "window_end": "2026-09-14T09:10:00Z"},
+  "droppedTooLate": {"event_id": "e011", "line": "L1", "units": 9, "event_time": "2026-09-14T09:03:00Z", "batchId": 4, "watermark": "2026-09-14T09:13:30Z", "window_end": "2026-09-14T09:10:00Z"},
+  "neverEmitted": [{"window_start": "2026-09-14T09:40:00Z", "line": "L1", "units": 8, "events": 1}]
+ }
+}

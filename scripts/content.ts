@@ -11,6 +11,7 @@ import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import {
+  teachingLinkTargets,
   validateTeaching,
   type TeachingIndexEntry,
 } from "../src/teaching-schema.ts";
@@ -18,19 +19,63 @@ import {
   validateCourses,
   safePath,
   type Course,
+  type Lesson,
   validatePaths,
   validatePreservation,
 } from "../src/content-schema.ts";
+import type {
+  CatalogCourse,
+  CatalogLesson,
+  ContentBody,
+  CourseReferences,
+} from "../src/catalog-types.ts";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 type RawLesson = {
   bodyFile: string;
   sections: { id: string; kind: string; markdown?: string }[];
 };
-type RawCourse = {
-  modules: { lessonFiles: string[]; lessons?: RawLesson[] }[];
+type RawModule = { lessonFiles: string[]; lessons?: RawLesson[] };
+type RawModulePackage = {
+  module: RawModule;
+  scenarios?: unknown[];
+  sources?: unknown[];
+  claims?: unknown[];
+  concepts?: unknown[];
 };
-export async function loadCourses(contentRoot = join(root, "content")) {
+type RawCourse = {
+  id: string;
+  modules: (RawModule | { file: string })[];
+  scenarios?: unknown[];
+  sources?: unknown[];
+  claims?: unknown[];
+  concepts?: unknown[];
+  labs?: { bodyFile?: string; body?: string }[];
+  guides?: { bodyFile?: string; body?: unknown }[];
+  cases?: { bodyFile?: string; body?: string }[];
+};
+export type LoadOptions = {
+  /** Module package files to load as if course.json listed them (course id → paths). */
+  extraModuleFiles?: Record<string, string[]>;
+};
+const guideMarkers = ["action", "example", "template", "limits"] as const;
+export function splitGuideBody(body: string) {
+  const blocks = body.split(/^<!-- section:([a-z][a-z0-9-]*) -->\s*$/m);
+  if (blocks[0].trim()) throw Error("Guide text before its first section");
+  const map: Record<string, string> = {};
+  for (let i = 1; i < blocks.length; i += 2) {
+    if (map[blocks[i]] !== undefined) throw Error("Duplicate guide section");
+    map[blocks[i]] = blocks[i + 1].trim();
+  }
+  for (const key of Object.keys(map))
+    if (!guideMarkers.includes(key as (typeof guideMarkers)[number]))
+      throw Error(`Unknown guide section: ${key}`);
+  return map;
+}
+export async function loadCourses(
+  contentRoot = join(root, "content"),
+  options: LoadOptions = {},
+) {
   const dirs = (
     await readdir(join(contentRoot, "courses"), { withFileTypes: true })
   )
@@ -42,7 +87,76 @@ export async function loadCourses(contentRoot = join(root, "content")) {
     const c = JSON.parse(
       await readFile(await confinedFile(courseDir, "course.json"), "utf8"),
     ) as RawCourse;
-    for (const m of c.modules) {
+    // A module package keeps one module's map entry, scenario, sources, claims
+    // and course-level concepts together; it is merged before validation so
+    // identities and references are checked exactly as inline modules are.
+    const modules: RawModule[] = [];
+    for (const entry of [
+      ...c.modules,
+      ...(options.extraModuleFiles?.[c.id] ?? []).map((file) => ({ file })),
+    ]) {
+      if (!("file" in entry)) {
+        modules.push(entry);
+        continue;
+      }
+      if (!safePath(entry.file) || !entry.file.endsWith(".json"))
+        throw Error("Unsafe module package path");
+      const pkg = JSON.parse(
+        await readFile(await confinedFile(courseDir, entry.file), "utf8"),
+      ) as RawModulePackage;
+      if (!pkg.module || typeof pkg.module !== "object")
+        throw Error(`Module package without a module: ${entry.file}`);
+      for (const key of Object.keys(pkg))
+        if (
+          !["module", "scenarios", "sources", "claims", "concepts"].includes(
+            key,
+          )
+        )
+          throw Error(`Unknown module package field: ${key}`);
+      modules.push(pkg.module);
+      c.scenarios = [...(c.scenarios ?? []), ...(pkg.scenarios ?? [])];
+      c.sources = [...(c.sources ?? []), ...(pkg.sources ?? [])];
+      c.claims = [...(c.claims ?? []), ...(pkg.claims ?? [])];
+      c.concepts = [...(c.concepts ?? []), ...(pkg.concepts ?? [])];
+    }
+    c.modules = modules;
+    for (const item of c.labs ?? []) {
+      if (
+        !item.bodyFile ||
+        !safePath(item.bodyFile) ||
+        !item.bodyFile.endsWith(".md")
+      )
+        throw Error("Unsafe lab body path");
+      item.body = (
+        await readFile(await confinedFile(courseDir, item.bodyFile), "utf8")
+      ).trim();
+      delete item.bodyFile;
+    }
+    for (const item of c.guides ?? []) {
+      if (
+        !item.bodyFile ||
+        !safePath(item.bodyFile) ||
+        !item.bodyFile.endsWith(".md")
+      )
+        throw Error("Unsafe guide body path");
+      item.body = splitGuideBody(
+        await readFile(await confinedFile(courseDir, item.bodyFile), "utf8"),
+      );
+      delete item.bodyFile;
+    }
+    for (const item of c.cases ?? []) {
+      if (
+        !item.bodyFile ||
+        !safePath(item.bodyFile) ||
+        !item.bodyFile.endsWith(".md")
+      )
+        throw Error("Unsafe case body path");
+      item.body = (
+        await readFile(await confinedFile(courseDir, item.bodyFile), "utf8")
+      ).trim();
+      delete item.bodyFile;
+    }
+    for (const m of modules) {
       const lessons = [];
       for (const f of m.lessonFiles) {
         if (!safePath(f) || !f.endsWith(".json"))
@@ -79,7 +193,7 @@ export async function loadCourses(contentRoot = join(root, "content")) {
         delete (l as Partial<RawLesson>).bodyFile;
         lessons.push(l);
       }
-      delete (m as Partial<typeof m>).lessonFiles;
+      delete (m as Partial<RawModule>).lessonFiles;
       m.lessons = lessons;
     }
     raw.push(c);
@@ -275,7 +389,191 @@ export function counts(courses: Course[]) {
       scenarios: 1,
     })),
     capstones: c.scenarios.filter((s) => s.isCapstone).length,
+    tracks: c.tracks?.length ?? 0,
+    labs: c.labs?.length ?? 0,
+    guides: c.guides?.length ?? 0,
+    cases: c.cases?.length ?? 0,
   }));
+}
+/** The catalog tier: every identity, mapping and number, no prose or assessment text. */
+export function stripLesson(lesson: Lesson): CatalogLesson {
+  return {
+    ...lesson,
+    sections: lesson.sections.map(
+      ({
+        markdown: _markdown,
+        claimIds: _claimIds,
+        conceptIds: _conceptIds,
+        ...section
+      }) => section,
+    ),
+    cards: lesson.cards.map(({ id, revision, lessonId, sectionId }) => ({
+      id,
+      revision,
+      lessonId,
+      sectionId,
+    })),
+    questions: lesson.questions.map(({ id, revision, conceptIds }) => ({
+      id,
+      revision,
+      conceptIds,
+    })),
+  };
+}
+export function stripCourse(course: Course): CatalogCourse {
+  const withoutBody = <T extends { body: unknown }>({
+    body: _body,
+    ...rest
+  }: T) => rest;
+  const idOnly = ({ id }: { id: string }) => ({ id });
+  return {
+    ...course,
+    sources: course.sources.map(idOnly),
+    claims: course.claims.map(idOnly),
+    concepts: course.concepts.map(idOnly),
+    modules: course.modules.map((module) => ({
+      ...module,
+      lessons: module.lessons.map(stripLesson),
+    })),
+    scenarios: course.scenarios.map(
+      ({
+        context: _context,
+        task: _task,
+        model: _model,
+        reasoning: _reasoning,
+        disclosures: _disclosures,
+        requirements: _requirements,
+        rubric,
+        claimIds: _claimIds,
+        ...scenario
+      }) => ({
+        ...scenario,
+        rubric: rubric.map(({ id, criterion }) => ({ id, criterion })),
+      }),
+    ),
+    ...(course.labs ? { labs: course.labs.map(withoutBody) } : {}),
+    ...(course.guides ? { guides: course.guides.map(withoutBody) } : {}),
+    ...(course.cases ? { cases: course.cases.map(withoutBody) } : {}),
+  };
+}
+/** The body tier: one same-origin JSON file per lesson, scenario, lab, guide and case. */
+export function contentBodies(course: Course): ContentBody[] {
+  return [
+    ...course.modules.flatMap((module) =>
+      module.lessons.map((lesson): ContentBody => ({
+        kind: "lesson",
+        id: lesson.id,
+        contentVersion: lesson.contentVersion,
+        sections: Object.fromEntries(
+          lesson.sections.map((section) => [section.id, section.markdown]),
+        ),
+        sectionClaims: Object.fromEntries(
+          lesson.sections.map((section) => [section.id, section.claimIds]),
+        ),
+        questions: lesson.questions,
+        cards: lesson.cards,
+      })),
+    ),
+    ...course.scenarios.map(
+      ({
+        id,
+        context,
+        task,
+        model,
+        reasoning,
+        disclosures,
+        requirements,
+        rubric,
+        claimIds,
+      }): ContentBody => ({
+        kind: "scenario",
+        id,
+        context,
+        task,
+        model,
+        reasoning,
+        disclosures,
+        requirements,
+        rubric,
+        claimIds,
+      }),
+    ),
+    ...(course.labs ?? []).map(({ id, body }): ContentBody => ({
+      kind: "lab",
+      id,
+      body,
+    })),
+    ...(course.guides ?? []).map(({ id, body }): ContentBody => ({
+      kind: "guide",
+      id,
+      body,
+    })),
+    ...(course.cases ?? []).map(({ id, body }): ContentBody => ({
+      kind: "case",
+      id,
+      body,
+    })),
+  ];
+}
+/** The reference tier: a course's full source, claim and glossary records, in catalog order. */
+export function courseReferences(course: Course): CourseReferences {
+  return {
+    kind: "references",
+    courseId: course.id,
+    sources: course.sources,
+    claims: course.claims,
+    concepts: course.concepts,
+  };
+}
+/** Search entries for a course's labs, field guides and case analyses, linking to their own routes. */
+export function collectionSearchEntries(c: Course) {
+  return [
+    ...(c.labs ?? []).map((lab) => ({
+      id: lab.id,
+      type: "Lab",
+      courseId: c.id,
+      title: lab.title,
+      text: [
+        lab.title,
+        lab.summary,
+        lab.outcome,
+        lab.environment,
+        lab.evidence,
+        lab.body,
+      ].join(" "),
+      href: `#/course/${c.id}/labs/${lab.id}`,
+    })),
+    ...(c.guides ?? []).map((guide) => ({
+      id: guide.id,
+      type: "Field guide",
+      courseId: c.id,
+      title: guide.title,
+      text: [
+        guide.title,
+        guide.question,
+        guide.summary,
+        guide.body.action,
+        guide.body.example,
+        guide.body.template,
+        guide.body.limits,
+      ].join(" "),
+      href: `#/course/${c.id}/guides/${guide.id}`,
+    })),
+    ...(c.cases ?? []).map((item) => ({
+      id: item.id,
+      type: "Case analysis",
+      courseId: c.id,
+      title: item.title,
+      text: [
+        item.title,
+        item.domain,
+        item.summary,
+        item.reporter,
+        item.body,
+      ].join(" "),
+      href: `#/course/${c.id}/cases/${item.id}`,
+    })),
+  ];
 }
 export async function buildContent(
   contentRoot = join(root, "content"),
@@ -296,7 +594,7 @@ export async function buildContent(
   );
   await writeFile(
     join(destination, "src/generated/catalog.json"),
-    JSON.stringify(courses),
+    JSON.stringify(courses.map(stripCourse)),
   );
   await writeFile(
     join(destination, "src/generated/paths.json"),
@@ -331,19 +629,29 @@ export async function buildContent(
       text: [g.term, ...g.aliases, g.definition].join(" "),
       href: `#/lesson/${g.lessonId}/${g.sectionId}`,
     })),
+    ...collectionSearchEntries(c),
   ]);
   const teachingIndex: TeachingIndexEntry[] = [];
   const teachingDirectory = join(destination, "public/teaching");
   await rm(teachingDirectory, { recursive: true, force: true });
-  await mkdir(teachingDirectory, { recursive: true });
+  await mkdir(join(teachingDirectory, "bodies"), { recursive: true });
+  for (const body of courses.flatMap(contentBodies))
+    await writeFile(
+      join(teachingDirectory, "bodies", `${body.id}.json`),
+      JSON.stringify(body),
+    );
+  await mkdir(join(teachingDirectory, "references"), { recursive: true });
+  for (const course of courses)
+    await writeFile(
+      join(teachingDirectory, "references", `${course.id}.json`),
+      JSON.stringify(courseReferences(course)),
+    );
   for (const module of teaching.modules) {
     const {
       courseId,
       moduleId,
       title,
       summary,
-      outcomes,
-      startingAssumptions,
       lessonIds,
       optionalBridgeLessonIds,
       cardLinks,
@@ -359,21 +667,23 @@ export async function buildContent(
       moduleId,
       title,
       summary,
-      outcomes,
-      startingAssumptions,
       lessonIds,
       optionalBridgeLessonIds,
       cardLinks,
-      extensionCards,
+      extensionCards: extensionCards.map(
+        ({ id, revision, lessonId, sectionId, beatId }) => ({
+          id,
+          revision,
+          lessonId,
+          sectionId,
+          beatId,
+        }),
+      ),
       visualIds: module.visuals.map((v) => v.id),
       conceptIds: module.concepts.map((c) => c.id),
-      referenceIds: [
-        ...module.concepts,
-        ...module.questions,
-        ...module.selfQuestions,
-        ...module.visuals,
-        ...module.visuals.flatMap((v) => v.states),
-      ].map((x) => x.id),
+      referenceIds: [...module.questions, ...module.selfQuestions].map(
+        (x) => x.id,
+      ),
       url: `teaching/${filename}`,
       beats: module.beats.map(
         ({ id, title, version, lessonId, sectionId, recap, questionIds }) => ({
@@ -539,10 +849,58 @@ export async function loadTeaching(
           "utf8",
         ),
       );
-      if (name === "media.json") media.push(...data);
+      if (name === "media.json" || /^media-[a-z0-9-]+\.json$/.test(name))
+        media.push(...data);
       else raw.push(data);
     }
   return validateTeaching(raw, courses, media);
+}
+/**
+ * Link targets from every teaching module file present on disk, registered
+ * or not, so a single module checked alone may link to its neighbours. A file
+ * that cannot be read as a module (for example one still being written)
+ * contributes no targets; a link to it then fails as broken.
+ */
+export async function diskTeachingLinkTargets(
+  contentRoot = join(root, "content"),
+) {
+  const entries: { moduleId: string; beats: { id: string }[] }[] = [];
+  let dirs: import("node:fs").Dirent[] = [];
+  try {
+    dirs = await readdir(join(contentRoot, "teaching"), {
+      withFileTypes: true,
+    });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  for (const dir of dirs.filter((d) => d.isDirectory()))
+    for (const name of (await readdir(join(contentRoot, "teaching", dir.name)))
+      .filter(
+        (n) =>
+          n.endsWith(".json") &&
+          n !== "media.json" &&
+          !/^media-[a-z0-9-]+\.json$/.test(n),
+      )
+      .sort()) {
+      try {
+        const data = JSON.parse(
+          await readFile(
+            await confinedFile(join(contentRoot, "teaching", dir.name), name),
+            "utf8",
+          ),
+        ) as { moduleId?: unknown; beats?: { id?: unknown }[] };
+        if (typeof data.moduleId === "string" && Array.isArray(data.beats))
+          entries.push({
+            moduleId: data.moduleId,
+            beats: data.beats.flatMap((b) =>
+              typeof b?.id === "string" ? [{ id: b.id }] : [],
+            ),
+          });
+      } catch {
+        // Not a readable teaching module: it offers no link targets.
+      }
+    }
+  return teachingLinkTargets(entries);
 }
 export async function verifyDesign() {
   const directory = join(root, "public/design-system");

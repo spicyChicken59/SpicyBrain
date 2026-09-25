@@ -1,0 +1,334 @@
+{
+  "module": {
+    "id": "dbxfe-ai-assist",
+    "title": "AI-assisted development without surrendering verification",
+    "summary": "Use the workspace coding assistant (Genie Code, formerly Databricks Assistant) to explain code, draft a transformation, investigate an error and construct tests, while every suggestion is checked against an expected result you computed yourself and every request stays inside the permission and confidentiality boundary.",
+    "objectives": [
+      "Name the assistant as its documentation names it, what it can see, what governs that context and what must never be pasted into a request.",
+      "Write a bounded request that names tables, grain, counting rules, output columns and the expected row count.",
+      "Catch a suggested many-to-many join that inflates totals by computing the expected rows by hand, and correct it at the right grain with a documented source.",
+      "Turn an error fix and a generated test into a reviewed, recorded change rather than an accepted-and-run one."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-transformations"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-ai-assist-l01.json"
+    ],
+    "scenarioId": "dbxfe-ai-assist-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-ai-assist-scenario",
+      "title": "Assisted revenue-by-customer query for Cinderline's planning review",
+      "context": "Fictional Cinderline Components keeps order lines in `sales.order_lines` (order_id, line_no, customer, amount; several lines per order) and warehouse shipments in `logistics.shipments` (shipment_id, order_id, shipped_qty, shipped_at as text; zero or many per order). Planning wants revenue and shipped quantity per customer for the quarter. An analyst used the workspace assistant to draft the query and it returned revenue more than double what finance expects. The team has an eleven-row fixture copied from the two tables, the analyst's chat history, and a finance revenue total computed from order lines alone. One column, shipped_at, holds two date formats.",
+      "task": "Write the assistance record for this change: the bounded request you would send (with the context you would attach and what you would leave out), the test plan with expected rows computed by hand from the fixture, the diagnosis of why the draft inflated the totals, the corrected SQL with the documentation it rests on, and the verdict for both the draft and the correction.",
+      "requirements": [
+        "State the request with named tables, grain, counting rules, output columns and expected row count, and list the context attached; no credential, personal data or full customer export appears in it.",
+        "Compute the expected rows and grand totals by hand from the fixture before any query runs, and name the source of each expected value.",
+        "Explain the inflation as a many-to-many join with the line and shipment counts per order that cause it, and correct it by reducing both tables to order grain with a left join that keeps unshipped orders.",
+        "Treat the shipped_at format error separately: reject a fix that silently produces NULL and name the fix that resolves the cause.",
+        "Label every authored suggestion as authored; record the verdict, the evidence and what remains unverified."
+      ],
+      "model": "### Request (authored, bounded)\n\"Draft a Databricks SQL query over @sales.order_lines and @logistics.shipments. Grain of the answer: one row per customer. Columns: customer; revenue = SUM(order_lines.amount), each line counted once; shipped_qty = SUM(shipments.shipped_qty), each shipment counted once. An order can have several lines and zero or many shipments; do not let either table multiply the other. Keep customers whose orders have no shipment. Expected rows on the attached fixture: 2. Return the SQL only.\" Context attached: the two table references and the eleven-row fixture. Withheld: the finance workbook, customer contact fields and the warehouse token read in the notebook's secret-scope cell.\n\n### Expected results, by hand\nOrder lines: 1001 has 250 and 150, 1002 has 250 (Amberline Motors); 1003 has 900, 1004 has 120 (Brightwater Pumps). Revenue: Amberline 650, Brightwater 1020, total 1670, which matches the finance figure computed from order lines alone. Shipments: 1001 has S1 (10) and S2 (5), 1002 has S3 (8), so Amberline shipped 23; 1003 has S4, S5, S6 (20, 20, 10), so Brightwater shipped 50; 1004 has none. Checks: rows returned 2; rows reaching the final grouping 4, one per order; revenue total 1670; quantity total 73; zero shipped_at values parsing to NULL.\n\n### Diagnosis of the draft\nThe draft inner-joined order lines to shipments on order_id and summed both measures. Per-key counts: 1001 has 2 lines and 2 shipments (many-to-many, 4 joined rows), 1003 has 1 line and 3 shipments (3 rows). Each amount repeats once per matching shipment and each quantity once per matching line: Amberline 1050 / 38, Brightwater 2700 / 50, totals 3750 and 88, 8 joined rows against 4 orders, and order 1004 vanished. Evidence: `SELECT order_id, COUNT(*) ... GROUP BY order_id HAVING COUNT(*) > 1` on each table. The JOIN reference: an inner join returns the rows with matching values in both references, that is, every matching pair.\n\n### Correction\n```sql\nWITH order_totals AS (\n  SELECT order_id, customer, SUM(amount) AS amount\n  FROM sales.order_lines GROUP BY order_id, customer),\nshipped AS (\n  SELECT order_id, SUM(shipped_qty) AS shipped_qty\n  FROM logistics.shipments GROUP BY order_id)\nSELECT o.customer, SUM(o.amount) AS revenue,\n       SUM(COALESCE(s.shipped_qty, 0)) AS shipped_qty\nFROM order_totals o LEFT JOIN shipped s ON o.order_id = s.order_id\nGROUP BY o.customer;\n```\nObserved on the fixture: Amberline 650 / 23, Brightwater 1020 / 50; two rows; four joined rows; totals 1670 and 73. Verdict: draft rejected with evidence; correction accepted for the fixture.\n\n### The date error\nThe quarter filter failed with CAST_INVALID_INPUT because S5 reads 2026/09/05. A suggested try_cast makes the error disappear and turns S5 into NULL, silently dropping 20 units from Brightwater's quarter. Rejected. The fix parses each format explicitly, CASE WHEN shipped_at LIKE '____/__/__' THEN to_date(shipped_at, 'yyyy/MM/dd') ELSE to_date(shipped_at, 'yyyy-MM-dd') END, and the test plan gains a check that no shipped_at parses to NULL.\n\n### Unverified\nProduction may hold duplicate shipment rows or orders with two customers that the fixture lacks; the parse covers only the two formats seen; every suggestion above is authored for teaching, not captured assistant output.",
+      "reasoning": "The record keeps four artefacts apart: a request that fixes grain, counting rules and expected shape before the model sees it, expected values computed independently of any query, a diagnosis that names the mechanism and shows the per-key counts that prove it, and a correction with a documented basis. The date fix is handled as its own decision because a fix that hides an error is a silent data change, not a repair.",
+      "rubric": [
+        {
+          "id": "dbxfe-ai-assist-scenario-rubric-1",
+          "criterion": "Bounded request and context boundary",
+          "weak": "A one-line 'write revenue by customer' request with the notebook and a secret pasted in.",
+          "partial": "Tables named but grain, counting rules or expected row count missing, or context attached without saying what was withheld.",
+          "strong": "Tables, grain, columns, the several-lines and many-shipments rule and expected rows stated; context listed and confidential items named as withheld."
+        },
+        {
+          "id": "dbxfe-ai-assist-scenario-rubric-2",
+          "criterion": "Independent expected results",
+          "weak": "Expected values copied from the draft's output.",
+          "partial": "Per-customer figures computed but no row count, grand total or source named.",
+          "strong": "Rows, totals and counts computed by hand from the fixture before running, each with its source, reconciled to the finance total."
+        },
+        {
+          "id": "dbxfe-ai-assist-scenario-rubric-3",
+          "criterion": "Diagnosis and correction of the many-to-many join",
+          "weak": "Totals 'looked too high' and a DISTINCT was added somewhere.",
+          "partial": "Fan-out named but only shipments pre-aggregated, so order 1001's quantity still doubles even where a LEFT JOIN makes revenue match finance, or the unshipped order still lost.",
+          "strong": "Per-key counts on both tables shown, both reduced to order grain, LEFT JOIN keeps order 1004, JOIN documentation cited."
+        },
+        {
+          "id": "dbxfe-ai-assist-scenario-rubric-4",
+          "criterion": "Error fix judged by cause, not silence",
+          "weak": "try_cast accepted because the error went away.",
+          "partial": "try_cast rejected but no explicit parse or NULL check proposed.",
+          "strong": "The silent NULL named with the units it drops, an explicit per-format parse proposed, and a no-NULL check added to the test plan."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can we just ask the assistant to fix the numbers and re-run until they match finance?",
+          "response": "No. Matching a known total tests one total, not the query; a pre-aggregation of shipments alone, once the join is also a LEFT JOIN, makes revenue match finance at 1670 while Amberline's quantity still reads 38 instead of 23 (with the draft's inner join revenue reads 1550). The expected rows are computed by hand first, and the query is judged against all of them."
+        },
+        {
+          "question": "Is the chat history with the assistant part of the evidence?",
+          "response": "The request and a summary of the suggestion are recorded; the assistant's own explanation is never treated as proof. What went into the prompt is listed so the confidentiality review can see it."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-ai-assist-l01"
+      ],
+      "claimIds": [
+        "dbxfe-guidance",
+        "dbxfe-fiction",
+        "dbxfe-ai-assist-course-claim-names",
+        "dbxfe-ai-assist-course-claim-context",
+        "dbxfe-ai-assist-course-claim-trust",
+        "dbxfe-ai-assist-course-claim-fix",
+        "dbxfe-ai-assist-course-claim-join",
+        "dbxfe-ai-assist-course-claim-try-cast"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-ai-assist-course-source-genie-code",
+      "title": "Genie Code",
+      "url": "https://docs.databricks.com/aws/en/genie-code/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the current landing page for the workspace coding and data assistant.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Genie Code: introduction and pricing note. Documentation only; no product execution."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-source-use",
+      "title": "Use Genie Code",
+      "url": "https://docs.databricks.com/aws/en/genie-code/use-genie-code",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; the context sent to the model with a prompt and the permission boundary on it.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Get help with code; Built-in code assistance. Documentation only; no product execution."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-source-features",
+      "title": "Genie Code features and capabilities",
+      "url": "https://docs.databricks.com/aws/en/genie-code/features-capabilities",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; surfaces, coding and debugging features.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Get help with code; Get answers sourced from documentation; Genie Code across the Databricks platform; Built-in code assistance. Documentation only; no product execution."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-source-faq-gcp",
+      "title": "Genie Code",
+      "url": "https://docs.databricks.com/gcp/en/notebooks/databricks-assistant-faq",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Former Assistant FAQ address redirects to Genie Code.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Genie Code: introduction and pricing note; Built-in features for code assistance. Reader returned a June 2026 page snapshot; used only for the observed redirect and scoped historical comparison. September AWS pages govern current modes and pricing."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-source-assistant-tips",
+      "title": "Tips to improve Genie Code responses",
+      "url": "https://docs.databricks.com/aws/en/notebooks/assistant-tips",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Former Assistant tips address; redirect inspected.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Be specific; Genie Code uses context to provide better answers. Reader returned a June 2026 page snapshot; used only for the observed redirect and scoped historical comparison. September AWS pages govern current modes and pricing."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-source-tips",
+      "title": "Tips to improve Genie Code responses",
+      "url": "https://docs.databricks.com/aws/en/genie-code/tips",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; prompt specificity, response structure and attached context.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Be specific; Genie Code uses context to provide better answers; Help Genie Code work with datasets. Documentation only; no product execution."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-source-trust",
+      "title": "Databricks AI assistive features trust and safety",
+      "url": "https://docs.databricks.com/aws/en/databricks-ai/databricks-ai-trust",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; data handling, retention and permission statements for AI assistive features.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Confidentiality statements; What data is sent to the models?; Does the data sent to the models respect the user's Unity Catalog permissions?; Code execution and accuracy. Documentation only; no product execution."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-source-join",
+      "title": "JOIN",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks SQL language manual; join types and criteria.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Parameters: join_type and join_criteria. Documentation only; no product execution."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-source-try-cast",
+      "title": "try_cast function",
+      "url": "https://docs.databricks.com/aws/en/sql/language-manual/functions/try_cast",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks SQL language manual; cast that returns NULL instead of raising on invalid input.",
+      "accessDate": "2026-09-24",
+      "reviewDate": "2026-09-24",
+      "caveat": "Primary page sections read directly through the web reader on 2026-09-24: Returns; Exceptions; Examples. Documentation only; no product execution."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-ai-assist-course-claim-names",
+      "description": "Databricks documentation titles the workspace coding and data assistant Genie Code and describes it as generating and running code, building pipelines and AI/BI dashboards, debugging errors and working with Unity Catalog data in notebooks, the SQL editor, jobs, AI/BI dashboards and the file editor. Former Assistant URLs redirect to Genie Code documentation.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-assist-course-source-genie-code",
+        "dbxfe-ai-assist-course-source-features",
+        "dbxfe-ai-assist-course-source-faq-gcp",
+        "dbxfe-ai-assist-course-source-assistant-tips"
+      ],
+      "context": "Product naming as reviewed on 2026-09-23; both names appear on indexed pages."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-claim-context",
+      "description": "To complete a task the assistant sends the prompt and relevant context to the model: table and column names, descriptions, the code being worked on, and, in Agent mode, table samples and cell outputs; context can be attached with Add context or referenced with @; the assistant can access only what the user has permission for, and everything sent respects the user's Unity Catalog permissions.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-assist-course-source-use",
+        "dbxfe-ai-assist-course-source-features",
+        "dbxfe-ai-assist-course-source-tips"
+      ],
+      "context": "Genie Code usage, features and tips pages."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-claim-trust",
+      "description": "For AI assistive features Databricks states that model partners do not retain submitted data, even for abuse monitoring; that submissions are not used to train generative foundation models Databricks makes available to third parties; that content filtering or model safety mechanisms apply; and that data sent to the models respects Unity Catalog permissions.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-assist-course-source-trust"
+      ],
+      "context": "Databricks AI assistive features trust and safety page."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-claim-fix",
+      "description": "The assistant answers questions with citations from Databricks documentation, gives inline suggestions, suggests fixes for basic errors which the user can accept and run, analyzes more complex errors including environment errors, and supports slash commands for common prompts.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-assist-course-source-features",
+        "dbxfe-ai-assist-course-source-faq-gcp"
+      ],
+      "context": "Coding and debugging features as documented."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-claim-join",
+      "description": "An INNER JOIN returns the rows that have matching values in both table references and is the default join type; a LEFT JOIN returns all rows of the left reference and the matched values from the right, appending NULL where there is no match.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-assist-course-source-join"
+      ],
+      "context": "Databricks SQL JOIN reference; standard SQL semantics."
+    },
+    {
+      "id": "dbxfe-ai-assist-course-claim-try-cast",
+      "description": "try_cast returns the source value cast to the target type when the cast is supported and returns NULL instead of an invalid-data or overflow error when the value is malformed or out of range. Unsupported type pairs still fail; NOT NULL struct fields and map keys have exceptions.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-assist-course-source-try-cast"
+      ],
+      "context": "Databricks SQL function reference."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-ai-assist-l01-assistant-concept",
+      "term": "Genie Code (formerly Databricks Assistant)",
+      "aliases": [
+        "Databricks Assistant",
+        "workspace assistant",
+        "AI pair programmer"
+      ],
+      "definition": "The Databricks workspace's documented coding and data assistant that drafts, explains, fixes and runs code from a prompt plus the context it is allowed to see.",
+      "lessonId": "dbxfe-ai-assist-l01",
+      "sectionId": "dbxfe-ai-assist-l01-names"
+    },
+    {
+      "id": "dbxfe-ai-assist-l01-context-concept",
+      "term": "assistant context",
+      "aliases": [
+        "attached context",
+        "@resource reference"
+      ],
+      "definition": "The table metadata, code, samples and outputs the assistant sends to the model with a prompt, bounded by the user's Unity Catalog permissions.",
+      "lessonId": "dbxfe-ai-assist-l01",
+      "sectionId": "dbxfe-ai-assist-l01-context"
+    },
+    {
+      "id": "dbxfe-ai-assist-l01-bounded-concept",
+      "term": "bounded request",
+      "aliases": [
+        "specific prompt",
+        "scoped request"
+      ],
+      "definition": "A request that names the tables, the grain of the answer, the counting rules, the output columns and the expected row count before the model drafts anything.",
+      "lessonId": "dbxfe-ai-assist-l01",
+      "sectionId": "dbxfe-ai-assist-l01-requests"
+    },
+    {
+      "id": "dbxfe-ai-assist-l01-fanout-concept",
+      "term": "join fan-out",
+      "aliases": [
+        "many-to-many join inflation",
+        "row multiplication"
+      ],
+      "definition": "The multiplication of rows when a join key matches several rows on the other side; each measure repeats once per opposite match, and a many-to-many key inflates both sides.",
+      "lessonId": "dbxfe-ai-assist-l01",
+      "sectionId": "dbxfe-ai-assist-l01-verify"
+    },
+    {
+      "id": "dbxfe-ai-assist-l01-expected-concept",
+      "term": "independent expected result",
+      "aliases": [
+        "hand-computed expected rows",
+        "oracle"
+      ],
+      "definition": "Rows, counts and totals worked out from a fixture by hand or by a separate method before the draft runs, so the draft is judged against them and never against itself.",
+      "lessonId": "dbxfe-ai-assist-l01",
+      "sectionId": "dbxfe-ai-assist-l01-verify"
+    },
+    {
+      "id": "dbxfe-ai-assist-l01-review-concept",
+      "term": "review gate",
+      "aliases": [
+        "accept discipline",
+        "read, run, compare, record"
+      ],
+      "definition": "The rule that a suggestion is read, run on a fixture, compared with the expected result and recorded before it is accepted, whether it is code, a fix or a test.",
+      "lessonId": "dbxfe-ai-assist-l01",
+      "sectionId": "dbxfe-ai-assist-l01-review"
+    },
+    {
+      "id": "dbxfe-ai-assist-l01-record-concept",
+      "term": "assistance record",
+      "aliases": [
+        "verification record",
+        "prompt log"
+      ],
+      "definition": "The artefact kept beside the code that holds the bounded request, the context attached and withheld, the suggestion summary, the expected and observed results, the verdict and the correction with its source.",
+      "lessonId": "dbxfe-ai-assist-l01",
+      "sectionId": "dbxfe-ai-assist-l01-review"
+    }
+  ]
+}

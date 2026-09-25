@@ -1,30 +1,55 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   beatHref,
-  cards,
+  cardIndex,
   courses,
   findBeat,
   findLesson,
   lessonHref,
+  loadLessonBody,
   loadTeachingMedia,
+  loadReferences,
   loadTeachingModule,
+  moduleLessonIds,
   paths,
   plainTeaching,
   teachingIndex,
 } from "./catalog";
-import type { Course } from "./content-schema";
+import type { CatalogCourse, LessonBody } from "./catalog-types";
 import type { Beat, TeachingMedia, TeachingModule } from "./teaching-schema";
 import { nowISO, reviewQueue, type BeatPosition } from "./study";
-import { MD, SaveStatus, useStudy, uuid } from "./ui";
+import { MD, SaveStatus, useReferences, useStudy, uuid } from "./ui";
 import { NoteEditor } from "./reader";
 import { Review } from "./practice-review";
 import { TeachingSources, TeachingText, Visual } from "./teaching-text";
+import {
+  AlsoInCourse,
+  BuildsOn,
+  CourseCounts,
+  CourseSection,
+  ModuleNext,
+  RoutesPanel,
+} from "./collections";
+import { beatNeighbourhood, trackOf } from "./collections-model";
+import type { CatalogModule } from "./catalog-types";
 
 export function TeacherToday() {
   const { data } = useStudy(),
     resume = data.beatResume,
     entry = resume ? findBeat(resume.beatId) : undefined;
-  const due = reviewQueue(cards, data, nowISO(), 100000).length;
+  const due = reviewQueue(cardIndex, data, nowISO(), 100000).length;
+  // A re-entry cue read from the catalog tier: where the saved beat sits,
+  // never an inference about time away or mastery.
+  const place = entry
+      ? beatNeighbourhood(entry.module, entry.beat.id)
+      : undefined,
+    resumeCourse = entry
+      ? courses.find((c) => c.id === entry.module.courseId)
+      : undefined,
+    track =
+      entry && resumeCourse
+        ? trackOf(resumeCourse, entry.module.moduleId)
+        : undefined;
   return (
     <div className="teacher-home">
       <p className="sc-eyebrow">Your learning space</p>
@@ -38,6 +63,16 @@ export function TeacherToday() {
           <>
             <span className="sc-eyebrow">Continue · {entry.module.title}</span>
             <h2>{entry.beat.title}</h2>
+            {place && (
+              <ul className="academy-reentry" aria-label="Where you were">
+                {track && <li>Track: {track.title}</li>}
+                <li>
+                  Beat {place.index + 1} of {place.total} in{" "}
+                  {entry.module.title}
+                </li>
+                {place.previous && <li>Before this: {place.previous.title}</li>}
+              </ul>
+            )}
             <p>{entry.beat.recap}</p>
             <a
               className="sc-btn sc-btn--primary"
@@ -119,7 +154,15 @@ export function TeacherToday() {
     </div>
   );
 }
-export function TeacherCourses({ id }: { id?: string }) {
+export function TeacherCourses({
+  id,
+  section,
+  item,
+}: {
+  id?: string;
+  section?: string;
+  item?: string;
+}) {
   const { data } = useStudy(),
     course = courses.find((c) => c.id === id);
   if (id && !course)
@@ -143,11 +186,14 @@ export function TeacherCourses({ id }: { id?: string }) {
             <span className="sc-eyebrow">{c.modules.length} modules</span>
             <h2>{c.title}</h2>
             <p>{c.subtitle}</p>
+            <CourseCounts course={c} />
             <strong>See the course →</strong>
           </a>
         ))}
       </div>
     );
+  if (section)
+    return <CourseSection course={course} section={section} item={item} />;
   const savedCoursePosition =
     data.beatResume?.courseId === course.id && findBeat(data.beatResume.beatId)
       ? data.beatResume
@@ -161,6 +207,60 @@ export function TeacherCourses({ id }: { id?: string }) {
     : teachingIndex.some((m) => m.moduleId === course.modules[0].id)
       ? beatHref(course.modules[0].id)
       : lessonHref(course.modules[0].lessons[0].id);
+  // One renderer for both maps: grouped under tracks (module titles become
+  // h3 under each track's h2, with prerequisites as suggestions) or the flat
+  // list a course without tracks has always had.
+  const moduleItem = (m: CatalogModule, i: number, grouped: boolean) => {
+    const t = teachingIndex.find((t) => t.moduleId === m.id),
+      completed =
+        t?.beats.filter(
+          (b) =>
+            data.completions[`beat-${b.id}`]?.completed &&
+            data.completions[`beat-${b.id}`]?.contentVersion === b.version,
+        ).length ?? 0,
+      saved = Object.values(data.beatPositions)
+        .filter(
+          (p) => p.moduleId === m.id && t?.beats.some((b) => b.id === p.beatId),
+        )
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0],
+      Heading = grouped ? "h3" : "h2";
+    return (
+      <li key={m.id}>
+        <span className="module-index">{String(i + 1).padStart(2, "0")}</span>
+        <div>
+          <Heading>
+            <a href={t ? beatHref(m.id) : lessonHref(m.lessons[0].id)}>
+              {t?.title ?? m.title}
+            </a>
+          </Heading>
+          <p>{t?.summary ?? m.summary}</p>
+          {grouped && <BuildsOn ids={m.prerequisiteIds} />}
+          {saved && (
+            <p className="sc-hint">
+              Saved place: {t?.beats.find((b) => b.id === saved.beatId)?.title}
+            </p>
+          )}
+          <div className="module-map-meta">
+            <span>
+              {t
+                ? `${t.beats.length} teaching beats · ${completed} marked complete`
+                : `${m.lessons.length} ${m.lessons.length === 1 ? "lesson" : "lessons"}`}
+            </span>
+            {t && (
+              <a href={beatHref(m.id, undefined, "handbook", true)}>Handbook</a>
+            )}
+          </div>
+        </div>
+        <a
+          className="module-open"
+          href={t ? beatHref(m.id) : lessonHref(m.lessons[0].id)}
+          aria-label={`Open ${t?.title ?? m.title}`}
+        >
+          →
+        </a>
+      </li>
+    );
+  };
   return (
     <div className="teacher-course">
       <a href="#/courses" className="sc-link--quiet">
@@ -198,65 +298,47 @@ export function TeacherCourses({ id }: { id?: string }) {
           </details>
         ))}
       </details>
-      <ol className="teacher-module-map">
-        {course.modules.map((m, i) => {
-          const t = teachingIndex.find((t) => t.moduleId === m.id),
-            completed =
-              t?.beats.filter(
-                (b) =>
-                  data.completions[`beat-${b.id}`]?.completed &&
-                  data.completions[`beat-${b.id}`]?.contentVersion ===
-                    b.version,
-              ).length ?? 0,
-            saved = Object.values(data.beatPositions)
-              .filter(
-                (p) =>
-                  p.moduleId === m.id &&
-                  t?.beats.some((b) => b.id === p.beatId),
-              )
-              .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-          return (
-            <li key={m.id}>
-              <span className="module-index">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <div>
-                <h2>
-                  <a href={t ? beatHref(m.id) : lessonHref(m.lessons[0].id)}>
-                    {t?.title ?? m.title}
-                  </a>
-                </h2>
-                <p>{t?.summary ?? m.summary}</p>
-                {saved && (
-                  <p className="sc-hint">
-                    Saved place:{" "}
-                    {t?.beats.find((b) => b.id === saved.beatId)?.title}
-                  </p>
-                )}
-                <div className="module-map-meta">
-                  <span>
-                    {t
-                      ? `${t.beats.length} teaching beats · ${completed} marked complete`
-                      : `${m.lessons.length} lessons`}
-                  </span>
-                  {t && (
-                    <a href={beatHref(m.id, undefined, "handbook", true)}>
-                      Handbook
+      <RoutesPanel course={course} />
+      <AlsoInCourse course={course} />
+      {course.tracks?.length ? (
+        course.tracks.map((track) => (
+          <section
+            className="academy-track"
+            key={track.id}
+            aria-labelledby={`academy-track-${track.id}`}
+          >
+            <div className="academy-track-head">
+              <h2 id={`academy-track-${track.id}`}>{track.title}</h2>
+              <p>{track.summary}</p>
+              <p className="academy-track-meta">
+                {track.moduleIds.length}{" "}
+                {track.moduleIds.length === 1 ? "module" : "modules"}
+                {/* Only a track with a handbook chapter offers its handbook. */}
+                {track.moduleIds.some((moduleId) =>
+                  teachingIndex.some((t) => t.moduleId === moduleId),
+                ) && (
+                  <>
+                    {" · "}
+                    <a href={`#/handbook/${course.id}?track=${track.id}`}>
+                      Handbook for this track
                     </a>
-                  )}
-                </div>
-              </div>
-              <a
-                className="module-open"
-                href={t ? beatHref(m.id) : lessonHref(m.lessons[0].id)}
-                aria-label={`Open ${t?.title ?? m.title}`}
-              >
-                →
-              </a>
-            </li>
-          );
-        })}
-      </ol>
+                  </>
+                )}
+              </p>
+            </div>
+            <ol className="teacher-module-map">
+              {track.moduleIds.map((moduleId) => {
+                const i = course.modules.findIndex((m) => m.id === moduleId);
+                return i < 0 ? null : moduleItem(course.modules[i], i, true);
+              })}
+            </ol>
+          </section>
+        ))
+      ) : (
+        <ol className="teacher-module-map">
+          {course.modules.map((m, i) => moduleItem(m, i, false))}
+        </ol>
+      )}
       <details className="secondary-library">
         <summary>Original references and alternative paths</summary>
         <p>
@@ -320,18 +402,27 @@ function BeatCheck({
   course,
   beat,
   questionId,
+  lessons,
 }: {
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
   beat: Beat;
   questionId: string;
+  lessons: LessonBody[];
 }) {
   const { data, store } = useStudy(),
     q = [
       ...module.questions,
       ...module.selfQuestions,
-      ...course.modules.flatMap((m) => m.lessons.flatMap((l) => l.questions)),
-    ].find((q) => q.id === questionId)!;
+      ...lessons.flatMap((l) => l.questions),
+    ].find((q) => q.id === questionId);
+  if (!q)
+    return (
+      <p className="sc-hint">
+        This check is unavailable in the current course files. Your earlier
+        answers are retained.
+      </p>
+    );
   const id = `check-${q.id}`,
     raw = data.beatChecks[id],
     saved = raw?.questionRevision === q.revision ? raw : undefined,
@@ -507,7 +598,7 @@ function MediaReference({
 }: {
   item: TeachingMedia;
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
 }) {
   const [loaded, setLoaded] = useState(false),
     [failed, setFailed] = useState(false);
@@ -631,7 +722,7 @@ function HandbookArticle({
   withVisual = true,
 }: {
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
   beat: Beat;
   withVisual?: boolean;
 }) {
@@ -710,17 +801,21 @@ function HandbookArticle({
 function ModuleCards({
   module,
   course,
+  lessons,
 }: {
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
+  lessons: LessonBody[];
 }) {
   const [scope, setScope] = useState("core"),
     [topic, setTopic] = useState("all"),
     [reviewing, setReviewing] = useState(false);
-  const core = module.cardLinks.map((l) => ({
-      ...cards.find((c) => c.id === l.cardId)!,
-      beatId: l.beatId,
-    })),
+  const { references } = useReferences(course.id);
+  const lessonCards = lessons.flatMap((l) => l.cards);
+  const core = module.cardLinks.flatMap((l) => {
+      const card = lessonCards.find((c) => c.id === l.cardId);
+      return card ? [{ ...card, beatId: l.beatId }] : [];
+    }),
     all = [...core, ...module.extensionCards];
   const filtered = (
     scope === "core"
@@ -729,8 +824,8 @@ function ModuleCards({
         ? module.extensionCards
         : all
   ).filter((c) => topic === "all" || c.conceptIds.includes(topic));
-  const concepts = [...module.concepts, ...course.concepts].filter((g) =>
-    all.some((c) => c.conceptIds.includes(g.id)),
+  const concepts = [...module.concepts, ...(references?.concepts ?? [])].filter(
+    (g) => all.some((c) => c.conceptIds.includes(g.id)),
   );
   return (
     <section className="module-cards">
@@ -836,15 +931,26 @@ export function ModuleWorkspace({
   extensionId?: string;
   detour?: boolean;
 }) {
-  const [module, setModule] = useState<TeachingModule | null>(null),
+  const [loaded, setLoaded] = useState<{
+      module: TeachingModule;
+      lessons: LessonBody[];
+    } | null>(null),
     [error, setError] = useState(""),
     [retry, setRetry] = useState(0);
   useEffect(() => {
     let active = true;
     setError("");
-    void loadTeachingModule(id)
-      .then((m) => {
-        if (active) setModule(m);
+    // The module, the lesson bodies its beats and cards draw on, and the
+    // course references (glossary definitions, sources) load in parallel;
+    // any failure is retried through the same control.
+    const entry = teachingIndex.find((m) => m.moduleId === id);
+    void Promise.all([
+      loadTeachingModule(id),
+      Promise.all((entry ? moduleLessonIds(entry) : []).map(loadLessonBody)),
+      entry ? loadReferences(entry.courseId) : undefined,
+    ])
+      .then(([module, lessons]) => {
+        if (active) setLoaded({ module, lessons });
       })
       .catch((e) => {
         if (active) setError(e.message);
@@ -867,12 +973,13 @@ export function ModuleWorkspace({
         <a href="#/courses">Browse courses</a>
       </div>
     );
-  if (!module || module.moduleId !== id)
+  if (!loaded || loaded.module.moduleId !== id)
     return <p role="status">Opening the teaching module…</p>;
   return (
     <ModuleView
       key={id}
-      module={module}
+      module={loaded.module}
+      lessons={loaded.lessons}
       beatId={beatId}
       view={view}
       extensionId={extensionId}
@@ -882,12 +989,14 @@ export function ModuleWorkspace({
 }
 function ModuleView({
   module,
+  lessons,
   beatId,
   view: requestedView,
   extensionId,
   detour,
 }: {
   module: TeachingModule;
+  lessons: LessonBody[];
   beatId?: string;
   view?: string;
   extensionId?: string;
@@ -1187,6 +1296,7 @@ function ModuleView({
                   course={course}
                   beat={beat}
                   questionId={q}
+                  lessons={lessons}
                 />
               ))}
               {mediaError && <p className="sc-hint">{mediaError}</p>}
@@ -1300,7 +1410,10 @@ function ModuleView({
               )}
             </nav>
             {index === module.beats.length - 1 && (
-              <ModuleRecap module={module} course={course} />
+              <>
+                <ModuleRecap module={module} course={course} />
+                <ModuleNext course={course} moduleId={module.moduleId} />
+              </>
             )}
           </div>
           {position?.handbookOpen && (
@@ -1374,9 +1487,10 @@ function ModuleView({
             />
           ))}
           <ModuleRecap module={module} course={course} />
+          <ModuleNext course={course} moduleId={module.moduleId} />
         </div>
       ) : (
-        <ModuleCards module={module} course={course} />
+        <ModuleCards module={module} course={course} lessons={lessons} />
       )}
       <details className="module-foundations">
         <summary>Module outcomes, starting assumptions and bridges</summary>
@@ -1409,7 +1523,7 @@ function ModuleRecap({
   course,
 }: {
   module: TeachingModule;
-  course: Course;
+  course: CatalogCourse;
 }) {
   return (
     <section className="module-recap">
@@ -1454,82 +1568,203 @@ function ModuleRecap({
     </section>
   );
 }
-export function CourseHandbook({ id }: { id: string }) {
+export function CourseHandbook({
+  id,
+  track: trackId,
+}: {
+  id: string;
+  track?: string;
+}) {
   const course = courses.find((c) => c.id === id),
-    [modules, setModules] = useState<TeachingModule[]>([]),
-    [error, setError] = useState("");
+    track = trackId ? course?.tracks?.find((t) => t.id === trackId) : undefined,
+    // A track assembles only its own modules, in the track's order; the whole
+    // course is assembled only when no track is requested.
+    chapters = course
+      ? track
+        ? track.moduleIds.flatMap((moduleId) =>
+            course.modules.filter((m) => m.id === moduleId),
+          )
+        : course.modules
+      : [],
+    // Only a module with a teaching module has a handbook chapter. The others
+    // are listed with their lessons, never as a contents link to nothing.
+    taught = chapters.filter((m) =>
+      teachingIndex.some((t) => t.courseId === id && t.moduleId === m.id),
+    ),
+    untaught = chapters.filter((m) => !taught.includes(m)),
+    key = `${id}?${trackId ?? ""}`,
+    unknownTrack = !!trackId && !track,
+    scopeLabel = useId(),
+    [assembled, setAssembled] = useState<{
+      key: string;
+      modules?: TeachingModule[];
+      error?: string;
+    }>();
   useEffect(() => {
     let active = true;
-    void Promise.all(
-      teachingIndex
-        .filter((m) => m.courseId === id)
-        .map((m) => loadTeachingModule(m.moduleId)),
-    )
-      .then((m) => {
-        if (active) setModules(m);
+    if (unknownTrack || !taught.length) return;
+    void Promise.all([
+      Promise.all(taught.map((m) => loadTeachingModule(m.id))),
+      loadReferences(id),
+    ])
+      .then(([modules]) => {
+        if (active) setAssembled({ key, modules });
       })
-      .catch((e) => {
-        if (active) setError(e.message);
+      .catch((e: Error) => {
+        if (active) setAssembled({ key, error: e.message });
       });
     return () => {
       active = false;
     };
-  }, [id]);
+    // `taught` and `unknownTrack` are derived from `key`.
+  }, [key]);
   if (!course) return <h1>Course unavailable</h1>;
+  const current = assembled?.key === key ? assembled : undefined,
+    modules = current?.modules ?? [];
   return (
     <div className="course-handbook">
       <a href={`#/course/${id}`}>← Course map</a>
       <h1 tabIndex={-1}>{course.title}: handbook</h1>
+      {track && (
+        <p className="academy-handbook-scope">
+          Track: {track.title} · {chapters.length}{" "}
+          {chapters.length === 1 ? "module" : "modules"}
+        </p>
+      )}
       <p>
         The full written course reference, with the same concepts, visuals and
         sources as the deck.
       </p>
       <div className="handbook-tools">
+        {!!course.tracks?.length && (
+          // Links, not a select that navigates on change: moving through the
+          // scopes with the keyboard never loads a handbook (WCAG 3.2.2).
+          <nav className="academy-scope-nav" aria-labelledby={scopeLabel}>
+            <p className="academy-scope-label" id={scopeLabel}>
+              Handbook scope
+            </p>
+            <ul>
+              <li>
+                <a
+                  href={`#/handbook/${id}`}
+                  aria-current={trackId ? undefined : "page"}
+                >
+                  Whole course · every module
+                </a>
+              </li>
+              {course.tracks.map((t) => (
+                <li key={t.id}>
+                  <a
+                    href={`#/handbook/${id}?track=${t.id}`}
+                    aria-current={t.id === track?.id ? "page" : undefined}
+                  >
+                    Track: {t.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
         <button
           className="sc-btn sc-btn--secondary"
           disabled={!modules.length}
           onClick={() => window.print()}
         >
-          Print course handbook
+          {track ? "Print track handbook" : "Print course handbook"}
         </button>
       </div>
-      <nav aria-label="Course handbook contents">
-        <ol>
-          {course.modules.map((m) => (
-            <li key={m.id}>
-              <a
-                href={`#chapter-${m.id}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById(`chapter-${m.id}`)?.scrollIntoView();
-                }}
+      {unknownTrack ? (
+        <p className="sc-notice" role="alert">
+          That track is not part of this course, so nothing was assembled.{" "}
+          <a href={`#/handbook/${id}`}>Open the whole course handbook</a> or
+          return to the <a href={`#/course/${id}`}>course map</a>.
+        </p>
+      ) : (
+        <>
+          {taught.length > 0 ? (
+            <nav
+              aria-label={
+                track ? "Track handbook contents" : "Course handbook contents"
+              }
+            >
+              <ol>
+                {taught.map((m) => (
+                  <li key={m.id}>
+                    <a
+                      href={`#chapter-${m.id}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document
+                          .getElementById(`chapter-${m.id}`)
+                          ?.scrollIntoView();
+                      }}
+                    >
+                      {m.title}
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          ) : (
+            <p className="sc-notice">
+              {track
+                ? "No module in this track has a handbook chapter yet, so there is nothing to assemble or print."
+                : "No module in this course has a handbook chapter yet, so there is nothing to assemble or print."}{" "}
+              Its modules are listed below with their lessons, or return to the{" "}
+              <a href={`#/course/${id}`}>course map</a>.
+            </p>
+          )}
+          {current?.error && <p role="alert">{current.error}</p>}
+          {taught.length > 0 && !current && (
+            <p role="status">
+              {track
+                ? "Assembling the track handbook…"
+                : "Assembling the course handbook…"}
+            </p>
+          )}
+          {taught.map((m) => {
+            const t = modules.find((t) => t.moduleId === m.id);
+            return t ? (
+              <section
+                className="handbook-chapter"
+                id={`chapter-${m.id}`}
+                key={m.id}
               >
-                {m.title}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </nav>
-      {error && <p role="alert">{error}</p>}
-      {!modules.length && !error && (
-        <p role="status">Assembling the course handbook…</p>
+                <h2>{t.title}</h2>
+                {t.beats.map((b) => (
+                  <HandbookArticle
+                    key={b.id}
+                    module={t}
+                    course={course}
+                    beat={b}
+                  />
+                ))}
+                <ModuleRecap module={t} course={course} />
+              </section>
+            ) : null;
+          })}
+          {untaught.length > 0 && (
+            <section
+              className="academy-handbook-lessons"
+              aria-labelledby={`${scopeLabel}-lessons`}
+            >
+              <h2 id={`${scopeLabel}-lessons`}>
+                {untaught.length === 1
+                  ? "A module without a handbook chapter"
+                  : "Modules without a handbook chapter"}
+              </h2>
+              <p>Their material is in their lessons.</p>
+              <ul>
+                {untaught.map((m) => (
+                  <li key={m.id}>
+                    <a href={lessonHref(m.lessons[0].id)}>{m.title}</a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       )}
-      {course.modules.map((m) => {
-        const t = modules.find((t) => t.moduleId === m.id);
-        return t ? (
-          <section
-            className="handbook-chapter"
-            id={`chapter-${m.id}`}
-            key={m.id}
-          >
-            <h2>{t.title}</h2>
-            {t.beats.map((b) => (
-              <HandbookArticle key={b.id} module={t} course={course} beat={b} />
-            ))}
-            <ModuleRecap module={t} course={course} />
-          </section>
-        ) : null;
-      })}
     </div>
   );
 }

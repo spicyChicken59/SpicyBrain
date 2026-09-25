@@ -1,0 +1,3543 @@
+{
+ "schemaVersion": 1,
+ "courseId": "dbxfe",
+ "moduleId": "dbxfe-mlflow",
+ "title": "MLflow, experiments and reproducibility",
+ "summary": "A model's number is only as good as the record behind it: what a run holds, when two runs compare, when a rerun reproduces, what a packaged model promises, and how a version earns an alias.",
+ "outcomes": [
+  "Name what an MLflow run records (parameters, metrics, tags, datasets, artifacts, a logged model) and where each part is stored.",
+  "Decide whether two runs are comparable from their dataset digests and differing parameters, and read a sorted table against its baselines.",
+  "Rerun a run from its record, recognize a run that cannot be reproduced, and refuse a rerun on changed data or a different library version.",
+  "Read a logged model's flavors, signature and environment, and predict which input drift MLflow rejects and which a contract must catch.",
+  "Promote a registered version by moving an alias only after a versioned contract's evidence gate and thresholds pass, and separate open-source duties from those of models in Unity Catalog."
+ ],
+ "startingAssumptions": [
+  "The machine-learning foundations module has covered targets, prediction moments, baselines, leakage and deployment-shaped splits.",
+  "Python and pandas can be read; no prior MLflow experience is assumed."
+ ],
+ "lessonIds": [
+  "dbxfe-mlflow-l01"
+ ],
+ "optionalBridgeLessonIds": [],
+ "editorialRationale": "MLflow is usually taught as an API tour, which leaves learners able to log runs they cannot defend. The module instead follows one executed experiment: it defines the record, shows what a dataset digest does and does not prove, then uses the record to compare runs, expose a superior-looking run that cannot be rerun and reproduce a clean one exactly. Packaging, signatures and environments come next as the model's promises, and the registry closes the loop with promotion by evidence. Version-specific behaviour is labelled as observed in the lab, and the Databricks-managed column is kept separate from what was executed.",
+ "sources": [
+  {
+   "id": "dbxfe-mlflow-source-tracking",
+   "title": "ML Experiment Tracking",
+   "url": "https://mlflow.org/docs/latest/ml/tracking/",
+   "publisher": "MLflow project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source MLflow, latest documentation; the module's lab pins MLflow 3.16.1.",
+   "caveat": "Describes the open-source APIs and stores; a hosted service changes who operates the stores, not what a run records.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: MLflow Tracking is organized around runs, executions of data science code; each run records metadata such as metrics, parameters and start and end times, and artifacts, output files such as model weights and images; mlflow.start_run() opens a run and logging functions such as log_param and log_metric record values; a metric can be updated during a run and MLflow keeps its full history; a backend store persists runs, parameters, metrics and tags and an artifact store persists files."
+  },
+  {
+   "id": "dbxfe-mlflow-source-datasets",
+   "title": "ML Dataset Tracking",
+   "url": "https://mlflow.org/docs/latest/ml/dataset/",
+   "publisher": "MLflow project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source MLflow dataset tracking (mlflow.data and mlflow.log_input).",
+   "caveat": "The page describes how digests are computed per dataset type in general terms; the row limit quoted in this module was observed in the installed 3.16.1 package, not read here.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: mlflow.data.from_pandas() constructs a PandasDataset from a DataFrame with optional targets, predictions and source; mlflow.log_input() logs the dataset's metadata to a run; a dataset carries a name, a digest computed automatically, a source, and optional profile and schema; standard datasets compute the digest from data content and structure."
+  },
+  {
+   "id": "dbxfe-mlflow-source-models",
+   "title": "MLflow Models",
+   "url": "https://mlflow.org/docs/latest/ml/model/",
+   "publisher": "MLflow project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source MLflow model format; the search result listed this page under the site-wide title.",
+   "caveat": "Flavor details and default serialization formats vary by library and version; check the flavor's own page before relying on a format.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Each MLflow Model is a directory containing arbitrary files together with an MLmodel file in its root that can define multiple flavors; flavors are a convention deployment tools use to understand a model without integrating with every library; the python_function flavor is the default model interface for MLflow Python models, and built-in flavors include it."
+  },
+  {
+   "id": "dbxfe-mlflow-source-signatures",
+   "title": "Model Signatures and Input Examples",
+   "url": "https://mlflow.org/docs/latest/ml/model/signatures/",
+   "publisher": "MLflow project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source MLflow signatures and schema enforcement.",
+   "caveat": "Enforcement rules differ for column-based and tensor-based signatures and for optional inputs; the exact messages quoted in the module were observed with 3.16.1.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Schema enforcement validates inputs against the model's signature and raises an exception when inputs are incompatible, before the underlying model is invoked; it applies when a model is loaded as python_function or used by MLflow deployment tools, not when loaded in its native format such as with mlflow.sklearn.load_model(); missing required inputs raise and missing optional inputs do not; for column-based signatures MLflow performs only lossless type conversions."
+  },
+  {
+   "id": "dbxfe-mlflow-source-dependencies",
+   "title": "Managing Dependencies in MLflow Models",
+   "url": "https://mlflow.org/docs/latest/ml/model/dependencies/",
+   "publisher": "MLflow project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source MLflow environment files written with a logged model.",
+   "caveat": "Inferred requirements reflect the logging environment; they are not a guarantee that another platform can install the same versions.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: When a model is logged MLflow writes python_env.yaml, with the Python version, build tools and pip requirements for virtualenv, plus conda.yaml and requirements.txt; manual edits are overwritten when the model is saved again; extra_pip_requirements adds dependencies MLflow does not infer; since MLflow 2.16.0 dependencies, including transitive ones, can be locked to exact versions."
+  },
+  {
+   "id": "dbxfe-mlflow-source-registry",
+   "title": "ML Model Registry",
+   "url": "https://mlflow.org/docs/latest/ml/model-registry/",
+   "publisher": "MLflow project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source MLflow Model Registry.",
+   "caveat": "Stages remain documented for the open-source registry but are not the recommended mechanism; models in Unity Catalog do not support them at all.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: The registry provides lineage to the producing experiment and run, versioning, aliasing and tagging; a newly registered model starts at version 1; aliases are mutable, user-defined references to one model version, loadable with get_model_version_by_alias() or the URI models:/<name>@<alias>; more than one alias can be applied to a version, unlike stages."
+  },
+  {
+   "id": "dbxfe-mlflow-source-search",
+   "title": "Search Runs",
+   "url": "https://mlflow.org/docs/latest/ml/search/search-runs/",
+   "publisher": "MLflow project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source MLflow run search API and syntax.",
+   "caveat": "Sorting and filtering read the record; they cannot tell a valid run from an invalid one.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: mlflow.search_runs() searches runs in experiments identified by ID or by name; the filter string resembles a SQL WHERE clause over metrics, params, tags, datasets and run metadata joined with and; order_by takes columns with an optional DESC or ASC, ASC by default; without order_by results are sorted by start_time DESC, then run_id."
+  },
+  {
+   "id": "dbxfe-mlflow-source-mlflow3",
+   "title": "MLflow 3 Migration Guide",
+   "url": "https://mlflow.org/docs/latest/ml/mlflow-3/",
+   "publisher": "MLflow project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Open-source MLflow 3 changes to model logging.",
+   "caveat": "Code written for MLflow 2 (artifact_path, runs:/ URIs) still appears widely; check which major version a project pins.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: MLflow 3 introduces the LoggedModel as a first-class entity beyond the run-centric approach; each logged model has a model ID and can be referenced as models:/<model_id>; log_model takes a name parameter and can be called without an active run; metrics can be linked to specific models and datasets."
+  },
+  {
+   "id": "dbxfe-mlflow-source-filestore",
+   "title": "Migrate from File Store",
+   "url": "https://mlflow.org/docs/latest/self-hosting/migrate-from-file-store/",
+   "publisher": "MLflow project",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Self-hosted open-source MLflow backends.",
+   "caveat": "Migration applies to self-hosted tracking; it says nothing about Databricks-managed MLflow.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: The recommended path is to migrate the file-based backend to a database backend with mlflow migrate-filestore, which preserves data losslessly; it requires MLflow 3.10 or later; SQLite is the only supported target because FileStore experiment IDs exceed the 32-bit integers PostgreSQL and MySQL enforce; artifacts stay in their original location and the database stores the same artifact URIs; an error rolls the migration back."
+  },
+  {
+   "id": "dbxfe-mlflow-source-databricks",
+   "title": "MLflow on Databricks",
+   "url": "https://docs.databricks.com/aws/en/mlflow/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Databricks-managed MLflow.",
+   "caveat": "An overview; feature availability depends on workspace, region and entitlement, and nothing in this module ran on Databricks.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Databricks-managed MLflow is built on Unity Catalog; tracking logs parameters, metrics and artifacts to evaluate and compare model performance; the MLflow Model Registry integrated with Unity Catalog centralizes models; MLflow Models are the standardized packaging format for models and agents."
+  },
+  {
+   "id": "dbxfe-mlflow-source-dbx-models",
+   "title": "Log, load, and register MLflow models",
+   "url": "https://docs.databricks.com/aws/en/mlflow/models",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; logging and registering models with MLflow 3.",
+   "caveat": "Defaults differ between MLflow major versions; a project pinned to MLflow 2 may still target the legacy workspace registry.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: With MLflow 3 the default registry URI is databricks-uc, so the MLflow Model Registry in Unity Catalog is used; models created with MLflow 3 and registered to Unity Catalog show their parameters and metrics in one place across experiments and workspaces."
+  },
+  {
+   "id": "dbxfe-mlflow-source-experiments",
+   "title": "Organize training runs with MLflow experiments",
+   "url": "https://docs.databricks.com/aws/en/mlflow/experiments",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; workspace and notebook experiments.",
+   "caveat": "Permission levels and their effects should be confirmed on the current page before designing access.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Experiments organize MLflow runs; workspace experiments are not associated with a notebook and any notebook can log to them by experiment ID or name; a notebook experiment is associated with one notebook and is created automatically when a run starts with no active experiment; experiment permission levels are NO PERMISSIONS, CAN READ, CAN EDIT and CAN MANAGE; notebook experiment permissions follow the notebook's."
+  },
+  {
+   "id": "dbxfe-mlflow-source-uc-lifecycle",
+   "title": "Manage model lifecycle in Unity Catalog",
+   "url": "https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; models registered in Unity Catalog.",
+   "caveat": "Requires a Unity Catalog-enabled workspace; privilege details change, so grants are checked against the current page.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Models in Unity Catalog take a three-level name <catalog>.<schema>.<model>; stages are not supported; Databricks recommends the three-level namespace to express environments and aliases to promote models, with tags to label them; creating a registered model requires USE CATALOG and USE SCHEMA plus CREATE MODEL or CREATE FUNCTION on the schema."
+  },
+  {
+   "id": "dbxfe-mlflow-source-uc-privileges",
+   "title": "Unity Catalog privileges reference",
+   "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "Databricks on AWS; Unity Catalog privileges for registered models.",
+   "caveat": "Ownership and version-creation rules are the part most likely to change; confirm the current reference before granting anything.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: EXECUTE on a registered model allows loading it for inference, viewing metadata for all its versions and downloading model files; creating new model versions and setting aliases are tied to ownership of the registered model or to a privilege the reference names for that purpose."
+  },
+  {
+   "id": "dbxfe-mlflow-source-pitfalls",
+   "title": "Common pitfalls and recommended practices",
+   "url": "https://scikit-learn.org/stable/common_pitfalls.html",
+   "publisher": "scikit-learn contributors",
+   "reviewedAt": "2026-09-23",
+   "publishedAt": null,
+   "context": "scikit-learn 1.9.1 documentation; general and cloud-independent.",
+   "caveat": "General guidance for scikit-learn estimators; it does not cover experiment tracking.",
+   "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Data leakage occurs when information unavailable at prediction time is used when building the model, producing overly optimistic estimates; preprocessing must be learnt from the training subset only and fit is never called on test data; randomness in estimators and splitters is controlled by random_state, and passing an integer to a splitter is usually the safest choice for repeatable splits."
+  }
+ ],
+ "claims": [
+  {
+   "id": "dbxfe-mlflow-claim-tracking",
+   "description": "An experiment groups runs; a run records parameters, metrics with an optional step history, tags and artifacts; a backend store keeps run metadata and an artifact store keeps files.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-tracking"
+   ],
+   "context": "Open-source MLflow tracking."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-datasets",
+   "description": "mlflow.data builds a dataset with a name, an automatically computed digest, a source and optional schema and profile; mlflow.log_input attaches it to a run with a context such as training or evaluation.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-datasets"
+   ],
+   "context": "Open-source MLflow dataset tracking."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-models",
+   "description": "A logged MLflow model is a directory with an MLmodel file listing its flavors; python_function is the generic interface built-in flavors include.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-models"
+   ],
+   "context": "Open-source MLflow model format."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-signatures",
+   "description": "Signature enforcement runs when a model is loaded as python_function or used by MLflow deployment tools, not with native-flavor loading; missing required inputs raise and only lossless type conversions are made.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-signatures"
+   ],
+   "context": "Column-based signatures in open-source MLflow."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-dependencies",
+   "description": "Logging a model writes requirements.txt, python_env.yaml and conda.yaml describing the environment that loads it; extra requirements can be added at logging time.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-dependencies"
+   ],
+   "context": "Open-source MLflow."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-registry",
+   "description": "A registered model holds numbered versions with lineage to their runs; aliases are mutable references to one version, a version can hold several aliases, and tags annotate versions.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-registry"
+   ],
+   "context": "Open-source MLflow Model Registry."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-search",
+   "description": "mlflow.search_runs filters runs with a WHERE-like expression over metrics, params, tags and run metadata and orders them by chosen columns.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-search"
+   ],
+   "context": "Open-source MLflow run search."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-mlflow3",
+   "description": "In MLflow 3 a logged model is a first-class entity with a model ID, referenced as models:/<model_id>, to which metrics can be linked.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-mlflow3"
+   ],
+   "context": "MLflow 3.x."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-filestore",
+   "description": "The file-based tracking backend is superseded by database backends; mlflow migrate-filestore (MLflow 3.10 or later) moves its metadata to SQLite and leaves artifacts in place.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-filestore"
+   ],
+   "context": "Self-hosted open-source MLflow."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-databricks",
+   "description": "Databricks-managed MLflow hosts tracking in the workspace, where experiments carry permission levels, and registers models in Unity Catalog, the default registry with MLflow 3.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-databricks",
+    "dbxfe-mlflow-source-dbx-models",
+    "dbxfe-mlflow-source-experiments"
+   ],
+   "context": "Databricks on AWS; entitlement and region vary."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-uc",
+   "description": "Models in Unity Catalog use catalog.schema.model names, do not support stages, and use aliases and tags instead.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-uc-lifecycle"
+   ],
+   "context": "Databricks on AWS."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-privileges",
+   "description": "Creating a registered model in Unity Catalog needs USE CATALOG, USE SCHEMA and CREATE MODEL on the schema; EXECUTE allows loading a model, reading its version metadata and downloading its files; versions and aliases are tied to model ownership or a privilege named for that purpose.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-uc-lifecycle",
+    "dbxfe-mlflow-source-uc-privileges"
+   ],
+   "context": "Databricks on AWS; confirm current privilege rules before granting."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-randomness",
+   "description": "Leakage uses information unavailable at prediction time and inflates estimates; preprocessing is learnt from training data only; random_state controls randomness, and an integer seed makes a split repeatable.",
+   "kind": "documented",
+   "sourceIds": [
+    "dbxfe-mlflow-source-pitfalls"
+   ],
+   "context": "scikit-learn; general, cloud-independent."
+  },
+  {
+   "id": "dbxfe-mlflow-claim-lab",
+   "description": "Observed by executing lab L17 on open-source MLflow 3.16.1 with scikit-learn 1.9.1: changing a logged parameter raises an error; the scikit-learn flavor saves in the skops format by default; the pandas dataset digest reads at most the first 10,000 rows plus the row count and column names and ignores the source text; pyfunc enforcement refuses a missing input and an int64-to-float64 conversion but ignores an extra input with a warning; the default tracking URI is a local SQLite file and the file store requires MLFLOW_ALLOW_FILE_STORE=true; a clean rerun reproduced every metric exactly on one machine.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "Local execution on one machine with pinned versions; observations, not documented guarantees; re-check on another version."
+  },
+  {
+   "id": "dbxfe-mlflow-guidance",
+   "description": "Original SpicyBrain reasoning for comparing runs, refusing irreproducible ones, writing model contracts and promoting by evidence; not an MLflow or Databricks procedure.",
+   "kind": "guidance",
+   "sourceIds": [],
+   "context": "Independent curriculum; adapt thresholds and gates to the owner's actual decision."
+  },
+  {
+   "id": "dbxfe-mlflow-fiction",
+   "description": "Cinderline Components, its plants, ovens, runs, digests, contracts, decisions and registry entries are synthetic teaching records.",
+   "kind": "fictional",
+   "sourceIds": [],
+   "context": "The lab's data is generated with a seed; no real equipment, workspace or catalog is described."
+  }
+ ],
+ "concepts": [
+  {
+   "id": "dbxfe-mlflow-experiment-concept",
+   "term": "MLflow experiment",
+   "aliases": [
+    "tracking experiment"
+   ],
+   "definition": "A named container that groups related runs so they can be searched and compared together.",
+   "example": "cinderline-oven-fault-warning holds the baselines, the clean runs, the leaks and the hero.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-tracking"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-run-concept",
+   "term": "MLflow run",
+   "aliases": [
+    "tracked run"
+   ],
+   "definition": "One execution of training or evaluation code, recorded with its parameters, metrics, tags, datasets and artifacts.",
+   "example": "time-split-C-1 records C=1.0, seed 20260923, recall 0.8333 and its model.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-tracking"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-param-concept",
+   "term": "parameter",
+   "aliases": [
+    "run parameter",
+    "hyperparameter"
+   ],
+   "definition": "An input value chosen before a run, stored as text and fixed once logged.",
+   "example": "C is stored as the text 1.0; logging C=0.5 later is refused.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-tracking"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-metric-concept",
+   "term": "metric",
+   "aliases": [
+    "run metric"
+   ],
+   "definition": "A numeric result measured by a run, optionally logged at several steps with the latest shown.",
+   "example": "recall 0.8333 and warnings_per_day 1.8889 for time-split-C-1.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-tracking"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-artifact-concept",
+   "term": "artifact",
+   "aliases": [
+    "run artifact"
+   ],
+   "definition": "A file a run writes to the artifact store, such as a report, a plot or a model directory.",
+   "example": "The clean run's split report, checks/split_report.json, and its confusion matrix.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-tracking"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-digest-concept",
+   "term": "dataset digest",
+   "aliases": [
+    "MLflow dataset digest",
+    "dataset fingerprint"
+   ],
+   "definition": "A short hash MLflow computes from a logged dataset's content that identifies which rows a run saw.",
+   "example": "4950f73b for days 1 to 84; 3f06bea0 for the random split's rows.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-datasets"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-leak-concept",
+   "term": "post-event feature",
+   "aliases": [
+    "leaking feature",
+    "future information"
+   ],
+   "definition": "A column recorded after the prediction moment, so a model using it cannot run when the prediction is needed.",
+   "example": "repair_minutes, written by the technician after the fault it would predict.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-pitfalls"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-comparable-concept",
+   "term": "comparable runs",
+   "aliases": [
+    "controlled comparison"
+   ],
+   "definition": "Two runs trained on the same rows that differ in exactly one deliberate parameter.",
+   "example": "time-split-C-1 and time-split-C-0.01 share digest 4950f73b and differ only in C.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-datasets",
+    "dbxfe-mlflow-source-search"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-baseline-concept",
+   "term": "baseline run",
+   "aliases": [
+    "trivial predictor",
+    "rule in use"
+   ],
+   "definition": "A simple predictor logged as a run in the same experiment so that every model is read against it.",
+   "example": "never-warn at accuracy 0.9375 and the temperature rule at recall 0.6667.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-tracking"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-reproduce-concept",
+   "term": "reproducible from the record",
+   "aliases": [
+    "rerun from record",
+    "reproducibility"
+   ],
+   "definition": "A run whose logged parameters, training data and environment let a rerun return the same numbers.",
+   "example": "The clean rerun of time-split-C-1 returned digest 4950f73b and identical metrics.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-tracking",
+    "dbxfe-mlflow-source-pitfalls"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-flavor-concept",
+   "term": "model flavor",
+   "aliases": [
+    "MLflow flavor",
+    "python_function"
+   ],
+   "definition": "A named way to load a logged model, listed in its MLmodel file, such as python_function or sklearn.",
+   "example": "The lab's model lists python_function and sklearn, saved as model.skops.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-models"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-signature-concept",
+   "term": "model signature",
+   "aliases": [
+    "input schema",
+    "output schema"
+   ],
+   "definition": "The named, typed inputs and outputs recorded with a model and enforced when it is loaded as python_function.",
+   "example": "Six required double inputs and fault_next_24h as a long output.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-signatures"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-contract-concept",
+   "term": "model contract",
+   "aliases": [
+    "versioned model contract"
+   ],
+   "definition": "A versioned document stating a model's inputs, output, thresholds and the evidence a run must carry.",
+   "example": "Contract 1.0.0: six doubles, recall at least 0.75, at most 2.0 warnings a day.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-signatures"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-environment-concept",
+   "term": "model environment",
+   "aliases": [
+    "requirements.txt",
+    "python_env.yaml",
+    "conda.yaml"
+   ],
+   "definition": "The Python version and pinned packages written beside a logged model so it can be loaded again.",
+   "example": "requirements.txt pins mlflow 3.16.1 and scikit-learn 1.9.1.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-dependencies"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-version-concept",
+   "term": "registered model version",
+   "aliases": [
+    "model version"
+   ],
+   "definition": "A numbered registration of a logged model under a registered model's name; its model files and source run do not change, though its tags can.",
+   "example": "cinderline-oven-fault version 1 came from time-split-C-1.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-registry"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-alias-concept",
+   "term": "model alias",
+   "aliases": [
+    "registered model alias",
+    "candidate alias",
+    "champion alias"
+   ],
+   "definition": "A mutable name that points at exactly one version of a registered model.",
+   "example": "models:/cinderline-oven-fault@candidate loads version 1 after the rollback.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-registry"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-promotion-concept",
+   "term": "promotion by evidence",
+   "aliases": [
+    "evidence gate",
+    "promotion decision"
+   ],
+   "definition": "Moving an alias to a version only after its run passes a contract's evidence gate and then its thresholds.",
+   "example": "Only time-split-C-1 passed both gates and became the candidate.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-registry"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-uc-concept",
+   "term": "models in Unity Catalog",
+   "aliases": [
+    "Unity Catalog model registry",
+    "databricks-uc"
+   ],
+   "definition": "Databricks' model registry, where models have catalog.schema.model names, catalog privileges, aliases and no stages.",
+   "example": "cinderline_ml.maintenance.oven_fault with the alias candidate.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-uc-lifecycle"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-extension-filestore-concept",
+   "term": "file store migration",
+   "aliases": [
+    "mlflow migrate-filestore",
+    "MLFLOW_ALLOW_FILE_STORE"
+   ],
+   "definition": "Moving a self-hosted MLflow file-based backend's metadata into a database backend.",
+   "example": "mlflow migrate-filestore copies ./mlruns metadata into SQLite.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-filestore"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-extension-logged-model-concept",
+   "term": "LoggedModel",
+   "aliases": [
+    "logged model",
+    "model ID"
+   ],
+   "definition": "MLflow 3's first-class record of a logged model, with its own ID, artifacts and linked metrics.",
+   "example": "models:/m-<id> loads the model that time-split-C-1 logged, before any registration.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-mlflow3"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-extension-uc-privileges-concept",
+   "term": "registered model privileges",
+   "aliases": [
+    "EXECUTE",
+    "CREATE MODEL"
+   ],
+   "definition": "The Unity Catalog grants that control creating, versioning, aliasing and loading a registered model.",
+   "example": "CREATE MODEL on the schema to create; EXECUTE to load for inference.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-uc-privileges"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-extension-experiment-permissions-concept",
+   "term": "experiment permissions",
+   "aliases": [
+    "CAN READ",
+    "CAN EDIT",
+    "CAN MANAGE"
+   ],
+   "definition": "The permission levels that decide who can read, log to or manage a Databricks MLflow experiment.",
+   "example": "A reviewer is given CAN READ on the workspace experiment holding the oven runs.",
+   "sourceIds": [
+    "dbxfe-mlflow-source-experiments"
+   ]
+  }
+ ],
+ "visuals": [
+  {
+   "id": "dbxfe-mlflow-record-visual",
+   "kind": "nodes",
+   "title": "What one run holds, and where",
+   "alt": "What one run holds, and where. The experiment contains the run; the run records parameters, metrics, tags and dataset references, writes artifacts and logs a model.",
+   "caption": "Every number traces to a node of the run; metadata and files live in two different stores. Synthetic teaching example; values from the executed lab L17.",
+   "textEquivalent": "What one run holds: The experiment contains the run; the run records parameters, metrics, tags and dataset references, writes artifacts and logs a model. Nodes: Experiment: cinderline-oven-fault-warning groups the baselines and every model run. (context); Run time-split-C-1: One execution of the training code, with a run ID and start and end times. (selected); Parameters: C=1.0, seed=20260923. Inputs chosen before the run, stored as text. (selected); Metrics: recall 0.8333. Measured numbers, each with a step history. (selected); Tags: Run name, user and source, set by MLflow. (context); Dataset inputs: training 4950f73b. Training and evaluation datasets with their contexts. (selected); Artifacts: Check reports, metrics JSON, confusion matrix. (selected); Logged model: models:/m-<id>. A model directory with its own ID in MLflow 3. (selected). Relationships: Experiment → Run time-split-C-1: contains; Run time-split-C-1 → Parameters: records; Run time-split-C-1 → Metrics: records; Run time-split-C-1 → Tags: records; Run time-split-C-1 → Dataset inputs: reads; Run time-split-C-1 → Artifacts: writes; Run time-split-C-1 → Logged model: logs.\n\nWhere each part is stored: Parameters, metrics, tags and dataset references sit in the backend store; artifacts and the model's files sit in the artifact store. Losing the artifact store keeps the numbers and loses what they were computed with. Nodes: Backend store: Run metadata: params/, metrics/, tags/, inputs/ in the lab's file store; tables in a database backend. (selected); Artifact store: Files: artifacts/checks, artifacts/evaluation and models/<id>/artifacts. (selected); Parameters: One small file per parameter in the file store. (context); Metrics: timestamp, value and step per logged value. (context); Artifacts: Reports the reviewer reads. (context); Logged model: MLmodel, model.skops, environment files. (context). Relationships: Parameters → Backend store: kept in; Metrics → Backend store: kept in; Artifacts → Artifact store: kept in; Logged model → Artifact store: kept in.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-tracking",
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "holds",
+     "title": "What one run holds",
+     "explanation": "The experiment contains the run; the run records parameters, metrics, tags and dataset references, writes artifacts and logs a model.",
+     "nodes": [
+      {
+       "id": "exp",
+       "label": "Experiment",
+       "detail": "cinderline-oven-fault-warning groups the baselines and every model run.",
+       "status": "context"
+      },
+      {
+       "id": "run",
+       "label": "Run time-split-C-1",
+       "detail": "One execution of the training code, with a run ID and start and end times.",
+       "status": "selected"
+      },
+      {
+       "id": "params",
+       "label": "Parameters",
+       "value": "C=1.0, seed=20260923",
+       "detail": "Inputs chosen before the run, stored as text.",
+       "status": "selected"
+      },
+      {
+       "id": "metrics",
+       "label": "Metrics",
+       "value": "recall 0.8333",
+       "detail": "Measured numbers, each with a step history.",
+       "status": "selected"
+      },
+      {
+       "id": "tags",
+       "label": "Tags",
+       "detail": "Run name, user and source, set by MLflow.",
+       "status": "context"
+      },
+      {
+       "id": "inputs",
+       "label": "Dataset inputs",
+       "value": "training 4950f73b",
+       "detail": "Training and evaluation datasets with their contexts.",
+       "status": "selected"
+      },
+      {
+       "id": "artifacts",
+       "label": "Artifacts",
+       "detail": "Check reports, metrics JSON, confusion matrix.",
+       "status": "selected"
+      },
+      {
+       "id": "model",
+       "label": "Logged model",
+       "value": "models:/m-<id>",
+       "detail": "A model directory with its own ID in MLflow 3.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "exp",
+       "to": "run",
+       "label": "contains"
+      },
+      {
+       "from": "run",
+       "to": "params",
+       "label": "records"
+      },
+      {
+       "from": "run",
+       "to": "metrics",
+       "label": "records"
+      },
+      {
+       "from": "run",
+       "to": "tags",
+       "label": "records"
+      },
+      {
+       "from": "run",
+       "to": "inputs",
+       "label": "reads"
+      },
+      {
+       "from": "run",
+       "to": "artifacts",
+       "label": "writes"
+      },
+      {
+       "from": "run",
+       "to": "model",
+       "label": "logs"
+      }
+     ]
+    },
+    {
+     "id": "stores",
+     "title": "Where each part is stored",
+     "explanation": "Parameters, metrics, tags and dataset references sit in the backend store; artifacts and the model's files sit in the artifact store. Losing the artifact store keeps the numbers and loses what they were computed with.",
+     "nodes": [
+      {
+       "id": "backend",
+       "label": "Backend store",
+       "detail": "Run metadata: params/, metrics/, tags/, inputs/ in the lab's file store; tables in a database backend.",
+       "status": "selected"
+      },
+      {
+       "id": "artstore",
+       "label": "Artifact store",
+       "detail": "Files: artifacts/checks, artifacts/evaluation and models/<id>/artifacts.",
+       "status": "selected"
+      },
+      {
+       "id": "params",
+       "label": "Parameters",
+       "detail": "One small file per parameter in the file store.",
+       "status": "context"
+      },
+      {
+       "id": "metrics",
+       "label": "Metrics",
+       "detail": "timestamp, value and step per logged value.",
+       "status": "context"
+      },
+      {
+       "id": "artifacts",
+       "label": "Artifacts",
+       "detail": "Reports the reviewer reads.",
+       "status": "context"
+      },
+      {
+       "id": "model",
+       "label": "Logged model",
+       "detail": "MLmodel, model.skops, environment files.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "params",
+       "to": "backend",
+       "label": "kept in"
+      },
+      {
+       "from": "metrics",
+       "to": "backend",
+       "label": "kept in"
+      },
+      {
+       "from": "artifacts",
+       "to": "artstore",
+       "label": "kept in"
+      },
+      {
+       "from": "model",
+       "to": "artstore",
+       "label": "kept in"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-params-visual",
+   "kind": "table",
+   "title": "Chosen once, measured many times",
+   "alt": "Chosen once, measured many times. Parameters are the choices the code read; metrics are what it measured on the 288 test rows.",
+   "caption": "Parameters are stored as text and cannot change; metrics keep a history and show the latest value. Synthetic teaching example; values from the executed lab L17.",
+   "textEquivalent": "Logged once: Parameters are the choices the code read; metrics are what it measured on the 288 test rows. Table columns: kind, key, stored value. Rows: parameter; C; \"1.0\" (text) | parameter; seed; \"20260923\" | parameter; split; \"time\" | parameter; train_through_day; \"84\" | metric; recall; 0.8333 | metric; warnings_per_day; 1.8889.\n\nA change is refused: Logging the same value again is accepted; a different value for C raises; a metric logged at two steps keeps both and shows the latest. Table columns: call, result in MLflow 3.16.1. Rows: log_param C=1.0 again; accepted: same value | log_param C=0.5; MlflowException: Changing param values is not allowed | log_metric loss 0.5 at step 0; kept in the metric history | log_metric loss 0.4 at step 1; history 0.5, 0.4; run shows 0.4.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-tracking",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "logged",
+     "title": "Logged once",
+     "explanation": "Parameters are the choices the code read; metrics are what it measured on the 288 test rows.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "kind",
+       "key",
+       "stored value"
+      ],
+      "rows": [
+       [
+        "parameter",
+        "C",
+        "\"1.0\" (text)"
+       ],
+       [
+        "parameter",
+        "seed",
+        "\"20260923\""
+       ],
+       [
+        "parameter",
+        "split",
+        "\"time\""
+       ],
+       [
+        "parameter",
+        "train_through_day",
+        "\"84\""
+       ],
+       [
+        "metric",
+        "recall",
+        "0.8333"
+       ],
+       [
+        "metric",
+        "warnings_per_day",
+        "1.8889"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "refused",
+     "title": "A change is refused",
+     "explanation": "Logging the same value again is accepted; a different value for C raises; a metric logged at two steps keeps both and shows the latest.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "call",
+       "result in MLflow 3.16.1"
+      ],
+      "rows": [
+       [
+        "log_param C=1.0 again",
+        "accepted: same value"
+       ],
+       [
+        "log_param C=0.5",
+        "MlflowException: Changing param values is not allowed"
+       ],
+       [
+        "log_metric loss 0.5 at step 0",
+        "kept in the metric history"
+       ],
+       [
+        "log_metric loss 0.4 at step 1",
+        "history 0.5, 0.4; run shows 0.4"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-dataset-visual",
+   "kind": "table",
+   "title": "What a dataset digest tells apart",
+   "alt": "What a dataset digest tells apart. Every run logs the full training rows; the features parameter says which columns the model read.",
+   "caption": "Same rows give the same digest whatever the feature list; the pandas digest in MLflow 3.16.1 reads the row count, the column names and at most the first 10,000 rows. Synthetic teaching example; values from the executed lab L17.",
+   "textEquivalent": "Same rows, same digest: Every run logs the full training rows; the features parameter says which columns the model read. Table columns: run, training rows, digest. Rows: time-split-C-1; days 1–84, 672 rows; 4950f73b | time-split-C-0.01; days 1–84, 672 rows; 4950f73b | time-split-leaky; days 1–84, 672 rows; 4950f73b | random-split-seeded; random 672 rows; 3f06bea0 | C = 1 rerun, other plant; days 1–84, second plant; 2729bc65.\n\nWhat the digest reads: On a 10,001-row frame, a change in row 1 moves the digest, a change in row 10,001 does not, and dropping a row does. Table columns: change to a 10,001-row frame, digest. Rows: none; d0 | value in row 1 changed; different from d0 | value in row 10,001 changed; d0 again | last row dropped; different (row count) | source text changed; d0 again.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "rows",
+     "title": "Same rows, same digest",
+     "explanation": "Every run logs the full training rows; the features parameter says which columns the model read.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "run",
+       "training rows",
+       "digest"
+      ],
+      "rows": [
+       [
+        "time-split-C-1",
+        "days 1–84, 672 rows",
+        "4950f73b"
+       ],
+       [
+        "time-split-C-0.01",
+        "days 1–84, 672 rows",
+        "4950f73b"
+       ],
+       [
+        "time-split-leaky",
+        "days 1–84, 672 rows",
+        "4950f73b"
+       ],
+       [
+        "random-split-seeded",
+        "random 672 rows",
+        "3f06bea0"
+       ],
+       [
+        "C = 1 rerun, other plant",
+        "days 1–84, second plant",
+        "2729bc65"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "sample",
+     "title": "What the digest reads",
+     "explanation": "On a 10,001-row frame, a change in row 1 moves the digest, a change in row 10,001 does not, and dropping a row does.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "change to a 10,001-row frame",
+       "digest"
+      ],
+      "rows": [
+       [
+        "none",
+        "d0"
+       ],
+       [
+        "value in row 1 changed",
+        "different from d0"
+       ],
+       [
+        "value in row 10,001 changed",
+        "d0 again"
+       ],
+       [
+        "last row dropped",
+        "different (row count)"
+       ],
+       [
+        "source text changed",
+        "d0 again"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-quality-visual",
+   "kind": "timeline",
+   "title": "One oven-day and the leaky run's record",
+   "alt": "One oven-day and the leaky run's record. At 09:00 the previous 24 hours of readings exist. The fault happens later; the technician writes the repair record after it.",
+   "caption": "The repair record exists hours after the 09:00 prediction, yet a complete run record holds it as a feature. Synthetic teaching example; the run is from the executed lab L17.",
+   "textEquivalent": "The prediction moment: At 09:00 the previous 24 hours of readings exist. The fault happens later; the technician writes the repair record after it. Nodes: Previous 24 h readings: Temperature, door cycles, humidity: available at 09:00. (selected); 09:00 prediction: Should this oven join today's inspection round? (selected); 14:00 fault stop: The event the label records. (context); 16:00 repair record: repair_minutes and fault_code are written now. (excluded). Relationships: Previous 24 h readings → 09:00 prediction: input to; 09:00 prediction → 14:00 fault stop: precedes; 14:00 fault stop → 16:00 repair record: then.\n\nThe leaky run's record: The run logged a seed, a time split, datasets, a signature and artifacts, and its feature list includes repair_minutes. Accuracy 1.0 is real arithmetic on invalid inputs. Nodes: Previous 24 h readings: Six features, all available at 09:00. (selected); 09:00 prediction: The model is asked here. (selected); 14:00 fault stop: 18 of 288 test rows. (context); 16:00 repair record: Read as a feature by the leaky run. (warning); Run record: accuracy 1.0. Complete: seed, split, digest 4950f73b, signature, artifacts. (warning). Relationships: Previous 24 h readings → 09:00 prediction: input to; 09:00 prediction → 14:00 fault stop: precedes; 14:00 fault stop → 16:00 repair record: then; 16:00 repair record → Run record: recorded as feature; Previous 24 h readings → Run record: recorded as features.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-randomness",
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "day",
+     "title": "The prediction moment",
+     "explanation": "At 09:00 the previous 24 hours of readings exist. The fault happens later; the technician writes the repair record after it.",
+     "nodes": [
+      {
+       "id": "readings",
+       "label": "Previous 24 h readings",
+       "detail": "Temperature, door cycles, humidity: available at 09:00.",
+       "status": "selected"
+      },
+      {
+       "id": "predict",
+       "label": "09:00 prediction",
+       "detail": "Should this oven join today's inspection round?",
+       "status": "selected"
+      },
+      {
+       "id": "fault",
+       "label": "14:00 fault stop",
+       "detail": "The event the label records.",
+       "status": "context"
+      },
+      {
+       "id": "repair",
+       "label": "16:00 repair record",
+       "detail": "repair_minutes and fault_code are written now.",
+       "status": "excluded"
+      }
+     ],
+     "connections": [
+      {
+       "from": "readings",
+       "to": "predict",
+       "label": "input to"
+      },
+      {
+       "from": "predict",
+       "to": "fault",
+       "label": "precedes"
+      },
+      {
+       "from": "fault",
+       "to": "repair",
+       "label": "then"
+      }
+     ]
+    },
+    {
+     "id": "record",
+     "title": "The leaky run's record",
+     "explanation": "The run logged a seed, a time split, datasets, a signature and artifacts, and its feature list includes repair_minutes. Accuracy 1.0 is real arithmetic on invalid inputs.",
+     "nodes": [
+      {
+       "id": "readings",
+       "label": "Previous 24 h readings",
+       "detail": "Six features, all available at 09:00.",
+       "status": "selected"
+      },
+      {
+       "id": "predict",
+       "label": "09:00 prediction",
+       "detail": "The model is asked here.",
+       "status": "selected"
+      },
+      {
+       "id": "fault",
+       "label": "14:00 fault stop",
+       "detail": "18 of 288 test rows.",
+       "status": "context"
+      },
+      {
+       "id": "repair",
+       "label": "16:00 repair record",
+       "detail": "Read as a feature by the leaky run.",
+       "status": "warning"
+      },
+      {
+       "id": "logged",
+       "label": "Run record",
+       "value": "accuracy 1.0",
+       "detail": "Complete: seed, split, digest 4950f73b, signature, artifacts.",
+       "status": "warning"
+      }
+     ],
+     "connections": [
+      {
+       "from": "readings",
+       "to": "predict",
+       "label": "input to"
+      },
+      {
+       "from": "predict",
+       "to": "fault",
+       "label": "precedes"
+      },
+      {
+       "from": "fault",
+       "to": "repair",
+       "label": "then"
+      },
+      {
+       "from": "repair",
+       "to": "logged",
+       "label": "recorded as feature"
+      },
+      {
+       "from": "readings",
+       "to": "logged",
+       "label": "recorded as features"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-compare-visual",
+   "kind": "table",
+   "title": "Two runs that compare, and one pair that does not",
+   "alt": "Two runs that compare, and one pair that does not. C = 1 and C = 0.01 share digest, split, features and seed; only C differs, so every metric difference belongs to C.",
+   "caption": "Same training digest and one changed parameter make a difference attributable; different rows do not. Synthetic teaching example; values from the executed lab L17.",
+   "textEquivalent": "Same rows, one parameter: C = 1 and C = 0.01 share digest, split, features and seed; only C differs, so every metric difference belongs to C. Table columns: field, time-split-C-1, time-split-C-0.01. Rows: training digest; 4950f73b; 4950f73b | split; time, day 84; time, day 84 | features; six at 09:00; six at 09:00 | seed; 20260923; 20260923 | C; 1.0; 0.01 | recall; 0.8333; 0.9444 | precision; 0.2206; 0.1868 | warnings a day; 1.89; 2.53.\n\nSame rows, features changed: The leaky run differs only in features, so the jump to 1.0 is the post-event column's effect alone. Table columns: field, time-split-C-1, time-split-leaky. Rows: training digest; 4950f73b; 4950f73b | features; six at 09:00; six + repair_minutes | C; 1.0; 1.0 | accuracy; 0.8056; 1.0 | recall; 0.8333; 1.0.\n\nDifferent rows: The random split changes the rows and three parameters at once; no single cause can be named. Table columns: field, time-split-C-1, random-split-seeded. Rows: training digest; 4950f73b; 3f06bea0 | split; time; random | differing parameters; none; split, train_fraction, train_through_day | comparable; reference; no.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-search",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "onec",
+     "title": "Same rows, one parameter",
+     "explanation": "C = 1 and C = 0.01 share digest, split, features and seed; only C differs, so every metric difference belongs to C.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "field",
+       "time-split-C-1",
+       "time-split-C-0.01"
+      ],
+      "rows": [
+       [
+        "training digest",
+        "4950f73b",
+        "4950f73b"
+       ],
+       [
+        "split",
+        "time, day 84",
+        "time, day 84"
+       ],
+       [
+        "features",
+        "six at 09:00",
+        "six at 09:00"
+       ],
+       [
+        "seed",
+        "20260923",
+        "20260923"
+       ],
+       [
+        "C",
+        "1.0",
+        "0.01"
+       ],
+       [
+        "recall",
+        "0.8333",
+        "0.9444"
+       ],
+       [
+        "precision",
+        "0.2206",
+        "0.1868"
+       ],
+       [
+        "warnings a day",
+        "1.89",
+        "2.53"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "feat",
+     "title": "Same rows, features changed",
+     "explanation": "The leaky run differs only in features, so the jump to 1.0 is the post-event column's effect alone.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "field",
+       "time-split-C-1",
+       "time-split-leaky"
+      ],
+      "rows": [
+       [
+        "training digest",
+        "4950f73b",
+        "4950f73b"
+       ],
+       [
+        "features",
+        "six at 09:00",
+        "six + repair_minutes"
+       ],
+       [
+        "C",
+        "1.0",
+        "1.0"
+       ],
+       [
+        "accuracy",
+        "0.8056",
+        "1.0"
+       ],
+       [
+        "recall",
+        "0.8333",
+        "1.0"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "rows",
+     "title": "Different rows",
+     "explanation": "The random split changes the rows and three parameters at once; no single cause can be named.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "field",
+       "time-split-C-1",
+       "random-split-seeded"
+      ],
+      "rows": [
+       [
+        "training digest",
+        "4950f73b",
+        "3f06bea0"
+       ],
+       [
+        "split",
+        "time",
+        "random"
+       ],
+       [
+        "differing parameters",
+        "none",
+        "split, train_fraction, train_through_day"
+       ],
+       [
+        "comparable",
+        "reference",
+        "no"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-sorted-visual",
+   "kind": "table",
+   "title": "The table a hurried reader sorts",
+   "alt": "The table a hurried reader sorts. search_runs ordered by accuracy, ties broken by name. Time-split runs and baselines are scored on 288 test rows with 18 faults.",
+   "caption": "Sorted by accuracy, the two leaks and never-warn outrank every honest model; read against the contract, only one run meets all three measures. Synthetic teaching example; values from the executed lab L17.",
+   "textEquivalent": "Sorted by accuracy: search_runs ordered by accuracy, ties broken by name. Time-split runs and baselines are scored on 288 test rows with 18 faults. Table columns: rank, run, accuracy, recall. Rows: 1; hero; 1.0; 1.0 | 2; time-split-leaky; 1.0; 1.0 | 3; never-warn; 0.9375; 0.0 | 4; temperature-rule; 0.8715; 0.6667 | 5; random-split-seeded; 0.8438; 0.7368 | 6; time-split-C-1; 0.8056; 0.8333 | 7; time-split-C-0.01; 0.7396; 0.9444.\n\nRead against the contract: Recall against the rule in use, precision, and warnings against a round that holds two ovens: the ranking changes shape. Table columns: run, recall ≥ 0.75, precision ≥ 0.2, ≤ 2.0 warnings a day. Rows: hero; 1.0 (record fails first); 1.0; 0.56 | time-split-leaky; 1.0 (record fails first); 1.0; 0.50 | never-warn; 0.0 no; none; 0 | temperature-rule; 0.6667 no; 0.2791; 1.19 | random-split-seeded; 0.7368 no; 0.2593; 1.50 | time-split-C-1; 0.8333 yes; 0.2206 yes; 1.89 yes | time-split-C-0.01; 0.9444 yes; 0.1868 no; 2.53 no.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-search",
+    "dbxfe-mlflow-claim-randomness",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "acc",
+     "title": "Sorted by accuracy",
+     "explanation": "search_runs ordered by accuracy, ties broken by name. Time-split runs and baselines are scored on 288 test rows with 18 faults.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "rank",
+       "run",
+       "accuracy",
+       "recall"
+      ],
+      "rows": [
+       [
+        "1",
+        "hero",
+        "1.0",
+        "1.0"
+       ],
+       [
+        "2",
+        "time-split-leaky",
+        "1.0",
+        "1.0"
+       ],
+       [
+        "3",
+        "never-warn",
+        "0.9375",
+        "0.0"
+       ],
+       [
+        "4",
+        "temperature-rule",
+        "0.8715",
+        "0.6667"
+       ],
+       [
+        "5",
+        "random-split-seeded",
+        "0.8438",
+        "0.7368"
+       ],
+       [
+        "6",
+        "time-split-C-1",
+        "0.8056",
+        "0.8333"
+       ],
+       [
+        "7",
+        "time-split-C-0.01",
+        "0.7396",
+        "0.9444"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "contract",
+     "title": "Read against the contract",
+     "explanation": "Recall against the rule in use, precision, and warnings against a round that holds two ovens: the ranking changes shape.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "run",
+       "recall ≥ 0.75",
+       "precision ≥ 0.2",
+       "≤ 2.0 warnings a day"
+      ],
+      "rows": [
+       [
+        "hero",
+        "1.0 (record fails first)",
+        "1.0",
+        "0.56"
+       ],
+       [
+        "time-split-leaky",
+        "1.0 (record fails first)",
+        "1.0",
+        "0.50"
+       ],
+       [
+        "never-warn",
+        "0.0 no",
+        "none",
+        "0"
+       ],
+       [
+        "temperature-rule",
+        "0.6667 no",
+        "0.2791",
+        "1.19"
+       ],
+       [
+        "random-split-seeded",
+        "0.7368 no",
+        "0.2593",
+        "1.50"
+       ],
+       [
+        "time-split-C-1",
+        "0.8333 yes",
+        "0.2206 yes",
+        "1.89 yes"
+       ],
+       [
+        "time-split-C-0.01",
+        "0.9444 yes",
+        "0.1868 no",
+        "2.53 no"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-hero-visual",
+   "kind": "table",
+   "title": "The superior-looking run beside a clean one",
+   "alt": "The superior-looking run beside a clean one. Everything a rerun would need is present for the clean run and absent for the hero.",
+   "caption": "The hero's record holds one parameter; the same code run again leaves an identical record and a different result. Synthetic teaching example; values from the executed lab L17.",
+   "textEquivalent": "Two records side by side: Everything a rerun would need is present for the clean run and absent for the hero. Table columns: field, hero, time-split-C-1. Rows: parameters; model only; 9: C, seed, split, cut-off, features, ... | training dataset; none; 4950f73b | features recorded; no (used repair_minutes); six at 09:00 | signature; none; 6 doubles in, long out | accuracy; 1.0; 0.8056 | rerun from record; refused: 8 gaps; exact.\n\nThe same code, run again: The hero's code executed twice: the records are indistinguishable, the test sets are not. Table columns: run, logged parameters, test faults, caught, warnings a day. Rows: hero; model=logistic_regression; 20; 20; 0.56 | hero-again; model=logistic_regression; 18; 18; 0.50.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-tracking",
+    "dbxfe-mlflow-claim-randomness",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "side",
+     "title": "Two records side by side",
+     "explanation": "Everything a rerun would need is present for the clean run and absent for the hero.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "field",
+       "hero",
+       "time-split-C-1"
+      ],
+      "rows": [
+       [
+        "parameters",
+        "model only",
+        "9: C, seed, split, cut-off, features, ..."
+       ],
+       [
+        "training dataset",
+        "none",
+        "4950f73b"
+       ],
+       [
+        "features recorded",
+        "no (used repair_minutes)",
+        "six at 09:00"
+       ],
+       [
+        "signature",
+        "none",
+        "6 doubles in, long out"
+       ],
+       [
+        "accuracy",
+        "1.0",
+        "0.8056"
+       ],
+       [
+        "rerun from record",
+        "refused: 8 gaps",
+        "exact"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "again",
+     "title": "The same code, run again",
+     "explanation": "The hero's code executed twice: the records are indistinguishable, the test sets are not.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "run",
+       "logged parameters",
+       "test faults",
+       "caught",
+       "warnings a day"
+      ],
+      "rows": [
+       [
+        "hero",
+        "model=logistic_regression",
+        "20",
+        "20",
+        "0.56"
+       ],
+       [
+        "hero-again",
+        "model=logistic_regression",
+        "18",
+        "18",
+        "0.50"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-rerun-visual",
+   "kind": "equation",
+   "title": "When a rerun counts as a reproduction",
+   "alt": "When a rerun counts as a reproduction. The rerun of time-split-C-1 reads its parameters from the record and meets all three conditions.",
+   "caption": "Three conditions, checked from the record: same training digest, same recorded library version, every metric equal. Synthetic teaching example; values from the executed lab L17.",
+   "textEquivalent": "Clean rerun: The rerun of time-split-C-1 reads its parameters from the record and meets all three conditions. Table columns: check, original, rerun. Rows: training digest; 4950f73b; 4950f73b | scikit-learn; 1.9.1; 1.9.1 | tp, fp, fn, tn; 15, 53, 3, 217; 15, 53, 3, 217 | recall; 0.8333…; 0.8333… (equal). Equation: reproduced = same digest ∧ same environment ∧ identical metrics = true ∧ true ∧ true = true\n\nRerun on another plant: The same record rerun on a second plant's rows: the digest changes and recall falls to 0.6. That is a new experiment. Table columns: check, original, rerun. Rows: training digest; 4950f73b; 2729bc65 | scikit-learn; 1.9.1; 1.9.1 | recall; 0.8333; 0.6. Equation: reproduced = (4950f73b = 2729bc65) ∧ true ∧ (0.8333 = 0.6) = false\n\nDifferent library version: A copy of the clean record claiming scikit-learn 1.8.0 is refused before any training on a 1.9.1 installation. Equation: reproduced = refused before training: scikit-learn 1.8.0 recorded ≠ 1.9.1 installed",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-dependencies",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "clean",
+     "title": "Clean rerun",
+     "explanation": "The rerun of time-split-C-1 reads its parameters from the record and meets all three conditions.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "check",
+       "original",
+       "rerun"
+      ],
+      "rows": [
+       [
+        "training digest",
+        "4950f73b",
+        "4950f73b"
+       ],
+       [
+        "scikit-learn",
+        "1.9.1",
+        "1.9.1"
+       ],
+       [
+        "tp, fp, fn, tn",
+        "15, 53, 3, 217",
+        "15, 53, 3, 217"
+       ],
+       [
+        "recall",
+        "0.8333…",
+        "0.8333… (equal)"
+       ]
+      ]
+     },
+     "equation": "reproduced = same digest ∧ same environment ∧ identical metrics = true ∧ true ∧ true = true"
+    },
+    {
+     "id": "plant",
+     "title": "Rerun on another plant",
+     "explanation": "The same record rerun on a second plant's rows: the digest changes and recall falls to 0.6. That is a new experiment.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "check",
+       "original",
+       "rerun"
+      ],
+      "rows": [
+       [
+        "training digest",
+        "4950f73b",
+        "2729bc65"
+       ],
+       [
+        "scikit-learn",
+        "1.9.1",
+        "1.9.1"
+       ],
+       [
+        "recall",
+        "0.8333",
+        "0.6"
+       ]
+      ]
+     },
+     "equation": "reproduced = (4950f73b = 2729bc65) ∧ true ∧ (0.8333 = 0.6) = false"
+    },
+    {
+     "id": "version",
+     "title": "Different library version",
+     "explanation": "A copy of the clean record claiming scikit-learn 1.8.0 is refused before any training on a 1.9.1 installation.",
+     "nodes": [],
+     "connections": [],
+     "equation": "reproduced = refused before training: scikit-learn 1.8.0 recorded ≠ 1.9.1 installed"
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-flavors-visual",
+   "kind": "nodes",
+   "title": "Inside a logged model",
+   "alt": "Inside a logged model. log_model wrote a directory for the logged model, linked to the run that produced it.",
+   "caption": "One directory, two flavors, and two ways to load it; only the python_function path enforces the signature. Synthetic teaching example; structure from the executed lab L17 (open-source MLflow 3.16.1).",
+   "textEquivalent": "The model directory: log_model wrote a directory for the logged model, linked to the run that produced it. Nodes: Run time-split-C-1: Produced the model; lists it among its outputs. (context); Logged model: models:/m-<id>. MLflow 3 entity with its own ID and linked metrics. (selected); MLmodel: Flavors, signature, run ID, model ID, mlflow_version 3.16.1. (selected); model.skops: The fitted pipeline, skops format by default for scikit-learn in 3.16.1. (selected); Environment files: requirements.txt, python_env.yaml, conda.yaml. (selected); Input examples: input_example.json and serving_input_example.json. (context). Relationships: Run time-split-C-1 → Logged model: logs; Logged model → MLmodel: contains; Logged model → model.skops: contains; Logged model → Environment files: contains; Logged model → Input examples: contains; MLmodel → model.skops: points to.\n\nTwo ways to load: python_function is the generic interface MLflow tools use and enforces the signature; the sklearn flavor returns the Pipeline object itself. Nodes: Logged model: The same directory for both paths. (context); mlflow.pyfunc.load_model: Generic predict(frame); schema enforced before the model runs. (selected); mlflow.sklearn.load_model: The scikit-learn Pipeline; no signature enforcement. (warning); Batch job or service: Chooses a path and inherits its protections. (context). Relationships: Logged model → mlflow.pyfunc.load_model: python_function flavor; Logged model → mlflow.sklearn.load_model: sklearn flavor; Batch job or service → mlflow.pyfunc.load_model: predict with checks; Batch job or service → mlflow.sklearn.load_model: predict without checks.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-models",
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-claim-signatures",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "dir",
+     "title": "The model directory",
+     "explanation": "log_model wrote a directory for the logged model, linked to the run that produced it.",
+     "nodes": [
+      {
+       "id": "run",
+       "label": "Run time-split-C-1",
+       "detail": "Produced the model; lists it among its outputs.",
+       "status": "context"
+      },
+      {
+       "id": "logged",
+       "label": "Logged model",
+       "value": "models:/m-<id>",
+       "detail": "MLflow 3 entity with its own ID and linked metrics.",
+       "status": "selected"
+      },
+      {
+       "id": "mlmodel",
+       "label": "MLmodel",
+       "detail": "Flavors, signature, run ID, model ID, mlflow_version 3.16.1.",
+       "status": "selected"
+      },
+      {
+       "id": "skops",
+       "label": "model.skops",
+       "detail": "The fitted pipeline, skops format by default for scikit-learn in 3.16.1.",
+       "status": "selected"
+      },
+      {
+       "id": "env",
+       "label": "Environment files",
+       "detail": "requirements.txt, python_env.yaml, conda.yaml.",
+       "status": "selected"
+      },
+      {
+       "id": "examples",
+       "label": "Input examples",
+       "detail": "input_example.json and serving_input_example.json.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "run",
+       "to": "logged",
+       "label": "logs"
+      },
+      {
+       "from": "logged",
+       "to": "mlmodel",
+       "label": "contains"
+      },
+      {
+       "from": "logged",
+       "to": "skops",
+       "label": "contains"
+      },
+      {
+       "from": "logged",
+       "to": "env",
+       "label": "contains"
+      },
+      {
+       "from": "logged",
+       "to": "examples",
+       "label": "contains"
+      },
+      {
+       "from": "mlmodel",
+       "to": "skops",
+       "label": "points to"
+      }
+     ]
+    },
+    {
+     "id": "load",
+     "title": "Two ways to load",
+     "explanation": "python_function is the generic interface MLflow tools use and enforces the signature; the sklearn flavor returns the Pipeline object itself.",
+     "nodes": [
+      {
+       "id": "logged",
+       "label": "Logged model",
+       "detail": "The same directory for both paths.",
+       "status": "context"
+      },
+      {
+       "id": "pyfunc",
+       "label": "mlflow.pyfunc.load_model",
+       "detail": "Generic predict(frame); schema enforced before the model runs.",
+       "status": "selected"
+      },
+      {
+       "id": "native",
+       "label": "mlflow.sklearn.load_model",
+       "detail": "The scikit-learn Pipeline; no signature enforcement.",
+       "status": "warning"
+      },
+      {
+       "id": "caller",
+       "label": "Batch job or service",
+       "detail": "Chooses a path and inherits its protections.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "logged",
+       "to": "pyfunc",
+       "label": "python_function flavor"
+      },
+      {
+       "from": "logged",
+       "to": "native",
+       "label": "sklearn flavor"
+      },
+      {
+       "from": "caller",
+       "to": "pyfunc",
+       "label": "predict with checks"
+      },
+      {
+       "from": "caller",
+       "to": "native",
+       "label": "predict without checks"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-signature-visual",
+   "kind": "table",
+   "title": "The signature, at the request door and at promotion",
+   "alt": "The signature, at the request door and at promotion. Inferred from the float64 training frame and a named output; every input is required.",
+   "caption": "MLflow refuses missing and unsafely typed inputs in a request but ignores extras; the contract, applied to a candidate's logged signature at promotion, names every change and never sees a request. Synthetic teaching example; behaviour observed in the executed lab L17 (MLflow 3.16.1).",
+   "textEquivalent": "Signature as logged: Inferred from the float64 training frame and a named output; every input is required. Table columns: column, type, required, side. Rows: oven_age_years; double; yes; input | days_since_service; double; yes; input | temp_mean_c; double; yes; input | temp_max_c; double; yes; input | door_cycles; double; yes; input | humidity_pct; double; yes; input | fault_next_24h; long; yes; output.\n\nDrift at the pyfunc door: Each change sent in a request to the model loaded as python_function. Table columns: change, MLflow 3.16.1. Rows: humidity_pct renamed humidity; error: Model is missing inputs ['humidity_pct'] | door_cycles sent as int64; error: Can not safely convert int64 to float64 | door_cycles sent as int32; accepted: lossless widening | repair_minutes added; accepted: extra input ignored with a warning | columns reordered; accepted: matched by name.\n\nA signature logged from the drifted frame, against contract 1.0.0: A candidate logged from each drifted frame, its signature compared with the contract at promotion: names, types and the output. A request sent to a correctly signed model is not checked here. Table columns: frame the candidate was logged from, contract reason. Rows: humidity_pct renamed humidity; missing_input:humidity_pct, unexpected_input:humidity | door_cycles sent as int64; type_mismatch:door_cycles:double->long | repair_minutes added; unexpected_input:repair_minutes | output named prediction; output_mismatch:prediction:long | columns reordered; none.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-signatures",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "sig",
+     "title": "Signature as logged",
+     "explanation": "Inferred from the float64 training frame and a named output; every input is required.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "column",
+       "type",
+       "required",
+       "side"
+      ],
+      "rows": [
+       [
+        "oven_age_years",
+        "double",
+        "yes",
+        "input"
+       ],
+       [
+        "days_since_service",
+        "double",
+        "yes",
+        "input"
+       ],
+       [
+        "temp_mean_c",
+        "double",
+        "yes",
+        "input"
+       ],
+       [
+        "temp_max_c",
+        "double",
+        "yes",
+        "input"
+       ],
+       [
+        "door_cycles",
+        "double",
+        "yes",
+        "input"
+       ],
+       [
+        "humidity_pct",
+        "double",
+        "yes",
+        "input"
+       ],
+       [
+        "fault_next_24h",
+        "long",
+        "yes",
+        "output"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "pyfunc",
+     "title": "Drift at the pyfunc door",
+     "explanation": "Each change sent in a request to the model loaded as python_function.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "change",
+       "MLflow 3.16.1"
+      ],
+      "rows": [
+       [
+        "humidity_pct renamed humidity",
+        "error: Model is missing inputs ['humidity_pct']"
+       ],
+       [
+        "door_cycles sent as int64",
+        "error: Can not safely convert int64 to float64"
+       ],
+       [
+        "door_cycles sent as int32",
+        "accepted: lossless widening"
+       ],
+       [
+        "repair_minutes added",
+        "accepted: extra input ignored with a warning"
+       ],
+       [
+        "columns reordered",
+        "accepted: matched by name"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "contract",
+     "title": "A signature logged from the drifted frame, against contract 1.0.0",
+     "explanation": "A candidate logged from each drifted frame, its signature compared with the contract at promotion: names, types and the output. A request sent to a correctly signed model is not checked here.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "frame the candidate was logged from",
+       "contract reason"
+      ],
+      "rows": [
+       [
+        "humidity_pct renamed humidity",
+        "missing_input:humidity_pct, unexpected_input:humidity"
+       ],
+       [
+        "door_cycles sent as int64",
+        "type_mismatch:door_cycles:double->long"
+       ],
+       [
+        "repair_minutes added",
+        "unexpected_input:repair_minutes"
+       ],
+       [
+        "output named prediction",
+        "output_mismatch:prediction:long"
+       ],
+       [
+        "columns reordered",
+        "none"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-environment-visual",
+   "kind": "table",
+   "title": "The environment written beside the model",
+   "alt": "The environment written beside the model. MLflow inferred the pins from the modules the model imports when loaded.",
+   "caption": "Three files pin what loads the model; the run's recorded library version decides whether a rerun may proceed. Synthetic teaching example; versions from the executed lab L17.",
+   "textEquivalent": "Files beside the model: MLflow inferred the pins from the modules the model imports when loaded. Table columns: file, holds, used by. Rows: requirements.txt; mlflow==3.16.1, numpy==2.5.3, pandas==3.0.6, scikit-learn==1.9.1, scipy==1.18.1, skops==0.15.0; pip | python_env.yaml; python 3.12.3, pip and build tools, -r requirements.txt; virtualenv restore | conda.yaml; conda-forge, python=3.12.3, the same pip pins; conda restore | MLmodel; sklearn_version 1.9.1, mlflow_version 3.16.1; flavor loaders.\n\nRecorded against installed: The run also records scikit-learn as a parameter; the reproduction step compares it with the installed version before training. Table columns: record, recorded, installed, outcome. Rows: time-split-C-1; 1.9.1; 1.9.1; rerun allowed; metrics identical | environment copy; 1.8.0; 1.9.1; refused before training.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-dependencies",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "files",
+     "title": "Files beside the model",
+     "explanation": "MLflow inferred the pins from the modules the model imports when loaded.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "file",
+       "holds",
+       "used by"
+      ],
+      "rows": [
+       [
+        "requirements.txt",
+        "mlflow==3.16.1, numpy==2.5.3, pandas==3.0.6, scikit-learn==1.9.1, scipy==1.18.1, skops==0.15.0",
+        "pip"
+       ],
+       [
+        "python_env.yaml",
+        "python 3.12.3, pip and build tools, -r requirements.txt",
+        "virtualenv restore"
+       ],
+       [
+        "conda.yaml",
+        "conda-forge, python=3.12.3, the same pip pins",
+        "conda restore"
+       ],
+       [
+        "MLmodel",
+        "sklearn_version 1.9.1, mlflow_version 3.16.1",
+        "flavor loaders"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "check",
+     "title": "Recorded against installed",
+     "explanation": "The run also records scikit-learn as a parameter; the reproduction step compares it with the installed version before training.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "record",
+       "recorded",
+       "installed",
+       "outcome"
+      ],
+      "rows": [
+       [
+        "time-split-C-1",
+        "1.9.1",
+        "1.9.1",
+        "rerun allowed; metrics identical"
+       ],
+       [
+        "environment copy",
+        "1.8.0",
+        "1.9.1",
+        "refused before training"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-registry-visual",
+   "kind": "nodes",
+   "title": "From run to logged model to registered version",
+   "alt": "From run to logged model to registered version. time-split-C-1 passed the contract; its logged model became version 1, tagged with its evidence, and the alias candidate points at it.",
+   "caption": "The run logs a model, the decision justifies a registration, the version is fixed, and the alias is the only thing that moves. Synthetic teaching example; values from the executed lab L17 (file-store registry).",
+   "textEquivalent": "Registered and aliased: time-split-C-1 passed the contract; its logged model became version 1, tagged with its evidence, and the alias candidate points at it. Nodes: Run time-split-C-1: Recall 0.8333, 1.89 warnings a day; record complete. (selected); Logged model: models:/m-<id>. MLmodel, model.skops, environment files. (selected); Decision file: promote-candidate under contract 1.0.0, with every run's reasons. (selected); Version 1: Tags: contract_version 1.0.0, decided_from_run. (selected); Alias candidate: → version 1. models:/cinderline-oven-fault@candidate (selected). Relationships: Run time-split-C-1 → Logged model: logs; Logged model → Version 1: registered as; Decision file → Version 1: justifies; Alias candidate → Version 1: points to.\n\nA second version: The reproduced rerun is registered as version 2 and the alias moves to it. Version 1 is unchanged and now has no alias. Nodes: Run time-split-C-1-rerun: Same digest and metrics as the original. (context); Logged model 2: A second model directory with identical predictions. (context); Version 1: Unchanged; no alias. (context); Version 2: Tags: contract_version 1.0.0, decided_from_run. (selected); Alias candidate: → version 2. Moved; version numbers did not change. (selected). Relationships: Run time-split-C-1-rerun → Logged model 2: logs; Logged model 2 → Version 2: registered as; Alias candidate → Version 2: points to.\n\nRolled back: Moving the alias back is the rollback. Both versions still exist, and both predict identically. Nodes: Version 1: Holds the alias again. (selected); Version 2: Kept, with no alias. (context); Alias candidate: → version 1. One pointer, moved twice. (selected); Consumer: Loads models:/cinderline-oven-fault@candidate and follows the alias. (context). Relationships: Alias candidate → Version 1: points to; Consumer → Alias candidate: loads by.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-registry",
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "first",
+     "title": "Registered and aliased",
+     "explanation": "time-split-C-1 passed the contract; its logged model became version 1, tagged with its evidence, and the alias candidate points at it.",
+     "nodes": [
+      {
+       "id": "run",
+       "label": "Run time-split-C-1",
+       "detail": "Recall 0.8333, 1.89 warnings a day; record complete.",
+       "status": "selected"
+      },
+      {
+       "id": "logged",
+       "label": "Logged model",
+       "value": "models:/m-<id>",
+       "detail": "MLmodel, model.skops, environment files.",
+       "status": "selected"
+      },
+      {
+       "id": "decision",
+       "label": "Decision file",
+       "detail": "promote-candidate under contract 1.0.0, with every run's reasons.",
+       "status": "selected"
+      },
+      {
+       "id": "version1",
+       "label": "Version 1",
+       "detail": "Tags: contract_version 1.0.0, decided_from_run.",
+       "status": "selected"
+      },
+      {
+       "id": "alias",
+       "label": "Alias candidate",
+       "value": "→ version 1",
+       "detail": "models:/cinderline-oven-fault@candidate",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "run",
+       "to": "logged",
+       "label": "logs"
+      },
+      {
+       "from": "logged",
+       "to": "version1",
+       "label": "registered as"
+      },
+      {
+       "from": "decision",
+       "to": "version1",
+       "label": "justifies"
+      },
+      {
+       "from": "alias",
+       "to": "version1",
+       "label": "points to"
+      }
+     ]
+    },
+    {
+     "id": "second",
+     "title": "A second version",
+     "explanation": "The reproduced rerun is registered as version 2 and the alias moves to it. Version 1 is unchanged and now has no alias.",
+     "nodes": [
+      {
+       "id": "rerun",
+       "label": "Run time-split-C-1-rerun",
+       "detail": "Same digest and metrics as the original.",
+       "status": "context"
+      },
+      {
+       "id": "logged2",
+       "label": "Logged model 2",
+       "detail": "A second model directory with identical predictions.",
+       "status": "context"
+      },
+      {
+       "id": "version1",
+       "label": "Version 1",
+       "detail": "Unchanged; no alias.",
+       "status": "context"
+      },
+      {
+       "id": "version2",
+       "label": "Version 2",
+       "detail": "Tags: contract_version 1.0.0, decided_from_run.",
+       "status": "selected"
+      },
+      {
+       "id": "alias",
+       "label": "Alias candidate",
+       "value": "→ version 2",
+       "detail": "Moved; version numbers did not change.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "rerun",
+       "to": "logged2",
+       "label": "logs"
+      },
+      {
+       "from": "logged2",
+       "to": "version2",
+       "label": "registered as"
+      },
+      {
+       "from": "alias",
+       "to": "version2",
+       "label": "points to"
+      }
+     ]
+    },
+    {
+     "id": "rollback",
+     "title": "Rolled back",
+     "explanation": "Moving the alias back is the rollback. Both versions still exist, and both predict identically.",
+     "nodes": [
+      {
+       "id": "version1",
+       "label": "Version 1",
+       "detail": "Holds the alias again.",
+       "status": "selected"
+      },
+      {
+       "id": "version2",
+       "label": "Version 2",
+       "detail": "Kept, with no alias.",
+       "status": "context"
+      },
+      {
+       "id": "alias",
+       "label": "Alias candidate",
+       "value": "→ version 1",
+       "detail": "One pointer, moved twice.",
+       "status": "selected"
+      },
+      {
+       "id": "consumer",
+       "label": "Consumer",
+       "detail": "Loads models:/cinderline-oven-fault@candidate and follows the alias.",
+       "status": "context"
+      }
+     ],
+     "connections": [
+      {
+       "from": "alias",
+       "to": "version1",
+       "label": "points to"
+      },
+      {
+       "from": "consumer",
+       "to": "alias",
+       "label": "loads by"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-promotion-visual",
+   "kind": "table",
+   "title": "Two gates, then a decision",
+   "alt": "Two gates, then a decision. Each candidate's record against contract 1.0.0's evidence clause.",
+   "caption": "Evidence is read before metrics; only runs that pass meet the thresholds, and the same contract rejects the transfer plant's run. Synthetic teaching example; decisions from the executed lab L17.",
+   "textEquivalent": "Evidence gate: Each candidate's record against contract 1.0.0's evidence clause. Table columns: run, split, seed, training dataset, features, signature, gate. Rows: time-split-C-1; time; yes; yes; six at 09:00; matches; pass | time-split-C-0.01; time; yes; yes; six at 09:00; matches; pass | random-split-seeded; random; yes; yes; six at 09:00; matches; fail: split_not_time_based | time-split-leaky; time; yes; yes; + repair_minutes; 7 inputs; fail: post-event feature, unexpected input | hero; none; no; no; not recorded; none; fail: 5 reasons.\n\nThresholds for runs that passed: recall at least 0.75, precision at least 0.2, at most 2.0 warnings a day on days 85 to 120. Table columns: run, recall, precision, warnings a day, decision. Rows: time-split-C-1; 0.8333 pass; 0.2206 pass; 1.89 pass; promote-candidate | time-split-C-0.01; 0.9444 pass; 0.1868 fail; 2.53 fail; reject.\n\nSame contract, another plant: The C = 1 configuration on a second synthetic plant passes the evidence gate and fails recall. Table columns: run, recall, precision, warnings a day, decision. Rows: time-split-C-1, transfer plant; 0.6 fail; 0.2727 pass; 0.92 pass; reject: recall_below_min.",
+   "provenance": "Original SpicyBrain authored visual; values produced by the executed local lab L17 (open-source MLflow 3.16.1 with a file store, scikit-learn 1.9.1, synthetic data); no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-registry",
+    "dbxfe-mlflow-claim-signatures",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "evidence",
+     "title": "Evidence gate",
+     "explanation": "Each candidate's record against contract 1.0.0's evidence clause.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "run",
+       "split",
+       "seed",
+       "training dataset",
+       "features",
+       "signature",
+       "gate"
+      ],
+      "rows": [
+       [
+        "time-split-C-1",
+        "time",
+        "yes",
+        "yes",
+        "six at 09:00",
+        "matches",
+        "pass"
+       ],
+       [
+        "time-split-C-0.01",
+        "time",
+        "yes",
+        "yes",
+        "six at 09:00",
+        "matches",
+        "pass"
+       ],
+       [
+        "random-split-seeded",
+        "random",
+        "yes",
+        "yes",
+        "six at 09:00",
+        "matches",
+        "fail: split_not_time_based"
+       ],
+       [
+        "time-split-leaky",
+        "time",
+        "yes",
+        "yes",
+        "+ repair_minutes",
+        "7 inputs",
+        "fail: post-event feature, unexpected input"
+       ],
+       [
+        "hero",
+        "none",
+        "no",
+        "no",
+        "not recorded",
+        "none",
+        "fail: 5 reasons"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "thresholds",
+     "title": "Thresholds for runs that passed",
+     "explanation": "recall at least 0.75, precision at least 0.2, at most 2.0 warnings a day on days 85 to 120.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "run",
+       "recall",
+       "precision",
+       "warnings a day",
+       "decision"
+      ],
+      "rows": [
+       [
+        "time-split-C-1",
+        "0.8333 pass",
+        "0.2206 pass",
+        "1.89 pass",
+        "promote-candidate"
+       ],
+       [
+        "time-split-C-0.01",
+        "0.9444 pass",
+        "0.1868 fail",
+        "2.53 fail",
+        "reject"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "transfer",
+     "title": "Same contract, another plant",
+     "explanation": "The C = 1 configuration on a second synthetic plant passes the evidence gate and fails recall.",
+     "nodes": [],
+     "connections": [],
+     "table": {
+      "columns": [
+       "run",
+       "recall",
+       "precision",
+       "warnings a day",
+       "decision"
+      ],
+      "rows": [
+       [
+        "time-split-C-1, transfer plant",
+        "0.6 fail",
+        "0.2727 pass",
+        "0.92 pass",
+        "reject: recall_below_min"
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-managed-visual",
+   "kind": "comparison",
+   "title": "Who does what: open-source MLflow and Databricks",
+   "alt": "Who does what: open-source MLflow and Databricks. The lab's setup: a library, a local store, and every operational duty with you.",
+   "caption": "Hosting, access and registry governance change hands; the evidence and the data checks do not. Schematic teaching comparison; nothing was executed on Databricks.",
+   "textEquivalent": "Open-source MLflow you operate: The lab's setup: a library, a local store, and every operational duty with you. Nodes: Tracking server: You host, patch, secure and back it up; the lab used none. (warning); Backend store: SQLite file by default in 3.16.1; the file store needs an explicit opt-in. (pending); Artifact store: Local disk or object storage you run. (pending); Model registry: Same backend; versions, aliases, tags. (pending); Access control: Yours to configure around the server. (warning); Contract and evidence: The team's. (selected); Data validity checks: The team's. (selected). Relationships: Backend store → Tracking server: behind; Artifact store → Tracking server: behind; Model registry → Backend store: stored in; Access control → Tracking server: guards.\n\nDatabricks-managed with Unity Catalog: Hosting and governance move to the platform; the decision and the data checks stay with the team. Nodes: Tracking server: Hosted in the workspace. (context); Experiments: Workspace or notebook objects; CAN READ, CAN EDIT, CAN MANAGE. (selected); Model registry: Unity Catalog, catalog.schema.model; the default with MLflow 3. (selected); Privileges: CREATE MODEL with USE CATALOG and USE SCHEMA to create; EXECUTE to load. (selected); Stages: Not supported; aliases and tags instead. (excluded); Contract and evidence: Still the team's. (selected); Data validity checks: Still the team's. (selected). Relationships: Experiments → Tracking server: held by; Privileges → Model registry: govern; Contract and evidence → Model registry: justifies an alias in.",
+   "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
+   "claimIds": [
+    "dbxfe-mlflow-claim-databricks",
+    "dbxfe-mlflow-claim-uc",
+    "dbxfe-mlflow-claim-privileges",
+    "dbxfe-mlflow-claim-filestore",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "states": [
+    {
+     "id": "oss",
+     "title": "Open-source MLflow you operate",
+     "explanation": "The lab's setup: a library, a local store, and every operational duty with you.",
+     "nodes": [
+      {
+       "id": "server",
+       "label": "Tracking server",
+       "detail": "You host, patch, secure and back it up; the lab used none.",
+       "status": "warning"
+      },
+      {
+       "id": "backend",
+       "label": "Backend store",
+       "detail": "SQLite file by default in 3.16.1; the file store needs an explicit opt-in.",
+       "status": "pending"
+      },
+      {
+       "id": "artifacts",
+       "label": "Artifact store",
+       "detail": "Local disk or object storage you run.",
+       "status": "pending"
+      },
+      {
+       "id": "registry",
+       "label": "Model registry",
+       "detail": "Same backend; versions, aliases, tags.",
+       "status": "pending"
+      },
+      {
+       "id": "access",
+       "label": "Access control",
+       "detail": "Yours to configure around the server.",
+       "status": "warning"
+      },
+      {
+       "id": "evidence",
+       "label": "Contract and evidence",
+       "detail": "The team's.",
+       "status": "selected"
+      },
+      {
+       "id": "quality",
+       "label": "Data validity checks",
+       "detail": "The team's.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "backend",
+       "to": "server",
+       "label": "behind"
+      },
+      {
+       "from": "artifacts",
+       "to": "server",
+       "label": "behind"
+      },
+      {
+       "from": "registry",
+       "to": "backend",
+       "label": "stored in"
+      },
+      {
+       "from": "access",
+       "to": "server",
+       "label": "guards"
+      }
+     ]
+    },
+    {
+     "id": "dbx",
+     "title": "Databricks-managed with Unity Catalog",
+     "explanation": "Hosting and governance move to the platform; the decision and the data checks stay with the team.",
+     "nodes": [
+      {
+       "id": "server",
+       "label": "Tracking server",
+       "detail": "Hosted in the workspace.",
+       "status": "context"
+      },
+      {
+       "id": "experiments",
+       "label": "Experiments",
+       "detail": "Workspace or notebook objects; CAN READ, CAN EDIT, CAN MANAGE.",
+       "status": "selected"
+      },
+      {
+       "id": "registry",
+       "label": "Model registry",
+       "detail": "Unity Catalog, catalog.schema.model; the default with MLflow 3.",
+       "status": "selected"
+      },
+      {
+       "id": "privs",
+       "label": "Privileges",
+       "detail": "CREATE MODEL with USE CATALOG and USE SCHEMA to create; EXECUTE to load.",
+       "status": "selected"
+      },
+      {
+       "id": "stages",
+       "label": "Stages",
+       "detail": "Not supported; aliases and tags instead.",
+       "status": "excluded"
+      },
+      {
+       "id": "evidence",
+       "label": "Contract and evidence",
+       "detail": "Still the team's.",
+       "status": "selected"
+      },
+      {
+       "id": "quality",
+       "label": "Data validity checks",
+       "detail": "Still the team's.",
+       "status": "selected"
+      }
+     ],
+     "connections": [
+      {
+       "from": "experiments",
+       "to": "server",
+       "label": "held by"
+      },
+      {
+       "from": "privs",
+       "to": "registry",
+       "label": "govern"
+      },
+      {
+       "from": "evidence",
+       "to": "registry",
+       "label": "justifies an alias in"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "dbxfe-mlflow-record-question",
+   "revision": "1",
+   "prompt": "After an outage only the tracking backend database is restored; the artifact store for time-split-C-1 is gone. What can a reviewer still read?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-record-question-a",
+     "text": "Parameters, metrics and dataset references, but no model or reports.",
+     "rationale": "Parameters, metrics, tags and dataset metadata live in the backend store; the model and report files lived in the artifact store."
+    },
+    {
+     "id": "dbxfe-mlflow-record-question-b",
+     "text": "Its model directory, because the MLmodel file is stored with the run's metadata.",
+     "rationale": "MLmodel is a file inside the model directory in the artifact store, so it went with the artifact store."
+    },
+    {
+     "id": "dbxfe-mlflow-record-question-c",
+     "text": "Its split report, because check results are logged as run parameters.",
+     "rationale": "The split report was logged as a JSON artifact; only its conclusion is implied by the split parameter."
+    },
+    {
+     "id": "dbxfe-mlflow-record-question-d",
+     "text": "Nothing at all, because MLflow stores each run as a single file.",
+     "rationale": "A run is split across two stores; the backend part survives on its own and still describes what was chosen and measured."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-record-question-a",
+   "conceptIds": [
+    "dbxfe-mlflow-run-concept",
+    "dbxfe-mlflow-artifact-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-tracking",
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-params-question",
+   "revision": "1",
+   "prompt": "A notebook cell that logged C=1.0 into the active run is edited to C=0.5 and executed again in the same run. What does MLflow 3.16.1 do?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-params-question-a",
+     "text": "It silently replaces the stored 1.0 with 0.5 and keeps no trace of the old value.",
+     "rationale": "Silent replacement would let the record drift away from the model that was trained; MLflow refuses it."
+    },
+    {
+     "id": "dbxfe-mlflow-params-question-b",
+     "text": "It keeps 1.0 and 0.5 as a step history, the way it treats a metric.",
+     "rationale": "Only metrics have step histories; parameters hold one value."
+    },
+    {
+     "id": "dbxfe-mlflow-params-question-c",
+     "text": "It logs the new value under a second key named C_1.",
+     "rationale": "MLflow never renames keys; the call either matches the stored value or fails."
+    },
+    {
+     "id": "dbxfe-mlflow-params-question-d",
+     "text": "It raises an MlflowException: a logged parameter cannot change.",
+     "rationale": "Observed in the lab: the record keeps the first value, and a different choice needs a new run."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-params-question-d",
+   "conceptIds": [
+    "dbxfe-mlflow-param-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-tracking",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-dataset-question",
+   "revision": "1",
+   "prompt": "With MLflow 3.16.1, a 50,000-row pandas training frame is logged, then one value in row 30,000 is corrected and the frame is logged again. Row count and columns are unchanged. What happens to the digest?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-dataset-question-a",
+     "text": "MLflow refuses to log a dataset under the same name a second time.",
+     "rationale": "The same dataset can be logged to many runs; each run references it with its own context."
+    },
+    {
+     "id": "dbxfe-mlflow-dataset-question-b",
+     "text": "It stays the same; rows beyond the first 10,000 are not hashed.",
+     "rationale": "Observed in the lab and in the installed code: a change beyond row 10,000 that keeps the shape leaves the digest unchanged."
+    },
+    {
+     "id": "dbxfe-mlflow-dataset-question-c",
+     "text": "It changes, because MLflow hashes every row of the frame on each log_input call.",
+     "rationale": "Only the first 10,000 rows enter the hash in this version; the rest are represented by the row count alone."
+    },
+    {
+     "id": "dbxfe-mlflow-dataset-question-d",
+     "text": "It changes, because the logging timestamp is folded into the digest.",
+     "rationale": "The digest depends on content, row count and column names; timestamps and the source text are not part of it."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-dataset-question-b",
+   "conceptIds": [
+    "dbxfe-mlflow-digest-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-compare-question",
+   "revision": "1",
+   "prompt": "Which pair of the lab's runs lets you attribute its metric difference to a single cause?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-compare-question-a",
+     "text": "time-split-C-1 and time-split-leaky: same digest, only features differ.",
+     "rationale": "Same rows and one changed parameter isolate the post-event column; accuracy moves from 0.8056 to 1.0 because of it alone."
+    },
+    {
+     "id": "dbxfe-mlflow-compare-question-b",
+     "text": "time-split-C-1 and random-split-seeded: both use seed 20260923.",
+     "rationale": "A shared seed is not enough: the rows differ (3f06bea0 against 4950f73b) and three parameters change."
+    },
+    {
+     "id": "dbxfe-mlflow-compare-question-c",
+     "text": "time-split-C-1 and hero: both are logistic regressions.",
+     "rationale": "The hero logged no dataset and eight parameters differ, so nothing about the difference can be attributed."
+    },
+    {
+     "id": "dbxfe-mlflow-compare-question-d",
+     "text": "hero and hero-again: their records are identical, so the difference is noise.",
+     "rationale": "Identical records with different results mean the cause is unrecorded, the hidden split; that is not a comparison, it is a reproducibility failure."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-compare-question-a",
+   "conceptIds": [
+    "dbxfe-mlflow-comparable-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-search",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-sorted-question",
+   "revision": "1",
+   "prompt": "In the oven experiment, why does never-warn rank above every honest model when runs are sorted by accuracy?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-sorted-question-a",
+     "text": "Accuracy gives extra weight to the rows where a model issues no warning.",
+     "rationale": "Accuracy counts correct predictions of both classes; never-warn makes no warnings and is wrong only on the 18 faults."
+    },
+    {
+     "id": "dbxfe-mlflow-sorted-question-b",
+     "text": "search_runs always places runs logged as baselines at the top of the table.",
+     "rationale": "search_runs orders by the requested column only; never-warn is third because of its accuracy value."
+    },
+    {
+     "id": "dbxfe-mlflow-sorted-question-c",
+     "text": "Faults are 18 of 288 test rows, so 'no fault' is right 270 times.",
+     "rationale": "Accuracy counts the majority class: 270/288 = 0.9375 with recall 0, which is why the contract reads recall, precision and warnings a day."
+    },
+    {
+     "id": "dbxfe-mlflow-sorted-question-d",
+     "text": "never-warn reads the repair record, which is written after each fault.",
+     "rationale": "never-warn reads nothing at all; its score comes entirely from the class balance."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-sorted-question-c",
+   "conceptIds": [
+    "dbxfe-mlflow-baseline-concept",
+    "dbxfe-mlflow-metric-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-search",
+    "dbxfe-mlflow-claim-randomness",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-hero-question",
+   "revision": "1",
+   "prompt": "The hero and hero-again runs have identical records but different confusion matrices. What does that establish?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-hero-question-a",
+     "text": "The leak disappeared in the second execution, so its score came from real features.",
+     "rationale": "Both executions read repair_minutes and both score 1.0; only the test population changed."
+    },
+    {
+     "id": "dbxfe-mlflow-hero-question-b",
+     "text": "The result depends on something the record does not hold.",
+     "rationale": "Identical records with different numbers locate the cause outside the record: here the unseeded random split."
+    },
+    {
+     "id": "dbxfe-mlflow-hero-question-c",
+     "text": "The model is unstable and would need more training data to converge on one result.",
+     "rationale": "Both executions score perfectly on their own rows; the difference is which rows were tested, not the model's stability."
+    },
+    {
+     "id": "dbxfe-mlflow-hero-question-d",
+     "text": "MLflow dropped part of the second run's record while writing the file store.",
+     "rationale": "Nothing was lost: the code logged only one parameter both times."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-hero-question-b",
+   "conceptIds": [
+    "dbxfe-mlflow-reproduce-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-tracking",
+    "dbxfe-mlflow-claim-randomness",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-rerun-question",
+   "revision": "1",
+   "prompt": "A rerun of time-split-C-1 on a refreshed extract returns recall 0.81 and a new training digest; the recorded and installed library versions match. How should the result be described?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-rerun-question-a",
+     "text": "A failed reproduction, which shows that the original run's recall was wrong.",
+     "rationale": "A reproduction needs the same rows; with new rows the original claim was never retested."
+    },
+    {
+     "id": "dbxfe-mlflow-rerun-question-b",
+     "text": "A successful reproduction, because 0.81 is within a normal tolerance of 0.8333.",
+     "rationale": "There is no tolerance for changed data: the comparison is between different experiments."
+    },
+    {
+     "id": "dbxfe-mlflow-rerun-question-c",
+     "text": "Evidence that the scikit-learn version changed between the two executions.",
+     "rationale": "The versions match; the digest identifies the data as the thing that changed."
+    },
+    {
+     "id": "dbxfe-mlflow-rerun-question-d",
+     "text": "A new experiment on changed data; it neither confirms nor refutes the original.",
+     "rationale": "The digest shows the rows changed, so the metric difference cannot be attributed to the code or the record."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-rerun-question-d",
+   "conceptIds": [
+    "dbxfe-mlflow-reproduce-concept",
+    "dbxfe-mlflow-digest-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-dependencies",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-flavors-question",
+   "revision": "1",
+   "prompt": "A batch job loads the promoted model with mlflow.sklearn.load_model and calls predict on a frame whose humidity column was renamed. What does MLflow's signature enforcement do in this call?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-flavors-question-a",
+     "text": "It renames the column back to humidity_pct using the signature's column list.",
+     "rationale": "Enforcement never repairs inputs; at most it converts types losslessly or refuses."
+    },
+    {
+     "id": "dbxfe-mlflow-flavors-question-b",
+     "text": "It casts every column to double as the signature says, then calls the pipeline.",
+     "rationale": "Only the python_function path applies the signature's types, and only for lossless conversions."
+    },
+    {
+     "id": "dbxfe-mlflow-flavors-question-c",
+     "text": "Nothing; native-flavor loading skips signature enforcement.",
+     "rationale": "Documented: native-flavor loading does not enforce the signature. Any error that follows comes from scikit-learn's own feature-name check, not from MLflow."
+    },
+    {
+     "id": "dbxfe-mlflow-flavors-question-d",
+     "text": "It raises Model is missing inputs ['humidity_pct'] before the pipeline runs.",
+     "rationale": "That message comes from python_function enforcement; the native flavor bypasses it."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-flavors-question-c",
+   "conceptIds": [
+    "dbxfe-mlflow-flavor-concept",
+    "dbxfe-mlflow-signature-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-models",
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-claim-signatures",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-signature-question",
+   "revision": "1",
+   "prompt": "For this signature, which change to a request does MLflow 3.16.1's pyfunc enforcement let through without an error?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-signature-question-a",
+     "text": "Dropping humidity_pct from the request entirely.",
+     "rationale": "A missing required input raises; the documented rule applies to every required column."
+    },
+    {
+     "id": "dbxfe-mlflow-signature-question-b",
+     "text": "Adding repair_minutes as a seventh column.",
+     "rationale": "Observed: an input the signature does not name is ignored with a warning, which is why the contract checks a candidate's signature for unexpected inputs and a request needs its own check."
+    },
+    {
+     "id": "dbxfe-mlflow-signature-question-c",
+     "text": "Renaming humidity_pct to humidity while keeping the same values.",
+     "rationale": "The required input humidity_pct is then missing, and enforcement raises before the model runs."
+    },
+    {
+     "id": "dbxfe-mlflow-signature-question-d",
+     "text": "Sending door_cycles as int64 values instead of doubles.",
+     "rationale": "int64 to double is not a lossless conversion, so enforcement raises."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-signature-question-b",
+   "conceptIds": [
+    "dbxfe-mlflow-signature-concept",
+    "dbxfe-mlflow-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-signatures",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-registry-question",
+   "revision": "1",
+   "prompt": "After the rollback, what does models:/cinderline-oven-fault@candidate load, and what happened to version 2?",
+   "options": [
+    {
+     "id": "dbxfe-mlflow-registry-question-a",
+     "text": "Version 1, and the rollback deleted version 2 from the registry.",
+     "rationale": "Rollback moved a pointer; deleting a version is a separate, deliberate action."
+    },
+    {
+     "id": "dbxfe-mlflow-registry-question-b",
+     "text": "Nothing, until one of the versions is moved to the Production stage.",
+     "rationale": "Aliases replace stages here; models in Unity Catalog do not support stages at all."
+    },
+    {
+     "id": "dbxfe-mlflow-registry-question-c",
+     "text": "Version 1; version 2 still exists, unchanged, with no alias.",
+     "rationale": "The alias names one version at a time, and moving it never deletes or edits a version."
+    },
+    {
+     "id": "dbxfe-mlflow-registry-question-d",
+     "text": "Version 2, because the newest registered version always wins.",
+     "rationale": "An alias is explicit; the newest version is loaded only if the alias points at it."
+    }
+   ],
+   "correctOptionId": "dbxfe-mlflow-registry-question-c",
+   "conceptIds": [
+    "dbxfe-mlflow-alias-concept",
+    "dbxfe-mlflow-version-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-registry",
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  }
+ ],
+ "selfQuestions": [
+  {
+   "id": "dbxfe-mlflow-quality-self",
+   "revision": "1",
+   "prompt": "A colleague argues that the leaky run is trustworthy because its record is complete and a rerun reproduces it exactly. Explain what is wrong with the argument and what evidence would settle it.",
+   "modelAnswer": "Completeness and reproducibility show that the run can be traced and repeated, not that its inputs were valid. The leaky run reads repair_minutes, which the data dictionary dates after the fault it predicts, so at 09:00 the model could not run; its accuracy 1.0 is a faithful record of an invalid experiment. The evidence that settles it is availability, not provenance: the dictionary entry for each feature, the leakage report logged as an artifact, and a comparison with the same run minus that column, which drops to accuracy 0.8056.",
+   "reasoning": "It separates provenance from validity and names the check that decides validity; pointing to the time-split comparison or the evidence gate's post-event rule are equally acceptable ways to finish the argument.",
+   "conceptIds": [
+    "dbxfe-mlflow-leak-concept",
+    "dbxfe-mlflow-reproduce-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-randomness",
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-environment-self",
+   "revision": "1",
+   "prompt": "The registered model was logged with scikit-learn 1.9.1. The image the platform team builds for batch scoring pins scikit-learn 1.8.0. What do you check, and what do you decide, before the model is loaded there?",
+   "modelAnswer": "Read the model's requirements.txt and MLmodel: they pin scikit-learn 1.9.1 and record the flavor's sklearn_version. A 1.8.0 image is a different environment, so loading may fail or, worse, succeed with different numerics. Decide not to load it there as is: either rebuild the image from the model's requirements.txt or python_env.yaml, or retrain and re-evaluate the model on 1.8.0 as a new run and new version. Record the choice beside the model version.",
+   "reasoning": "The environment files are part of the model's promise; a mismatch is resolved by matching the environment or by producing new evidence, never by assuming equivalence. Pinning the image to the model's file is the cheaper usual answer.",
+   "conceptIds": [
+    "dbxfe-mlflow-environment-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-dependencies",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-promotion-self",
+   "revision": "1",
+   "prompt": "Write the decision entry for time-split-C-0.01, explain why its better recall does not rescue it, and say what would have to happen for a run like it to pass.",
+   "modelAnswer": "time-split-C-0.01: reject at the thresholds gate; precision_below_min (0.1868 against 0.2) and warnings_above_cap (2.53 a day against 2.0). Its recall of 0.9444 is better, but the round holds two ovens, so 2.53 warnings a day cannot be inspected and a fifth of warnings being real is the owner's floor. Only a changed decision could change the outcome: the maintenance lead agrees a larger round or a lower floor, the contract becomes a new version, and the runs are evaluated again under it.",
+   "reasoning": "Thresholds come from the decision's capacity and costs, set before evaluation; moving them after seeing a result is tuning on the test period. Proposing a different threshold on predicted probabilities is also acceptable if it is chosen on validation days before day 85 and confirmed on a period after day 120; re-tuning it on days 85 to 120 would turn the test into development data.",
+   "conceptIds": [
+    "dbxfe-mlflow-promotion-concept",
+    "dbxfe-mlflow-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-registry",
+    "dbxfe-mlflow-claim-signatures",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  },
+  {
+   "id": "dbxfe-mlflow-managed-self",
+   "revision": "1",
+   "prompt": "Cinderline moves the lab's workflow to a Databricks workspace with Unity Catalog. List what changes in the code, what responsibilities move to the platform, and two that stay with the team.",
+   "modelAnswer": "Code: drop the temporary file store and MLFLOW_ALLOW_FILE_STORE; log to a workspace experiment; register under a three-level name such as cinderline_ml.maintenance.oven_fault, with databricks-uc as the registry (the default with MLflow 3); keep aliases and tags, never stages. Moving to the platform: hosting the tracking server and stores, experiment permissions, and governance of the model through Unity Catalog privileges such as CREATE MODEL and EXECUTE. Staying with the team: which run earns the alias under the versioned contract, and checking that the logged data was valid and available at 09:00.",
+   "reasoning": "It separates operational duties the platform can host from judgements no platform makes, and keeps the registry mechanics (aliases, tags, no stages) consistent across both. Naming entitlement, region and catalog ownership as things to confirm first is also a good answer.",
+   "conceptIds": [
+    "dbxfe-mlflow-uc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-databricks",
+    "dbxfe-mlflow-claim-uc",
+    "dbxfe-mlflow-claim-privileges",
+    "dbxfe-mlflow-claim-filestore",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "dbxfe-mlflow-record",
+   "version": "1.0.0",
+   "title": "A run is the record behind one number",
+   "outcome": "Name what an MLflow run records and which store keeps each part.",
+   "explanation": "An [[dbxfe-mlflow-experiment-concept|experiment]] groups [[dbxfe-mlflow-run-concept|runs]], and a run is one execution of training or evaluation code. It records the parameters you chose, the metrics you measured, tags, the datasets it read and the [[dbxfe-mlflow-artifact-concept|artifacts]] it wrote, including a logged model. Notice in the first state that each number a report quotes traces to one of these nodes. In the second, metadata sits in a backend store and files in an artifact store, so losing either one breaks the record in a different way.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-record",
+   "conceptIds": [
+    "dbxfe-mlflow-experiment-concept",
+    "dbxfe-mlflow-run-concept",
+    "dbxfe-mlflow-artifact-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-tracking",
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-record-visual",
+   "questionIds": [
+    "dbxfe-mlflow-record-question"
+   ],
+   "handbook": {
+    "markdown": "A run is opened with `mlflow.start_run()` inside an experiment and closed when the block ends. Everything logged in between belongs to it:\n\n```python\nwith mlflow.start_run(experiment_id=exp, run_name=\"time-split-C-1\") as run:\n    mlflow.log_params({\"model\": \"logistic_regression\", \"C\": 1.0, \"seed\": 20260923,\n                       \"split\": \"time\", \"train_through_day\": 84, \"features\": \",\".join(FEATURES)})\n    mlflow.log_input(train_ds, context=\"training\")\n    mlflow.log_dict(split_report, \"checks/split_report.json\")\n    info = mlflow.sklearn.log_model(model, name=\"model\", signature=sig, input_example=X.head(3))\n    mlflow.log_metrics(metrics, model_id=info.model_id)\n```\n\nIn the lab's file store the record is visible on disk, which makes the two stores concrete:\n\n```text\ntracking/<experiment_id>/<run_id>/meta.yaml         run name, status, start and end time, artifact URI\ntracking/<experiment_id>/<run_id>/params/C          the text 1.0\ntracking/<experiment_id>/<run_id>/metrics/recall    \"<timestamp> <value> <step>\" per logged value\ntracking/<experiment_id>/<run_id>/inputs/<id>/      dataset references and their context\ntracking/<experiment_id>/<run_id>/artifacts/checks/ split and leakage reports\ntracking/<experiment_id>/models/<model_id>/artifacts/  MLmodel, model.skops, requirements.txt, ...\n```\n\nIn MLflow 3 the logged model is its own entity with an ID; metrics logged with `model_id=` attach to it as well as to the run, and the run lists it among its outputs. A database backend keeps the same metadata in tables and an object store keeps the files; the split is the same.\n\nWhat to inspect when a number is questioned: the run's parameters (what was chosen), its dataset inputs (which rows), its artifacts (the checks that were run) and its model (what was saved). What the record cannot tell you is whether any of it was right; later beats deal with that. Nothing here needs a server: the lab points `mlflow.set_tracking_uri()` at a temporary directory and deletes it afterwards.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-record"
+    ]
+   },
+   "recap": "A run holds params, metrics, tags, datasets, artifacts and a model, split across a backend and an artifact store.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-params",
+   "version": "1.0.0",
+   "title": "Parameters are written once; metrics are measured",
+   "outcome": "Predict how MLflow treats a changed parameter and a repeated metric.",
+   "explanation": "A [[dbxfe-mlflow-param-concept|parameter]] is a choice made before the run, stored as text: C becomes \"1.0\". A [[dbxfe-mlflow-metric-concept|metric]] is a number the run measured, and it can be logged at several steps, with the latest shown in the run. Notice in the second state that logging C=0.5 into a run that recorded C=1.0 is refused while repeating 1.0 is accepted. The record cannot be edited into agreement with a result; a new choice is a new run.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-record",
+   "conceptIds": [
+    "dbxfe-mlflow-param-concept",
+    "dbxfe-mlflow-metric-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-tracking",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-params-visual",
+   "questionIds": [
+    "dbxfe-mlflow-params-question"
+   ],
+   "handbook": {
+    "markdown": "Parameters are key-value pairs whose values are stored as strings. `mlflow.log_params({\"C\": 1.0, \"seed\": 20260923})` stores `\"1.0\"` and `\"20260923\"`; a rerun must parse them back (`float(params[\"C\"])`, `int(params[\"seed\"])`), which is one reason to log exactly the values the code reads rather than a description of them. Log the seed and the split's own parameter (`train_through_day=84`, or `train_fraction=0.7` for a random split): without them the rows cannot be recreated.\n\nImmutability was observed directly in the lab:\n\n```python\nclient.log_param(run_id, \"C\", 0.5)\n# MlflowException: Changing param values is not allowed. Param with key='C' was already\n# logged with value='1.0' ...\n```\n\nRepeating the identical value is accepted, so idempotent logging code is safe. Metrics are numbers with a timestamp and a step; `mlflow.log_metric(\"loss\", 0.4, step=1)` appends to the history, `run.data.metrics` shows the latest value and `MlflowClient().get_metric_history(run_id, \"loss\")` returns every step. The lab logs its evaluation metrics once, after training; a training loop would log a loss per epoch.\n\nTwo small disciplines pay off later. Do not log a metric that is undefined: precision with no warnings has no value, and a logged zero would be a claim, so the lab omits it for never-warn. And log counts (tp, fp, fn, tn) beside the rates, because rates hide the denominator: recall 0.8333 is 15 of 18 faults.\n\nWhen a parameter really must change, start a new run with its own name. That also produces what later comparisons need: two runs that differ in exactly the parameter you changed.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-record"
+    ]
+   },
+   "recap": "Parameters are fixed text choices; metrics are measured numbers with a history.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-dataset",
+   "version": "1.0.0",
+   "title": "A dataset digest pins which rows a run saw",
+   "outcome": "Log training and evaluation datasets and use their digests to tell same rows from different rows.",
+   "explanation": "`mlflow.log_input()` attaches a dataset with a name, source, schema, profile and [[dbxfe-mlflow-digest-concept|digest]], plus a context such as training or evaluation. Log the rows, not only the model's columns: then runs with different feature lists still share a digest. Notice in the first state that C = 1, C = 0.01 and the leaky run share 4950f73b while the random split and the second plant differ. The second state shows the limit: in MLflow 3.16.1 the pandas digest reads at most the first 10,000 rows.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-datasets",
+   "conceptIds": [
+    "dbxfe-mlflow-digest-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-dataset-visual",
+   "samajh": {
+    "text": "Library mein kitaabon ka ek bada dher aata hai. Librarian poori ginti likhta hai aur sirf upar ki pehli sau kitaabon ke naam note karta hai. Kal agar neeche ki koi kitaab badal di jaaye aur ginti wahi rahe, toh note bilkul wahi rahega. Aur note kabhi yeh nahi batata ki kitaabein sahi hain ya galat; woh bas yeh batata hai ki kaunsa dher tha.",
+    "mapping": "The note is the digest: the count is the row count, the noted titles are the first 10,000 rows, and the note identifies the batch without judging its content.",
+    "boundary": "A digest is a hash of the rows it reads, not a list of titles; any change among those rows changes it completely, and it never samples at random."
+   },
+   "questionIds": [
+    "dbxfe-mlflow-dataset-question"
+   ],
+   "handbook": {
+    "markdown": "The dataset API wraps the rows a run saw and records their identity without copying them into the store:\n\n```python\ntrain_ds = mlflow.data.from_pandas(train, source=\"fixtures/oven_days.csv\",\n                                   name=\"oven-days-train\", targets=\"fault_next_24h\")\nmlflow.log_input(train_ds, context=\"training\")\nmlflow.log_input(test_ds, context=\"evaluation\")\nprint(train_ds.digest)   # 4950f73b for days 1-84 of the lab fixture\n```\n\nThe digest is what makes comparisons checkable: two runs with the same training digest trained on the same rows. That only works if the logged frame is the rows, not the model's column selection. The lab logs every column of the training rows and records the model's columns in the `features` parameter, so a feature ablation keeps its digest.\n\nHow the digest is computed matters. Reading the installed MLflow 3.16.1 code and testing it in the lab: the pandas digest hashes the first 10,000 rows (string and numeric columns), the total row count and the column names, and it ignores the source text. So:\n\n- a change inside the first 10,000 rows, a changed row count or a renamed column gives a new digest;\n- a changed value after row 10,000, with the same shape, gives the same digest;\n- the same frame logged with a different `source` gives the same digest.\n\nFor small tables the digest is a strong identity. For large ones, treat it as a fingerprint and record something exact beside it: a table version, a snapshot identifier or a full-file checksum, as a parameter or tag. The digest, in either case, says which data; it says nothing about whether the data was right. That is the next beat.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-datasets"
+    ]
+   },
+   "recap": "Log the rows, not the columns; a digest identifies them, within its sampling limit.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-quality",
+   "version": "1.0.0",
+   "title": "A complete record can describe an invalid experiment",
+   "outcome": "Explain why a fully logged run still needs availability and split checks before its metrics mean anything.",
+   "explanation": "The leaky run logged everything: seed, time split, datasets, signature and artifacts. It also used repair_minutes, a [[dbxfe-mlflow-leak-concept|post-event feature]] the technician writes after the fault it predicts, and scored 1.0. Notice on the timeline that the column exists only at 16:00, hours after the 09:00 prediction. MLflow faithfully recorded it; it cannot know when a column becomes available. A logged run does not certify data quality: that takes separate checks, such as the availability dictionary and the split report, whose outputs the run keeps as artifacts.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-datasets",
+   "conceptIds": [
+    "dbxfe-mlflow-leak-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-randomness",
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-quality-visual",
+   "questionIds": [
+    "dbxfe-mlflow-quality-self"
+   ],
+   "handbook": {
+    "markdown": "Provenance and validity are different properties. MLflow gives provenance: which code parameters, which rows, which files, which model. It has no notion of when a column became available, whether a label was defined honestly, whether rows were duplicated, or whether the test period resembles the future. Those are properties of the data and the design, and they need their own checks.\n\nThe lab runs two checks before training and logs both reports as artifacts:\n\n```python\nleakage = leakage_report(features)      # reads fixtures/data_dictionary.json\n# {\"flagged\": [{\"feature\": \"repair_minutes\", \"reason\": \"recorded_after_prediction\",\n#               \"available_at\": \"after the fault, same day\"}], \"ok\": false}\nsplit = split_report(train, test)       # time-ordered only if max(train day) < min(test day)\nmlflow.log_dict(leakage, \"checks/leakage_report.json\")\nmlflow.log_dict(split, \"checks/split_report.json\")\n```\n\nThe leakage check reads the dictionary's `available_at`, never a correlation: a column that predicts the label perfectly is a warning sign, not evidence of skill. The leaky run's report says `ok: false`, and the run was logged anyway, which is exactly the situation a reviewer meets: a complete record whose own artifacts say the experiment is invalid.\n\nThe same controlled comparison that isolates a parameter isolates the leak: time-split-C-1 and time-split-leaky share rows and differ only in `features`, and accuracy moves from 0.8056 to 1.0. Scikit-learn's pitfalls guide names the mechanism: information unavailable at prediction time produces overly optimistic estimates, and preprocessing must be learnt from training data only.\n\nWhat to ask of any run before its metrics: does each feature exist at the prediction moment, is the test period later than the training period, is the label defined the same way in both, and are the check reports attached? A run that reproduces exactly can still fail every one of these.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-datasets"
+    ]
+   },
+   "recap": "Provenance is not validity: a complete, reproducible record can hold a leak.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-compare",
+   "version": "1.0.0",
+   "title": "Two runs compare only when one thing changed",
+   "outcome": "Decide whether two runs are comparable from their digests and their differing parameters.",
+   "explanation": "Put two runs side by side only when they trained on the same rows and differ in one deliberate parameter; then the metric difference belongs to that parameter. Notice in the first state that C = 1 and C = 0.01 share digest 4950f73b and differ only in C. In the second, the leaky run differs only in features, so the jump to 1.0 is the leak alone. In the third, the random split changes the rows and three parameters: [[dbxfe-mlflow-comparable-concept|comparable]] is a property of two records, not of two scores.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-compare",
+   "conceptIds": [
+    "dbxfe-mlflow-comparable-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-search",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-compare-visual",
+   "samajh": {
+    "text": "Do students ke marks tabhi compare karo jab paper, time aur checker teeno same hon. Agar ek ko aasaan paper mila aur doosre ko extra time bhi, toh marks ka farak kiski wajah se hai, koi nahi bata sakta. Ek hi cheez badlo, jaise sirf padhne ka tareeka, tab farak ka matlab banta hai.",
+    "mapping": "The paper is the training rows (the digest), the time and checker are the other parameters, and changing only the study method is changing one parameter such as C.",
+    "boundary": "Exam scores carry human variation; two runs on the same rows with a fixed seed can be repeated exactly, so a difference between them is not luck."
+   },
+   "questionIds": [
+    "dbxfe-mlflow-compare-question"
+   ],
+   "handbook": {
+    "markdown": "Comparability can be decided from the records alone, before looking at a metric:\n\n```python\ndef comparable(run_a, run_b):\n    a, b = mlflow.get_run(run_a).data.params, mlflow.get_run(run_b).data.params\n    differing = sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))\n    same_rows = training_digest(run_a) is not None and training_digest(run_a) == training_digest(run_b)\n    return {\"differing_params\": differing, \"same_dataset_digest\": same_rows,\n            \"comparable\": same_rows and len(differing) == 1}\n```\n\nRun against the lab's experiment:\n\n| pair | differing parameters | same rows | comparable |\n|---|---|---|---|\n| C-1 / C-0.01 | C | yes | yes |\n| C-1 / leaky | features | yes | yes |\n| C-1 / random split | split, train_fraction, train_through_day | no | no |\n| C-1 / hero | eight | hero logged none | no |\n\nHold everything else fixed as well: the evaluation rows (the lab logs them with context `evaluation`), the library versions (logged as a parameter) and the metric definitions. Two runs evaluated on different test rows are not comparable even with identical training data.\n\n`mlflow.search_runs()` makes the candidates easy to pull, for example `filter_string=\"params.split = 'time'\"` with `order_by=[\"metrics.recall DESC\"]`; the filter narrows by the record, and the comparability test above decides which pairs to read. When a pair is not comparable, the honest statement is \"these differ in several ways at once\", not a conclusion about any one of them.\n\nChoosing between C = 1 and C = 0.01 on days 85 to 120 spends those days: whichever wins, its score there is a selection result, and the promotion beat says what confirms it. A comparable pair is not a validated pair. C-1 against the leaky run is a perfectly controlled comparison, and its lesson is that the leak inflates accuracy; the leaky run still fails the evidence gate later.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-compare"
+    ]
+   },
+   "recap": "Same rows and one changed parameter: only then does a difference have one cause.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-sorted",
+   "version": "1.0.0",
+   "title": "The top of an accuracy-sorted table is where leaks live",
+   "outcome": "Read a sorted experiment table against its baselines and the measures that match the decision.",
+   "explanation": "Sorting runs by accuracy is the first thing a hurried reader does. Notice the order in the first state: the two runs that read the repair record tie at 1.0, and never-warn comes third at 0.9375 because only 18 of 288 test rows are faults. The model worth keeping is sixth. Read the same runs against the contract's measures and the table changes shape. Logging [[dbxfe-mlflow-baseline-concept|baselines]] as runs is what puts the rule in use and never-warn in the same table.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-compare",
+   "conceptIds": [
+    "dbxfe-mlflow-baseline-concept",
+    "dbxfe-mlflow-metric-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-search",
+    "dbxfe-mlflow-claim-randomness",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-sorted-visual",
+   "questionIds": [
+    "dbxfe-mlflow-sorted-question"
+   ],
+   "handbook": {
+    "markdown": "The accuracy table is not wrong; it is answering a question nobody asked. With 18 faults in 288 test rows, the base rate alone gives 0.9375, and any column that encodes the label (repair_minutes is non-zero exactly on fault rows) gives 1.0. The top of a sorted table therefore collects two kinds of run: the ones that exploit class balance and the ones that exploit leakage.\n\nThe lab builds the table the way a reviewer would:\n\n```python\nframe = mlflow.search_runs(experiment_ids=[exp], order_by=[\"metrics.accuracy DESC\"])\n# columns: run_id, tags.mlflow.runName, params.C, params.split, metrics.accuracy, metrics.recall, ...\n```\n\nThen it re-reads the same rows through the contract. Recall is the share of the 18 faults caught; precision is the share of warnings that were real; warnings a day is warnings divided by the 36 test days, because the inspection round holds two ovens a day. The temperature rule catches 12 of 18 with 43 warnings (1.19 a day); the C = 1 model catches 15 of 18 with 68 warnings (1.89 a day). That comparison, model against the rule in use at a workable load, is the one the model evaluation report asks for.\n\nThree habits make the table honest. Log the baselines as runs, with the same evaluation dataset, so they appear in every query. Log counts beside rates, so a reader sees that recall 0.8333 is 15 of 18. Sort by the decision's measure, and when a run tops the table by a wide margin, read its record before celebrating: in this experiment both perfect scores fail the evidence gate before their metrics are consulted.\n\nNothing here requires a better model. It requires reading the numbers in the currency of the decision, and a small test set (18 faults) is a reason to report the counts, not just the rates.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-compare"
+    ]
+   },
+   "recap": "On rare faults, accuracy ranks never-warn and the leaks first; read the contract's measures instead.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-hero",
+   "version": "1.0.0",
+   "title": "The best-looking run may be one nobody can rerun",
+   "outcome": "Compare a superior-looking run's record with a clean run's and name what blocks its reproduction.",
+   "explanation": "The hero run scored 1.0 on everything. Notice in the first state what its record holds: one parameter, model=logistic_regression, and nothing else a rerun needs. The reproduction step refuses and names eight gaps. In the second state the same code ran again: the record is identical and the result is not, 20 of 20 faults in one hidden test set, 18 of 18 in the other. When identical records hold different results, the number belongs to something unrecorded, so it cannot be [[dbxfe-mlflow-reproduce-concept|reproduced]].",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-reproduce",
+   "conceptIds": [
+    "dbxfe-mlflow-reproduce-concept",
+    "dbxfe-mlflow-leak-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-tracking",
+    "dbxfe-mlflow-claim-randomness",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-hero-visual",
+   "samajh": {
+    "text": "Mummy ne ek din kaha, namak thoda sa, andaaz se. Us din sabzi kamaal ki bani, par kisi ne nahi likha kitna namak gaya, kaunsa masala, kitni der aanch. Agli baar wahi haath, wahi bartan, par swaad alag. Aur koi bata nahi sakta kyun, kyunki jo cheez badli woh kabhi likhi hi nahi gayi thi.",
+    "mapping": "The unmeasured pinch of salt is the unlogged seed and split; the masala brand is the dataset and library version; a written recipe with exact amounts is a run record that can be rerun.",
+    "boundary": "Cooking always varies a little; a seeded computation on the same machine and versions can repeat bit for bit, so any difference there points to something unrecorded."
+   },
+   "questionIds": [
+    "dbxfe-mlflow-hero-question"
+   ],
+   "handbook": {
+    "markdown": "The hero is a composite of ordinary habits: a notebook that logs the model and a score, a random split with no seed, a feature list built interactively, and a model saved without a signature. The lab reproduces it on purpose:\n\n```python\nfeatures = FEATURES + [\"repair_minutes\"]           # a post-event column\ntrain, test = split_random(frame, 0.7, seed=None)  # a new permutation every execution\nwith mlflow.start_run(run_name=\"hero\"):\n    mlflow.log_param(\"model\", \"logistic_regression\")\n    info = mlflow.sklearn.log_model(model, name=\"model\")   # no signature, no input example\n    mlflow.log_metrics(metrics, model_id=info.model_id)\n```\n\n(The tests pass hidden seeds 11 and 12 so that the executions are checkable; the record still omits them.)\n\nA reproduction step reads the record and refuses rather than guesses:\n\n```text\ncannot reproduce this run: not recorded: C, class_weight, features, max_iter,\nscikit_learn, seed, split, training_dataset\n```\n\nGuessing would be worse than refusing. Trying seeds until the 1.0 comes back reproduces nothing: it searches for a test set that agrees with the claim.\n\nWhere hidden state comes from: unseeded splits and samplers, estimators whose `random_state` is left to chance, notebook cells executed out of order, a data extract that has since been overwritten, and library upgrades. Scikit-learn's guidance is to control randomness through `random_state`, passing an integer to splitters for repeatable splits. The record should hold every value the code reads, the training dataset, the feature list and the library versions; the next beat shows what a rerun does with them.\n\nThe hero is not rejected for its score. It is rejected because nobody, including its author, can say which rows produced the score or which columns the model read.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-reproduce"
+    ]
+   },
+   "recap": "Identical records with different results: the number lives outside the record.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-rerun",
+   "version": "1.0.0",
+   "title": "A reproduction repeats the digest and every metric",
+   "outcome": "Decide whether a rerun is a reproduction, a new experiment or a refusal.",
+   "explanation": "Reproduction here has a strict meaning: rerun from the record alone, then compare. Notice the equation: the rerun must see the same training digest, run on the recorded library version, and return every metric equal. The clean C = 1 rerun meets all three, bit for bit. The same rerun on another plant's rows changes the digest and recall falls to 0.6: a new experiment, not a failed reproduction. A record claiming scikit-learn 1.8.0 on a 1.9.1 installation is refused before training.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-reproduce",
+   "conceptIds": [
+    "dbxfe-mlflow-reproduce-concept",
+    "dbxfe-mlflow-digest-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-datasets",
+    "dbxfe-mlflow-claim-dependencies",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-rerun-visual",
+   "questionIds": [
+    "dbxfe-mlflow-rerun-question"
+   ],
+   "handbook": {
+    "markdown": "The lab's `reproduce()` reads only the record:\n\n```python\nrun = mlflow.get_run(run_id)\nparams = run.data.params\nmissing = [k for k in (\"model\", \"C\", \"class_weight\", \"max_iter\", \"seed\", \"split\", \"features\")\n           if k not in params]\nif params.get(\"scikit_learn\") != sklearn.__version__:\n    raise ReproductionRefused(missing, [\"scikit-learn ... recorded, ... installed\"])\nrerun = train_time_split(frame, C=float(params[\"C\"]), seed=int(params[\"seed\"]),\n                         train_through_day=int(params[\"train_through_day\"]),\n                         features=params[\"features\"].split(\",\"), ...)\nreproduced = same_digest and not differences      # every metric compared with ==\n```\n\nOn the lab machine the rerun of time-split-C-1 returned digest 4950f73b and metrics equal to the original's with exact float equality. That is achievable because every source of variation was pinned: the rows (digest), the split (a day cut-off), the estimator (lbfgs with fixed data is deterministic), the library versions and the machine.\n\nThree outcomes, three words:\n\n- **Reproduced**: same digest, same environment, identical metrics.\n- **New experiment**: the digest changed. Report both results; neither refutes the other.\n- **Refused**: something needed is not recorded, or the environment differs. Name what, and do not run.\n\nWhat can break exactness even with a complete record: a different CPU or linear-algebra (BLAS) library build, multi-threaded or GPU arithmetic, a library upgrade, or data re-extracted from a table that has changed since. For such cases decide in advance what tolerance counts as a reproduction and write it down with the contract; deciding after seeing the numbers turns a check into a negotiation. Also record the code version, for example a commit hash as a tag, because the record cannot rerun code that no longer exists.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-reproduce"
+    ]
+   },
+   "recap": "Same digest, same versions, identical metrics: reproduced; new rows: a new experiment.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-flavors",
+   "version": "1.0.0",
+   "title": "A logged model is a directory that names its flavors",
+   "outcome": "Read an MLmodel file and choose how a consumer should load the model.",
+   "explanation": "`log_model` writes a directory whose MLmodel file lists [[dbxfe-mlflow-flavor-concept|flavors]]: python_function, the generic interface MLflow's tools load, and sklearn, the library's own. Notice the nodes: model.skops holds the fitted pipeline (skops was the default format for scikit-learn in MLflow 3.16.1), the environment files sit beside it, and in MLflow 3 the model is its own logged-model entity with an ID. In the second state, loading through python_function enforces the signature; the native flavor does not.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-package",
+   "conceptIds": [
+    "dbxfe-mlflow-flavor-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-models",
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-claim-signatures",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-flavors-visual",
+   "questionIds": [
+    "dbxfe-mlflow-flavors-question"
+   ],
+   "handbook": {
+    "markdown": "The MLmodel file the lab's clean run wrote (abridged):\n\n```yaml\nflavors:\n  python_function:\n    env: {conda: conda.yaml, virtualenv: python_env.yaml}\n    loader_module: mlflow.sklearn\n    model_path: model.skops\n    python_version: 3.12.3\n  sklearn:\n    pickled_model: model.skops\n    serialization_format: skops\n    sklearn_version: 1.9.1\nmlflow_version: 3.16.1\nmodel_id: m-<id>\nrun_id: <run id>\nsignature:\n  inputs: '[{\"type\": \"double\", \"name\": \"oven_age_years\", \"required\": true}, ...]'\n  outputs: '[{\"type\": \"long\", \"name\": \"fault_next_24h\", \"required\": true}]'\n```\n\nA flavor is a convention for loading. `python_function` is the one every MLflow Python model is expected to support and the one deployment tools use: `mlflow.pyfunc.load_model(uri).predict(frame)` works the same for scikit-learn, XGBoost or custom code, and it is where signature enforcement happens. The `sklearn` flavor returns the fitted `Pipeline`, useful for inspecting coefficients, with no enforcement.\n\nSerialization is a flavor detail with consequences. In the lab's MLflow 3.16.1 the scikit-learn flavor saved `model.skops` by default, which is why `skops` appears in the pinned requirements; pickle-based formats remain available but deserializing a pickle from an untrusted source can run code.\n\nMLflow 3 changes how models are referenced: `log_model(model, name=\"model\")` creates a LoggedModel with an ID, `models:/m-<id>` loads it before any registration, and metrics logged with `model_id=` attach to it. Older code and articles use `artifact_path=` and `runs:/<run_id>/model`; check the major version a project pins.\n\nWhat to check before loading someone else's model: the flavors present, the serialization format, the signature, and the environment files, which the next beats cover.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-package"
+    ]
+   },
+   "recap": "MLmodel lists how to load a model; only python_function applies the signature.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-signature",
+   "version": "1.0.0",
+   "title": "The signature is checked at the pyfunc door",
+   "outcome": "Predict which input changes schema enforcement rejects and which a contract must catch itself.",
+   "explanation": "A [[dbxfe-mlflow-signature-concept|signature]] lists the model's inputs and outputs: here six required double columns and fault_next_24h as a long. When the model is loaded as python_function, MLflow checks each request before the model runs. Notice the second state: a renamed column and an int64 column are refused, a reordered frame passes because columns match by name, and an extra column is ignored with a warning. The third state logs a candidate from each drifted frame and checks its signature against a [[dbxfe-mlflow-contract-concept|model contract]]: every change is named, the extra column included. That check gates promotion; it never sees a request.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-package",
+   "conceptIds": [
+    "dbxfe-mlflow-signature-concept",
+    "dbxfe-mlflow-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-signatures",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-signature-visual",
+   "questionIds": [
+    "dbxfe-mlflow-signature-question"
+   ],
+   "handbook": {
+    "markdown": "The lab infers the signature from the model's real inputs and a named output:\n\n```python\nX_train = train[FEATURES].astype(\"float64\")          # the model's inputs, as served\nsignature = infer_signature(X_train, pd.Series(model.predict(X_train.head(5)),\n                                               name=\"fault_next_24h\"))\nmlflow.sklearn.log_model(model, name=\"model\", signature=signature, input_example=X_train.head(3))\n```\n\nCasting to float64 first is deliberate: integer columns cannot hold missing values, and MLflow warns that an integer schema will reject a request whose integers arrive as floats because a value is missing. Naming the output gives `fault_next_24h: long` instead of an anonymous int64 tensor.\n\nThe documented enforcement rules are that missing required inputs raise and only lossless conversions are made; the lab observed what that means in 3.16.1: int32 is widened to double, int64 is refused, a string is refused, a reordered frame is accepted, and an extra column is dropped with the log line \"These inputs will be ignored\".\n\nThat last behaviour is why a contract checks the signature itself:\n\n```python\nexpected = {c[\"name\"]: c[\"type\"] for c in contract[\"input_schema\"]}\nactual = {c[\"name\"]: c[\"type\"] for c in json.loads(signature[\"inputs\"])}\nreasons = ([f\"missing_input:{n}\" for n in sorted(set(expected) - set(actual))]\n           + [f\"unexpected_input:{n}\" for n in sorted(set(actual) - set(expected))]\n           + [f\"type_mismatch:{n}:{expected[n]}->{actual[n]}\"\n              for n in sorted(set(expected) & set(actual)) if expected[n] != actual[n]])\n```\n\nThe contract is versioned (1.0.0) so that a legitimate change, such as the plant renaming a sensor, becomes a new contract version and a retrained model, never a silent mapping. This check reads a logged model's signature, so it gates promotion: a candidate trained on a frame that carried `repair_minutes` is refused. It never sees a serving request, and a correctly signed model still drops an extra request column with only a warning. If such a request should fail loudly, check the request itself before `predict` (illustrative, not in the lab):\n\n```python\ndef check_request(frame, contract):\n    expected = {c[\"name\"] for c in contract[\"input_schema\"]}\n    unexpected, missing = sorted(set(frame.columns) - expected), sorted(expected - set(frame.columns))\n    if unexpected or missing:\n        raise ValueError(f\"request refused: unexpected={unexpected} missing={missing}\")\n```\n\nMLflow already refuses missing inputs and unsafe types, so names are the gap it leaves.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-package"
+    ]
+   },
+   "recap": "MLflow refuses missing and unsafe inputs but ignores extras; the contract refuses an extra in a candidate's signature at promotion, and only a request check refuses it in a request.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-environment",
+   "version": "1.0.0",
+   "title": "The environment travels with the model",
+   "outcome": "Read the environment files a logged model carries and decide when a version difference voids a reproduction.",
+   "explanation": "Logging the model also wrote requirements.txt, python_env.yaml and conda.yaml. Notice the pins in the first state: MLflow inferred mlflow 3.16.1, scikit-learn 1.9.1, pandas, numpy, scipy and skops from what the model imports, and python_env.yaml records Python 3.12.3. That [[dbxfe-mlflow-environment-concept|environment]] is part of the result. The second state shows the lab's reproduction step comparing the recorded scikit-learn version with the installed one and refusing a mismatch rather than calling a different computation the same.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-package",
+   "conceptIds": [
+    "dbxfe-mlflow-environment-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-dependencies",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-environment-visual",
+   "questionIds": [
+    "dbxfe-mlflow-environment-self"
+   ],
+   "handbook": {
+    "markdown": "What the lab's model directory holds:\n\n```text\nrequirements.txt   mlflow==3.16.1  numpy==2.5.3  pandas==3.0.6  scikit-learn==1.9.1  scipy==1.18.1  skops==0.15.0\npython_env.yaml    python: 3.12.3; build_dependencies: pip, setuptools, wheel; dependencies: -r requirements.txt\nconda.yaml         channels: conda-forge; python=3.12.3; pip: the same pins\n```\n\nMLflow infers these by loading the model in a subprocess and recording the packages it imports, then pinning the versions installed at logging time. The lab's test compares them with the lab's own `requirements.txt`: they match exactly. Edits to these files are overwritten the next time the model is saved; `extra_pip_requirements=` adds what inference misses, such as a package imported only inside custom code. Newer MLflow versions can also lock transitive dependencies.\n\nTwo environments are easy to confuse. The model's files describe what is needed to load and run the model. The training environment (the code that split, trained and evaluated) is not captured unless you record it: the lab logs `scikit_learn` as a run parameter, and a project should also tag the code version.\n\nA reproduction step checks the recorded version before doing anything:\n\n```python\nif params[\"scikit_learn\"] != sklearn.__version__:\n    raise ReproductionRefused([], [f\"scikit-learn {params['scikit_learn']} recorded, \"\n                                   f\"{sklearn.__version__} installed\"])\n```\n\nRefusing is conservative on purpose: a patch release may give identical numbers, but that is a claim to test, not assume. When a serving or scoring platform cannot install the model's pins, the options are to build its image from the model's files or to retrain there as a new run and a new version, with its own evidence.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-package"
+    ]
+   },
+   "recap": "The model carries its pins; a rerun on other versions is refused, not assumed equal.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-registry",
+   "version": "1.0.0",
+   "title": "Versions stay fixed; the alias is the pointer you move",
+   "outcome": "Trace a model from run to logged model to registered version, and move an alias forward and back.",
+   "explanation": "Registering a logged model creates a numbered [[dbxfe-mlflow-version-concept|version]] of a registered model, with lineage to its run. An [[dbxfe-mlflow-alias-concept|alias]] such as candidate names one version and is loaded as models:/cinderline-oven-fault@candidate. Notice across the states: version 1 gets the alias, the reproduced rerun becomes version 2 and the alias moves, and moving it back is the rollback. No version changed, and versions 1 and 2 predict identically: a version records a registration, not unique content.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-registry",
+   "conceptIds": [
+    "dbxfe-mlflow-version-concept",
+    "dbxfe-mlflow-alias-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-registry",
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-registry-visual",
+   "samajh": {
+    "text": "Hospital ki reception pe ek board hai: aaj ke duty doctor, Dr. Mehta. Doctors ki list waisi hi rehti hai, har doctor ka apna number hai. Kal Dr. Rao ki duty hai toh sirf board ka naam badalta hai, koi doctor hataya nahi jaata. Galat naam lag gaya toh board pe wapas Dr. Mehta likh do. Mareez sirf board padhkar jaate hain.",
+    "mapping": "The doctors with fixed numbers are model versions, the board is the alias candidate, changing the board is promotion, restoring the old name is rollback, and patients reading the board are consumers loading by alias.",
+    "boundary": "An alias points to exactly one version of one registered model, and moving it serves nothing by itself; a serving or batch system must read it."
+   },
+   "questionIds": [
+    "dbxfe-mlflow-registry-question"
+   ],
+   "handbook": {
+    "markdown": "The registry calls the lab makes, all against the same temporary file store:\n\n```python\nclient = MlflowClient()\nversion = mlflow.register_model(info.model_uri, \"cinderline-oven-fault\")   # version 1\nclient.set_model_version_tag(\"cinderline-oven-fault\", version.version, \"contract_version\", \"1.0.0\")\nclient.set_model_version_tag(\"cinderline-oven-fault\", version.version, \"decided_from_run\", run_id)\nclient.set_registered_model_alias(\"cinderline-oven-fault\", \"candidate\", version.version)\nmodel = mlflow.pyfunc.load_model(\"models:/cinderline-oven-fault@candidate\")\n```\n\nObserved states: after the first registration the alias points to version 1; registering the reproduced rerun creates version 2 and moving the alias leaves version 1 with an empty alias list; moving it back restores version 1. `get_model_version_by_alias()` answers \"which version is the candidate now?\" and each version keeps its `run_id`, which is the lineage back to parameters, datasets and checks.\n\nWhy aliases rather than stages: an alias is an explicit, named pointer, a version can carry several (candidate and champion, say), and consumers that load by alias need no code change when the pointer moves. Stages still exist in the open-source registry but are not supported for models in Unity Catalog, where aliases and tags do this job.\n\nRegistering is not deploying. Nothing runs because an alias moved; a serving or batch system must read the alias. Keep evidence on the version itself (the contract version, the deciding run, a link to the decision file) so that a reader of the registry can get from the pointer back to the reasons.\n\nA version is a registration event: the same model registered twice gets two numbers. Do not re-register to \"update\" a version, and do not delete old versions that an alias might need to return to.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-registry"
+    ]
+   },
+   "recap": "Register once per decision, tag the evidence, and move the alias; a version's model never changes.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-promotion",
+   "version": "1.0.0",
+   "title": "Promotion reads the evidence before the metrics",
+   "outcome": "Apply a contract's evidence gate and thresholds and write the decision with its reasons.",
+   "explanation": "A [[dbxfe-mlflow-promotion-concept|promotion decision]] applies a written, versioned contract in two gates. The evidence gate asks whether the record can be trusted: a time split, a seed, a training dataset, a feature list without post-event columns, a signature matching the contract. Only then are thresholds read. Notice in the first two states that three runs with attractive numbers stop at the first gate, C = 0.01 stops at the second, and C = 1 alone becomes a candidate. The third applies the same contract to another plant and rejects it.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-registry",
+   "conceptIds": [
+    "dbxfe-mlflow-promotion-concept",
+    "dbxfe-mlflow-contract-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-registry",
+    "dbxfe-mlflow-claim-signatures",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-promotion-visual",
+   "questionIds": [
+    "dbxfe-mlflow-promotion-self"
+   ],
+   "handbook": {
+    "markdown": "The contract is a file with a version, written before any run is judged:\n\n```json\n{\"contract_version\": \"1.0.0\", \"model_name\": \"cinderline-oven-fault\",\n \"input_schema\": [{\"name\": \"oven_age_years\", \"type\": \"double\"}, \"... six in all\"],\n \"output\": {\"name\": \"fault_next_24h\", \"type\": \"long\", \"values\": [0, 1]},\n \"thresholds\": {\"recall_min\": 0.75, \"precision_min\": 0.2, \"warnings_per_day_max\": 2.0},\n \"evidence\": {\"split\": \"time\", \"post_event_features\": \"none\", \"seed_recorded\": true,\n              \"dataset_digest_recorded\": true, \"signature_required\": true}}\n```\n\nThe thresholds come from the decision, not from the results: catch at least three faults in four, keep one warning in five real, and never add more ovens than the round of two can inspect. The recall floor also sits above the temperature rule's 0.6667, so a candidate must beat the rule in use.\n\n```python\ndef decide(contract, run_id):\n    evidence = evidence_report(contract, run_id)        # reads params, inputs and the model only\n    if not evidence[\"ok\"]:\n        return {\"decision\": \"reject\", \"gate\": \"evidence\", \"reasons\": evidence[\"reasons\"]}\n    thresholds = threshold_report(contract, mlflow.get_run(run_id).data.metrics)\n    return {\"decision\": \"promote-candidate\" if thresholds[\"ok\"] else \"reject\",\n            \"gate\": \"thresholds\", \"reasons\": thresholds[\"reasons\"]}\n```\n\nThe decision file lists the contract version, the thresholds, the baselines and every run with its gate and sorted reasons, and says in words that promote-candidate registers a version and moves an alias, deploys nothing, and does not certify data quality.\n\nThree limits. Days 85 to 120 did two jobs here: they chose C = 1 over C = 0.01 and they produced the numbers the decision quotes, so they are a selection (validation) period, not an untouched test. Quote 0.8333 and 0.2206 as the selection result, and confirm the frozen candidate on a later period, such as the next month's oven-days, before calling them an estimate. The gate reads what a record declares, so a record that misstates its split would pass; the check reports stored as artifacts let a reviewer compare the declaration with the rows. And a passing decision belongs to one dataset and one period: the transfer plant's run shows the same code and contract rejecting on recall. The model evaluation report's decision section is where this entry belongs.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-registry"
+    ]
+   },
+   "recap": "Evidence gate first, thresholds second, every reason written down; promotion deploys nothing.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  },
+  {
+   "id": "dbxfe-mlflow-managed",
+   "version": "1.0.0",
+   "title": "Databricks hosts the record; the evidence is still yours",
+   "outcome": "Separate the duties open-source MLflow leaves to you from those Databricks-managed MLflow and Unity Catalog take on.",
+   "explanation": "With open-source MLflow you choose, run and secure the tracking server, its stores and the registry; in 3.16.1 the default tracking URI is a local SQLite file. Databricks-managed MLflow hosts tracking in the workspace with experiment permissions and registers models in [[dbxfe-mlflow-uc-concept|Unity Catalog]]: three-level names, catalog privileges, aliases and tags, no stages. Notice what stays selected in both states: the contract and the data checks. No platform decides which run earns an alias.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-managed",
+   "conceptIds": [
+    "dbxfe-mlflow-uc-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-databricks",
+    "dbxfe-mlflow-claim-uc",
+    "dbxfe-mlflow-claim-privileges",
+    "dbxfe-mlflow-claim-filestore",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "visualId": "dbxfe-mlflow-managed-visual",
+   "questionIds": [
+    "dbxfe-mlflow-managed-self"
+   ],
+   "handbook": {
+    "markdown": "What changes, as a schematic diff (nothing here was executed on Databricks; workspace type, region and entitlements must be confirmed first):\n\n```python\n# open-source, as in the lab\nos.environ[\"MLFLOW_ALLOW_FILE_STORE\"] = \"true\"      # file store: maintenance mode, explicit opt-in\nmlflow.set_tracking_uri(tmp_dir.as_uri())\nmlflow.register_model(model_uri, \"cinderline-oven-fault\")\n\n# Databricks-managed MLflow with Unity Catalog\nmlflow.set_registry_uri(\"databricks-uc\")            # the default with MLflow 3 on Databricks\nmlflow.register_model(model_uri, \"cinderline_ml.maintenance.oven_fault\")\n```\n\n| duty | open-source MLflow | Databricks-managed |\n|---|---|---|\n| tracking server and stores | you run, secure and back up | hosted in the workspace |\n| who can see runs | your server's access control | experiment permissions (CAN READ, CAN EDIT, CAN MANAGE) |\n| registry | same backend, versions and aliases | Unity Catalog: catalog.schema.model, privileges, aliases and tags, no stages |\n| create a registered model | whatever your server's access control allows | USE CATALOG, USE SCHEMA and CREATE MODEL on the schema |\n| load a model | whatever your server's access control allows | EXECUTE on the model |\n| which run earns an alias | the team | the team |\n| was the data valid | the team | the team |\n\nFor self-hosted MLflow, current releases steer away from the file store: the default tracking URI in 3.16.1 is a SQLite file, and `mlflow migrate-filestore` moves an existing file store's metadata into SQLite while leaving artifacts where they are.\n\nOwnership rules for versions and aliases in Unity Catalog are the detail most likely to change, so check the privileges reference before designing who may move a production alias. The alias itself behaves as in the lab: one pointer per name, moved on evidence, with versions fixed. Platform lineage and permissions make the record easier to trust as a record; they do not make a leaky feature valid.",
+    "sourceSectionIds": [
+     "dbxfe-mlflow-l01-managed"
+    ]
+   },
+   "recap": "The platform hosts and governs the record; the contract and the data checks stay with the team.",
+   "changeNote": "New academy beat.",
+   "mediaIds": []
+  }
+ ],
+ "cardLinks": [
+  {
+   "cardId": "dbxfe-mlflow-l01-card1",
+   "beatId": "dbxfe-mlflow-record"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card2",
+   "beatId": "dbxfe-mlflow-params"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card3",
+   "beatId": "dbxfe-mlflow-dataset"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card4",
+   "beatId": "dbxfe-mlflow-quality"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card5",
+   "beatId": "dbxfe-mlflow-compare"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card6",
+   "beatId": "dbxfe-mlflow-sorted"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card7",
+   "beatId": "dbxfe-mlflow-rerun"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card8",
+   "beatId": "dbxfe-mlflow-hero"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card9",
+   "beatId": "dbxfe-mlflow-flavors"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card10",
+   "beatId": "dbxfe-mlflow-signature"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card11",
+   "beatId": "dbxfe-mlflow-environment"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card12",
+   "beatId": "dbxfe-mlflow-registry"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card13",
+   "beatId": "dbxfe-mlflow-promotion"
+  },
+  {
+   "cardId": "dbxfe-mlflow-l01-card14",
+   "beatId": "dbxfe-mlflow-managed"
+  }
+ ],
+ "extensionCards": [
+  {
+   "id": "dbxfe-mlflow-extension-filestore",
+   "revision": "1",
+   "prompt": "Why did the lab have to opt in to the ./mlruns-style file store, and what does MLflow document as the way out?",
+   "answer": "MLflow 3.16.1 treats the file store as maintenance-mode and raises unless MLFLOW_ALLOW_FILE_STORE=true is set; mlflow migrate-filestore moves its metadata to SQLite.",
+   "explanation": "The error the installed MLflow raises points to a database backend and to the [[dbxfe-mlflow-extension-filestore-concept|file store migration]]. The documented tool needs MLflow 3.10 or later, targets SQLite only (file-store experiment IDs exceed the 32-bit integers PostgreSQL and MySQL enforce), moves metadata losslessly, leaves artifacts in their original location with the database storing the same artifact URIs, and rolls back on error. The lab keeps the file store only because it lives in a temporary directory that is deleted.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-managed",
+   "conceptIds": [
+    "dbxfe-mlflow-extension-filestore-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-filestore",
+    "dbxfe-mlflow-claim-lab",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "beatId": "dbxfe-mlflow-managed",
+   "whyItMatters": "Most older tutorials default to ./mlruns; a team starting today should plan a database backend and know the migration path."
+  },
+  {
+   "id": "dbxfe-mlflow-extension-logged-model",
+   "revision": "1",
+   "prompt": "How does an MLflow 3 LoggedModel change the way you reference a model and read its metrics?",
+   "answer": "A logged model has its own ID and URI, models:/<model_id>, can be logged outside a run, and metrics can be linked to it directly.",
+   "explanation": "In MLflow 2 a model was an artifact path inside a run, referenced as runs:/<run_id>/model. The MLflow 3 [[dbxfe-mlflow-extension-logged-model-concept|LoggedModel]] is a first-class entity: log_model takes a name, returns a model ID, and metrics logged with model_id attach to the model, so a registry reader can see a version's metrics without opening the run. The lab used this: every clean run's evaluation metrics are linked to its logged model.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-record",
+   "conceptIds": [
+    "dbxfe-mlflow-extension-logged-model-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-mlflow3",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "beatId": "dbxfe-mlflow-flavors",
+   "whyItMatters": "Code and articles written for MLflow 2 use artifact_path and runs:/ URIs; mixing the two styles is a common source of broken model references."
+  },
+  {
+   "id": "dbxfe-mlflow-extension-uc-privileges",
+   "revision": "1",
+   "prompt": "Which Unity Catalog privileges separate creating a registered model from loading one for inference?",
+   "answer": "Creating needs USE CATALOG and USE SCHEMA with CREATE MODEL on the schema; loading needs EXECUTE on the model.",
+   "explanation": "The [[dbxfe-mlflow-extension-uc-privileges-concept|registered model privileges]] split duties cleanly: a training principal can create the model in a schema it may write to, while a scoring job needs only EXECUTE, which also allows reading version metadata and downloading model files. Creating further versions and setting aliases are tied to ownership of the registered model or to a privilege the reference names for that purpose, so who may move a production alias is a governance decision to check against the current privileges reference before granting.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-managed",
+   "conceptIds": [
+    "dbxfe-mlflow-extension-uc-privileges-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-privileges",
+    "dbxfe-mlflow-claim-uc",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "beatId": "dbxfe-mlflow-registry",
+   "whyItMatters": "Promotion by evidence only holds if the people who can move an alias are the ones who apply the contract."
+  },
+  {
+   "id": "dbxfe-mlflow-extension-experiment-permissions",
+   "revision": "1",
+   "prompt": "Who can read or change the runs in a Databricks experiment, and how does a notebook experiment differ?",
+   "answer": "Principals granted CAN READ, CAN EDIT or CAN MANAGE on a workspace experiment; a notebook experiment follows its notebook's permissions.",
+   "explanation": "[[dbxfe-mlflow-extension-experiment-permissions-concept|Experiment permissions]] come in four levels: NO PERMISSIONS, CAN READ, CAN EDIT and CAN MANAGE. A workspace experiment is independent of any notebook, and any notebook can log to it by ID or name. A notebook experiment is tied to one notebook, created automatically when a run starts without an active experiment, and managed through that notebook. For a promotion review, put the runs in a workspace experiment whose readers are the reviewers.",
+   "lessonId": "dbxfe-mlflow-l01",
+   "sectionId": "dbxfe-mlflow-l01-managed",
+   "conceptIds": [
+    "dbxfe-mlflow-extension-experiment-permissions-concept"
+   ],
+   "claimIds": [
+    "dbxfe-mlflow-claim-databricks",
+    "dbxfe-mlflow-guidance",
+    "dbxfe-mlflow-fiction"
+   ],
+   "beatId": "dbxfe-mlflow-record",
+   "whyItMatters": "Runs logged into an automatically created notebook experiment can be invisible to the reviewer who has to judge them."
+  }
+ ],
+ "recap": {
+  "title": "A number is only as good as its record",
+  "markdown": "**Every number a model report quotes should trace to a run that could be rerun.** A run records parameters, metrics, datasets, artifacts and a model; a digest says which rows, not whether they were right; two runs compare only when one thing changed; a reproduction repeats the digest and every metric, and a record that cannot be rerun is refused, however good its score. The model carries its flavors, signature and environment, a versioned contract names, at promotion, the drift MLflow lets through, and promotion reads the evidence before the metrics and moves an alias, nothing more. Databricks hosts and governs the record; the judgement stays yours. **Transfer challenge:** take a predictive-maintenance experiment from another industry, such as pump failures at a water utility, and write the contract's evidence clause, the comparable pairs and the decision entry for its best-scoring run before reading any metric.",
+  "visualId": "dbxfe-mlflow-registry-visual"
+ },
+ "appliedTask": {
+  "title": "Review the East plant's press-seal promotion request",
+  "prompt": "Cinderline's East plant predicts, at the start of each shift, whether each of its twelve hydraulic presses will lose a seal before the shift ends; maintenance can service two presses a shift. The experiment holds: P-1 with a time split, a seed, training digest 9d2e41c0, seven sensor features and a matching signature, recall 0.72 and 1.6 warnings a shift; P-2, identical except max_depth, recall 0.81 and 2.4 warnings a shift; P-3 with accuracy 0.99, split=random, no seed, no dataset and a signature with eight inputs including seal_replaced_at; and the pressure-threshold rule in use at recall 0.41. The contract asks recall of at least 0.7, precision of at least 0.25 and at most 2.0 warnings a shift. Write the decision entries, the registry actions and what the record cannot tell you.",
+  "modelAnswer": "P-3: reject at the evidence gate with split_not_time_based, seed_not_recorded, dataset_digest_missing, features_not_recorded and unexpected_input:seal_replaced_at, a column written after the failure it predicts; its 0.99 is never read. P-1 and P-2 share digest 9d2e41c0 and differ only in max_depth, so they are comparable. P-2 is rejected at the thresholds gate with warnings_above_cap (2.4 against 2.0). P-1 meets recall (0.72) and the cap (1.6) and beats the rule's 0.41, but its precision must be read from its record against 0.25 before it can be decided. If it passes: register P-1 as a new version, tag it with the contract version and run ID, and move the alias candidate. The record cannot say whether the logged sensor data was valid, how P-1 behaves on presses absent from training, or anything about serving.",
+  "reasoning": "The answer applies the evidence gate before any metric, uses the shared digest and the single differing parameter to decide comparability, refuses to decide on a threshold the brief does not report, and states the limits a complete record still leaves open.",
+  "beatIds": [
+   "dbxfe-mlflow-compare",
+   "dbxfe-mlflow-hero",
+   "dbxfe-mlflow-signature",
+   "dbxfe-mlflow-registry",
+   "dbxfe-mlflow-promotion"
+  ]
+ },
+ "scenarioIds": [
+  "dbxfe-mlflow-scenario"
+ ]
+}

@@ -1,0 +1,528 @@
+{
+  "module": {
+    "id": "dbxfe-ai-platform",
+    "title": "Managed AI building blocks and platform choices",
+    "summary": "Place foundation-model access, AI Functions, serving endpoints, the AI Gateway, Agent Bricks and custom agents by who writes the logic above the model, choose among them with five criteria rather than novelty, and record availability, cost and evaluation as dated assumptions.",
+    "objectives": [
+      "Distinguish pay-per-token, provisioned-throughput and external-model access, AI Functions, Agent Bricks agents and custom agents by who writes the logic, who hosts it and who pays.",
+      "Choose a pattern for a knowledge assistant with a decision table on customization, data access, operations, evaluation and risk, including when a fixed retrieval workflow beats autonomous tool selection.",
+      "Record availability, release stage and cost as dated assumptions from named artifacts, and plan an evaluation that compares the alternatives on one labelled question set."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-genai"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-ai-platform-l01.json"
+    ],
+    "scenarioId": "dbxfe-ai-platform-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-ai-platform-scenario",
+      "title": "Choose the managed pattern for Cinderline's maintenance-knowledge assistant",
+      "context": "Fictional Cinderline Components wants maintenance technicians on three press lines to ask questions of 2,400 equipment manuals and service bulletins stored as PDFs in a Unity Catalog volume, alongside a work-order history table. Technicians want cited answers on a tablet; the reliability lead also asks whether the assistant could check spare-part stock. Security requires that manual content never be sent to a third-party model provider, that every answer cite a manual revision, and that technicians see only their own plant's bulletins. The workspace's region, entitlements, release stages and prices are unconfirmed, and no model has been called.",
+      "task": "Write a one-page pattern selection for the platform owner: the recommended building block with two alternatives, a decision table, a responsibilities note saying who hosts, governs and pays, an availability and status table with unknown cells, a cost-assumption table that names drivers and says check current pricing, an evaluation plan built on a labelled question set, and the condition under which the team would move from retrieval to autonomous tool selection.",
+      "requirements": [
+        "Compare at least three supported patterns on customization, data access, operations, evaluation and risk; do not rank by novelty.",
+        "Say who hosts, governs and pays for each component, including any external provider.",
+        "Mark release stage, cloud and region availability and workspace enablement as unknown until verified against a named, dated source; infer nothing from launch announcements.",
+        "Give cost drivers and synthetic volumes but no prices; every rate reads check current pricing.",
+        "Plan one labelled evaluation set run against every alternative, with blocking rules agreed before any result."
+      ],
+      "model": "### Recommendation\nFirst release: a **Knowledge Assistant** over the manuals volume (a files source) and the bulletin index, answering on a Databricks-hosted model. Named fallback: a **fixed retrieval workflow in code** (retrieve permitted passages, answer with a citation or refuse) if the assistant is not enabled in Cinderline's region. Deferred: a **Supervisor Agent** with a stock_lookup function, until stock or history questions reach one in five of labelled questions or live stock becomes a requirement. External models are excluded for manual content by the security rule.\n\n### Decision table\n| Pattern | Customization | Data access | Operations | Evaluation | Risk |\n|---|---|---|---|---|---|\n| Knowledge Assistant | sources, instructions, examples | volume, index | platform-built; sync after new manuals | examples, labelled set, experiment | opaque internals; plant scoping to verify |\n| Fixed workflow (code) | every step | the index we build | our team | labelled set, traces | our bugs and upkeep |\n| Supervisor Agent | tools, descriptions | manuals plus stock | more tools to maintain | adds tool-call and denied-tool cases | wrong or denied tool on every question |\n\n### Responsibilities\nDatabricks hosts the endpoints, the model and the assistant's orchestration, outside Cinderline's cloud account. Cinderline governs the volume, the index, the grants (CAN_QUERY for the tablet app's identity only) and the evaluation sign-off, and pays for usage. No third party receives manual text.\n\n### Availability and status (unknown until verified)\n| Item | Label found | Region | Workspace |\n|---|---|---|---|\n| Knowledge Assistant | Public Beta badge, Terraform provider v1.133.0 | unknown | unknown |\n| Hosted model for this use | no label found | unknown | unknown |\n| Per-technician document permissions in answers | not stated in artifacts read | not applicable | unknown |\n| AI Gateway on the agent endpoint | SDK 0.141.0: inference tables only | not applicable | not applicable |\n\nBecause one assistant cannot yet be shown to respect plant permissions, sources are split per plant until that is verified. With one app identity holding CAN_QUERY on every plant's assistant, plant separation rests on the app: it selects each technician's plant assistant from the signed-in identity, never from a request field, and a two-plant test (a plant-2 technician asking for a plant-3 bulletin is refused) is an owned verification item. The alternative is to grant CAN_QUERY on each plant's assistant to that plant's users and call it with user authorization.\n\n### Cost assumptions\nQuestions: 300 a day at about 3,400 tokens each; an index over 2,400 manuals; one agent endpoint; evaluation at 60 rows × 4 scorers × 10 runs. Every rate: check current pricing. After the pilot, usage-tracking system tables and endpoint tags replace these figures.\n\n### Evaluation plan\nSixty labelled technician questions (46 manuals, 6 refusals, 5 stock, 3 history), with expected facts, sources and refusals labelled by a maintenance engineer. Both retrieval candidates run on the same rows with correctness, retrieval groundedness, safety and a citation guideline. Each row carries its caller, so refusal cases run as a technician of the asking plant. Blocking rules agreed now: every refusal case passes; no answer cites a superseded revision; correctness at least 0.85; an engineer reviews every failure. After release, the inference table is sampled into the set monthly.\n\n### Switching condition\nPilot a Supervisor Agent when stock or history questions reach one in five, or when answers must use live stock. Drafting work orders waits for an authorization design.",
+      "reasoning": "The note filters on the hard security constraint first, compares three supported patterns on the same five criteria, prefers retrieval because the labelled mix shows one corpus answers most questions, keeps hosting, governing and paying apart, fills status cells only from named artifacts while leaving region, workspace and prices unknown, and fixes the evaluation and switching rules before any result exists.",
+      "rubric": [
+        {
+          "id": "dbxfe-ai-platform-scenario-rubric-1",
+          "criterion": "Pattern choice and alternatives",
+          "weak": "One pattern named, chosen because it is newest or most capable.",
+          "partial": "Alternatives listed but compared on different criteria, or the security constraint ignored.",
+          "strong": "Hard constraints filter first; three patterns compared on the same five criteria; a named fallback and a deferral with its trigger."
+        },
+        {
+          "id": "dbxfe-ai-platform-scenario-rubric-2",
+          "criterion": "Responsibilities",
+          "weak": "Databricks is said to own everything because the compute is managed.",
+          "partial": "Hosting and paying stated; governance of sources and grants missing.",
+          "strong": "Hosts, governs and pays separated per component; no third party receives manual text; plant scoping owned by Cinderline."
+        },
+        {
+          "id": "dbxfe-ai-platform-scenario-rubric-3",
+          "criterion": "Availability, status and cost honesty",
+          "weak": "Availability or GA inferred from an announcement; prices quoted from memory.",
+          "partial": "Unknowns mentioned in prose without a table, or some rates guessed.",
+          "strong": "Status cells cite an artifact and date or read unknown; the cost table has drivers and volumes and check current pricing for every rate."
+        },
+        {
+          "id": "dbxfe-ai-platform-scenario-rubric-4",
+          "criterion": "Evaluation plan and switching condition",
+          "weak": "Evaluation means trying a few questions after launch.",
+          "partial": "A labelled set exists, but candidates run on different questions or rules are set after results.",
+          "strong": "One labelled set for every candidate, blocking rules agreed in advance, engineer review, post-release sampling and a measurable switching condition."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "May manual text go to an external model provider if the endpoint lives in our workspace?",
+          "response": "No. The rule is about where the prompt is processed, not where the endpoint is configured; manual content stays on Databricks-hosted models."
+        },
+        {
+          "question": "Is the Knowledge Assistant enabled in our workspace and region?",
+          "response": "Unknown. Nobody has checked yet; the platform owner will verify in the workspace and the current documentation before the design review."
+        },
+        {
+          "question": "Do technicians need the assistant to create or draft work orders?",
+          "response": "Not in the first release. Drafting is a later wish; for now the assistant should link to the maintenance system."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-ai-platform-l01"
+      ],
+      "claimIds": [
+        "dbxfe-ai-platform-course-claim-access",
+        "dbxfe-ai-platform-course-claim-modes",
+        "dbxfe-ai-platform-course-claim-functions",
+        "dbxfe-ai-platform-course-claim-serving",
+        "dbxfe-ai-platform-course-claim-gateway",
+        "dbxfe-ai-platform-course-claim-bricks",
+        "dbxfe-ai-platform-course-claim-custom",
+        "dbxfe-ai-platform-course-claim-status",
+        "dbxfe-ai-platform-course-claim-evaluation",
+        "dbxfe-ai-platform-course-claim-cost",
+        "dbxfe-fact-agents",
+        "dbxfe-fact-evaluation",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-ai-platform-course-source-serving",
+      "title": "Databricks SDK for Python v0.141.0: service/serving.py",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/serving.py",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Generated client for Model Serving and the serving-endpoint AI Gateway, released 2026-09-23.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Client docstrings prove API shapes and state support notes; they do not prove a feature is enabled for a cloud, region or workspace. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-functions",
+      "title": "Databricks SDK for Python v0.141.0: service/aifunctions.py",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/aifunctions.py",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "REST client for task-specific AI Functions (ai_classify, ai_extract, ai_parse_document).",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Covers the REST equivalents only; SQL signatures, ai_query and availability are documented elsewhere. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-knowledge",
+      "title": "Databricks SDK for Python v0.141.0: service/knowledgeassistants.py",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/knowledgeassistants.py",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "REST client for Knowledge Assistants, an Agent Bricks agent.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Shows the configuration contract, not answer quality, end-user permission behaviour or regional availability. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-supervisor",
+      "title": "Databricks SDK for Python v0.141.0: service/supervisoragents.py",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/supervisoragents.py",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "REST client for Supervisor Agents and their tools, an Agent Bricks agent.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Lists accepted tool types; the identity each tool call runs with is not stated and must be verified. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-tfserving",
+      "title": "Terraform provider for Databricks v1.133.0: databricks_model_serving resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/model_serving.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Infrastructure-as-code documentation for serving endpoints and their ai_gateway block, dated 2026-09-21.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Some statements lag the API; its ai_gateway note is narrower than the SDK's, so it is quoted with version and date. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-tfstage",
+      "title": "Terraform provider for Databricks v1.133.0: databricks_knowledge_assistant resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/knowledge_assistant.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Infrastructure-as-code documentation for Knowledge Assistants under the subcategory Agent Bricks, with a release-stage badge.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A badge is a dated label on this provider page, not availability in any cloud, region or workspace. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-tfsupervisor",
+      "title": "Terraform provider for Databricks v1.133.0: databricks_supervisor_agent resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/supervisor_agent.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Infrastructure-as-code documentation for Supervisor Agents under the subcategory Agent Bricks, with a release-stage badge.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A badge is a dated label on this provider page, not availability in any cloud, region or workspace. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-tfpt",
+      "title": "Terraform provider for Databricks v1.133.0: databricks_model_serving_provisioned_throughput resource",
+      "url": "https://raw.githubusercontent.com/databricks/terraform-provider-databricks/v1.133.0/docs/resources/model_serving_provisioned_throughput.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Infrastructure-as-code documentation for provisioned-throughput endpoints.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Its private-preview sentence describes this Terraform resource, not provisioned throughput itself. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-agents",
+      "title": "databricks-agents 1.12.0 (Mosaic AI Agent Framework SDK)",
+      "url": "https://pypi.org/project/databricks-agents/1.12.0/",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks' package for deploying agents to agent endpoints; read for behaviour of deploy().",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Behaviour at this version only; its Alpha classifier is package metadata, not a release stage. Release confirmed through PyPI's JSON API and the wheel's published SHA-256 in this build. Read in this build on 2026-09-23: the release was confirmed through PyPI's JSON API (the HTML page served a bot challenge to the sandbox) and the wheel was downloaded with its published SHA-256 (f059a23dfa8de3b0...) matching; databricks/agents/deployments.py w"
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-mlflow",
+      "title": "MLflow v3.16.1: mlflow/genai/evaluation/base.py",
+      "url": "https://raw.githubusercontent.com/mlflow/mlflow/v3.16.1/mlflow/genai/evaluation/base.py",
+      "publisher": "MLflow (open-source project)",
+      "type": "primary reference",
+      "context": "Open-source MLflow GenAI evaluation entry point, mlflow.genai.evaluate, with built-in scorers.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Computes assessments; thresholds and judge quality remain the evaluator's decisions. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-responses",
+      "title": "MLflow v3.16.1: mlflow/pyfunc/model.py (ResponsesAgent)",
+      "url": "https://raw.githubusercontent.com/mlflow/mlflow/v3.16.1/mlflow/pyfunc/model.py",
+      "publisher": "MLflow (open-source project)",
+      "type": "primary reference",
+      "context": "The ResponsesAgent authoring interface in open-source MLflow 3.16.1.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Describes the interface only; hosting and deployment behaviour come from the Databricks side. Read in this build on 2026-09-23 from the tagged file, whose SHA-256 matched the published package; no documentation host was contacted."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-fmapi",
+      "title": "Databricks Foundation Model APIs",
+      "url": "https://docs.databricks.com/aws/en/machine-learning/foundation-model-apis/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS documentation for pay-per-token and provisioned-throughput foundation-model access.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Model lists, modes, limits, regions and prices change often. Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the URL is as supplied in the build's source list and the title unconfirmed; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-aifunctions",
+      "title": "Apply AI on data using Databricks AI Functions",
+      "url": "https://docs.databricks.com/aws/en/large-language-models/ai-functions",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS documentation for task-specific AI Functions and ai_query.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Function lists, signatures, supported compute and regional availability change. Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the URL is as supplied in the build's source list and the title unconfirmed; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-devhub-customagents",
+      "title": "Databricks developer documentation source: Custom agent endpoints (databricks/devhub at a pinned commit)",
+      "url": "https://github.com/databricks/devhub/blob/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/custom-agents.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Markdown source of developers.databricks.com's Custom agent endpoints page at commit 35f4745 (2026-09-21); Call an existing agent endpoint.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Relied on only for the status of agents.deploy() and where custom agents are recommended to run. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/devhub/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/custom-agents.md: 'Some agents are reached as a Model Serving endpoint instead of running in-app. A Knowledge Assistant always is, and a Supervisor Agent or custom Python agent can be. ... Deploying a custom agent to its own Model Serving endpoint with `agents.deploy()` is a legacy path. Prefer running it in-app (above), or see ... and [Migrate to Databricks Apps](https://docs.databricks.com/aws/en/agents/custom-agents/migrate-agent-to-apps).' Scope: Databricks' own developer documentation source, dated by its commit; it says nothing about Model Serving limits, prices or regional availability."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-devhub-overview",
+      "title": "Databricks developer documentation source: What is Agent Bricks? (databricks/devhub at a pinned commit)",
+      "url": "https://github.com/databricks/devhub/blob/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/overview.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Markdown source of developers.databricks.com's Agent Bricks overview at commit 35f4745 (2026-09-21); opening paragraph.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Relied on only for the scope of the Agent Bricks name. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/devhub/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/overview.md: '**Agent Bricks** is Databricks' enterprise agent platform for building, deploying, and governing agents that operate on your business data. ... In your workspace you configure Knowledge Assistants, Supervisor Agents, and custom Python agents.' Scope: Databricks' own developer documentation source; nothing about release stage or availability."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-source-devhub-genie",
+      "title": "Databricks developer documentation source: Genie Agents (databricks/devhub at a pinned commit)",
+      "url": "https://github.com/databricks/devhub/blob/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/genie.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Markdown source of developers.databricks.com's Genie Agents page at commit 35f4745 (2026-09-21); opening paragraph.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Relied on only for the current product name; in SDK 0.141.0 the Genie API still identifies one by its space ID (GenieSpace, space_id) and the supervisor tool type is still genie_space. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/devhub/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/genie.md: 'A **Genie Agent** (formerly Genie space) is a Databricks natural-language interface over Unity Catalog tables' Scope: Databricks' own developer documentation source."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-ai-platform-course-claim-access",
+      "description": "Foundation-model access on Databricks serving endpoints comes as pay-per-token endpoints, provisioned-throughput endpoints sized in model units with optional burst scaling, and external-model endpoints that forward to a named provider using a key referenced from a secret scope.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-serving",
+        "dbxfe-ai-platform-course-source-tfserving",
+        "dbxfe-ai-platform-course-source-tfpt"
+      ],
+      "context": "SDK 0.141.0 and Terraform provider v1.133.0, read 2026-09-23."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-claim-modes",
+      "description": "Pay-per-token is charged by tokens processed and suits getting started and variable volume; provisioned throughput provides dedicated capacity for production workloads that need predictable performance; availability of models and modes varies by region.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-fmapi"
+      ],
+      "context": "Foundation Model APIs documentation as the author recalled it; not fetched or search-confirmed in this build."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-claim-functions",
+      "description": "Task-specific AI Functions such as ai_classify, ai_extract and ai_parse_document perform one task with a managed model, and ai_query sends each row's request to a serving endpoint the caller names.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-functions",
+        "dbxfe-ai-platform-course-source-aifunctions"
+      ],
+      "context": "REST equivalents read in SDK 0.141.0; ai_query as the author recalled it."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-claim-serving",
+      "description": "Serving endpoints run on Databricks-managed serverless compute outside the customer's cloud account, hold served entities and traffic routes and grant CAN_QUERY to callers; the agent framework's deploy() puts a Unity Catalog agent model version on an agent endpoint with an inference table, keeping earlier versions served at zero traffic.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-serving",
+        "dbxfe-ai-platform-course-source-agents"
+      ],
+      "context": "SDK 0.141.0 and databricks-agents 1.12.0, read 2026-09-23."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-claim-gateway",
+      "description": "The serving-endpoint AI Gateway provides rate limits, guardrails, usage tracking in system tables, inference tables and fallback; SDK 0.141.0 says external-model, provisioned-throughput and pay-per-token endpoints are fully supported while agent endpoints currently support only inference tables, and the Terraform provider v1.133.0 page states a narrower, external-only scope.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-serving",
+        "dbxfe-ai-platform-course-source-tfserving"
+      ],
+      "context": "Dated statements from two artifacts in the same week; re-check current documentation."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-claim-bricks",
+      "description": "A Knowledge Assistant is configured with a description, optional instructions, knowledge sources (a vector search index, Unity Catalog volume files or a file table) and examples, and reports an agent endpoint, an MLflow experiment and a state; non-index sources must be synced. A Supervisor Agent routes requests among configured tools such as Knowledge Assistants, Genie Agents (formerly Genie spaces), Unity Catalog functions, MCP connections and apps.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-knowledge",
+        "dbxfe-ai-platform-course-source-supervisor",
+        "dbxfe-ai-platform-course-source-devhub-genie",
+        "dbxfe-ai-platform-course-source-devhub-overview"
+      ],
+      "context": "SDK 0.141.0, read 2026-09-23; answer quality and identities per tool not stated."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-claim-custom",
+      "description": "A custom agent wraps its own logic in MLflow's ResponsesAgent interface, which can wrap any agent framework, and can be deployed to an agent endpoint with the Mosaic AI Agent Framework SDK; Databricks developer documentation calls that agents.deploy() path to the agent's own Model Serving endpoint legacy and recommends running a custom agent in a Databricks App.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-responses",
+        "dbxfe-ai-platform-course-source-agents",
+        "dbxfe-ai-platform-course-source-devhub-customagents"
+      ],
+      "context": "MLflow 3.16.1 and databricks-agents 1.12.0, read 2026-09-23."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-claim-status",
+      "description": "The Terraform provider v1.133.0 labels the Knowledge Assistant and Supervisor Agent resources Public Beta and states that its provisioned-throughput endpoint resource is in private preview for enrolled customers; these are dated labels on named artifacts, not availability for any workspace, region or cloud.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-tfstage",
+        "dbxfe-ai-platform-course-source-tfsupervisor",
+        "dbxfe-ai-platform-course-source-tfpt"
+      ],
+      "context": "Provider pages dated 2026-09-21."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-claim-evaluation",
+      "description": "mlflow.genai.evaluate runs built-in scorers such as Correctness, RetrievalGroundedness, Safety and Guidelines, and custom scorers, over labelled rows, traces or inputs passed to a predict function; Knowledge Assistants carry examples with guidelines and an MLflow experiment.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-mlflow",
+        "dbxfe-ai-platform-course-source-knowledge"
+      ],
+      "context": "MLflow 3.16.1 and SDK 0.141.0, read 2026-09-23."
+    },
+    {
+      "id": "dbxfe-ai-platform-course-claim-cost",
+      "description": "AI Gateway usage tracking records operational usage on endpoints and associated costs in system tables and endpoint tags propagate to billing logs; no artifact read states a rate, so rates come from current pricing.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-ai-platform-course-source-serving",
+        "dbxfe-ai-platform-course-source-tfserving"
+      ],
+      "context": "SDK 0.141.0 and Terraform provider v1.133.0, read 2026-09-23."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-ai-platform-l01-map-concept",
+      "term": "managed AI building block",
+      "aliases": [
+        "AI building block"
+      ],
+      "definition": "One of the platform's ways to put a model to work, distinguished by who writes the logic between request and model.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-map"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-access-concept",
+      "term": "foundation-model access mode",
+      "aliases": [
+        "pay-per-token",
+        "provisioned throughput",
+        "external model"
+      ],
+      "definition": "How an application reaches a model: per-token hosted endpoints, reserved provisioned capacity, or an endpoint forwarding to an outside provider.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-access"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-functions-concept",
+      "term": "AI Functions",
+      "aliases": [
+        "ai_query",
+        "ai_classify",
+        "task-specific AI function"
+      ],
+      "definition": "SQL-callable functions that apply a model to each row, either for a fixed task or against a serving endpoint the caller names.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-functions"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-endpoint-concept",
+      "term": "agent endpoint",
+      "aliases": [
+        "agent serving endpoint",
+        "Model Serving"
+      ],
+      "definition": "A Model Serving endpoint hosting an agent version, answering REST queries from identities that hold CAN_QUERY.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-serving"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-gateway-concept",
+      "term": "AI Gateway",
+      "aliases": [
+        "Mosaic AI Gateway",
+        "ai_gateway configuration"
+      ],
+      "definition": "Configuration on serving endpoints for rate limits, guardrails, usage tracking, inference tables and fallback, whose support varies by endpoint type.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-serving"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-bricks-concept",
+      "term": "Agent Bricks",
+      "aliases": [
+        "Knowledge Assistant",
+        "Supervisor Agent",
+        "Multi-Agent Supervisor"
+      ],
+      "definition": "Databricks agents configured from sources, tools, instructions and examples rather than written as code, such as a Knowledge Assistant or Supervisor Agent; Databricks also uses Agent Bricks as the name of its whole agent platform, custom Python agents included.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-bricks"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-custom-concept",
+      "term": "custom agent",
+      "aliases": [
+        "agent framework",
+        "ResponsesAgent"
+      ],
+      "definition": "Agent logic written as code and owned by the team that wrote it, run in a Databricks App as Databricks now recommends or, on the legacy path, deployed with the agent framework's deploy() to its own agent endpoint after being logged with MLflow and registered in Unity Catalog.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-custom"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-workflow-concept",
+      "term": "fixed retrieval workflow",
+      "aliases": [
+        "retrieve-then-answer workflow"
+      ],
+      "definition": "A pipeline that always retrieves permitted passages and answers from them with citations, or refuses, taking the same steps for every question.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-choice"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-autonomy-concept",
+      "term": "autonomous tool selection",
+      "aliases": [
+        "tool-calling agent"
+      ],
+      "definition": "A design in which a model chooses per request which tools to call, adding a routing decision that can be wrong.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-choice"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-responsibility-concept",
+      "term": "hosting, governing and paying",
+      "aliases": [
+        "shared responsibility"
+      ],
+      "definition": "The separation between who runs a component, who decides its data and access, and who is charged for it.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-tables"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-status-concept",
+      "term": "release stage",
+      "aliases": [
+        "Public Preview",
+        "Public Beta",
+        "GA"
+      ],
+      "definition": "A dated label on a named artifact describing a feature's support level, distinct from availability in a given cloud, region or workspace.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-tables"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-cost-concept",
+      "term": "cost assumption",
+      "aliases": [
+        "cost driver",
+        "check current pricing"
+      ],
+      "definition": "An estimate that multiplies countable volumes by named drivers and leaves every rate to current pricing.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-tables"
+    },
+    {
+      "id": "dbxfe-ai-platform-l01-evaluation-concept",
+      "term": "comparative evaluation set",
+      "aliases": [
+        "labelled question set"
+      ],
+      "definition": "One set of labelled questions with expected facts, sources and refusals, run against every candidate under rules agreed in advance.",
+      "lessonId": "dbxfe-ai-platform-l01",
+      "sectionId": "dbxfe-ai-platform-l01-example"
+    }
+  ]
+}

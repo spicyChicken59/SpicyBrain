@@ -1,0 +1,579 @@
+{
+  "module": {
+    "id": "dbxfe-delivery",
+    "title": "Reproducible development, APIs and delivery",
+    "summary": "Take Cinderline's scrap job from a notebook to one reviewed commit that deploys to dev, test and prod: five delivery states with their own evidence, a tested package, a bundle with targets, three clients of one API, and identities that keep credentials out of code.",
+    "objectives": [
+      "Trace one change through local source, validation, reviewed artifact, deployment and execution, naming the evidence of each state and refusing to let one stand in for the next.",
+      "Read and correct a Declarative Automation Bundle (formerly Databricks Asset Bundles): databricks.yml, targets, modes, variables, validate, plan, deploy and run, with business rules identical across environments.",
+      "Choose between the CLI, the SDK and a raw REST call, authenticate people with OAuth user-to-machine and pipelines as service principals, and write a promotion checklist whose rows are ticked only by their own evidence."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-m03"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-delivery-l01.json"
+    ],
+    "scenarioId": "dbxfe-delivery-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-delivery-scenario",
+      "title": "Write the delivery review for the scrap job's first production release",
+      "context": "Fictional Cinderline Components runs its daily scrap-rate job from one notebook edited in the production workspace, copied by hand to a test workspace, with a personal token pasted into a cell. A pull request now proposes a Python package with 14 unit tests and a Declarative Automation Bundle with dev, test and prod targets. Two service principals exist, one per service workspace. The team's CI product and whether workload identity federation is enabled for its account are unconfirmed. The plant wants the first production run on Monday.",
+      "task": "Produce a one-page delivery review for the platform lead: the state of the change with the evidence for each of the five delivery states, the findings on the proposed configuration with the rule each breaks and which check reveals it, the identity each pipeline stage uses and where its credential lives, a promotion checklist whose rows name their evidence, and an explicit list of what remains unproven or unknown. Deploy nothing.",
+      "requirements": [
+        "Name each of the five states with its evidence, marking those without evidence as not run rather than assumed.",
+        "List every configuration finding with the rule it breaks (a CLI rule or a house rule), the target it affects, and whether a local check, bundle validate, a run or only a reviewer reveals it.",
+        "Assign an identity to each pipeline stage (a person with OAuth user-to-machine, or a service principal through machine-to-machine OAuth or federation) and state where the credential lives; no token in code or configuration.",
+        "Write the promotion checklist with an evidence column, and mark unknowns (CI product, federation availability, the first prod run) instead of resolving them by assumption."
+      ],
+      "model": "### State of the change\nLocal source: commit 7f3c, 14 of 14 unit tests, 0 local structure findings (evidence: the CI log). Validation: NOT RUN until the pipeline runs `databricks bundle validate --strict --target test` as the test service principal; the review asks for that summary, showing the principal's application ID on the User line. Reviewed artifact: this review plus one approval from someone other than the author. Deployment and execution: NOT RUN; nothing exists in test or prod yet.\n\n### Configuration findings\nNo `test` target (house rule; local check). `prod` without `workspace.root_path` (CLI production-mode rule; local check sees the missing key, validate reports it). `workspace.token` (unknown field, a warning unless `--strict`; the credential itself is a review finding, and the pasted notebook token must be revoked because Git history keeps it). No `run_as` and no `git.branch` on prod (house rules). `alert_threshold` overridden in prod (business rule; only a reviewer catches it). `${var.catalogue}` (undeclared; local check and validate). Each fix is one line in `databricks.yml`; none needs a workspace to make.\n\n### Identities\nPull request and merge stages: the test service principal, OAuth M2M with the client secret in the CI secret store until federation is confirmed, then federation with no stored secret. Prod stage: the prod service principal, credentials available only to the approved prod stage. Developers: `databricks auth login` on their own laptops for dev only.\n\n### Promotion checklist\nApproval on the diff; test counts at 7f3c; validate summary for test naming the principal; the reviewed plan (`bundle plan -o json` attached); deploy log for test with 7f3c; run ID with SUCCESS; the summary file compared with the expected rows for one export day; prod plan reviewed by a second person; prod deploy log with the same SHA; first scheduled prod run observed. Every row after the second is open today.\n\n### Unknown\nThe CI product and its secret store; whether federation is enabled for the account; whether the test workspace's exports volume holds a known export day for the integration check. Monday is reachable only if test validation, deployment and a run happen first; the review does not promise it.",
+      "reasoning": "The review keeps the five states apart and marks the workspace states not run instead of implying them, names every configuration finding with who catches it, so the team learns which mistakes a tool will never report, assigns the narrowest identity to each stage with its credential's location, and turns the Monday deadline into a checklist with open rows rather than a promise.",
+      "rubric": [
+        {
+          "id": "dbxfe-delivery-scenario-rubric-1",
+          "criterion": "States and evidence",
+          "weak": "The change is called done or ready without naming a state.",
+          "partial": "States named, but validation or deployment is assumed from unit tests or a wheel build.",
+          "strong": "Five states each with its evidence, and every workspace state marked not run."
+        },
+        {
+          "id": "dbxfe-delivery-scenario-rubric-2",
+          "criterion": "Configuration findings",
+          "weak": "A vague 'fix the YAML' or only the token is noticed.",
+          "partial": "Most findings listed, but which check reveals each is missing or wrong.",
+          "strong": "Every finding with its rule, target and the check or reviewer that reveals it, including the business-rule override no tool reports."
+        },
+        {
+          "id": "dbxfe-delivery-scenario-rubric-3",
+          "criterion": "Identity and credentials",
+          "weak": "A person's token or login proposed for the pipeline.",
+          "partial": "Service principals named, but the credential's location or the prod stage's separation is unclear.",
+          "strong": "One principal per environment, M2M with the secret in the CI store or federation, prod credentials only in the approved stage, no credential in code or configuration."
+        },
+        {
+          "id": "dbxfe-delivery-scenario-rubric-4",
+          "criterion": "Promotion checklist and unknowns",
+          "weak": "A promise that Monday will happen.",
+          "partial": "A checklist without an evidence column, or unknowns resolved by assumption.",
+          "strong": "Rows with evidence, the open rows marked, and the CI product, federation and the integration input listed as unknown."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can we skip the test deployment and go straight to prod on Monday? The unit tests pass.",
+          "response": "No. Unit tests prove the local source state only. The first deployment to test and one run there are the only evidence that the wheel builds, the parameters render, the principal has its permissions and the volume is readable; skipping them moves that first failure into prod."
+        },
+        {
+          "question": "Is workload identity federation enabled for our account?",
+          "response": "Unknown; the platform team has not confirmed the account-side configuration. The plan uses OAuth machine-to-machine with the secret in the CI store and names federation as the replacement once confirmed."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-delivery-l01"
+      ],
+      "claimIds": [
+        "dbxfe-delivery-course-claim-validate",
+        "dbxfe-delivery-course-claim-modes",
+        "dbxfe-delivery-course-claim-variables",
+        "dbxfe-delivery-course-claim-deploy",
+        "dbxfe-delivery-course-claim-run",
+        "dbxfe-delivery-course-claim-nosecret",
+        "dbxfe-delivery-course-claim-auth",
+        "dbxfe-delivery-course-claim-gitfolders",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-delivery-course-source-changelog",
+      "title": "Databricks CLI v1.17.0: CHANGELOG.md (release notes from v0.x to v1.17.0)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/CHANGELOG.md",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Release notes summarize changes; the rename, the v1.0.0 token-storage change and each bundle entry should be checked against the documentation for the CLI version in use. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-validate",
+      "title": "Databricks CLI v1.17.0: cmd/bundle/validate.go (databricks bundle validate)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/cmd/bundle/validate.go",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Source code and help text of one CLI release; later releases can change behaviour, so re-read the current documentation and `databricks bundle --help` for the CLI version you pin. The CLI is distributed under the Databricks License; nothing from it is copied into this course. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-initialize",
+      "title": "Databricks CLI v1.17.0: bundle/phases/initialize.go (the phase validate runs)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/bundle/phases/initialize.go",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Source code and help text of one CLI release; later releases can change behaviour, so re-read the current documentation and `databricks bundle --help` for the CLI version you pin. The CLI is distributed under the Databricks License; nothing from it is copied into this course. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-modes",
+      "title": "Databricks CLI v1.17.0: validate_target_mode.go (development and production mode rules)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/bundle/config/mutator/resourcemutator/validate_target_mode.go",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Source code and help text of one CLI release; later releases can change behaviour, so re-read the current documentation and `databricks bundle --help` for the CLI version you pin. The CLI is distributed under the Databricks License; nothing from it is copied into this course. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-devmode",
+      "title": "Databricks CLI v1.17.0: apply_target_mode.go (what development mode changes)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/bundle/config/mutator/resourcemutator/apply_target_mode.go",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Source code and help text of one CLI release; later releases can change behaviour, so re-read the current documentation and `databricks bundle --help` for the CLI version you pin. The CLI is distributed under the Databricks License; nothing from it is copied into this course. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-variables",
+      "title": "Databricks CLI v1.17.0: bundle/config/variable/variable.go (bundle variables)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/bundle/config/variable/variable.go",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Source code and help text of one CLI release; later releases can change behaviour, so re-read the current documentation and `databricks bundle --help` for the CLI version you pin. The CLI is distributed under the Databricks License; nothing from it is copied into this course. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-deploy",
+      "title": "Databricks CLI v1.17.0: bundle/phases/deploy.go (what deploy does)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/bundle/phases/deploy.go",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Source code and help text of one CLI release; later releases can change behaviour, so re-read the current documentation and `databricks bundle --help` for the CLI version you pin. The CLI is distributed under the Databricks License; nothing from it is copied into this course. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-run",
+      "title": "Databricks CLI v1.17.0: bundle/run/job.go (how bundle run starts a job)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/bundle/run/job.go",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Source code and help text of one CLI release; later releases can change behaviour, so re-read the current documentation and `databricks bundle --help` for the CLI version you pin. The CLI is distributed under the Databricks License; nothing from it is copied into this course. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-template",
+      "title": "Databricks CLI v1.17.0: default-python template output, databricks.yml (acceptance snapshot)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/acceptance/bundle/templates/default-python/serverless/output/my_default_python/databricks.yml",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike. The file is the recorded output of databricks bundle init default-python in the CLI's own acceptance tests, with placeholders for host and user.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "A template's output shows one recommended layout, not the only valid one; placeholders stand for the host and user that bundle init would fill in. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-workspace",
+      "title": "Databricks CLI v1.17.0: bundle/config/workspace.go (the workspace section of a bundle)",
+      "url": "https://raw.githubusercontent.com/databricks/cli/v1.17.0/bundle/config/workspace.go",
+      "publisher": "Databricks (databricks/cli repository)",
+      "type": "primary reference",
+      "context": "Databricks CLI v1.17.0 (released 2026-09-16), the open repository databricks/cli at that tag; bundle behaviour for Databricks on AWS and the other clouds alike.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Source code and help text of one CLI release; later releases can change behaviour, so re-read the current documentation and `databricks bundle --help` for the CLI version you pin. The CLI is distributed under the Databricks License; nothing from it is copied into this course. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-sdkreadme",
+      "title": "Databricks SDK for Python v0.141.0: README.md",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/README.md",
+      "publisher": "Databricks (databricks-sdk-py repository)",
+      "type": "primary reference",
+      "context": "Databricks SDK for Python 0.141.0 (Beta), open source; authentication, retries, long-running operations and interface stability.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "The SDK is labelled Beta; its README describes client behaviour, not entitlement, feature availability or token lifetimes, which the platform decides. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-authtypes",
+      "title": "Databricks SDK for Python v0.141.0: docs/auth-types-reference.md (authentication types)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/docs/auth-types-reference.md",
+      "publisher": "Databricks (databricks-sdk-py repository)",
+      "type": "primary reference",
+      "context": "Authentication types of the Databricks SDK for Python 0.141.0; the CLI follows the same unified authentication.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Lists client-side authentication types and their parameters; whether an identity may use a type, and the federation policy it needs, is configured in the Databricks account. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-sdkjobs",
+      "title": "Databricks SDK for Python v0.141.0: databricks/sdk/service/jobs.py (Jobs API)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/jobs.py",
+      "publisher": "Databricks (databricks-sdk-py repository)",
+      "type": "primary reference",
+      "context": "Generated Jobs API client of the Databricks SDK for Python 0.141.0: request paths, fields and docstrings.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Generated API definitions show request fields and paths for one SDK release, not recommended settings; confirm behaviour in the current Jobs documentation. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-sdkworkspace",
+      "title": "Databricks SDK for Python v0.141.0: databricks/sdk/service/workspace.py (Repos and Secrets APIs)",
+      "url": "https://raw.githubusercontent.com/databricks/databricks-sdk-py/v0.141.0/databricks/sdk/service/workspace.py",
+      "publisher": "Databricks (databricks-sdk-py repository)",
+      "type": "primary reference",
+      "context": "Generated workspace APIs of the Databricks SDK for Python 0.141.0: Git folders (Repos API) and secrets.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "API docstrings describe operations, not the workspace's Git provider setup or permissions, which administrators configure. Read in full in this build on 2026-09-23 from the tagged raw URL, hash-checked; see the teaching module's source record for the passages relied on."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-docsbundles",
+      "title": "What are Declarative Automation Bundles? | Databricks on AWS",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/bundles/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS documentation entry page for bundles (formerly Databricks Asset Bundles); configuration, resources and templates live on pages linked from it.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "An overview page; every configuration key, target-mode rule and command flag quoted in this module is taken from the pinned CLI source, not from this page. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-docssettings",
+      "title": "Declarative Automation Bundles configuration | Databricks on AWS",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/bundles/settings",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Reference for the mappings of databricks.yml (bundle, include, variables, artifacts, resources, targets and the rest) and how a target overrides them.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Confirmed by search title and URL only (no snippet was shown); the key list and target behaviour quoted in this module come from the pinned CLI source. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-docscli",
+      "title": "Databricks CLI | Databricks on AWS",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/cli/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS documentation entry page for the Databricks CLI: installation, authentication, profiles and the command reference.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Version boundaries and installation methods change; confirm them for the release you pin. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-docssdk",
+      "title": "Databricks SDK for Python | Databricks on AWS",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/sdk-python",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS documentation page for the Databricks SDK for Python: status, authentication and where the reference lives.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "States the SDK's Beta status and requirements at the time of the search; behaviour of individual methods is read from the pinned SDK release. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-docsauth",
+      "title": "Authorize access to Databricks resources | Databricks on AWS",
+      "url": "https://docs.databricks.com/aws/en/dev-tools/auth/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS documentation entry page for authorizing the CLI, SDKs and REST API: OAuth user-to-machine, machine-to-machine and personal access tokens.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Which methods an account permits and any federation policy are account settings; token lifetimes are the platform's and may change. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-delivery-course-source-docsrepos",
+      "title": "Databricks Git folders | Databricks on AWS",
+      "url": "https://docs.databricks.com/aws/en/repos/",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS documentation entry page for Git folders (formerly Repos): operations, providers and CI/CD use.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Supported providers, credential handling and administrative restrictions are workspace settings; confirm them for the real workspace. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-delivery-course-claim-rename",
+      "description": "Databricks Asset Bundles were renamed Declarative Automation Bundles in CLI v0.295.0 without changing databricks.yml keys or the databricks bundle commands.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-changelog",
+        "dbxfe-delivery-course-source-docsbundles"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-validate",
+      "description": "databricks bundle validate connects to the workspace, resolves the current user and the configuration for a target, and with --strict fails on warnings.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-validate",
+        "dbxfe-delivery-course-source-initialize"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-modes",
+      "description": "Development mode prefixes names with [dev <short name>] and pauses schedules; production mode requires an explicit workspace.root_path unless every job sets run_as or a service principal deploys.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-devmode",
+        "dbxfe-delivery-course-source-modes",
+        "dbxfe-delivery-course-source-docssettings"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-variables",
+      "description": "Bundle variables resolve from --var, BUNDLE_VAR_<name>, the per-target overrides file, the target's value and the default, in that order, or fail.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-variables",
+        "dbxfe-delivery-course-source-docssettings"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-deploy",
+      "description": "bundle deploy takes a lock, uploads files and built libraries, applies a plan and records state; destructive plans need approval or --auto-approve.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-deploy"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-run",
+      "description": "bundle run starts a deployed job through the Jobs run-now call and waits for its result state; the SDK's run_now sends POST /api/2.2/jobs/run-now.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-run",
+        "dbxfe-delivery-course-source-sdkjobs"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-template",
+      "description": "The default Python template separates src/, resources/ and tests/ and defines dev and prod targets with catalog and schema variables.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-template"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-nosecret",
+      "description": "The bundle's workspace section has no token or secret field, and the SDK README advises against hard-coding credentials because they can leak through version control.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-workspace",
+        "dbxfe-delivery-course-source-sdkreadme"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-auth",
+      "description": "People authenticate with OAuth user-to-machine (databricks auth login); service principals use OAuth machine-to-machine with a client ID and secret, or workload identity federation without a stored secret.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-authtypes",
+        "dbxfe-delivery-course-source-changelog",
+        "dbxfe-delivery-course-source-docsauth"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-sdk",
+      "description": "The Databricks SDK for Python covers the public REST API, retries safe failures, and asks users to pin its exact version.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-sdkreadme",
+        "dbxfe-delivery-course-source-sdkjobs",
+        "dbxfe-delivery-course-source-docssdk"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    },
+    {
+      "id": "dbxfe-delivery-course-claim-gitfolders",
+      "description": "Databricks Git folders are a Git client in the workspace for clone, commit, push, pull and branch changes, used with CI/CD.",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-delivery-course-source-sdkworkspace",
+        "dbxfe-delivery-course-source-docsrepos"
+      ],
+      "context": "Databricks CLI v1.17.0 and Databricks SDK for Python v0.141.0, read in this build; verify against the pinned release."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-delivery-l01-states-concept",
+      "term": "delivery states",
+      "aliases": [
+        "source to execution timeline"
+      ],
+      "definition": "Local source, validation, reviewed artifact, deployment and execution: five states, each proven only by its own evidence.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-states"
+    },
+    {
+      "id": "dbxfe-delivery-l01-branch-concept",
+      "term": "feature branch and pull request",
+      "aliases": [
+        "branch",
+        "PR"
+      ],
+      "definition": "A branch isolates a change; a pull request shows its diff and runs checks before a reviewed merge moves main.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-git"
+    },
+    {
+      "id": "dbxfe-delivery-l01-gitfolder-concept",
+      "term": "Git folder",
+      "aliases": [
+        "Databricks Git folders",
+        "Repos"
+      ],
+      "definition": "A workspace folder connected to a remote Git repository for clone, commit, push, pull and branch changes.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-git"
+    },
+    {
+      "id": "dbxfe-delivery-l01-package-concept",
+      "term": "modular package",
+      "aliases": [
+        "src layout",
+        "thin entry point"
+      ],
+      "definition": "Pure functions in an importable package, called by a thin entry point that handles parameters and input and output.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-code"
+    },
+    {
+      "id": "dbxfe-delivery-l01-unittest-concept",
+      "term": "unit test",
+      "aliases": [
+        "unittest"
+      ],
+      "definition": "An automated check of one function against a small input with an independently computed expected output, needing no workspace.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-code"
+    },
+    {
+      "id": "dbxfe-delivery-l01-pinning-concept",
+      "term": "dependency pinning",
+      "aliases": [
+        "exact pins"
+      ],
+      "definition": "Exact versions for every dependency and tool so that two builds of one commit are the same software.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-code"
+    },
+    {
+      "id": "dbxfe-delivery-l01-config-concept",
+      "term": "environment configuration",
+      "aliases": [
+        "configuration",
+        "bundle variable"
+      ],
+      "definition": "Values that differ between environments, declared as bundle variables and assigned per target.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-config"
+    },
+    {
+      "id": "dbxfe-delivery-l01-mode-concept",
+      "term": "deployment mode",
+      "aliases": [
+        "mode: development",
+        "mode: production"
+      ],
+      "definition": "A target setting: private, prefixed and paused copies in development; one fixed location in production.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-config"
+    },
+    {
+      "id": "dbxfe-delivery-l01-bundle-concept",
+      "term": "Declarative Automation Bundles",
+      "aliases": [
+        "Databricks Asset Bundles",
+        "DABs",
+        "databricks.yml"
+      ],
+      "definition": "Databricks' configuration format, rooted in databricks.yml, that declares a project's resources and targets for the CLI to validate, deploy and run.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-bundle"
+    },
+    {
+      "id": "dbxfe-delivery-l01-validate-concept",
+      "term": "bundle validate",
+      "aliases": [
+        "databricks bundle validate"
+      ],
+      "definition": "The CLI command that authenticates, resolves a target's configuration and reports errors and warnings before deployment.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-bundle"
+    },
+    {
+      "id": "dbxfe-delivery-l01-deploy-concept",
+      "term": "bundle deploy and bundle run",
+      "aliases": [
+        "deployment",
+        "job run"
+      ],
+      "definition": "Deploy changes the workspace and records state; run starts the deployed job and returns a result state.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-bundle"
+    },
+    {
+      "id": "dbxfe-delivery-l01-interfaces-concept",
+      "term": "CLI, SDK and REST API",
+      "aliases": [
+        "databricks-sdk",
+        "databricks api"
+      ],
+      "definition": "Three clients of one HTTP API: the CLI for people and pipelines, the SDK for Python code, raw REST for exact control.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-interfaces"
+    },
+    {
+      "id": "dbxfe-delivery-l01-auth-concept",
+      "term": "authentication boundary",
+      "aliases": [
+        "OAuth U2M",
+        "OAuth M2M",
+        "service principal"
+      ],
+      "definition": "People act through OAuth user-to-machine logins; pipelines act as service principals through machine-to-machine OAuth or federation, never through tokens in code.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-auth"
+    },
+    {
+      "id": "dbxfe-delivery-l01-promotion-concept",
+      "term": "promotion",
+      "aliases": [
+        "CI/CD"
+      ],
+      "definition": "Deploying the same reviewed commit to the next environment after the previous one's evidence was accepted.",
+      "lessonId": "dbxfe-delivery-l01",
+      "sectionId": "dbxfe-delivery-l01-cicd"
+    }
+  ]
+}

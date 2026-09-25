@@ -1,0 +1,354 @@
+{
+  "module": {
+    "id": "dbxfe-streaming",
+    "title": "Structured Streaming, event time and recovery",
+    "summary": "Treat a stream as a growing table processed in micro-batches, decide when an event-time window is final with a watermark, read what the checkpoint remembers, and keep a restart from repeating a downstream effect.",
+    "objectives": [
+      "Explain micro-batches, triggers, offsets and the state store for a windowed streaming aggregation.",
+      "Predict watermarks, emitted windows and late-row outcomes batch by batch, separating event time from processing time.",
+      "Restart a query from its checkpoint, say where exactly-once holds, and key downstream effects so a replay is harmless."
+    ],
+    "prerequisiteIds": [
+      "dbxfe-transformations",
+      "dbxfe-delta"
+    ],
+    "lessonFiles": [
+      "lessons/dbxfe-streaming-l01.json"
+    ],
+    "scenarioId": "dbxfe-streaming-scenario"
+  },
+  "scenarios": [
+    {
+      "id": "dbxfe-streaming-scenario",
+      "title": "Explain the low 09:00 count and the double alerts to Cinderline's plant team",
+      "context": "Fictional Cinderline Components runs a streaming query over press-line count files: 10-minute tumbling windows by event time, a 5-minute watermark, append mode, and a foreachBatch function that writes each finished window to a results table and sends a 'window below target' alert. On Monday the stream reported L1 as 27 units for 09:00-09:10 while the next morning's batch report showed 36, and after a failure at 09:39 the maintenance channel received the three 09:20 alerts twice. The query was restarted on the same checkpoint and has run cleanly since. Measured arrival lag this month: 95% of events within 4 minutes, the slowest 25 minutes.",
+      "task": "Write a one-page incident note and design change for the plant operations lead: explain both symptoms from the engine's point of view, say which of the query's results were correct by its own contract, propose changes with their costs, and list what must be verified before the change goes live.",
+      "requirements": [
+        "Explain the 27 against 36 difference with event time, the watermark and the documented guarantee, naming the row involved and whether it could recur.",
+        "Explain the duplicate alerts with the checkpoint's offset and commit logs and the replay of an uncommitted batch, without blaming the restart itself.",
+        "Propose a watermark and alerting design with its trade-off in freshness, completeness and state, and an idempotency key for alerts and results.",
+        "List the evidence to collect and the unknowns, including anything about the target runtime that has not been verified."
+      ],
+      "model": "### What happened\nThe 09:00-09:10 window closed when the watermark (latest event time minus 5 minutes) passed 09:10, after the 09:18:30 event. Event e011, made at 09:03 and delivered at 09:28, reached a window that had already been emitted and removed from state, so Spark counted it in `numRowsDroppedByWatermark` and the stream kept 27. The next morning's batch report counts every event by event time, hence 36. This is within the query's contract: a 5-minute delay only guarantees rows less than 5 minutes late. It will recur whenever delivery lag exceeds the delay, which the monthly measurement says is up to 5% of events.\n\nThe duplicate alerts came from the sink, not the restart. The checkpoint shows offsets for batch 7 but no commit: the alerts were sent, then the function failed before Spark committed. The restart correctly replayed batch 7 with the same rows, and the alert code sent them again.\n\n### Proposed changes\n1. Keep a 5-minute watermark for alerts; they must be fast and can tolerate a rare missing late row.\n2. Add a daily batch reconciliation by event time that overwrites the reporting table; the plant reads totals from it, not from the alert stream.\n3. Key every alert and result row by window start, line and alert type; record the key in the same transaction as the alert, and MERGE results on window and line.\n4. Alternative, if streaming totals must be complete: a 30-minute delay, results about 25 minutes later and roughly four open windows per line in state instead of one or two.\n\n### Verify before go-live\nReplay a copy of the checkpoint with an injected failure after the alert call and count alerts; confirm the runtime's sink and state store settings; confirm who owns reconciliation failures. Unknown: whether the alert channel can reject duplicate keys itself.",
+      "reasoning": "The note separates the engine's contract from the business expectation, so the team fixes the right layer: late rows are a delay-versus-freshness decision plus reconciliation, and the duplicates are a sink design flaw that keying removes. It states costs and unknowns instead of promising completeness.",
+      "rubric": [
+        {
+          "id": "dbxfe-streaming-scenario-rubric-1",
+          "criterion": "Late-row explanation",
+          "weak": "Calls the stream wrong or a bug without naming the late row or the watermark.",
+          "partial": "Names the watermark but treats it as a per-row cutoff or promises late rows will always be dropped.",
+          "strong": "Names e011, the window end, the watermark and the one-directional guarantee, and estimates recurrence from measured lag."
+        },
+        {
+          "id": "dbxfe-streaming-scenario-rubric-2",
+          "criterion": "Replay explanation",
+          "weak": "Blames the restart or the checkpoint for the duplicates.",
+          "partial": "Says the batch was replayed but not why the effects repeated.",
+          "strong": "Reads offsets without a commit, explains the replay of the uncommitted batch and places the duplicate in the sink code."
+        },
+        {
+          "id": "dbxfe-streaming-scenario-rubric-3",
+          "criterion": "Design and trade-offs",
+          "weak": "Raises the delay or deletes the checkpoint as a fix with no cost stated.",
+          "partial": "Proposes keys or a longer delay but not both concerns, or omits the state and freshness cost.",
+          "strong": "Separates fast alerts from complete totals, keys every effect atomically, and states freshness, completeness and state costs."
+        },
+        {
+          "id": "dbxfe-streaming-scenario-rubric-4",
+          "criterion": "Evidence and unknowns",
+          "weak": "No verification plan.",
+          "partial": "Mentions testing without a failure-injection step or unknowns.",
+          "strong": "Rehearses on a copied checkpoint with an injected failure and lists runtime settings and ownership still to confirm."
+        }
+      ],
+      "disclosures": [
+        {
+          "question": "Can we just make the stream wait an hour so nothing is ever late?",
+          "response": "The plant manager says alerts older than 15 minutes are useless to the line supervisors, so an hour-long delay is not acceptable for alerts; a slower reporting path is fine."
+        },
+        {
+          "question": "Does the maintenance channel deduplicate alerts itself?",
+          "response": "Unknown. The channel's administrator has not confirmed whether it accepts an idempotency key, so the design must not depend on it."
+        }
+      ],
+      "lessonIds": [
+        "dbxfe-streaming-l01"
+      ],
+      "claimIds": [
+        "dbxfe-streaming-course-claim-time",
+        "dbxfe-streaming-course-claim-guarantee",
+        "dbxfe-streaming-course-claim-recovery",
+        "dbxfe-streaming-course-claim-sinks",
+        "dbxfe-streaming-course-claim-local-run",
+        "dbxfe-guidance",
+        "dbxfe-fiction"
+      ],
+      "isCapstone": false
+    }
+  ],
+  "sources": [
+    {
+      "id": "dbxfe-streaming-course-source-guide",
+      "title": "Structured Streaming Programming Guide: Overview",
+      "url": "https://spark.apache.org/docs/4.0.4/streaming/index.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4 open-source documentation; the engine lab L08 runs locally.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Rendered URL and title not confirmed by search or fetch in this build session (documentation host blocked, web-search allowance exhausted); the page's Markdown source at the apache/spark v4.0.4 tag was read instead."
+    },
+    {
+      "id": "dbxfe-streaming-course-source-model",
+      "title": "Structured Streaming Programming Guide: Programming Model",
+      "url": "https://spark.apache.org/docs/4.0.4/streaming/getting-started.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4; input table, result table, output modes, event time and fault tolerance semantics.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Rendered URL and title not confirmed by search or fetch in this build session; the page's Markdown source at the apache/spark v4.0.4 tag was read instead."
+    },
+    {
+      "id": "dbxfe-streaming-course-source-apis",
+      "title": "Structured Streaming Programming Guide: API using Datasets and DataFrames",
+      "url": "https://spark.apache.org/docs/4.0.4/streaming/apis-on-dataframes-and-datasets.html",
+      "publisher": "Apache Software Foundation",
+      "type": "official documentation",
+      "context": "Apache Spark 4.0.4; input sources, windows, watermarks, joins, output modes, sinks, foreachBatch, triggers, state store and recovery.",
+      "accessDate": "2026-09-23",
+      "reviewDate": "2026-09-23",
+      "caveat": "Rendered URL and title not confirmed by search or fetch in this build session; the page's Markdown source at the apache/spark v4.0.4 tag was read instead. Databricks Runtime can differ in defaults and adds its own sources and sinks."
+    },
+    {
+      "id": "dbxfe-streaming-course-source-checkpoints",
+      "title": "Structured Streaming checkpoints",
+      "url": "https://docs.databricks.com/aws/en/structured-streaming/checkpoints",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; Structured Streaming on Databricks Runtime.",
+      "accessDate": "2026-09-20",
+      "reviewDate": "2026-09-20",
+      "caveat": "Reused record confirmed for the retained orchestration module on 2026-09-20; not fetched or searched again in this build session. Restart compatibility depends on the change and the runtime. Reused source record: URL, title and publisher as confirmed for the retained orchestration module (its review of 2026-09-20; the course source-availability probe of that date returned HTTP 200)."
+    },
+    {
+      "id": "dbxfe-streaming-course-source-foreach",
+      "title": "Use foreachBatch to write to arbitrary data sinks",
+      "url": "https://docs.databricks.com/aws/en/structured-streaming/foreach",
+      "publisher": "Databricks",
+      "type": "official documentation",
+      "context": "Databricks on AWS; foreachBatch with Structured Streaming.",
+      "accessDate": "2026-09-20",
+      "reviewDate": "2026-09-20",
+      "caveat": "Reused record confirmed for the retained orchestration module on 2026-09-20; not fetched or searched again in this build session. Custom external effects are not made exactly-once by the checkpoint. Reused source record: URL, title and publisher as confirmed for the retained orchestration module (its review of 2026-09-20; the course source-availability probe of that date returned HTTP 200)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "dbxfe-streaming-course-claim-model",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-streaming-course-source-guide",
+        "dbxfe-streaming-course-source-model",
+        "dbxfe-streaming-course-source-apis"
+      ],
+      "description": "Structured Streaming runs a query incrementally over an input table that keeps being appended, by default as micro-batches whose timing a trigger sets; availableNow processes the data present at the start in one or more micro-batches and stops, and file-based sources need a user-specified schema by default.",
+      "context": "Apache Spark 4.0.4 programming model and triggers."
+    },
+    {
+      "id": "dbxfe-streaming-course-claim-time",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-streaming-course-source-model",
+        "dbxfe-streaming-course-source-apis"
+      ],
+      "description": "Event time is the time in the data; window aggregations group on it, sliding windows can hold an event more than once, and a watermark (latest event time minus a threshold) lets the engine finalize a window and drop its state once it passes the window's end; output modes decide which result rows reach the sink.",
+      "context": "Apache Spark 4.0.4 windows, watermarks and output modes."
+    },
+    {
+      "id": "dbxfe-streaming-course-claim-guarantee",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-streaming-course-source-apis"
+      ],
+      "description": "A watermark delay guarantees that data less late than the delay is never dropped; data later than the delay may or may not be aggregated.",
+      "context": "Apache Spark 4.0.4 semantic guarantee of aggregation with watermarking."
+    },
+    {
+      "id": "dbxfe-streaming-course-claim-joins",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-streaming-course-source-apis"
+      ],
+      "description": "Stream-static joins are not stateful; stream-stream joins buffer both inputs as state, bounded by watermarks and an event-time constraint that outer and semi joins must declare.",
+      "context": "Apache Spark 4.0.4 join support matrix."
+    },
+    {
+      "id": "dbxfe-streaming-course-claim-recovery",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-streaming-course-source-model",
+        "dbxfe-streaming-course-source-apis",
+        "dbxfe-streaming-course-source-checkpoints"
+      ],
+      "description": "A checkpoint records each trigger's offset range in write-ahead logs together with state and commits, so a query resumes where it left off; changing the number or type of sources or a stateful operation's schema between restarts is not allowed, and a new checkpoint location starts the query fresh.",
+      "context": "Apache Spark 4.0.4 recovery semantics and the Databricks checkpoints page."
+    },
+    {
+      "id": "dbxfe-streaming-course-claim-sinks",
+      "kind": "documented",
+      "sourceIds": [
+        "dbxfe-streaming-course-source-model",
+        "dbxfe-streaming-course-source-apis",
+        "dbxfe-streaming-course-source-foreach"
+      ],
+      "description": "End-to-end exactly-once needs replayable sources and idempotent sinks; the file sink is exactly-once, Kafka and foreach sinks are at-least-once, and foreachBatch is at-least-once by default and exactly-once only when it deduplicates, for example by batch id.",
+      "context": "Apache Spark 4.0.4 sink table and the Databricks foreachBatch page."
+    },
+    {
+      "id": "dbxfe-streaming-course-claim-local-run",
+      "kind": "guidance",
+      "sourceIds": [],
+      "description": "Recorded local run of lab L08 on Apache Spark 4.0.4 in local[2] mode: watermarks, state rows, late-row drops, checkpoint logs, state contents and sink calls are Spark's own output, asserted against hand-written literals.",
+      "context": "docs/academy/labs/lab-l08-streaming-restart.json; evidence about this configuration only, not a Databricks run."
+    }
+  ],
+  "concepts": [
+    {
+      "id": "dbxfe-streaming-l01-microbatch-concept",
+      "term": "micro-batch",
+      "aliases": [
+        "micro-batch processing"
+      ],
+      "definition": "One small batch job over the input that arrived since the previous one, planned, run and committed as a unit.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-model"
+    },
+    {
+      "id": "dbxfe-streaming-l01-trigger-concept",
+      "term": "trigger",
+      "aliases": [
+        "availableNow",
+        "processingTime"
+      ],
+      "definition": "The setting that decides when the next micro-batch starts and whether the query stops by itself.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-model"
+    },
+    {
+      "id": "dbxfe-streaming-l01-eventtime-concept",
+      "term": "event time",
+      "aliases": [
+        "event-time column"
+      ],
+      "definition": "The time recorded in the event itself, as opposed to when the pipeline processed it.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-time"
+    },
+    {
+      "id": "dbxfe-streaming-l01-window-concept",
+      "term": "event-time window",
+      "aliases": [
+        "tumbling window",
+        "sliding window"
+      ],
+      "definition": "A time interval on the event-time column used as a grouping key; tumbling windows do not overlap, sliding windows do.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-time"
+    },
+    {
+      "id": "dbxfe-streaming-l01-watermark-concept",
+      "term": "watermark",
+      "aliases": [
+        "withWatermark"
+      ],
+      "definition": "The latest event time seen minus a declared delay; a window is final once the watermark reaches its end.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-time"
+    },
+    {
+      "id": "dbxfe-streaming-l01-state-concept",
+      "term": "state store",
+      "aliases": [
+        "streaming state"
+      ],
+      "definition": "The versioned key-value store that keeps open windows and other stateful values between micro-batches.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-state"
+    },
+    {
+      "id": "dbxfe-streaming-l01-late-concept",
+      "term": "late data",
+      "aliases": [
+        "late arrival"
+      ],
+      "definition": "Rows that arrive after rows with later event times; judged against the end of the window they belong to.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-state"
+    },
+    {
+      "id": "dbxfe-streaming-l01-mode-concept",
+      "term": "output mode",
+      "aliases": [
+        "append",
+        "update",
+        "complete"
+      ],
+      "definition": "The rule that decides which result rows each trigger writes to the sink.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-state"
+    },
+    {
+      "id": "dbxfe-streaming-l01-join-concept",
+      "term": "stream-stream join",
+      "aliases": [
+        "stream-static join"
+      ],
+      "definition": "A join whose inputs are both streams, so Spark buffers both sides as state until watermarks release them.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-joins"
+    },
+    {
+      "id": "dbxfe-streaming-l01-checkpoint-concept",
+      "term": "checkpoint",
+      "aliases": [
+        "offset log",
+        "commit log"
+      ],
+      "definition": "A query's own directory of planned offsets, commits, source log and state, used to resume after a stop or failure.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-recovery"
+    },
+    {
+      "id": "dbxfe-streaming-l01-restart-concept",
+      "term": "query restart",
+      "aliases": [
+        "resume from checkpoint"
+      ],
+      "definition": "Starting the same query on the same checkpoint so it finishes uncommitted batches and then reads only new data.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-recovery"
+    },
+    {
+      "id": "dbxfe-streaming-l01-exactly-once-concept",
+      "term": "exactly-once",
+      "aliases": [
+        "end-to-end exactly-once",
+        "at-least-once"
+      ],
+      "definition": "Each input affects the output once despite failures, which needs a replayable source, the checkpoint and an idempotent sink.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-sinks"
+    },
+    {
+      "id": "dbxfe-streaming-l01-idempotency-concept",
+      "term": "idempotency key",
+      "aliases": [
+        "deduplication key"
+      ],
+      "definition": "A value that identifies one business effect so a repeated attempt with the same key changes nothing.",
+      "lessonId": "dbxfe-streaming-l01",
+      "sectionId": "dbxfe-streaming-l01-sinks"
+    }
+  ]
+}
