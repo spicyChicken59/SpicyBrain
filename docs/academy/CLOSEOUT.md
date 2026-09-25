@@ -157,3 +157,125 @@ Code checkpoint was pushed; it is not a passing full-suite run. Run 63 tests
 b8be663f338ed97e2fde1419adf761d92606023d, before this Genie Agents change.
 Manifest refresh and final exact-head acceptance/labs remain pending. G10/G14
 and affected editorial gates remain blocked.
+
+## Continuation — 2026-09-25: claim closeout in the priority areas
+
+Starting point: remote head `8ea004e519f5200cea2d8826a3b041712ebb809a`, whose
+CI run 35959071529 passed (acceptance job 107503527791, labs job 107503527559;
+artifacts 10791319657 and 10791449099). The branch had not moved since
+2026-09-24 05:14 UTC and no other session was working on it. Every commit of
+this continuation sits on top of that head; nothing was reset or force-pushed.
+This environment is a builder continuation, not an independent human review.
+
+### Access in this environment
+
+One request per host on 2026-09-25T07:36:54Z through the session egress proxy
+returned `CONNECT tunnel failed, response 403` for docs.databricks.com,
+www.databricks.com (the Barilla session page), learn.microsoft.com,
+docs.aws.amazon.com and www.youtube.com (the CVS Health recording). Publisher
+source repositories on raw.githubusercontent.com, PyPI and Google API discovery
+documents were reachable. Nothing was routed around the block: no archive,
+cache, mirror or CI relay. Unlike the 2026-09-24 environment, local Chromium
+runs here, so the rendered checks below were executed.
+
+### Claim decisions
+
+Fourteen modules had no claim-level decisions: identity, AWS, Azure, Google
+Cloud, apps, BI, AI platform, serving, retrieval, tools, sharing, Delta writes,
+operations and GenAI evaluation. Together with the owner's Lakebase, Genie and
+AI-assistance reviews, they cover every priority area in the brief. Each module's
+claims were researched and then verified by a separate agent. Each agent
+re-read the evidence itself at pinned commits: the Databricks SDK for Python
+0.141.0, the Terraform provider, the CLI and the developer-documentation source
+(databricks/devhub), open-source Delta Lake, MLflow, the MCP SDK and
+specification, urllib3, azure-docs and Google API discovery documents. An
+interface read supports the interface only, and open-source documentation
+supports open-source behaviour only. Three adversarial review rounds followed:
+round 1 had 69 findings (22 medium), round 2 had 30 (5 medium) and round 3 had
+4 (low). A fix pass after each round applied 109 items and rejected 8, each
+rejection with a reason. The last content finding was applied and checked
+directly.
+
+352 claims now carry an explicit decision with reviewer, date, method, verbatim
+evidence, supporting sections, gaps and any correction with the versions it
+moved: 68 reviewed, 24 corrected-and-reviewed, 232 partial and 28 still
+pending. The commit message of `47cfa49` says 349 decisions; the ledger holds
+352. Ledger totals: 111 reviewed, 50 corrected-and-reviewed, 232 partial,
+403 pending and 136 retained. Of the 403 pending claims, 375 in 20 modules have
+no decision yet. [`CLAIM-LEADS.md`](CLAIM-LEADS.md) is generated from the
+ledger and lists every open claim with the gap its decision records, including
+the page that would settle it.
+
+70 decisions record a correction. Examples: system schemas can also be enabled
+by a metastore admin; AWS same-group ingress is required, and instance profiles
+also serve serverless SQL; Azure outbound, managed resource group and access
+connector wording; GCP OIDC scope and Cloud KMS policy location; custom agents
+now run in Databricks Apps, with `agents.deploy()` the legacy path; Genie Agent
+naming; job failure notifications also cover canceled or skipped runs; VACUUM
+removes only unreferenced files; built-in judges run outside Databricks in
+MLflow 3.16.1; Delta DROP FEATURE, overwriteSchema and conditional MERGE
+failure; app credentials and row filters; dashboard publish entitlements and
+schedule warehouses; clean-room output expiry and `shared_as` scope; UniForm
+can be turned off while column mapping and the protocol upgrade cannot; the AI
+Search score threshold; MCP token audience; and urllib3's retry scope. Beats,
+assessed items and lessons carry new versions and revisions, with change notes
+in plain words. Stable identities are unchanged; the disposition check reports
+2,435 retained identities, 0 removed and 0 unmoved revisions. Course 4.0.5.
+
+### Regression protection
+
+`tests/claim-corrections-2026-09-25.test.ts` has 41 tests covering 39
+substantive corrections, the Genie Agent naming and the text equivalents of
+changed visuals. All 41 fail on the pre-correction content and pass on the
+corrected content. A mutation pass reintroduced 40 old statements, and each
+turned exactly its own test red. Of 58 same-meaning rewordings, 57 were caught;
+of 31 held-out rewordings, 29. All 18 near-miss controls stayed green. The
+prover found the Agent Bricks correction incomplete: two surfaces still said
+Agent Bricks agents are configured rather than coded. Both were corrected, and
+the tightened check fails on the previous text. `tests/py/test_claim_leads.py`
+keeps the blocker report in step with the ledger.
+
+### Other corrections and audits
+
+- Source provenance: 38 records said "as previously read" about pages this
+  build never read. They now say what was and was not read. The source-review
+  classifier counted "not a read in this build" as a read; that negation is now
+  handled and tested.
+- Cases: all eight were re-audited for attribution. The Petrobras case said its
+  speaker pages name the presenters, although only search results for those
+  pages were seen; it now says so. The other seven attribute every figure to
+  its reporter. Fresh 2026-09-25 searches contradicted none of the four blocked
+  cases. They stay blocked.
+- Lab L15: the Azure case sheet gave the default outbound rules' destinations
+  as address ranges. Microsoft's NSG reference (azure-docs `194fd50`) names the
+  VirtualNetwork and Internet service tags; the sheet now names them and says
+  it draws them as CIDRs. The fixture, keys and 30 checks are unchanged. The
+  evidence was regenerated, the lab repackaged and its download hash updated.
+- Lakebase restore window: the owner's "2–30 days, default 7" matches search
+  results for the documentation page's slider. The SDK and Terraform references
+  (`ProjectSpec.history_retention_duration`) accept 2–35 days through the API.
+  This is recorded as a lead, not a correction.
+- Coverage warnings: 109 warning findings are 106 distinct retained items, each
+  with its own reason in `warning-dispositions.json`.
+
+### Rendered and executed evidence in this environment
+
+- The owner's six closeout browser tests (Lakebase restore and pooler, Genie
+  Agents, Genie Code; 1440 and 390 px) passed locally on `cc7be0e`.
+- The visual review of the owner's three corrected modules passed on `cc7be0e`:
+  470 state renders in five contexts, 0 failing, 15 axe pages with 0 violations,
+  0 page errors. Screenshots of the restore, pooler, Genie access and AI-assist
+  states were inspected.
+- The full-course visual review and the full Chromium suite on the final
+  content head are recorded in `ACCEPTANCE.md` (G05, G23).
+
+### Still blocked
+
+- G10: no candidate video could be opened. The 32 new-module records stay
+  `blocked-review` and none is converted to no-placement without an actual
+  evaluation.
+- G14: 375 claims in 20 non-priority modules have no decision. 260 decided
+  claims are partial or pending because the pages that would settle them are
+  unreadable here; `CLAIM-LEADS.md` names each one. The AT&T, Barilla, CVS
+  Health and Petrobras session pages, and the Generative AI Application
+  Deployment and Monitoring catalog page, remain unread.

@@ -133,3 +133,17 @@ Code checkpoint was pushed; it is not a passing full-suite run. Run 63 tests
 b8be663f338ed97e2fde1419adf761d92606023d, before this Genie Agents change.
 Manifest refresh and final exact-head acceptance/labs remain pending. G10/G14
 and affected editorial gates remain blocked.
+
+### 2026-09-25 — claim closeout continuation (priority areas)
+
+Continued from `8ea004e` (CI run 35959071529 green) without rewriting it.
+Commits `cc7be0e`..`4223bf5` plus this record's commit correct provenance
+wording, the Petrobras attribution, the L15 Azure service-tag row and
+product claims in fourteen modules; add 352 explicit claim decisions
+(68 reviewed, 24 corrected-and-reviewed, 232 partial, 28 pending) after three
+adversarial review rounds; add 41 regression tests; and move the course to
+4.0.5. Ledger: 111 reviewed, 50 corrected-and-reviewed, 232 partial,
+403 pending (375 without a decision, in 20 non-priority modules), 136
+retained. Details, access record and remaining blockers: `CLOSEOUT.md`
+("Continuation — 2026-09-25") and `CLAIM-LEADS.md`. G10 and G14 remain
+BLOCKED.

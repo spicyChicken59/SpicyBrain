@@ -8,9 +8,10 @@ and changes no Site, origin, access model, repository setting or secret.
 ## Closeout status
 
 This candidate is **not ready for release**. G10/G14 and source-dependent
-editorial gates remain blocked; see CLOSEOUT.md. The manifest verifies bytes,
-not research completion. Final CI provenance belongs in PR #4 metadata. The current manifest still records
-the prior 4.0.2 build; a clean 4.0.4 refresh is pending at this checkpoint.
+editorial gates remain blocked; see CLOSEOUT.md and CLAIM-LEADS.md. The
+manifest verifies bytes, not research completion. Final CI provenance belongs
+in PR #4 metadata. The manifest was refreshed for course 4.0.5 on 2026-09-25
+from a clean build of the source commit it records.
 
 ## Candidate
 
@@ -18,11 +19,11 @@ the prior 4.0.2 build; a clean 4.0.4 refresh is pending at this checkpoint.
 |---|---|
 | Source commit | the `sourceCommit` recorded in [`release-manifest.json`](release-manifest.json), built from a clean tree; the commit that adds the manifest changes nothing else |
 | Node | 24.19.0 |
-| Course | `dbxfe`, contentVersion `4.0.4`, "Databricks: Build, Explain, Deliver" |
+| Course | `dbxfe`, contentVersion `4.0.5`, "Databricks: Build, Explain, Deliver" |
 | Modules / tracks / routes | 48 / 8 / 9 |
 | Labs / field guides / cases / capstones | 24 (20 local-executed, 2 tabletop, 2 platform guides) / 32 / 8 / 3 |
 | Build manifest | [`release-manifest.json`](release-manifest.json): every file of `dist/` and `dist-nested/` with its size and SHA-256, and the content manifest with every download's SHA-256 |
-| Initial JavaScript | 1,477,751 B raw / 337,148 B gzip (+6.7% raw over the 1,384,441 B baseline; ceiling +15%), measured at `09cba75`. See [`SCALE.md`](SCALE.md) |
+| Initial JavaScript | 1,481,647 B raw / 338,509 B gzip (+7.0% raw over the 1,384,441 B baseline; ceiling +15%), measured at `4223bf5` with `node scripts/measure-bundle.mjs`. See [`SCALE.md`](SCALE.md) |
 
 Regenerate the manifest from a clean checkout of the candidate with
 `npm ci --ignore-scripts && npm run check && APP_BASE=/SpicyBrain/ APP_OUT=dist-nested npm run build && python scripts/release-manifest.py --out docs/academy/release-manifest.json`.
