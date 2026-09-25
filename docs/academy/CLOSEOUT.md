@@ -235,6 +235,13 @@ Agent Bricks agents are configured rather than coded. Both were corrected, and
 the tightened check fails on the previous text. `tests/py/test_claim_leads.py`
 keeps the blocker report in step with the ledger.
 
+`scripts/academy-quote-check.py` re-checks every verbatim evidence quote in
+`CLAIM-REVIEWS.json` against its pinned source; decision texts that name
+"verify_quotes.py" refer to the build-session copy of the same matcher. On
+2026-09-25 it verified 1,878 of 1,878 quotes, the owner's decisions included,
+and it rejects an altered quote (exit 1). It needs network access to the
+pinned sources and is not part of `npm run check`.
+
 ### Other corrections and audits
 
 - Source provenance: 38 records said "as previously read" about pages this
