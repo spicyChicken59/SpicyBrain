@@ -52,7 +52,7 @@
       "reviewedAt": "2026-09-23",
       "publishedAt": null,
       "context": "Databricks on AWS; landing page for classic compute plane networking (secure cluster connectivity, customer-managed VPC, PrivateLink, peering).",
-      "caveat": "A classic network diagram must not be reused as a serverless diagram; port, endpoint and service lists change, so read the current page before designing.",
+      "caveat": "A classic network diagram must not be reused as a serverless diagram; port, endpoint and service lists change, so read the current page before designing. The unverified summary's 'no inbound ports need configuring on security groups' is not relied on: the Databricks Terraform provider guide lists inbound TCP and UDP from the same security group as required for all workspaces (dbxfe-aws-source-tf-firewall-guide).",
       "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: with secure cluster connectivity, customer VPCs have no open ports and classic compute plane resources have no public IP addresses, so no inbound ports need configuring on security groups; the page links customer-managed VPC, PrivateLink and VPC peering configuration."
     },
     {
@@ -129,7 +129,7 @@
       "reviewedAt": "2026-09-23",
       "publishedAt": null,
       "context": "Databricks on AWS; IAM roles carried by the EC2 instances of classic compute.",
-      "caveat": "Instance profiles apply to classic compute only; legacy credential passthrough is not covered, and the minimum S3 actions quoted must be checked against the current tutorial.",
+      "caveat": "Instance profiles are the classic-compute mechanism, but the Databricks API reference also documents them for Databricks SQL Serverless and a workspace-level SQL warehouse setting that it says also applies to serverless notebooks and jobs (dbxfe-aws-source-tf-instance-profile, dbxfe-aws-source-sdk-instance-profiles, dbxfe-aws-source-sdk-sql-warehouses); legacy credential passthrough is not covered, and the minimum S3 actions quoted must be checked against the current tutorial.",
       "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: instance profiles are AWS IAM roles associated with EC2 instances; administrators configure the IAM role in AWS, link it to a Databricks workspace and grant privileged users the ability to associate it with compute; the S3 tutorial lists ListBucket and GetObject as the minimum read-only actions, with PutObject and DeleteObject used by Delta Lake during regular operations."
     },
     {
@@ -142,6 +142,61 @@
       "context": "Databricks on AWS; customer-managed keys for managed services and workspace storage, and KMS for S3.",
       "caveat": "Requires the Enterprise tier; key policy templates, principals and region rules are on the configuration subpages and must be copied from the current text, never from memory.",
       "reviewedEvidence": "Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: customer-managed keys have two use cases: managed services, covering data in the control plane such as notebooks, secrets, SQL query data and default storage, and workspace storage, covering the workspace storage bucket (DBFS root) and the EBS volumes of classic compute; the same AWS KMS key can serve both; the KMS key must be in the same AWS region as the workspace; serverless workspaces configure keys for managed services only."
+    },
+    {
+      "id": "dbxfe-aws-source-tf-firewall-guide",
+      "title": "Databricks Terraform provider v1.134.0: Provisioning AWS Databricks workspace with a AWS Firewall (guide)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/guides/aws-e2-firewall-workspace.md",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Databricks-published Terraform provider guide at the v1.134.0 release commit; its Security Group section lists the rules the security groups of a customer-managed VPC must have.",
+      "caveat": "A provider guide read at a pinned commit, not the current docs.databricks.com page. It documents security-group requirements for the network configuration interface; it establishes no region, availability or current port list. Relied on only to correct the outbound-only security-group teaching.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/guides/aws-e2-firewall-workspace.md: 'Databricks must have access to at least one AWS security group and no more than five security groups. ... ***Ingress (inbound):*** Required for all workspaces (these can be separate rules or combined into one): ... - Allow TCP on all ports when the traffic source uses the same security group ... - Allow UDP on all ports when the traffic source uses the same security group'. Scope: Databricks-published Terraform documentation of the security-group requirements for a network configuration (interface requirement); not a read of the current customer-managed VPC page."
+    },
+    {
+      "id": "dbxfe-aws-source-sdk-networks",
+      "title": "Databricks SDK for Python: service/provisioning.py (NetworksAPI)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/provisioning.py",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Generated Account API client at a pinned commit; NetworksAPI docstring for customer-managed VPC network configurations.",
+      "caveat": "An API reference docstring: it shows the network configuration is optional when a workspace is created; it does not establish defaults, regions or availability.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/provisioning.py: 'These APIs manage network configurations for customer-managed VPCs (optional). Its ID is used when creating a new workspace if you use customer-managed VPCs.' Scope: API reference docstring (interface only)."
+    },
+    {
+      "id": "dbxfe-aws-source-tf-instance-profile",
+      "title": "Databricks Terraform provider v1.134.0: databricks_instance_profile resource",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/instance_profile.md",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Databricks-published Terraform resource documentation at the v1.134.0 release commit, including its section on usage with Databricks SQL serverless.",
+      "caveat": "Interface documentation read at a pinned commit: it documents that the instance-profile interface serves Databricks SQL serverless and that Databricks asks users to switch to Unity Catalog storage credentials; it does not establish availability or whether a given warehouse uses a profile.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/instance_profile.md: 'Please switch to ... with Unity Catalog to manage storage credentials, which provides a better and faster way for managing credential security. ... Usage with Databricks SQL serverless ... When the instance profile ARN and its associated IAM role ARN don't match and the instance profile is intended for use with Databricks SQL serverless, the `iam_role_arn` parameter can be specified.' Scope: Terraform interface documentation; not a read of the current instance-profile or SQL data access pages."
+    },
+    {
+      "id": "dbxfe-aws-source-sdk-instance-profiles",
+      "title": "Databricks SDK for Python: service/compute.py (InstanceProfilesAPI)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/compute.py",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Generated Workspace API client at a pinned commit; InstanceProfilesAPI.add docstring.",
+      "caveat": "An API reference docstring: it documents registration by admins and the iam_role_arn field for use with Databricks SQL Serverless; it does not establish availability or current managed behaviour.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/compute.py: 'Registers an instance profile in Databricks. In the UI, you can then give users the permission to use this instance profile when launching clusters. ... This API is only available to admin users. ... This field is required if your role name and instance profile name do not match and you want to use the instance profile with `Databricks SQL Serverless <https://docs.databricks.com/sql/admin/serverless.html>`__.' Scope: API reference docstring (interface only)."
+    },
+    {
+      "id": "dbxfe-aws-source-sdk-sql-warehouses",
+      "title": "Databricks SDK for Python: service/sql.py (WarehousesAPI workspace warehouse configuration)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/sql.py",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Generated Workspace API client (v0.141.0) at a pinned commit; WarehousesAPI.get_workspace_warehouse_config and set_workspace_warehouse_config, and the instance_profile_arn field of the workspace configuration and of a single warehouse.",
+      "caveat": "An API reference docstring: it documents that the SQL warehouse instance profile is a workspace-level setting and what the API says it applies to; it does not establish availability, current console behaviour or whether a given workspace names a profile.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/sql.py: 'Deprecated. Instance profile used to pass IAM role to the cluster ... AWS Only: The instance profile used to pass an IAM role to the SQL warehouses. This configuration is also applied to the workspace's serverless compute for notebooks and jobs. ... Sets the workspace level configuration that is shared by all SQL warehouses in a workspace.' The first fragment documents the per-warehouse field (EndpointInfo; WarehousesAPI.create and edit); the second documents the workspace configuration's field (GetWorkspaceWarehouseConfigResponse; set_workspace_warehouse_config). Scope: API reference docstring (interface only)."
     }
   ],
   "claims": [
@@ -179,11 +234,13 @@
     },
     {
       "id": "dbxfe-aws-claim-vpc",
-      "description": "A customer-managed VPC is named when the classic workspace is created and needs at least two subnets and at least one security group; with secure cluster connectivity, compute nodes have no public IP addresses and no inbound ports are opened; a customer-managed VPC is required for back-end PrivateLink and for front-end PrivateLink on classic workspaces.",
+      "description": "A customer-managed VPC is named when the classic workspace is created and needs at least two subnets and at least one security group; with secure cluster connectivity, compute nodes have no public IP addresses and no inbound ports are opened to sources outside the workspace's security group, whose documented rules include inbound TCP and UDP from the same group; a customer-managed VPC is required for back-end PrivateLink and for front-end PrivateLink on classic workspaces.",
       "kind": "documented",
       "sourceIds": [
         "dbxfe-aws-source-classic",
-        "dbxfe-aws-source-vpc"
+        "dbxfe-aws-source-vpc",
+        "dbxfe-aws-source-tf-firewall-guide",
+        "dbxfe-aws-source-sdk-networks"
       ],
       "context": "Classic compute plane on AWS; exact subnet, DNS and network-ACL requirements are on the current page."
     },
@@ -237,9 +294,12 @@
       "description": "An instance profile is an IAM role attached to the EC2 instances of classic compute; admins create it in AWS, register it in the workspace and grant users the right to launch compute with it; the S3 tutorial names ListBucket and GetObject as minimum read actions and PutObject and DeleteObject for Delta writes.",
       "kind": "documented",
       "sourceIds": [
-        "dbxfe-aws-source-profile"
+        "dbxfe-aws-source-profile",
+        "dbxfe-aws-source-tf-instance-profile",
+        "dbxfe-aws-source-sdk-instance-profiles",
+        "dbxfe-aws-source-sdk-sql-warehouses"
       ],
-      "context": "Classic compute only; serverless compute uses Unity Catalog credentials instead."
+      "context": "A classic-compute mechanism that Databricks asks users to replace with Unity Catalog storage credentials; the Databricks API reference also documents instance profiles for Databricks SQL Serverless and a workspace-level SQL warehouse instance-profile setting that it says also applies to serverless compute for notebooks and jobs."
     },
     {
       "id": "dbxfe-aws-claim-keys",
@@ -802,8 +862,8 @@
       "kind": "nodes",
       "title": "What a classic launch needs from the VPC",
       "alt": "What a classic launch needs from the VPC. The node starts in a private subnet, resolves the control plane name, and opens an outbound connection through the subnet's route.",
-      "caption": "Outbound route, DNS and security-group egress make a launch work; removing the route alone stops it while everything else still looks correct. Synthetic teaching example.",
-      "textEquivalent": "Launch succeeds: The node starts in a private subnet, resolves the control plane name, and opens an outbound connection through the subnet's route. Nodes: Cluster node: No public IP; initiates outbound only. (selected); Private subnet: One of at least two subnets named at workspace creation. (selected); Route table: 0.0.0.0/0 to NAT. Outbound route through a NAT gateway. (selected); Security group: Outbound rules allow the connection; no inbound rule needed. (selected); VPC DNS: Resolves the workspace and relay hostnames. (selected); Control plane relay: Accepts the node's outbound connection. (selected). Relationships: Cluster node → Private subnet: launches in; Private subnet → Route table: uses; Cluster node → VPC DNS: resolves; Security group → Cluster node: applies to; Route table → Control plane relay: outbound.\n\nRoute removed: The default route is gone. DNS still answers and the security group still allows, yet the node times out because nothing carries its packets out. Nodes: Cluster node: Bootstrap timeout reported by the workspace. (warning); Private subnet: Unchanged. (selected); Route table: no default route. No route to the NAT gateway or an endpoint. (warning); Security group: Still allows outbound; not the cause. (selected); VPC DNS: Still resolves; not the cause. (selected); Control plane relay: Never reached. (excluded). Relationships: Cluster node → Private subnet: launches in; Private subnet → Route table: uses; Cluster node → VPC DNS: resolves; Security group → Cluster node: applies to; Route table → Control plane relay: no path.",
+      "caption": "Outbound route, DNS and security-group egress, with the documented same-group ingress in place, make a launch work; removing the route alone stops it while everything else still looks correct. Synthetic teaching example.",
+      "textEquivalent": "Launch succeeds: The node starts in a private subnet, resolves the control plane name, and opens an outbound connection through the subnet's route. Nodes: Cluster node: No public IP; initiates outbound only. (selected); Private subnet: One of at least two subnets named at workspace creation. (selected); Route table: 0.0.0.0/0 to NAT. Outbound route through a NAT gateway. (selected); Security group: Outbound rules allow the connection; inbound only from the same group. (selected); VPC DNS: Resolves the workspace and relay hostnames. (selected); Control plane relay: Accepts the node's outbound connection. (selected). Relationships: Cluster node → Private subnet: launches in; Private subnet → Route table: uses; Cluster node → VPC DNS: resolves; Security group → Cluster node: applies to; Route table → Control plane relay: outbound.\n\nRoute removed: The default route is gone. DNS still answers and the security group still allows, yet the node times out because nothing carries its packets out. Nodes: Cluster node: Bootstrap timeout reported by the workspace. (warning); Private subnet: Unchanged. (selected); Route table: no default route. No route to the NAT gateway or an endpoint. (warning); Security group: Still allows outbound; not the cause. (selected); VPC DNS: Still resolves; not the cause. (selected); Control plane relay: Never reached. (excluded). Relationships: Cluster node → Private subnet: launches in; Private subnet → Route table: uses; Cluster node → VPC DNS: resolves; Security group → Cluster node: applies to; Route table → Control plane relay: no path.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-aws-claim-vpc",
@@ -839,7 +899,7 @@
             {
               "id": "secgroup",
               "label": "Security group",
-              "detail": "Outbound rules allow the connection; no inbound rule needed.",
+              "detail": "Outbound rules allow the connection; inbound only from the same group.",
               "status": "selected"
             },
             {
@@ -1604,7 +1664,7 @@
       "title": "Who owns what under each plane",
       "alt": "Who owns what under each plane. The VPC rows disappear under serverless; the policy rows do not.",
       "caption": "Classic keeps the network in Cinderline's hands; serverless removes the network but not the catalog, bucket and key policies. Synthetic teaching example.",
-      "textEquivalent": "Who provisions: The VPC rows disappear under serverless; the policy rows do not. Columns: Responsibility; Classic compute plane; Serverless compute plane. Rows: Compute network (VPC, subnets, route tables) — Cinderline — Databricks; Egress control — Cinderline NAT, firewall, endpoints — Cinderline network policy on Databricks plane; Security groups and NACLs — Cinderline — Not applicable; Storage identity — Instance profile or UC credential — UC storage credential only; Private path to control plane — Back-end PrivateLink, Cinderline endpoints — Cloud backbone, Databricks; Private path to Cinderline resources — VPC routing, peering, endpoints — NCC private endpoint rules; Unity Catalog privileges, bucket and key policies — Cinderline — Cinderline.\n\nWho diagnoses first: Where the first evidence for a failure lives changes with the plane; the denial layers stay with Cinderline on both. Columns: Failure; Classic: look first at; Serverless: look first at. Rows: Cluster or warehouse cannot start or reach control plane — Subnet route, DNS, security group, endpoints — Workspace status; Databricks-side, open a ticket; Timeout reaching an internal source — Route tables, security groups, peering — NCC rule, endpoint service acceptance, network policy; Timeout reaching the internet — NAT or egress firewall allowlist — Network policy (if enabled); PERMISSION_DENIED from the catalog — Unity Catalog grants for the run-as principal — Same; AccessDenied from S3 or KMS — Instance profile or credential role, bucket and key policies — Credential role, bucket and key policies.",
+      "textEquivalent": "Who provisions: The VPC rows disappear under serverless; the policy rows do not. Columns: Responsibility; Classic compute plane; Serverless compute plane. Rows: Compute network (VPC, subnets, route tables) — Cinderline — Databricks; Egress control — Cinderline NAT, firewall, endpoints — Cinderline network policy on Databricks plane; Security groups and NACLs — Cinderline — Not applicable; Storage identity — Instance profile or UC credential — UC storage credential (or an instance profile set in the workspace's SQL warehouse configuration); Private path to control plane — Back-end PrivateLink, Cinderline endpoints — Cloud backbone, Databricks; Private path to Cinderline resources — VPC routing, peering, endpoints — NCC private endpoint rules; Unity Catalog privileges, bucket and key policies — Cinderline — Cinderline.\n\nWho diagnoses first: Where the first evidence for a failure lives changes with the plane; the denial layers stay with Cinderline on both. Columns: Failure; Classic: look first at; Serverless: look first at. Rows: Cluster or warehouse cannot start or reach control plane — Subnet route, DNS, security group, endpoints — Workspace status; Databricks-side, open a ticket; Timeout reaching an internal source — Route tables, security groups, peering — NCC rule, endpoint service acceptance, network policy; Timeout reaching the internet — NAT or egress firewall allowlist — Network policy (if enabled); PERMISSION_DENIED from the catalog — Unity Catalog grants for the run-as principal — Same; AccessDenied from S3 or KMS — Instance profile or credential role, bucket and key policies — Credential role or the workspace's warehouse instance profile, bucket and key policies.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-aws-claim-architecture",
@@ -1612,6 +1672,7 @@
         "dbxfe-aws-claim-serverless",
         "dbxfe-aws-claim-storage",
         "dbxfe-aws-claim-keys",
+        "dbxfe-aws-claim-profile",
         "dbxfe-aws-guidance",
         "dbxfe-aws-fiction"
       ],
@@ -1647,7 +1708,7 @@
               [
                 "Storage identity",
                 "Instance profile or UC credential",
-                "UC storage credential only"
+                "UC storage credential (or an instance profile set in the workspace's SQL warehouse configuration)"
               ],
               [
                 "Private path to control plane",
@@ -1703,7 +1764,7 @@
               [
                 "AccessDenied from S3 or KMS",
                 "Instance profile or credential role, bucket and key policies",
-                "Credential role, bucket and key policies"
+                "Credential role or the workspace's warehouse instance profile, bucket and key policies"
               ]
             ]
           }
@@ -2468,7 +2529,7 @@
         {
           "id": "dbxfe-aws-profile-question-c",
           "text": "Open inbound port 443 on the cluster's security group.",
-          "rationale": "Secure cluster connectivity needs no inbound rule, and a permission error is not a reachability failure."
+          "rationale": "Secure cluster connectivity needs no inbound rule from outside the cluster's own security group, and a permission error is not a reachability failure."
         },
         {
           "id": "dbxfe-aws-profile-question-d",
@@ -2610,7 +2671,7 @@
         {
           "id": "dbxfe-aws-unreachable-question-b",
           "text": "The security group's inbound rules on the cluster.",
-          "rationale": "Secure cluster connectivity needs no inbound rule, and a wrong DNS answer is upstream of any security group."
+          "rationale": "Secure cluster connectivity needs no inbound rule from outside the cluster's own security group, and a wrong DNS answer is upstream of any security group."
         },
         {
           "id": "dbxfe-aws-unreachable-question-c",
@@ -2638,9 +2699,9 @@
   "selfQuestions": [
     {
       "id": "dbxfe-aws-vpc-self",
-      "revision": "1",
+      "revision": "2",
       "prompt": "A classic cluster fails to start after a network change. A colleague proposes adding inbound rules to its security group. Explain why that will not help and what you would check instead, in order.",
-      "modelAnswer": "Secure cluster connectivity means nodes have no public IP and initiate outbound connections, so inbound rules are never consulted for the launch. Check, in order: the subnet's route table has an outbound route to a NAT gateway or interface endpoint; VPC DNS resolves the control plane and relay hostnames from that subnet; the security group's outbound rules and the network ACL allow the connection; then retest a launch in the same subnet and record the result.",
+      "modelAnswer": "Secure cluster connectivity means nodes have no public IP and initiate outbound connections to the relay, so no inbound rule from another source is consulted to reach it; the documented inbound rules from the same security group stay in place for traffic between the workspace's own nodes. Check, in order: the subnet's route table has an outbound route to a NAT gateway or interface endpoint; VPC DNS resolves the control plane and relay hostnames from that subnet; the security group's outbound rules, its same-group inbound rules and the network ACL allow the connection; then retest a launch in the same subnet and record the result.",
       "reasoning": "The order follows the request outward from the node; each check is cheap and its result eliminates a layer. Checking NAT gateway state or the egress firewall first is an acceptable alternative when the change log points there.",
       "conceptIds": [
         "dbxfe-aws-vpc-concept"
@@ -2686,9 +2747,9 @@
     },
     {
       "id": "dbxfe-aws-responsibilities-self",
-      "revision": "1",
+      "revision": "2",
       "prompt": "Cinderline is moving its nightly job from a classic cluster to a serverless SQL warehouse. List which responsibilities disappear from its AWS account, which new ones appear, and which stay unchanged.",
-      "modelAnswer": "Disappearing: the compute VPC, subnets, route tables, NAT or egress firewall for that job, security groups and NACLs on compute, and the instance profile. Appearing: a network connectivity configuration and its private endpoint rules for any private source, an optional network policy for egress, and bucket policy conditions that admit serverless traffic. Unchanged: Unity Catalog grants for the run-as principal, the storage credential's IAM role, bucket policies, KMS key policies, and the workspace's front-end connectivity for the people who run it.",
+      "modelAnswer": "Disappearing: the compute VPC, subnets, route tables, NAT or egress firewall for that job, security groups and NACLs on compute, and the instance profile once the warehouse reads through the storage credential and the workspace's SQL warehouse configuration no longer names it. Appearing: a network connectivity configuration and its private endpoint rules for any private source, an optional network policy for egress, and bucket policy conditions that admit serverless traffic. Unchanged: Unity Catalog grants for the run-as principal, the storage credential's IAM role, bucket policies, KMS key policies, and the workspace's front-end connectivity for the people who run it.",
       "reasoning": "Sorting responsibilities into three lists makes the migration's real work visible: the network moves to Databricks, the permissions do not move at all, and the new constructs need availability verified.",
       "conceptIds": [
         "dbxfe-aws-responsibilities-concept"
@@ -2698,6 +2759,7 @@
         "dbxfe-aws-claim-serverless",
         "dbxfe-aws-claim-storage",
         "dbxfe-aws-claim-keys",
+        "dbxfe-aws-claim-profile",
         "dbxfe-aws-claim-vpc",
         "dbxfe-aws-guidance",
         "dbxfe-aws-fiction"
@@ -2792,10 +2854,10 @@
     },
     {
       "id": "dbxfe-aws-vpc",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "Classic compute obeys the VPC you hand it",
       "outcome": "Name the VPC pieces a classic workspace needs and identify which one decides a launch failure.",
-      "explanation": "A classic workspace takes a [[dbxfe-aws-vpc-concept|customer-managed VPC]] when it is created: the documentation asks for at least two subnets and at least one security group. Secure cluster connectivity means cluster nodes get no public IP address and need no open inbound port; the compute plane opens outbound connections to the control plane. So the working parts are the subnet, a route table with an outbound route, DNS resolution for the control plane names, and the security group's outbound rules. Notice in the second state that removing only the route stops the launch while DNS and the security group still look correct.",
+      "explanation": "A classic workspace can take a [[dbxfe-aws-vpc-concept|customer-managed VPC]] when it is created: the documentation asks for at least two subnets and at least one security group. Secure cluster connectivity means cluster nodes get no public IP address and need no inbound port open to anything outside their own security group; the compute plane opens outbound connections to the control plane. So the working parts are the subnet, a route table with an outbound route, DNS resolution for the control plane names, and the security group's outbound rules alongside its documented inbound rules from the same group. Notice in the second state that removing only the route stops the launch while DNS and the security group still look correct.",
       "lessonId": "dbxfe-aws-l01",
       "sectionId": "dbxfe-aws-l01-classic",
       "conceptIds": [
@@ -2812,13 +2874,13 @@
         "dbxfe-aws-vpc-self"
       ],
       "handbook": {
-        "markdown": "A customer-managed VPC is named in the workspace's network configuration at creation time. The documentation requires at least two subnets and at least one security group, states network ACL requirements at subnet level, and lists the DNS settings the VPC must have so that compute can resolve the control plane and AWS service names; read the current requirement list rather than this summary before designing.\n\nSecure cluster connectivity changes the shape of the diagnosis. Nodes have no public IP addresses, and the customer VPC has no open ports for Databricks to reach in. Each node dials out to the control plane's relay and keeps that connection for commands. Consequently, a launch depends on the outbound side only: a route from the subnet to a NAT gateway, or to interface endpoints if back-end PrivateLink is configured; DNS answers for the workspace and relay hostnames; security group outbound rules and network ACLs that allow the traffic.\n\nA typical failure reads as a bootstrap timeout or a cluster that never reaches running. Work outward from the node: the subnet's route table association, the NAT gateway's state and its own route through an internet gateway, the VPC's DNS attributes, the security group's outbound rules. Adding inbound rules does nothing here. What this beat does not cover: IP address exhaustion in small subnets, which surfaces as launch capacity errors rather than timeouts, and the exact port list, which the current page owns. Nothing here creates a VPC; a real design is verified by a network specialist against Cinderline's region.",
+        "markdown": "A customer-managed VPC is named in the workspace's network configuration at creation time. The documentation requires at least two subnets and at least one security group, states network ACL requirements at subnet level, and lists the DNS settings the VPC must have so that compute can resolve the control plane and AWS service names; read the current requirement list rather than this summary before designing.\n\nSecure cluster connectivity changes the shape of the diagnosis. Nodes have no public IP addresses, and the customer VPC has no open ports for Databricks to reach in. Each node dials out to the control plane's relay and keeps that connection for commands. Consequently, reaching the relay depends on the outbound side: a route from the subnet to a NAT gateway, or to interface endpoints if back-end PrivateLink is configured; DNS answers for the workspace and relay hostnames; security group outbound rules and network ACLs that allow the traffic. The documented security-group rules also require inbound TCP and UDP on all ports from the same security group, for traffic between the workspace's own nodes; no other inbound rule is on that list.\n\nA typical failure reads as a bootstrap timeout or a cluster that never reaches running. Work outward from the node: the subnet's route table association, the NAT gateway's state and its own route through an internet gateway, the VPC's DNS attributes, the security group's outbound rules and its same-group inbound rules. Adding inbound rules from other sources does nothing here. What this beat does not cover: IP address exhaustion in small subnets, which surfaces as launch capacity errors rather than timeouts, and the exact port list, which the current page owns. Nothing here creates a VPC; a real design is verified by a network specialist against Cinderline's region.",
         "sourceSectionIds": [
           "dbxfe-aws-l01-classic"
         ]
       },
-      "recap": "Two subnets, one security group, an outbound route and DNS; no inbound rule can rescue a launch.",
-      "changeNote": "New academy beat.",
+      "recap": "Two subnets, one security group with its same-group inbound rules, an outbound route and DNS; no other inbound rule can rescue a launch.",
+      "changeNote": "The security-group teaching now includes the inbound TCP and UDP rules from the same group, which the Databricks Terraform provider's AWS firewall workspace guide lists as required; the beat had said only outbound rules matter. A customer-managed VPC is now described as optional, as the Databricks SDK's network configuration API documents.",
       "mediaIds": []
     },
     {
@@ -2854,7 +2916,7 @@
     },
     {
       "id": "dbxfe-aws-profile",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "On classic compute, S3 trust rides on the instance",
       "outcome": "Trace a classic S3 read through the instance profile, the bucket policy and the KMS key policy.",
       "explanation": "An [[dbxfe-aws-profile-concept|instance profile]] is an AWS IAM role attached to the EC2 instances of a classic cluster. Administrators create the role in AWS, register it in the workspace, and decide which users may launch compute with it. When the cluster calls GetObject on cinderline-inspections, three policies are consulted: the role's own permissions, the bucket policy, and, for objects encrypted with a customer key, the KMS key policy. Notice that the second state passes S3 and still fails: the key policy does not name the role, so the decrypt is refused.",
@@ -2879,13 +2941,13 @@
         "dbxfe-aws-profile-question"
       ],
       "handbook": {
-        "markdown": "Mechanism. The role's trust policy lets the EC2 service assume it; its permissions policy names the bucket and prefix with the actions needed. The documentation's tutorial lists ListBucket and GetObject as the minimum for reads and notes that Delta Lake uses PutObject and DeleteObject during regular operations. An admin adds the instance profile to the workspace, and a user with permission to use it selects it when creating compute. Code on the cluster then obtains temporary credentials for that role from the instance and signs S3 requests with them.\n\nThree policies, three possible refusals. The identity policy on the role; the bucket policy, which must admit the role explicitly when the bucket is in another AWS account and can refuse it in the same account; the KMS key policy, which must allow kms:Decrypt (and kms:GenerateDataKey for writes) when the objects use SSE-KMS. An explicit deny in any of them wins. An AccessDenied error names the service that refused, and that word decides the next check.\n\n```python\n# Synthetic teaching example: what a classic cluster with an instance profile does, in outline.\n# The cluster obtains temporary credentials for cinderline-cluster-profile from the instance,\n# then S3 evaluates role policy, bucket policy and (for SSE-KMS) the key policy.\npath = \"s3://cinderline-inspections/accepted/\"   # the Delta table's root, where _delta_log lives\ndf = spark.read.format(\"delta\").load(path)  # not executed here\n```\n\nLimits. Instance profiles belong to classic compute only; serverless compute has no EC2 instance to carry a role and uses Unity Catalog credentials instead. Legacy credential passthrough is out of scope. A working interactive read proves the profile on that cluster, not the grants of a job that runs elsewhere.",
+        "markdown": "Mechanism. The role's trust policy lets the EC2 service assume it; its permissions policy names the bucket and prefix with the actions needed. The documentation's tutorial lists ListBucket and GetObject as the minimum for reads and notes that Delta Lake uses PutObject and DeleteObject during regular operations. An admin adds the instance profile to the workspace, and a user with permission to use it selects it when creating compute. Code on the cluster then obtains temporary credentials for that role from the instance and signs S3 requests with them.\n\nThree policies, three possible refusals. The identity policy on the role; the bucket policy, which must admit the role explicitly when the bucket is in another AWS account and can refuse it in the same account; the KMS key policy, which must allow kms:Decrypt (and kms:GenerateDataKey for writes) when the objects use SSE-KMS. An explicit deny in any of them wins. An AccessDenied error names the service that refused, and that word decides the next check.\n\n```python\n# Synthetic teaching example: what a classic cluster with an instance profile does, in outline.\n# The cluster obtains temporary credentials for cinderline-cluster-profile from the instance,\n# then S3 evaluates role policy, bucket policy and (for SSE-KMS) the key policy.\npath = \"s3://cinderline-inspections/accepted/\"   # the Delta table's root, where _delta_log lives\ndf = spark.read.format(\"delta\").load(path)  # not executed here\n```\n\nLimits. On classic compute the instance profile rides on the cluster's EC2 instances, and Databricks' Terraform documentation asks users to switch to Unity Catalog storage credentials. Do not assume serverless compute never involves one: the Databricks API reference documents registering an instance profile for use with Databricks SQL Serverless, and a workspace-level SQL warehouse setting, `instance_profile_arn`, shared by all of the workspace's SQL warehouses, which it says is also applied to the workspace's serverless compute for notebooks and jobs. The per-warehouse field is marked deprecated, so check that workspace setting, not a single warehouse, before removing a profile. Legacy credential passthrough is out of scope. A working interactive read proves the profile on that cluster, not the grants of a job that runs elsewhere.",
         "sourceSectionIds": [
           "dbxfe-aws-l01-storage"
         ]
       },
       "recap": "Role policy, bucket policy, key policy: three doors on one read, and the error names which one shut.",
-      "changeNote": "New academy beat.",
+      "changeNote": "This beat's limits now say instance profiles are not only for classic compute, and to check the workspace's SQL warehouse setting before removing one. The Databricks SDK and Terraform provider document instance profiles for Databricks SQL Serverless, and the SDK documents that workspace setting as also applying to serverless notebooks and jobs.",
       "mediaIds": []
     },
     {
@@ -2986,7 +3048,7 @@
     },
     {
       "id": "dbxfe-aws-responsibilities",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "Two planes split the responsibilities differently",
       "outcome": "State who owns each network and storage responsibility under classic and under serverless.",
       "explanation": "Put the two planes side by side. Under classic, Cinderline owns the VPC, subnets, route tables, NAT or firewall, security groups, DNS inside the VPC, the instance profiles and the workspace storage bucket. Under serverless, Databricks operates the compute network; Cinderline owns the NCC and its rules, any network policy, the bucket policies and Unity Catalog credentials, and the KMS keys it chooses. Notice the rows of the [[dbxfe-aws-responsibilities-concept|shared responsibility split]] that never move: Unity Catalog privileges, bucket policies and key policies stay Cinderline's on both planes, and the second table shows where the first evidence lives.",
@@ -3001,6 +3063,7 @@
         "dbxfe-aws-claim-serverless",
         "dbxfe-aws-claim-storage",
         "dbxfe-aws-claim-keys",
+        "dbxfe-aws-claim-profile",
         "dbxfe-aws-guidance",
         "dbxfe-aws-fiction"
       ],
@@ -3009,13 +3072,13 @@
         "dbxfe-aws-responsibilities-self"
       ],
       "handbook": {
-        "markdown": "The comparison is the module's summary. Read the first table by rows that disappear and rows that stay. Under serverless the compute network rows leave Cinderline's account: no subnets to size, no NAT gateway to pay for, no security group on compute, no instance profile. Under both planes the permission rows remain exactly where they were: Unity Catalog grants for the run-as principal, the storage credential's IAM role, the bucket policy, the key policy. A migration from classic to serverless therefore moves the network and leaves the permissions untouched; teams that expect a permission cleanup from the move are surprised twice.\n\nThe second table tells a diagnosis where to look first. On classic, a compute that cannot start is Cinderline's route, DNS and security group problem; on serverless, a warehouse that cannot start is a Databricks-side matter to raise with support after checking workspace status. A timeout reaching an internal source is route tables and peering on classic, and the NCC rule, endpoint service acceptance and network policy on serverless. Denials read the same on both.\n\nWhen to choose which. Classic fits existing VPC controls, instance-profile dependencies and library installs that need managed egress. Serverless removes network operations but depends on NCC, private endpoint and egress features being available in the region and entitled to the account. Name what is unknown: region, workspace type, tier, preview status. And do not relabel an Azure picture: AWS has no VNet injection or managed identity; it has customer-managed VPCs, instance profiles, IAM roles, VPC endpoint services and NCCs.",
+        "markdown": "The comparison is the module's summary. Read the first table by rows that disappear and rows that stay. Under serverless the compute network rows leave Cinderline's account: no subnets to size, no NAT gateway to pay for, no security group on compute. The instance profile leaves only once reads go through Unity Catalog and the workspace's SQL warehouse setting no longer names it; it is not strictly classic-only, since the Databricks API reference documents instance profiles for Databricks SQL Serverless and a workspace instance-profile setting for SQL warehouses that it says also applies to serverless notebooks and jobs. Under both planes the permission rows remain exactly where they were: Unity Catalog grants for the run-as principal, the storage credential's IAM role, the bucket policy, the key policy. A migration from classic to serverless therefore moves the network and leaves the permissions untouched; teams that expect a permission cleanup from the move are surprised twice.\n\nThe second table tells a diagnosis where to look first. On classic, a compute that cannot start is Cinderline's route, DNS and security group problem; on serverless, a warehouse that cannot start is a Databricks-side matter to raise with support after checking workspace status. A timeout reaching an internal source is route tables and peering on classic, and the NCC rule, endpoint service acceptance and network policy on serverless. Denials read the same on both.\n\nWhen to choose which. Classic fits existing VPC controls, instance-profile dependencies and library installs that need managed egress. Serverless removes network operations but depends on NCC, private endpoint and egress features being available in the region and entitled to the account. Name what is unknown: region, workspace type, tier, preview status. And do not relabel an Azure picture: AWS has no VNet injection or managed identity; it has customer-managed VPCs, instance profiles, IAM roles, VPC endpoint services and NCCs.",
         "sourceSectionIds": [
           "dbxfe-aws-l01-serverless"
         ]
       },
       "recap": "Serverless moves the network to Databricks and leaves every permission policy exactly where it was.",
-      "changeNote": "New academy beat.",
+      "changeNote": "This beat no longer says serverless has no instance profile. The Databricks SDK documents a workspace-level SQL warehouse instance-profile setting that it says also applies to serverless notebooks and jobs, so the serverless storage-identity and AccessDenied rows now name it beside the Unity Catalog credential.",
       "mediaIds": []
     },
     {
@@ -3235,10 +3298,10 @@
     },
     {
       "id": "dbxfe-aws-extension-bucket-condition",
-      "revision": "1",
-      "prompt": "How can Cinderline's bucket admit only Databricks serverless traffic when there is no instance profile to name?",
+      "revision": "2",
+      "prompt": "How can Cinderline's bucket admit only Databricks serverless traffic when reads go through a storage credential rather than a classic cluster's instance profile?",
       "answer": "With a bucket policy condition on the aws:VpceOrgPaths key that admits requests arriving through the documented Databricks serverless VPC endpoints, alongside the storage credential's role.",
-      "explanation": "Classic compute is named in a bucket policy by the instance profile role. Serverless compute reaches same-region S3 through a VPC endpoint on the Databricks side, so the firewall page describes an [[dbxfe-aws-extension-bucket-condition-concept|endpoint-scoped bucket policy]]: a condition on aws:VpceOrgPaths that accepts only requests from those endpoints. The storage credential's IAM role still has to be allowed; the condition narrows where an allowed identity may come from. Copy the exact condition text from the current page, because the values are documented per region and change. Test with a read from the serverless warehouse and a read from an unrelated identity, and expect the second to fail.",
+      "explanation": "A classic cluster reading through its instance profile is named in a bucket policy by that role. Serverless compute reaches same-region S3 through a VPC endpoint on the Databricks side, so the firewall page describes an [[dbxfe-aws-extension-bucket-condition-concept|endpoint-scoped bucket policy]]: a condition on aws:VpceOrgPaths that accepts only requests from those endpoints. The storage credential's IAM role still has to be allowed; the condition narrows where an allowed identity may come from. Copy the exact condition text from the current page, because the values are documented per region and change. Test with a read from the serverless warehouse and a read from an unrelated identity, and expect the second to fail.",
       "lessonId": "dbxfe-aws-l01",
       "sectionId": "dbxfe-aws-l01-storage",
       "conceptIds": [
@@ -3297,13 +3360,13 @@
   ],
   "recap": {
     "title": "Two accounts, two planes, one query path",
-    "markdown": "**Databricks account and control plane on one side; Cinderline's AWS account with its VPC, roles, buckets and keys on the other.** Classic compute crosses into Cinderline's VPC and obeys its subnets, routes, security groups, DNS and egress; serverless compute stays in the Databricks account and is reached through a network connectivity configuration. Storage identity is an instance profile on classic or a Unity Catalog storage credential on either, and a KMS key policy is a third door after S3 says yes. PrivateLink is three separate connections, each with its own DNS answer. A denial names its layer; a timeout names none, so each has its own ordered diagnosis. **Transfer challenge:** redraw the responsibility table for a partner-owned SSE-KMS bucket read from a serverless warehouse, marking every row that needs the partner's account and every feature whose availability is still unknown.",
+    "markdown": "**Databricks account and control plane on one side; Cinderline's AWS account with its VPC, roles, buckets and keys on the other.** Classic compute crosses into Cinderline's VPC and obeys its subnets, routes, security groups, DNS and egress; serverless compute stays in the Databricks account and is reached through a network connectivity configuration. Storage identity is an instance profile on classic compute (the API reference also documents one for serverless, set in the workspace's SQL warehouse configuration) or a Unity Catalog storage credential on either, and a KMS key policy is a third door after S3 says yes. PrivateLink is three separate connections, each with its own DNS answer. A denial names its layer; a timeout names none, so each has its own ordered diagnosis. **Transfer challenge:** redraw the responsibility table for a partner-owned SSE-KMS bucket read from a serverless warehouse, marking every row that needs the partner's account and every feature whose availability is still unknown.",
     "visualId": "dbxfe-aws-responsibilities-visual"
   },
   "appliedTask": {
     "title": "Move the nightly job and keep the evidence honest",
     "prompt": "Cinderline moves the nightly job from a classic cluster with an instance profile to a serverless SQL warehouse in a new workspace in the same region. The source is an SSE-KMS bucket in a supplier's AWS account, and a lookup table lives in an RDS database on a private IP in Cinderline's VPC. List, in order, what must exist on the AWS side and the Databricks side for the job to reach both sources, which responsibilities the migration removes from Cinderline's account, and what you would mark unknown before the design review.",
-    "modelAnswer": "AWS side: a supplier-account IAM role with the documented trust policy, a supplier bucket policy admitting that role for the prefix, and a supplier KMS key policy granting the role kms:Decrypt; on Cinderline's side, a VPC endpoint service in front of the RDS database and acceptance of the private endpoint connection. Databricks side: a storage credential pointing at the supplier's role ARN, an external location for the prefix, USE CATALOG, USE SCHEMA and SELECT for the job's run-as principal, a network connectivity configuration in the region attached to the new workspace with a private endpoint rule to the endpoint service, and optionally a network policy in dry-run first. Removed from Cinderline's account: the compute subnets, route tables, NAT or egress firewall for that job, compute security groups and the instance profile. Unchanged: catalog grants, the storage credential model, bucket and key policies. Unknown until verified: regional availability and entitlement of private endpoint rules and egress control, the workspace type, the Enterprise tier, the supplier's willingness to change its key policy, and networking charges. Nothing is provisioned by writing this list.",
+    "modelAnswer": "AWS side: a supplier-account IAM role with the documented trust policy, a supplier bucket policy admitting that role for the prefix, and a supplier KMS key policy granting the role kms:Decrypt; on Cinderline's side, a VPC endpoint service in front of the RDS database and acceptance of the private endpoint connection. Databricks side: a storage credential pointing at the supplier's role ARN, an external location for the prefix, USE CATALOG, USE SCHEMA and SELECT for the job's run-as principal, a network connectivity configuration in the region attached to the new workspace with a private endpoint rule to the endpoint service, and optionally a network policy in dry-run first. Removed from Cinderline's account: the compute subnets, route tables, NAT or egress firewall for that job, compute security groups and, once no workspace SQL warehouse setting still names it, the instance profile. Unchanged: catalog grants, the storage credential model, bucket and key policies. Unknown until verified: regional availability and entitlement of private endpoint rules and egress control, the workspace type, the Enterprise tier, the supplier's willingness to change its key policy, and networking charges. Nothing is provisioned by writing this list.",
     "reasoning": "The answer follows the request path from identity through catalog, storage and key, then reachability through the NCC, keeps the two accounts distinct, and turns each feature into a verification item instead of a promise.",
     "beatIds": [
       "dbxfe-aws-unity",

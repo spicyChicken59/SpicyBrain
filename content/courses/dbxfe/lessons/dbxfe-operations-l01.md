@@ -43,7 +43,7 @@ No record says whether 0.4% is right; only an independent recount does.
 
 A Unity Catalog owner holds privileges; an operational owner is paged. Cinderline's register names the on-call rota, the plant quality manager who decides whether a figure may be used, the Line 3 export team upstream, and the catalog owner group for access.
 
-Job failure notifications cover runs ending FAILED, TIMED_OUT or with an internal error, so they could not see INC-0412. A SQL alert on a reconciliation query, published rate against raw recount, would have triggered at 02:40 and paged the rota. Give it a rearm interval, route it to the rota and link its runbook.
+Job failure notifications cover runs ending FAILED, TIMED_OUT or with an internal error, and canceled or skipped runs unless muted, but not a run that ends SUCCESS, so they could not see INC-0412. A SQL alert on a reconciliation query, published rate against raw recount, would have triggered at 02:40 and paged the rota. Give it a rearm interval, route it to the rota and link its runbook.
 
 <!-- section:dbxfe-operations-l01-example -->
 
@@ -92,7 +92,7 @@ Pause every writer and the feature stream first; afterwards rebuild the stream's
 
 <!-- section:dbxfe-operations-l01-backup -->
 
-Table history is not a backup. Databricks advises against using it for long-term archival; with default retention VACUUM removes files older than 7 days, and a deleted storage location or an unavailable region takes the history with it. A backup strategy adds an independent copy in another failure domain (the deployment guide suggests deep clone for critical tables) refreshed often enough for the RPO, replayable raw files and queues, jobs and grants kept as code, and timed restore drills.
+Table history is not a backup. Databricks advises against using it for long-term archival; with default retention VACUUM removes files the table no longer references once they pass the 7-day retention threshold, and a deleted storage location or an unavailable region takes the history with it. A backup strategy adds an independent copy in another failure domain (the deployment guide suggests deep clone for critical tables) refreshed often enough for the RPO, replayable raw files and queues, jobs and grants kept as code, and timed restore drills.
 
 Managed promises have documented edges. Control plane high availability is described with a 15-minute RTO and 0 RPO, but customer data sits in Cinderline's own storage under Cinderline's RPO. Managed disaster recovery is gated and replicates opted-in categories up to a replication point.
 

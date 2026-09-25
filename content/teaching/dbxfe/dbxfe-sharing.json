@@ -108,7 +108,7 @@
       "reviewedAt": "2026-09-23",
       "publishedAt": null,
       "context": "Open-source Delta Lake documentation source (Delta Lake 3.x), read from the project repository; it describes UniForm with Hive Metastore as the Iceberg catalog.",
-      "caveat": "Open-source requirements and limits, such as Hive Metastore as the catalog and no deletion vectors, can differ from Databricks-managed Unity Catalog tables; confirm the Databricks page and runtime before enabling. The published documentation host was blocked, so the repository source was read.",
+      "caveat": "Open-source requirements and limits, such as Hive Metastore as the catalog and no deletion vectors, can differ from Databricks-managed Unity Catalog tables; confirm the Databricks page and runtime before enabling. The published documentation host was blocked, so the repository source was read. Its statement that column mapping and protocol upgrades cannot be undone is read together with the project's drop-feature page and source code (dbxfe-sharing-source-dropfeature, dbxfe-sharing-source-delta-featuredeps): column mapping is droppable in general, but not while the Iceberg compatibility feature that requires it is in the table's protocol.",
       "reviewedEvidence": "Read in full in this build on 2026-09-23 from the documentation source file (raw.githubusercontent.com, HTTP 200; SHA-256 d6f2a93324d89c02876b08624604d8d677745cd2aaaa37baa8c89e1644aedbf5). Passage relied on: UniForm lets Iceberg and Hudi clients read Delta tables because all three are Parquet data files plus metadata; Iceberg metadata is generated asynchronously after the Delta commit, frequent commits may be bundled, and only one generation per format runs at a time; one copy of the data files serves all formats; delta.enableIcebergCompatV2 = true and delta.universalFormat.enabledFormats = iceberg enable it and require column mapping; converted_delta_version and converted_delta_timestamp record what was converted; Delta and Iceberg versions do not align; Iceberg clients can only read, and an external writer may destroy the Delta table; UniForm does not work with deletion vectors or the VOID type; Change Data Feed and Delta Sharing have no Iceberg support; column mapping and protocol upgrades cannot be undone."
     },
     {
@@ -156,6 +156,28 @@
       "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the URL is as supplied in the build's source list and the title unconfirmed; page body not fetched in this build (documentation host blocked by the sandbox egress proxy, HTTP 403 at CONNECT on 2026-09-23). Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: Databricks documents UniForm for Delta tables registered in Unity Catalog, with Iceberg clients reading through Unity Catalog's Iceberg REST catalog interface and Iceberg metadata generated asynchronously after Delta commits."
     },
     {
+      "id": "dbxfe-sharing-source-dropfeature",
+      "title": "Drop Delta table features (Delta Lake 4.0.0 documentation source)",
+      "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-drop-feature.md",
+      "publisher": "Delta Lake project (delta-io)",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Open-source Delta Lake documentation source at the v4.0.0 release commit: the ALTER TABLE ... DROP FEATURE procedure, which table features it can drop and how it downgrades the protocol; read beside the same release's UniForm page.",
+      "caveat": "Open-source scope only: it describes open-source Delta Lake, not Databricks-managed tables or Databricks Runtime. Its list of droppable features does not include the Iceberg compatibility features, and it does not itself say how dropping column mapping interacts with UniForm.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-drop-feature.md (tag v4.0.0): 'This feature is available in <Delta> 3.0.0 and above.' ... 'To remove a Delta table feature, you run an `ALTER TABLE <table-name> DROP FEATURE <feature-name> [TRUNCATE HISTORY]` command.' ... 'Drop support for column mapping is available in <Delta> 3.3.0 and above.' ... 'You cannot drop other' table features. The same release's UniForm page (docs/source/delta-uniform.md at that commit) says 'The table must have column mapping enabled.' and 'You cannot turn off column mapping once enabled, and upgrades to <Delta> reader and writer protocol versions cannot be undone.' The drop-feature page at commit 4d3425413c68808f9f755bc16ee4be0789aa0b34 (docs/src/content/docs/delta-drop-feature.mdx), the revision of the UniForm page this module cites, gives the same column mapping entry. Open-source scope: column mapping can be dropped by a separate two-stage procedure in general; the Iceberg compatibility features are not on the droppable list."
+    },
+    {
+      "id": "dbxfe-sharing-source-delta-featuredeps",
+      "title": "Delta Lake 4.0.0 source code: table feature dependencies and the DROP FEATURE dependency check",
+      "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/commands/alterDeltaTableCommands.scala",
+      "publisher": "Delta Lake project (delta-io)",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Open-source Delta Lake implementation at the v4.0.0 release commit: the drop-feature command's check that no other supported feature depends on the feature being dropped, read with TableFeature.scala and the error-class catalogue at the same commit.",
+      "caveat": "Open-source implementation read, not executed in this build; it shows open-source Delta Lake 4.0.0 behaviour, not Databricks Runtime or Databricks-managed tables.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/commands/alterDeltaTableCommands.scala (tag v4.0.0): '// Validate that the `removableFeature` is not a dependency of any other feature that is // enabled on the table. dependentFeatureCheck(removableFeature, protocol)' and 'val dependentFeaturesInProtocol = dependentFeatures.filter(protocol.isFeatureSupported)'; from spark/src/main/scala/org/apache/spark/sql/delta/TableFeature.scala at the same commit: 'object IcebergCompatV2TableFeature extends WriterFeature(name = \"icebergCompatV2\")' ... 'override def requiredFeatures: Set[TableFeature] = Set(ColumnMappingTableFeature)'; and from spark/src/main/resources/error/delta-error-classes.json: 'Cannot drop table feature `<feature>` because some other features (<dependentFeatures>) in this table depends on `<feature>`.' Open-source scope: DROP FEATURE refuses to drop column mapping while the icebergCompatV2 feature, which UniForm's Iceberg support uses and which is not removable, is supported in the table's protocol."
+    },
+    {
       "id": "dbxfe-sharing-source-cleanrooms",
       "title": "What is Databricks Clean Rooms?",
       "url": "https://docs.databricks.com/aws/en/clean-rooms/",
@@ -165,6 +187,28 @@
       "context": "Databricks on AWS; clean rooms for multi-party collaboration.",
       "caveat": "Title and URL unconfirmed in this build; availability by cloud and region, collaborator limits and billing change, so verify them before proposing a clean room.",
       "reviewedEvidence": "Not confirmed by search for this record: the build session's web-search budget was exhausted (200 of 200 searches) before this module was written on 2026-09-23, so the URL is as supplied in the build's source list and the title unconfirmed; page body not fetched in this build (documentation host blocked by the sandbox egress proxy, HTTP 403 at CONNECT on 2026-09-23). The SDK 0.141.0 docstrings read in this build link Databricks' clean rooms documentation (docs.databricks.com/clean-rooms/index.html), which corroborates the section but not this page's current title. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: collaborators on Unity Catalog share tables, volumes and notebooks into a secure environment on serverless compute, run approved notebooks and write results to output tables, without direct access to each other's data."
+    },
+    {
+      "id": "dbxfe-sharing-source-sdk-cleanrooms",
+      "title": "Databricks SDK for Python v0.141.0: service/cleanrooms.py (clean room task run output schemas)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/cleanrooms.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "API reference docstrings of the clean rooms client: task runs, their output schema and shared output schema, and the output catalog.",
+      "caveat": "API reference docstring generated from the API specification; interface scope only. It records that a task run's output schema can carry an expiration time; it does not state the duration, whether every output expires, or availability by cloud, region or billing.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/cleanrooms.py (tag v0.141.0): 'Expiration time of the output schema of the task run (if any), in epoch milliseconds.' Interface scope: the clean rooms API models an expiration time on a task run's output schema, so this module no longer teaches that outputs already written stay."
+    },
+    {
+      "id": "dbxfe-sharing-source-sdk-sharing",
+      "title": "Databricks SDK for Python v0.141.0: service/sharing.py (aliases of shared data objects)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/sharing.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "API reference docstrings of the sharing client: the SharedDataObject fields shared_as and string_shared_as.",
+      "caveat": "API reference docstring generated from the API specification; interface scope only. It states which alias field applies to which object type, not which object types a given recipient type can read.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/sharing.py (tag v0.141.0): 'A user-provided alias name for table-like data objects within the share. Use this field for table-like objects (for example: TABLE, VIEW, MATERIALIZED_VIEW, STREAMING_TABLE, FOREIGN_TABLE). For non-table objects (for example: VOLUME, MODEL, NOTEBOOK_FILE, FUNCTION), use ``string_shared_as`` instead.' Interface scope: shared_as is the two-part alias of table-like objects only."
     }
   ],
   "claims": [
@@ -214,7 +258,8 @@
       "description": "A share is a container of existing metastore objects, optionally under aliases; object types in the API include tables, views, materialized views, streaming tables, foreign tables, volumes, models, functions and notebook files; the share owner must keep SELECT on each shared table indefinitely and a group owner is advised; history sharing is disabled unless enabled; start_version sets the lowest queryable version; granting needs USE_SHARE and SET_SHARE_PERMISSION or ownership, and revoking a recipient needs no additional privilege; a recipient's Delta Sharing catalog is created from a provider name and share name.",
       "kind": "documented",
       "sourceIds": [
-        "dbxfe-sharing-source-sdk"
+        "dbxfe-sharing-source-sdk",
+        "dbxfe-sharing-source-sdk-sharing"
       ],
       "context": "Databricks API reference in SDK 0.141.0; which types a recipient type can read is to be verified."
     },
@@ -248,14 +293,16 @@
     },
     {
       "id": "dbxfe-sharing-claim-uniform",
-      "description": "UniForm lets Iceberg clients read a Delta table from the same Parquet files by generating Iceberg metadata asynchronously after each Delta commit, possibly bundling commits; converted_delta_version records the Delta version reflected; it is enabled by delta.enableIcebergCompatV2 and delta.universalFormat.enabledFormats, requires column mapping and irreversible protocol upgrades, is read-only for Iceberg clients, and in open-source Delta does not work with deletion vectors.",
+      "description": "UniForm lets Iceberg clients read a Delta table from the same Parquet files by generating Iceberg metadata asynchronously after each Delta commit, possibly bundling commits; converted_delta_version records the Delta version reflected; it is enabled by delta.enableIcebergCompatV2 and delta.universalFormat.enabledFormats, requires column mapping and a reader and writer protocol upgrade that the UniForm page says cannot be undone; the separate DROP FEATURE procedure lists column mapping as droppable from Delta 3.3.0 but not the Iceberg compatibility feature that requires it; it is read-only for Iceberg clients, and in open-source Delta does not work with deletion vectors.",
       "kind": "documented",
       "sourceIds": [
         "dbxfe-sharing-source-uniform",
         "dbxfe-sharing-source-deltaprotocol",
-        "dbxfe-sharing-source-uniformdbx"
+        "dbxfe-sharing-source-uniformdbx",
+        "dbxfe-sharing-source-dropfeature",
+        "dbxfe-sharing-source-delta-featuredeps"
       ],
-      "context": "Open-source Delta Lake documentation and protocol read 2026-09-23; Databricks-specific requirements to be verified."
+      "context": "Open-source Delta Lake documentation and protocol read 2026-09-23; drop-feature page and source code at v4.0.0 read 2026-09-25; Databricks-specific requirements to be verified."
     },
     {
       "id": "dbxfe-sharing-claim-iceberg",
@@ -282,7 +329,8 @@
       "kind": "documented",
       "sourceIds": [
         "dbxfe-sharing-source-sdk",
-        "dbxfe-sharing-source-cleanrooms"
+        "dbxfe-sharing-source-cleanrooms",
+        "dbxfe-sharing-source-sdk-cleanrooms"
       ],
       "context": "Databricks API reference in SDK 0.141.0; availability by cloud, region and billing to be verified."
     },
@@ -2404,7 +2452,7 @@
       "title": "Six questions, then a decision per direction",
       "alt": "Two states: a comparison table of copy, governed share, federation and clean room across what moves, who enforces, who pays in kind, revocation, freshness and failure; then a decision table mapping conditions to the pattern to choose.",
       "caption": "Compare every pattern on the same six questions, then decide per direction from conditions, not product names. Synthetic teaching example.",
-      "textEquivalent": "Six questions, four patterns: The same six questions answered for every pattern, including freshness, cost, revocation and failure. Columns: Question | Copy | Governed share | Federation | Clean room. Rows: What moves | Full copy to them | Files per read; nothing copied by provider | Rows per query to the querier | Assets in; outputs out; Who enforces | The holder | Sharing server per request | Source credential and Unity Catalog grants | Review and runner list; Who pays, in kind | Export effort; their storage | Provider storage and transfer; their compute | Source load; querier's compute | Serverless runs; reviews; Revocation | Impossible | Next request fails; issued URLs expire | Source disables the credential | Remove assets; outputs stay; Freshness | As of the export | Current version per read | Live per query | As of each run; Failure | Silent gap | Visible read error | Query fails; source slows | Run fails; no output.\n\nDecide per direction: Conditions, not product names, select the pattern. Columns: Condition | Choose. Rows: They may see the rows and access must be withdrawable | Governed share; You need their rows live and they accept query load | Federation; You query it daily, need history, or they refuse load | Ingest a copy; Neither may see the other's rows; both on Unity Catalog | Clean room; No tooling reads a share and withdrawal is not required | Copy with retention terms.",
+      "textEquivalent": "Six questions, four patterns: The same six questions answered for every pattern, including freshness, cost, revocation and failure. Columns: Question | Copy | Governed share | Federation | Clean room. Rows: What moves | Full copy to them | Files per read; nothing copied by provider | Rows per query to the querier | Assets in; outputs out; Who enforces | The holder | Sharing server per request | Source credential and Unity Catalog grants | Review and runner list; Who pays, in kind | Export effort; their storage | Provider storage and transfer; their compute | Source load; querier's compute | Serverless runs; reviews; Revocation | Impossible | Next request fails; issued URLs expire | Source disables the credential | Remove assets; copied outputs stay; Freshness | As of the export | Current version per read | Live per query | As of each run; Failure | Silent gap | Visible read error | Query fails; source slows | Run fails; no output.\n\nDecide per direction: Conditions, not product names, select the pattern. Columns: Condition | Choose. Rows: They may see the rows and access must be withdrawable | Governed share; You need their rows live and they accept query load | Federation; You query it daily, need history, or they refuse load | Ingest a copy; Neither may see the other's rows; both on Unity Catalog | Clean room; No tooling reads a share and withdrawal is not required | Copy with retention terms.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-sharing-claim-protocol",
@@ -2455,7 +2503,7 @@
                 "Impossible",
                 "Next request fails; issued URLs expire",
                 "Source disables the credential",
-                "Remove assets; outputs stay"
+                "Remove assets; copied outputs stay"
               ],
               [
                 "Freshness",
@@ -2861,7 +2909,7 @@
         {
           "id": "dbxfe-sharing-uniform-question-c",
           "text": "Whether column mapping was switched off.",
-          "rationale": "Column mapping cannot be turned off once enabled, and it does not change row counts."
+          "rationale": "UniForm requires column mapping, so it stays on while UniForm is enabled, and it does not change row counts."
         },
         {
           "id": "dbxfe-sharing-uniform-question-d",
@@ -3054,7 +3102,7 @@
     },
     {
       "id": "dbxfe-sharing-objects",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "A share lists objects; a grant decides which recipient reads them",
       "outcome": "Set up a share, a recipient and a grant, and diagnose a failure caused by the share owner's privileges.",
       "explanation": "A [[dbxfe-sharing-share-concept|share]] is a container in Cinderline's metastore listing existing objects, here one view of line 2 coated-part defects. A [[dbxfe-sharing-recipient-concept|recipient]] represents Halvern, and a grant of SELECT on the share connects them. The API reference adds a dependency: the share owner must keep SELECT on every shared table, so a group should own the share. Notice in the second state that listing still works while the view reads as permission denied.",
@@ -3076,13 +3124,13 @@
       ],
       "hint": "Listing works, so the token and network are fine; look at what the object itself depends on.",
       "handbook": {
-        "markdown": "The objects live in Cinderline's Unity Catalog metastore. In SQL, as the author recalled it from the Databricks documentation (confirm against the current SQL reference):\n\n```sql\nCREATE SHARE IF NOT EXISTS halvern_line2_quality\n  COMMENT 'Line 2 coated-part defects for Halvern Coatings';\nALTER SHARE halvern_line2_quality\n  ADD VIEW quality.share.line2_coated_defects_by_batch;\nALTER SHARE halvern_line2_quality OWNER TO `quality-sharing-owners`;\nCREATE RECIPIENT IF NOT EXISTS halvern_coatings;\nGRANT SELECT ON SHARE halvern_line2_quality TO RECIPIENT halvern_coatings;\nSHOW GRANTS ON SHARE halvern_line2_quality;\n```\n\nThe same operations exist in the REST API that the Databricks SDK wraps: `shares.create`, `shares.update` with a list of object updates (ADD, REMOVE, UPDATE) and `shares.update_permissions` with a principal and the privileges to add or remove. The API reference states the rules that decide failures. Creating a share needs `CREATE_SHARE` on the metastore and creating a recipient needs `CREATE_RECIPIENT`. Granting a share to a recipient needs `USE_SHARE` and `SET_SHARE_PERMISSION`, or ownership of the share, plus ownership of the recipient; removing a recipient's grant does not need that recipient ownership. Each shared object can be exposed under an alias (`shared_as`, a two-part schema.table name) and reports a status, `ACTIVE` or `PERMISSION_DENIED`.\n\nThe dependency that surprises teams: for every table added, the share owner must also have `SELECT`, and must keep it indefinitely for recipients to keep reading. The API reference advises a group as the share owner. Object types beyond tables appear in the API (views, materialized views, streaming tables, foreign tables, volumes, models, functions, notebook files); which of them a given recipient type can read is a question for the current documentation, not an assumption. When a recipient reports a failure on one object while listing works, inspect that object's status in the share and the owner's current privileges.",
+        "markdown": "The objects live in Cinderline's Unity Catalog metastore. In SQL, as the author recalled it from the Databricks documentation (confirm against the current SQL reference):\n\n```sql\nCREATE SHARE IF NOT EXISTS halvern_line2_quality\n  COMMENT 'Line 2 coated-part defects for Halvern Coatings';\nALTER SHARE halvern_line2_quality\n  ADD VIEW quality.share.line2_coated_defects_by_batch;\nALTER SHARE halvern_line2_quality OWNER TO `quality-sharing-owners`;\nCREATE RECIPIENT IF NOT EXISTS halvern_coatings;\nGRANT SELECT ON SHARE halvern_line2_quality TO RECIPIENT halvern_coatings;\nSHOW GRANTS ON SHARE halvern_line2_quality;\n```\n\nThe same operations exist in the REST API that the Databricks SDK wraps: `shares.create`, `shares.update` with a list of object updates (ADD, REMOVE, UPDATE) and `shares.update_permissions` with a principal and the privileges to add or remove. The API reference states the rules that decide failures. Creating a share needs `CREATE_SHARE` on the metastore and creating a recipient needs `CREATE_RECIPIENT`. Granting a share to a recipient needs `USE_SHARE` and `SET_SHARE_PERMISSION`, or ownership of the share, plus ownership of the recipient; removing a recipient's grant does not need that recipient ownership. Each table-like shared object can be exposed under an alias (`shared_as`, a two-part schema.table name), and each shared object reports a status, `ACTIVE` or `PERMISSION_DENIED`.\n\nThe dependency that surprises teams: for every table added, the share owner must also have `SELECT`, and must keep it indefinitely for recipients to keep reading. The API reference advises a group as the share owner. Object types beyond tables appear in the API (views, materialized views, streaming tables, foreign tables, volumes, models, functions, notebook files); which of them a given recipient type can read is a question for the current documentation, not an assumption. When a recipient reports a failure on one object while listing works, inspect that object's status in the share and the owner's current privileges.",
         "sourceSectionIds": [
           "dbxfe-sharing-l01-sharing"
         ]
       },
       "recap": "Grant SELECT on the share to the recipient, and let a group own the share so reads survive staff changes.",
-      "changeNote": "New academy beat.",
+      "changeNote": "The handbook now says only table-like objects take a shared_as alias, while other objects use string_shared_as. Source: the Databricks SDK for Python v0.141.0 sharing API reference (service/sharing.py).",
       "mediaIds": []
     },
     {
@@ -3345,7 +3393,7 @@
     },
     {
       "id": "dbxfe-sharing-uniform",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "UniForm writes Iceberg metadata over the same Parquet files",
       "outcome": "Explain how UniForm serves Iceberg readers from the same files, and its lag and limits.",
       "explanation": "Delta Lake, Iceberg and Hudi tables are all Parquet files plus metadata. With [[dbxfe-sharing-uniform-concept|UniForm]] enabled, a Delta commit completes as usual, then Iceberg metadata for the same files is generated asynchronously, so one copy of the data serves both kinds of reader. The Iceberg view can lag, and frequent commits may be bundled. Notice in the first state that the Iceberg snapshot still reflects version 11, recorded in converted_delta_version, and in the second that an Iceberg writer stays excluded.",
@@ -3369,13 +3417,13 @@
         "dbxfe-sharing-uniform-question"
       ],
       "handbook": {
-        "markdown": "UniForm is a Delta Lake table setting, documented in the Delta Lake project's UniForm page (open source, read for this module) and by Databricks for Unity Catalog tables (confirm the current Databricks page and runtime before enabling):\n\n```sql\nALTER TABLE quality.gold.defects SET TBLPROPERTIES (\n  'delta.enableIcebergCompatV2' = 'true',\n  'delta.universalFormat.enabledFormats' = 'iceberg');\n```\n\nWhat it does: after each Delta commit, the same compute generates Iceberg metadata that points at the same Parquet files, so one copy of the data serves both. Frequent commits may be bundled into one Iceberg commit, and while one generation is running a further commit does not start another. Iceberg metadata records `converted_delta_version` and `converted_delta_timestamp`; Delta and Iceberg version numbers do not align, so compare through those properties.\n\nWhat it requires and changes: the Iceberg compatibility table feature requires column mapping (name or id mode) and upgrades the table's reader and writer protocol; column mapping cannot be turned off and the protocol upgrade cannot be undone, so every existing reader and writer must support them. The open-source documentation says UniForm does not work with deletion vectors enabled (a REORG upgrade purges them) and does not support the VOID type. Change Data Feed and Delta Sharing are Delta features with no Iceberg equivalent.\n\nThe limit that matters most: Iceberg clients may only read. The open-source page warns that an external Iceberg writer could perform cleanup Delta does not know about and destroy the table, so keep write access for Iceberg engines out of the design.\n\nA sharing interaction worth knowing: column mapping raises the table's reader version, and the sharing protocol reads such tables through its delta response format, so an open-sharing recipient whose client cannot request that format may fail on the table once UniForm is enabled. Test the recipient's client first.",
+        "markdown": "UniForm is a Delta Lake table setting, documented in the Delta Lake project's UniForm page (open source, read for this module) and by Databricks for Unity Catalog tables (confirm the current Databricks page and runtime before enabling):\n\n```sql\nALTER TABLE quality.gold.defects SET TBLPROPERTIES (\n  'delta.enableIcebergCompatV2' = 'true',\n  'delta.universalFormat.enabledFormats' = 'iceberg');\n```\n\nWhat it does: after each Delta commit, the same compute generates Iceberg metadata that points at the same Parquet files, so one copy of the data serves both. Frequent commits may be bundled into one Iceberg commit, and while one generation is running a further commit does not start another. Iceberg metadata records `converted_delta_version` and `converted_delta_timestamp`; Delta and Iceberg version numbers do not align, so compare through those properties.\n\nWhat it requires and changes: the Iceberg compatibility table feature requires column mapping (name or id mode) and upgrades the table's reader and writer protocol, so every existing reader and writer must support them before you enable it. Plan it as one-way. The UniForm page says column mapping cannot be turned off and the protocol upgrade cannot be undone. The project's drop-feature page does describe a separate `ALTER TABLE ... DROP FEATURE` procedure that can drop column mapping from Delta 3.3.0, but the Iceberg compatibility feature is not on its list, and the open-source code refuses to drop a feature that another feature still in the table's protocol requires. The open-source documentation says UniForm does not work with deletion vectors enabled (a REORG upgrade purges them) and does not support the VOID type. Change Data Feed and Delta Sharing are Delta features with no Iceberg equivalent.\n\nThe limit that matters most: Iceberg clients may only read. The open-source page warns that an external Iceberg writer could perform cleanup Delta does not know about and destroy the table, so keep write access for Iceberg engines out of the design.\n\nA sharing interaction worth knowing: column mapping raises the table's reader version, and the sharing protocol reads such tables through its delta response format, so an open-sharing recipient whose client cannot request that format may fail on the table once UniForm is enabled. Test the recipient's client first.",
         "sourceSectionIds": [
           "dbxfe-sharing-l01-formats"
         ]
       },
       "recap": "UniForm adds Iceberg metadata to the same files, a version or two behind, and Iceberg clients only read.",
-      "changeNote": "New academy beat.",
+      "changeNote": "The handbook now notes that open-source Delta Lake's separate DROP FEATURE procedure can remove column mapping in general, but not while UniForm's Iceberg compatibility feature is in the table's protocol, so UniForm is still taught as one-way; one check's feedback now says the same. Sources: the open-source Delta Lake 4.0.0 drop-feature page and source code.",
       "mediaIds": []
     },
     {
@@ -3413,7 +3461,7 @@
     },
     {
       "id": "dbxfe-sharing-cleanroom",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "A clean room shares computation and outputs, not rows",
       "outcome": "Decide when a clean room fits and design its outputs so no row-level record leaves.",
       "explanation": "When neither party may see the other's rows, a [[dbxfe-sharing-cleanroom-concept|clean room]] shares computation instead. Built on the sharing layer and serverless compute, it lets each collaborator add tables, views or volumes; notebooks are reviewed and run only by named collaborators, and results land in an output catalog. What leaves is whatever the approved notebook writes. Every collaborator is identified by a Unity Catalog metastore, so both need one. Notice which boxes each side can open, and which output would leak.",
@@ -3437,18 +3485,18 @@
         "dbxfe-sharing-cleanroom-self"
       ],
       "handbook": {
-        "markdown": "The Databricks API reference is the verified source here: \"A clean room uses Delta Sharing and serverless compute to provide a secure and privacy-protecting environment where multiple parties can work together on sensitive enterprise data without direct access to each other's data.\" Its objects show how the boundary works.\n\n- Collaborators are identified by a Unity Catalog global metastore identifier and an alias, so each party needs a Unity Catalog metastore. A central clean room has a cloud and a region, and can carry an egress network policy.\n- Assets are tables, views, volumes, foreign tables, notebooks and JAR analyses shared into the room. As with shares, the clean room owner must keep enough privilege on each asset indefinitely, and a group owner is advised.\n- Notebooks carry reviews in the states APPROVED, PENDING and REJECTED, and a list of collaborators allowed to run them.\n- Runs are task runs on serverless compute; results go to an output catalog.\n- Deleting a clean room leaves it in the other collaborators' metastores in a deleted state until they delete it too.\n\nDesign rules that follow. The exit is the output, so review what the notebook writes: aggregated columns, a minimum group size both parties agree (suppressing groups under 20 is a synthetic example), no identifiers. Approval is the control, so name reviewers on both sides and re-review after any change. Freshness is as of each run; revocation is removing assets or deleting the room, and outputs already written stay with whoever received them.\n\nWhere supported: availability by cloud and region, the number of collaborators and billing must be checked on the current Databricks pages before a clean room is proposed. If either party lacks a Unity Catalog metastore the pattern is unavailable, and the choice falls back to what each side may see: an aggregated share, or no collaboration.",
+        "markdown": "The Databricks API reference is the verified source here: \"A clean room uses Delta Sharing and serverless compute to provide a secure and privacy-protecting environment where multiple parties can work together on sensitive enterprise data without direct access to each other's data.\" Its objects show how the boundary works.\n\n- Collaborators are identified by a Unity Catalog global metastore identifier and an alias, so each party needs a Unity Catalog metastore. A central clean room has a cloud and a region, and can carry an egress network policy.\n- Assets are tables, views, volumes, foreign tables, notebooks and JAR analyses shared into the room. As with shares, the clean room owner must keep enough privilege on each asset indefinitely, and a group owner is advised.\n- Notebooks carry reviews in the states APPROVED, PENDING and REJECTED, and a list of collaborators allowed to run them.\n- Runs are task runs on serverless compute; results go to an output catalog.\n- Deleting a clean room leaves it in the other collaborators' metastores in a deleted state until they delete it too.\n\nDesign rules that follow. The exit is the output, so review what the notebook writes: aggregated columns, a minimum group size both parties agree (suppressing groups under 20 is a synthetic example), no identifiers. Approval is the control, so name reviewers on both sides and re-review after any change. Freshness is as of each run; revocation is removing assets or deleting the room, and neither recalls what a collaborator has already copied from an output. What a run leaves in its output schema, unlike those copies, may not last: the API reference records an expiration time for a task run's output schema, where one is set.\n\nWhere supported: availability by cloud and region, the number of collaborators and billing must be checked on the current Databricks pages before a clean room is proposed. If either party lacks a Unity Catalog metastore the pattern is unavailable, and the choice falls back to what each side may see: an aggregated share, or no collaboration.",
         "sourceSectionIds": [
           "dbxfe-sharing-l01-cleanrooms"
         ]
       },
       "recap": "A clean room releases only what the approved notebook writes, and needs every collaborator on Unity Catalog.",
-      "changeNote": "New academy beat.",
+      "changeNote": "The handbook no longer says clean room outputs stay for good: removing assets or deleting the room does not recall copies a collaborator made, and a run's output schema can carry an expiration time. Source: the Databricks SDK for Python v0.141.0 clean rooms API reference (service/cleanrooms.py).",
       "mediaIds": []
     },
     {
       "id": "dbxfe-sharing-decide",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "Compare on the same six questions, then decide per direction",
       "outcome": "Compare all patterns on six questions and record a conditional decision per direction.",
       "explanation": "Put copy, governed share, federation and clean room in one table and answer the same six questions: what moves, who enforces, who pays in kind, how revocation works, how fresh the view is, how it fails. Then decide each direction separately, attach conditions, and rehearse [[dbxfe-sharing-revocation-concept|revocation]] before the first real read. Notice that failures differ in visibility, since a copy fails silently, and that the decision table's rows are conditions, not product names.",
@@ -3477,7 +3525,7 @@
         ]
       },
       "recap": "Same six questions for every pattern, a decision per direction, and a timed revocation rehearsal.",
-      "changeNote": "New academy beat.",
+      "changeNote": "The comparison table's clean-room revocation cell now says copied outputs stay, rather than all outputs, because a run's output schema can carry an expiration time. Source: the Databricks SDK for Python v0.141.0 clean rooms API reference (service/cleanrooms.py).",
       "mediaIds": []
     }
   ],
@@ -3629,7 +3677,7 @@
   "appliedTask": {
     "title": "One supplier, two needs, two patterns",
     "prompt": "Pellmark Polymers, a fictional seal supplier, runs Databricks with Unity Catalog in another cloud region. It wants Cinderline's line 4 rejected-seal inspections each morning, with 30 days of history so it can compare today with any earlier day. Separately, both companies want to correlate Cinderline's warranty returns with Pellmark's compound batches, but neither may see the other's row-level records. Choose a pattern for each need, and for each give the setup, freshness, revocation steps and what remains afterwards, who pays in kind, the failure each side would see, and what you would mark unknown.",
-    "modelAnswer": "Need 1, a Databricks-to-Databricks share. Pellmark sends its sharing identifier and Cinderline creates recipient pellmark_polymers from it, so no token exists. A purpose-built table of line 4 rejected-seal inspections without inspector identity goes into share pellmark_seals, owned by a group that keeps SELECT, with history sharing enabled and a start version set at the version from 30 days before sharing begins, so comparisons reach back a month from day one; the table's own retention settings must keep the files of every version Pellmark may query. Pellmark creates a catalog from the share and grants its analysts. Freshness: the latest version at each read, with time travel inside the window. Cost in kind: Cinderline's storage serves cross-region reads (transfer charges unknown); Pellmark pays its compute. Revocation: revoke SELECT on the share; Pellmark's next query fails; tables Pellmark wrote from it remain under the agreement. Failure: the owner group losing SELECT reads as permission denied; a table feature Pellmark's runtime cannot read fails its queries. Need 2, a clean room, if available in both clouds and regions: each side adds its table, a notebook reviewed by both writes monthly return rates per compound batch above an agreed minimum group size to the output catalog. Freshness: as of each run. Revocation: remove assets or delete the room; outputs already written stay. Unknown: clean room availability and billing, cross-region transfer charges, the legal agreement.",
+    "modelAnswer": "Need 1, a Databricks-to-Databricks share. Pellmark sends its sharing identifier and Cinderline creates recipient pellmark_polymers from it, so no token exists. A purpose-built table of line 4 rejected-seal inspections without inspector identity goes into share pellmark_seals, owned by a group that keeps SELECT, with history sharing enabled and a start version set at the version from 30 days before sharing begins, so comparisons reach back a month from day one; the table's own retention settings must keep the files of every version Pellmark may query. Pellmark creates a catalog from the share and grants its analysts. Freshness: the latest version at each read, with time travel inside the window. Cost in kind: Cinderline's storage serves cross-region reads (transfer charges unknown); Pellmark pays its compute. Revocation: revoke SELECT on the share; Pellmark's next query fails; tables Pellmark wrote from it remain under the agreement. Failure: the owner group losing SELECT reads as permission denied; a table feature Pellmark's runtime cannot read fails its queries. Need 2, a clean room, if available in both clouds and regions: each side adds its table, a notebook reviewed by both writes monthly return rates per compound batch above an agreed minimum group size to the output catalog. Freshness: as of each run. Revocation: remove assets or delete the room; outputs either side already copied stay, and a run's output schema can carry its own expiration time. Unknown: clean room availability and billing, cross-region transfer charges, the legal agreement.",
     "reasoning": "Each need is matched to its binding constraint: Pellmark may see the inspection rows and runs Unity Catalog, so a token-free share with history fits; neither side may see the other's warranty or batch rows, so only a clean room fits, conditionally. Every answer follows the six questions and turns availability and billing into verification items.",
     "beatIds": [
       "dbxfe-sharing-modes",

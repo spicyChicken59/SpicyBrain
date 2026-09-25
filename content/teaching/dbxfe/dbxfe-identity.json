@@ -42,7 +42,7 @@
       "publishedAt": "2026-09-23",
       "context": "How one Databricks client authenticates: personal access tokens (pat), OAuth machine-to-machine (oauth-m2m), OAuth user-to-machine through a browser (external-browser) and OIDC token exchange for federated workloads; oauth.py and oidc.py at the same tag hold the token requests.",
       "caveat": "Client behaviour of one SDK version; the CLI, Terraform and drivers implement the same flows separately, and token lifetimes are decided by the server, not by this code.",
-      "reviewedEvidence": "File read in full on 2026-09-23 from the tagged raw URL, which this build can reach although the documentation host is blocked; its SHA-256 matches the same file inside the databricks-sdk 0.141.0 wheel published on PyPI that day. The companion files oauth.py and oidc.py at the same tag were also read in full and matched the wheel. Passages relied on: the oauth-m2m strategy needs host, client_id and client_secret, discovers endpoints at /oidc/.well-known/oauth-authorization-server, requests a token with grant_type client_credentials from /oidc/v1/token and adds the refreshed bearer token to every request; tokens are refreshed 40 seconds before expiry; scopes default to all-apis, and offline_access only controls whether a refresh token is issued; the external-browser strategy defaults to the databricks-cli client ID, runs an authorization-code flow with a PKCE S256 challenge and a redirect to http://localhost:8020, and caches tokens under ~/.config/databricks-sdk-py/oauth; the pat strategy needs host and token; OIDC federation exchanges a workload's JWT with the token-exchange grant, authenticating as a service principal when a client ID is given, and uses no rotatable secret; token and client_secret are marked sensitive and print as *** in the configuration debug string."
+      "reviewedEvidence": "File read in full on 2026-09-23 from the tagged raw URL, which this build can reach although the documentation host is blocked; its SHA-256 matches the same file inside the databricks-sdk 0.141.0 wheel published on PyPI that day. The companion files oauth.py and oidc.py at the same tag were also read in full and matched the wheel. Passages relied on: the oauth-m2m strategy needs host, client_id and client_secret, discovers endpoints at /oidc/.well-known/oauth-authorization-server, requests a token with grant_type client_credentials from /oidc/v1/token and adds the refreshed bearer token to every request; by default a token is refreshed in the background once stale (at most 20 minutes before expiry) and a request within 40 seconds of expiry waits for a new one (this timing corrected on 2026-09-25 after re-reading oauth.py at commit 9df82c7, record dbxfe-identity-source-sdk-oauth-refresh); scopes default to all-apis, and offline_access only controls whether a refresh token is issued; the external-browser strategy defaults to the databricks-cli client ID, runs an authorization-code flow with a PKCE S256 challenge and a redirect to http://localhost:8020, and caches tokens under ~/.config/databricks-sdk-py/oauth; the pat strategy needs host and token; OIDC federation exchanges a workload's JWT with the token-exchange grant, authenticating as a service principal when a client ID is given, and uses no rotatable secret; token and client_secret are marked sensitive and print as *** in the configuration debug string."
     },
     {
       "id": "dbxfe-identity-source-sdk-oauth2",
@@ -241,6 +241,28 @@
       "context": "Databricks on AWS; Unity Catalog row filters and column masks applied to tables.",
       "caveat": "Supported compute, runtimes and access paths have explicit limits; a mask is a query-time control, not encryption.",
       "reviewedEvidence": "Reused from the retained Unity Catalog module's source record for this URL, title and publisher (dbxfe-m06-source-masks, reviewed 2026-09-20 in the earlier release); not re-confirmed in this build session, whose web-search allowance was used up and whose sandbox blocks the documentation host. Passage relied on, as recorded there: column masks are query-time functions returning original or masked column values, row filters restrict returned rows, and supported access paths and runtimes have explicit limits. The is_account_group_member pattern mentioned in this module is recalled from the same page and is marked as not re-confirmed where it is used."
+    },
+    {
+      "id": "dbxfe-identity-source-sdk-system-schemas",
+      "title": "Databricks SDK for Python v0.141.0: service/catalog.py, SystemSchemasAPI (who may enable a system schema)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/catalog.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "The system schemas API of the Unity Catalog client: enable, disable and list system schemas per metastore, with the caller each operation requires.",
+      "caveat": "API reference docstring generated from the API specification; interface scope only. It states who may call the enable operation, not which schemas an account has enabled, their release status or regional availability.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/catalog.py (tag v0.141.0): 'Enables the system schema and adds it to the system catalog. The caller must be an account admin or a metastore admin.' Interface scope: the SDK's API reference names the caller the enable operation requires; the provider page for databricks_system_schema at v1.133.0 names only the account admin, so both routes are stated where this module says who enables a system schema."
+    },
+    {
+      "id": "dbxfe-identity-source-sdk-oauth-refresh",
+      "title": "Databricks SDK for Python v0.141.0: oauth.py, Token and Refreshable (when an OAuth token is refreshed)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/oauth.py",
+      "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Client-side refresh of OAuth tokens in the SDK's token sources, which the oauth-m2m strategy uses: when a cached token counts as stale or expired, and whether a request waits for the new token.",
+      "caveat": "Client code of one SDK version, so it supports how this SDK behaves, not the server's token lifetimes or the CLI, Terraform and drivers, which implement refresh separately.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/oauth.py (tag v0.141.0): '# Azure Databricks rejects tokens that expire in 30 seconds or less, # so we refresh the token 40 seconds before it expires.' ... '_MAX_STALE_DURATION = timedelta(minutes=20)' ... 'stale_period = min(TTL x 0.5, max_stale_duration)' ... 'If the token is stale, triggers an asynchronous refresh. If the token is expired, refreshes it synchronously, blocking until the refresh is complete.' The oauth-m2m strategy in credentials_provider.py at the same commit passes 'disable_async=cfg.disable_async_token_refresh,', and config.py returns None for that attribute unless DATABRICKS_DISABLE_ASYNC_TOKEN_REFRESH or the configuration sets it, so asynchronous refresh is the default. The same three files inside the databricks-sdk 0.141.0 wheel from PyPI are byte-identical; an offline run of that wheel's token source on 2026-09-25 marked a one-hour token stale 20 minutes before expiry and refreshed it in the background. Scope: client implementation of one SDK version."
     }
   ],
   "claims": [
@@ -289,7 +311,8 @@
       "kind": "documented",
       "sourceIds": [
         "dbxfe-identity-source-sdk-auth",
-        "dbxfe-identity-source-tf-auth"
+        "dbxfe-identity-source-tf-auth",
+        "dbxfe-identity-source-sdk-oauth-refresh"
       ],
       "context": "OAuth M2M on account and workspace APIs, all clouds."
     },
@@ -370,13 +393,14 @@
     },
     {
       "id": "dbxfe-identity-claim-audit",
-      "description": "The audit log system table system.access.audit records account and workspace events with event time, workspace, service and action names, the acting identity, request parameters, source IP address, user agent and response; system schemas, including access, are enabled by an account admin; on AWS, audit logs can also be delivered as JSON files to the account's S3 bucket, available within 15 minutes of activation, with new files every few minutes and occasional later arrivals.",
+      "description": "The audit log system table system.access.audit records account and workspace events with event time, workspace, service and action names, the acting identity, request parameters, source IP address, user agent and response; system schemas, including access, are enabled by an account admin or a metastore admin; on AWS, audit logs can also be delivered as JSON files to the account's S3 bucket, available within 15 minutes of activation, with new files every few minutes and occasional later arrivals.",
       "kind": "documented",
       "sourceIds": [
         "dbxfe-identity-source-doc-audit",
         "dbxfe-identity-source-tf-system-schema",
         "dbxfe-identity-source-sdk-catalog",
-        "dbxfe-identity-source-tf-log-delivery"
+        "dbxfe-identity-source-tf-log-delivery",
+        "dbxfe-identity-source-sdk-system-schemas"
       ],
       "context": "System tables and log delivery; coverage and delay change, and the system-table column names were not re-read in this build."
     },
@@ -426,11 +450,12 @@
     },
     {
       "id": "dbxfe-identity-claim-ext-system-schema",
-      "description": "System tables are a Databricks-hosted store of the account's operational data that an account admin must enable schema by schema; enablement is identified per metastore and schema; some schemas are enabled automatically and some cannot be disabled; system schemas live in the system catalog.",
+      "description": "System tables are a Databricks-hosted store of the account's operational data that an account admin or a metastore admin must enable schema by schema; enablement is identified per metastore and schema; some schemas are enabled automatically and some cannot be disabled; system schemas live in the system catalog.",
       "kind": "documented",
       "sourceIds": [
         "dbxfe-identity-source-tf-system-schema",
-        "dbxfe-identity-source-sdk-catalog"
+        "dbxfe-identity-source-sdk-catalog",
+        "dbxfe-identity-source-sdk-system-schemas"
       ],
       "context": "System schema enablement."
     }
@@ -773,11 +798,12 @@
         "system.access",
         "enable system tables"
       ],
-      "definition": "The account-admin action that makes a system schema such as access available in a metastore before any of its tables can be queried.",
+      "definition": "The action, taken by an account admin or a metastore admin, that makes a system schema such as access available in a metastore before any of its tables can be queried.",
       "example": "Until the access schema is enabled, system.access.audit cannot be queried in Cinderline's metastore.",
       "sourceIds": [
         "dbxfe-identity-source-tf-system-schema",
-        "dbxfe-identity-source-sdk-catalog"
+        "dbxfe-identity-source-sdk-catalog",
+        "dbxfe-identity-source-sdk-system-schemas"
       ]
     }
   ],
@@ -3644,7 +3670,7 @@
     },
     {
       "id": "dbxfe-identity-m2m",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "M2M trades a service principal's secret for a short-lived token",
       "outcome": "Describe the OAuth client-credentials exchange a service principal performs and locate the two places it can fail.",
       "explanation": "In [[dbxfe-identity-m2m-concept|OAuth machine-to-machine (M2M)]] authentication, the caller sends the service principal's client ID, which is its application ID, and an OAuth secret to the Databricks token endpoint. It receives an access token with an expiry and sends that token as a bearer header on each API call; the SDK refreshes it shortly before it expires. Notice the two failure points in the diagram: a wrong or expired secret fails at the token endpoint, while a valid token without a grant fails later, at Unity Catalog.",
@@ -3672,13 +3698,13 @@
       ],
       "hint": "Ask whether the failing request ever received a token.",
       "handbook": {
-        "markdown": "**The exchange.** The SDK's oauth-m2m strategy needs a host, a client ID and a client secret. It discovers endpoints at `/oidc/.well-known/oauth-authorization-server`, posts `grant_type=client_credentials` to the token endpoint (`/oidc/v1/token`) with the scope `all-apis` unless configured otherwise, and adds `Authorization: Bearer <token>` to every request, refreshing the token 40 seconds before its expiry.\n\n```python\n# Synthetic teaching example; not executed. The runner injects the variables.\nimport os\nfrom databricks.sdk import WorkspaceClient\nw = WorkspaceClient(\n    host=os.environ[\"DATABRICKS_HOST\"],\n    client_id=os.environ[\"DATABRICKS_CLIENT_ID\"],          # sp-nightly-ingest's application ID\n    client_secret=os.environ[\"DATABRICKS_CLIENT_SECRET\"],  # never written in code or notebooks\n)\n```\n\nThe SDK marks the secret as sensitive, so its configuration debug output prints `***` instead of the value.\n\n**Secrets have lifetimes.** Administrators create OAuth secrets for a service principal; the provider documents a default lifetime of 730 days when none is set, and every secret reports its creation time, expiry time and status. A script that worked for two years and then fails at the token request is the expected symptom of a lapsed secret. Rotate by creating a second secret, switching the workload, confirming it, then deleting the first.\n\n**Credential scope.** The scope bounds which APIs a token is issued for; the grants bound which data the principal reaches. Neither replaces the other, and neither is widened to fix a refusal from the other.\n\n**Two failure points.** Authentication errors arrive before any object is named: check the secret, its status and the host. PERMISSION_DENIED naming a privilege arrives after authentication succeeded: check the principal's grants, not the secret.",
+        "markdown": "**The exchange.** The SDK's oauth-m2m strategy needs a host, a client ID and a client secret. It discovers endpoints at `/oidc/.well-known/oauth-authorization-server`, posts `grant_type=client_credentials` to the token endpoint (`/oidc/v1/token`) with the scope `all-apis` unless configured otherwise, and adds `Authorization: Bearer <token>` to every request. It refreshes the token before it expires: by default, a request in the token's final 20 minutes (the final half of a token issued for under 40 minutes) starts a background refresh, and a request within 40 seconds of expiry waits for a new token.\n\n```python\n# Synthetic teaching example; not executed. The runner injects the variables.\nimport os\nfrom databricks.sdk import WorkspaceClient\nw = WorkspaceClient(\n    host=os.environ[\"DATABRICKS_HOST\"],\n    client_id=os.environ[\"DATABRICKS_CLIENT_ID\"],          # sp-nightly-ingest's application ID\n    client_secret=os.environ[\"DATABRICKS_CLIENT_SECRET\"],  # never written in code or notebooks\n)\n```\n\nThe SDK marks the secret as sensitive, so its configuration debug output prints `***` instead of the value.\n\n**Secrets have lifetimes.** Administrators create OAuth secrets for a service principal; the provider documents a default lifetime of 730 days when none is set, and every secret reports its creation time, expiry time and status. A script that worked for two years and then fails at the token request is the expected symptom of a lapsed secret. Rotate by creating a second secret, switching the workload, confirming it, then deleting the first.\n\n**Credential scope.** The scope bounds which APIs a token is issued for; the grants bound which data the principal reaches. Neither replaces the other, and neither is widened to fix a refusal from the other.\n\n**Two failure points.** Authentication errors arrive before any object is named: check the secret, its status and the host. PERMISSION_DENIED naming a privilege arrives after authentication succeeded: check the principal's grants, not the secret.",
         "sourceSectionIds": [
           "dbxfe-identity-l01-oauth"
         ]
       },
       "recap": "Client ID plus secret buys a bearer token; a bad secret fails early, a missing grant fails late.",
-      "changeNote": "New academy beat.",
+      "changeNote": "We corrected when the handbook says the SDK refreshes an M2M token: by default in the background during the token's last 20 minutes; only within 40 seconds of expiry does a request wait for a new token. Source: the Databricks SDK for Python v0.141.0 token code (oauth.py).",
       "mediaIds": []
     },
     {
@@ -3889,7 +3915,7 @@
     },
     {
       "id": "dbxfe-identity-abac",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "An attribute-based policy follows the tag, not the table",
       "outcome": "Decide when one attribute-based policy on a schema can replace per-table masks, and name what must be verified before relying on it.",
       "explanation": "Per-table masks are attached table by table, so a new table with an email column starts unprotected. An [[dbxfe-identity-abac-concept|attribute-based access control (ABAC)]] policy is defined once on a catalog, schema or table and applies to that securable and everything beneath it: it matches columns by governance tag, applies a row filter or column mask function, and names the principals it applies to and exempts. Creating one requires MANAGE on the securable. Notice in the second state that a new tagged table is masked without anyone touching it, and that an untagged column is not.",
@@ -3910,21 +3936,21 @@
       ],
       "hint": "Look at what the policy's condition tests.",
       "handbook": {
-        "markdown": "**Components.** The provider's ABAC policy resource and the SDK's Policies API agree on the parts: conditions on governance tags and the caller's identity, an action (a row filter or a column mask function), a scope (a catalog, a schema or a table, applying to all descendants), principals the policy applies to and principals excepted, and a MANAGE requirement on the securable for anyone who views, creates, changes or deletes a policy.\n\n```hcl\n# Synthetic teaching example following the provider's documented shape; not applied.\nresource \"databricks_policy_info\" \"mask_pii_columns\" {\n  on_securable_type     = \"SCHEMA\"\n  on_securable_fullname = \"quality.accepted\"\n  name                  = \"mask_pii_columns\"\n  policy_type           = \"POLICY_TYPE_COLUMN_MASK\"\n  for_securable_type    = \"TABLE\"\n  to_principals         = [\"account users\"]\n  except_principals     = [\"quality-leads\"]\n  when_condition        = \"hasTag('pii')\"\n  match_columns         = [{ condition = \"hasTag('pii')\", alias = \"pii_col\" }]\n  column_mask = {\n    function_name = \"quality.governance.redact_string\"\n    on_column     = \"pii_col\"\n  }\n}\n```\n\nThe mask function's first argument and return type should match the masked column, as with a table-level mask.\n\n**What moves.** The control shifts from \"who attached a mask\" to \"who tags columns correctly\". Governed tags are managed through tag policies, and account rule sets include separate tag policy creator, manager and assigner roles, so assigning a tag is itself a governed permission. Separate the people who write policies from the people who tag data, and test with an untagged column as a must-fail case.\n\n**Status and limits.** The provider's page for this resource carried a GA release-stage badge when read on 2026-09-23. The product documentation's own status label, supported compute and regional availability were not read in this build; verify them for Cinderline's workspace before promising the feature. The API also lists grant and deny policy types, which this module does not rely on. Read the current rules before combining a table-level mask and a policy on the same column.",
+        "markdown": "**Components.** The provider's ABAC policy resource and the SDK's Policies API describe the parts: conditions (on governance tags and the user identity, in the provider's words; on securable properties, governance tags and environment contexts, in the SDK's), an action (a row filter or a column mask function), a scope (a catalog, a schema or a table, applying to all descendants), principals the policy applies to and principals excepted, and a MANAGE requirement on the securable for anyone who views, creates, changes or deletes a policy.\n\n```hcl\n# Synthetic teaching example following the provider's documented shape; not applied.\nresource \"databricks_policy_info\" \"mask_pii_columns\" {\n  on_securable_type     = \"SCHEMA\"\n  on_securable_fullname = \"quality.accepted\"\n  name                  = \"mask_pii_columns\"\n  policy_type           = \"POLICY_TYPE_COLUMN_MASK\"\n  for_securable_type    = \"TABLE\"\n  to_principals         = [\"account users\"]\n  except_principals     = [\"quality-leads\"]\n  when_condition        = \"hasTag('pii')\"\n  match_columns         = [{ condition = \"hasTag('pii')\", alias = \"pii_col\" }]\n  column_mask = {\n    function_name = \"quality.governance.redact_string\"\n    on_column     = \"pii_col\"\n  }\n}\n```\n\nThe mask function's first argument and return type should match the masked column, as with a table-level mask.\n\n**What moves.** The control shifts from \"who attached a mask\" to \"who tags columns correctly\". Governed tags are managed through tag policies, and account rule sets include separate tag policy creator, manager and assigner roles, so assigning a tag is itself a governed permission. Separate the people who write policies from the people who tag data, and test with an untagged column as a must-fail case.\n\n**Status and limits.** The provider's page for this resource carried a GA release-stage badge when read on 2026-09-23. The product documentation's own status label, supported compute and regional availability were not read in this build; verify them for Cinderline's workspace before promising the feature. The API also lists grant and deny policy types, which this module does not rely on. Read the current rules before combining a table-level mask and a policy on the same column.",
         "sourceSectionIds": [
           "dbxfe-identity-l01-policies"
         ]
       },
       "recap": "One policy on a schema masks every tagged column beneath it; the tag is the control.",
-      "changeNote": "New academy beat.",
+      "changeNote": "The handbook no longer says the Terraform provider and the SDK agree on what a policy condition can test: the provider names governance tags and the user identity, the SDK securable properties, governance tags and environment contexts. Sources: the Databricks Terraform provider v1.133.0 policy_info page and the Databricks SDK for Python v0.141.0 Policies API (service/catalog.py).",
       "mediaIds": []
     },
     {
       "id": "dbxfe-identity-audit",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "An audit row joins an identity to an action and its response",
       "outcome": "Write a query over the audit log that answers who did what, when, from where and with what result, and state what it cannot show.",
-      "explanation": "The [[dbxfe-identity-audit-concept|audit log system table]], system.access.audit, records account and workspace events as rows: the time, the workspace, a service and action name, the identity that acted, request parameters, the source address and the response. An account admin enables the access system schema first, and reading it should itself be a narrow grant. Notice in the second state how one filter isolates the only permission change, and that no row records what anyone did with data after reading it.",
+      "explanation": "The [[dbxfe-identity-audit-concept|audit log system table]], system.access.audit, records account and workspace events as rows: the time, the workspace, a service and action name, the identity that acted, request parameters, the source address and the response. An account admin or a metastore admin enables the access system schema first, and reading it should itself be a narrow grant. Notice in the second state how one filter isolates the only permission change, and that no row records what anyone did with data after reading it.",
       "lessonId": "dbxfe-identity-l01",
       "sectionId": "dbxfe-identity-l01-audit",
       "conceptIds": [
@@ -3940,13 +3966,13 @@
         "dbxfe-identity-audit-question"
       ],
       "handbook": {
-        "markdown": "**Enable, then grant narrowly.** The provider documents that system tables must be enabled by an account admin, schema by schema, with the access schema as its example; the SDK describes system schemas as holding usage information such as audit logs. Grant read on the audit table to a security group, not to everyone: it lists who touched what.\n\n**Query shape.** Column names below are recalled from the audit log reference and were not re-read in this build; confirm them before evidence depends on a query.\n\n```sql\n-- Synthetic teaching example; not executed.\nSELECT user_identity.email AS actor,\n       count(*)            AS reads,\n       min(event_time)     AS first_read,\n       max(event_time)     AS last_read\nFROM system.access.audit\nWHERE service_name = 'secrets'\n  AND action_name  = 'getSecret'\n  AND request_params['scope'] = 'supplier-sftp'\n  AND event_date >= current_date() - INTERVAL 7 DAYS\nGROUP BY user_identity.email;\n```\n\nThe same pattern answers \"who changed grants\" with `service_name = 'unityCatalog'` and the permission-change action, and \"what did this identity do\" with a filter on the actor and a time window, reading `source_ip_address` and `user_agent` for unfamiliar origins.\n\n**A second channel.** On AWS, audit logs can also be delivered as JSON files to Cinderline's own S3 bucket. The provider documents availability within 15 minutes of activation, new files every few minutes, occasional later arrivals, and files that may be rewritten with extra lines. Evidence gathered minutes after an event can therefore be incomplete: record the query time with the result.\n\n**What it cannot show.** What a user did with rows after reading them, what a notebook printed, or whether a person or a copied token was behind a request. A row tied to sp-nightly-ingest shows the principal that acted, not who edited the job. Combine audit rows with job change history and the identity provider's sign-in log.",
+        "markdown": "**Enable, then grant narrowly.** The provider documents that system tables must be enabled by an account admin, schema by schema, with the access schema as its example; the SDK's system schemas API accepts an account admin or a metastore admin as the caller that enables one, and describes system schemas as holding usage information such as audit logs. Grant read on the audit table to a security group, not to everyone: it lists who touched what.\n\n**Query shape.** Column names below are recalled from the audit log reference and were not re-read in this build; confirm them before evidence depends on a query.\n\n```sql\n-- Synthetic teaching example; not executed.\nSELECT user_identity.email AS actor,\n       count(*)            AS reads,\n       min(event_time)     AS first_read,\n       max(event_time)     AS last_read\nFROM system.access.audit\nWHERE service_name = 'secrets'\n  AND action_name  = 'getSecret'\n  AND request_params['scope'] = 'supplier-sftp'\n  AND event_date >= current_date() - INTERVAL 7 DAYS\nGROUP BY user_identity.email;\n```\n\nThe same pattern answers \"who changed grants\" with `service_name = 'unityCatalog'` and the permission-change action, and \"what did this identity do\" with a filter on the actor and a time window, reading `source_ip_address` and `user_agent` for unfamiliar origins.\n\n**A second channel.** On AWS, audit logs can also be delivered as JSON files to Cinderline's own S3 bucket. The provider documents availability within 15 minutes of activation, new files every few minutes, occasional later arrivals, and files that may be rewritten with extra lines. Evidence gathered minutes after an event can therefore be incomplete: record the query time with the result.\n\n**What it cannot show.** What a user did with rows after reading them, what a notebook printed, or whether a person or a copied token was behind a request. A row tied to sp-nightly-ingest shows the principal that acted, not who edited the job. Combine audit rows with job change history and the identity provider's sign-in log.",
         "sourceSectionIds": [
           "dbxfe-identity-l01-audit"
         ]
       },
       "recap": "Audit rows tie identities to actions and responses, and say nothing about intent or later use.",
-      "changeNote": "New academy beat.",
+      "changeNote": "We corrected who can turn on a system schema such as access: an account admin or a metastore admin, not only an account admin (explanation and handbook). Source: the system schemas API reference in the Databricks SDK for Python v0.141.0 (service/catalog.py).",
       "mediaIds": []
     },
     {
@@ -4149,10 +4175,10 @@
     },
     {
       "id": "dbxfe-identity-extension-system-schema",
-      "revision": "1",
+      "revision": "2",
       "prompt": "Why might a query on system.access.audit fail or return nothing in a newly configured account?",
-      "answer": "The access system schema must first be enabled by an account admin, and the reader needs privileges on it before any row is visible.",
-      "explanation": "The provider documents system tables as a Databricks-hosted store of the account's operational data that an account admin must enable, schema by schema, with access as its example; [[dbxfe-identity-extension-system-schema-concept|system schema enablement]] is identified per metastore, some schemas are enabled automatically and some cannot be disabled. Until access is enabled the audit table cannot be queried, and because system schemas live in the system catalog, reading them follows Unity Catalog grants, so grant them to a security group. Rows can also lag the events they describe.",
+      "answer": "The access system schema must first be enabled by an account admin or a metastore admin, and the reader needs privileges on it before any row is visible.",
+      "explanation": "The provider documents system tables as a Databricks-hosted store of the account's operational data that an account admin must enable, schema by schema, with access as its example, and the SDK's system schemas API also accepts a metastore admin as the caller; [[dbxfe-identity-extension-system-schema-concept|system schema enablement]] is identified per metastore, some schemas are enabled automatically and some cannot be disabled. Until access is enabled the audit table cannot be queried, and because system schemas live in the system catalog, reading them follows Unity Catalog grants, so grant them to a security group. Rows can also lag the events they describe.",
       "lessonId": "dbxfe-identity-l01",
       "sectionId": "dbxfe-identity-l01-audit",
       "conceptIds": [

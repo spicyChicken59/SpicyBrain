@@ -251,6 +251,39 @@
    "context": "Databricks SQL language reference; metric views.",
    "caveat": "Syntax only; the function exists for metric view queries and was not executed in this build.",
    "reviewedEvidence": "Reused from this repository's data-modeling module's record for the same URL, title and publisher (dbxfe-modeling-source-measure; its author confirmed the search-result title and snippet on 2026-09-23); not re-searched for this record, and the page body not fetched in this build (documentation host blocked by the sandbox egress proxy). Passage relied on, as recorded there: measure(measure_column) evaluates a measure of a metric view, with an optional FILTER clause restricting the rows used; queries list columns rather than SELECT * because measures need MEASURE() to evaluate."
+  },
+  {
+   "id": "dbxfe-bi-source-sdk-dashboards",
+   "title": "Databricks SDK for Python v0.141.0: service/dashboards.py, dashboard Schedule and Subscription",
+   "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/dashboards.py",
+   "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "API reference docstrings of the Lakeview (AI/BI) dashboards client: the fields of a dashboard schedule and of a subscription to it.",
+   "caveat": "API reference docstrings generated from the API specification; interface scope only. They say which fields a schedule and a subscription carry, not how often a schedule may run, what it costs, what the dashboard cache does, or who sets a subscription's notification choice in the user interface.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/dashboards.py (tag v0.141.0): Schedule.cron_schedule, 'The cron expression describing the frequency of the periodic refresh for this schedule.'; Schedule.warehouse_id, 'The warehouse id to run the dashboard with for the schedule.'; Subscription.skip_notify, 'Controls whether notifications are sent to the subscriber for scheduled dashboard refreshes. If not defined, defaults to false in the backend to match the current behavior (refresh and notify)'. Interface scope: a schedule is a cron cadence of periodic refreshes and can name its own warehouse, so a scheduled run is not always on the dashboard's warehouse, and a subscription can be set not to notify its subscriber of scheduled refreshes, the default being refresh and notify. It does not establish which queries a run executes, the cache it refreshes or where snapshots are delivered."
+  },
+  {
+   "id": "dbxfe-bi-source-sdk-lakeview",
+   "title": "Databricks SDK for Python v0.141.0: docs/workspace/dashboards/lakeview.rst, LakeviewAPI.publish",
+   "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/dashboards/lakeview.rst",
+   "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Generated API reference of the Lakeview (AI/BI) dashboards client: the publish call and its embed_credentials flag.",
+   "caveat": "API reference generated from the API specification; interface scope only. It states what the publish call requires of its caller and what embed_credentials does, not the permissions the documentation's API tutorial lists for a publishing service principal, the user-interface default or audit-log behaviour.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/dashboards/lakeview.rst (tag v0.141.0): 'Publish the current draft dashboard. Requires the `Databricks SQL access <https://docs.databricks.com/security/auth/entitlements>`__ entitlement. Grant Databricks SQL access in addition to Workspace access.' and, for embed_credentials, 'Flag to indicate if the publisher's credentials should be embedded in the published dashboard. These embedded credentials will be used to execute the published dashboard's queries.' Interface scope: whoever calls publish, a service principal included, holds these entitlements besides any table grant, so the principal's data grants, not all its grants, bound what viewers reach."
+  },
+  {
+   "id": "dbxfe-bi-source-sdk-tables",
+   "title": "Databricks SDK for Python v0.141.0: docs/workspace/catalog/tables.rst, TablesAPI",
+   "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/catalog/tables.rst",
+   "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Generated API reference of the Unity Catalog tables client: the privileges a caller needs to query a table.",
+   "caveat": "API reference generated from the API specification; interface scope only. It states the privileges a query requires; it says nothing about dashboards, publishing modes or what a viewer sees when a grant is missing.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/docs/workspace/catalog/tables.rst (tag v0.141.0), TablesAPI: 'To query a table, users must have the SELECT permission on the table, and they must have the USE_CATALOG permission on its parent catalog and the USE_SCHEMA permission on its parent schema.' Interface scope: a publishing service principal that runs the page's queries needs USE_CATALOG and USE_SCHEMA as well as SELECT on each object the page reads, so its data grants reach only the accepted objects rather than consisting of one table grant."
   }
  ],
  "claims": [
@@ -309,7 +342,9 @@
    "description": "The dashboard API publishes with embed_credentials; publishing as a service principal needs at least CAN MANAGE on the dashboard, SELECT on its data sources and CAN USE on the warehouse, after which viewers use the principal's permissions and audit logs show the principal as the executor.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-bi-source-api"
+    "dbxfe-bi-source-api",
+    "dbxfe-bi-source-sdk-lakeview",
+    "dbxfe-bi-source-sdk-tables"
    ],
    "context": "Dashboard (Lakeview) REST API tutorial."
   },
@@ -318,7 +353,8 @@
    "description": "A dashboard schedule runs all dataset SQL on a periodic cadence and, for a dashboard published with shared data permissions, refreshes the shared cache; subscriptions send snapshots by email, Slack or Microsoft Teams.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-bi-source-schedule"
+    "dbxfe-bi-source-schedule",
+    "dbxfe-bi-source-sdk-dashboards"
    ],
    "context": "Published AI/BI dashboards; each run uses warehouse compute."
   },
@@ -532,7 +568,7 @@
     "embed_credentials"
    ],
    "definition": "A publishing mode in which every viewer's queries run with the publisher's data permissions, so viewers need only access to the dashboard.",
-   "example": "Published as a service principal granted only the accepted table, a page lets supervisors read tiles without grants of their own.",
+   "example": "Published as a service principal whose data grants reach only the accepted objects, a page lets supervisors read tiles without grants of their own.",
    "sourceIds": [
     "dbxfe-bi-source-share",
     "dbxfe-bi-source-api"
@@ -1329,7 +1365,7 @@
    "title": "Whose grants are checked when a tile runs",
    "alt": "A request path from a viewer through the published page and the SQL warehouse to a Unity Catalog privilege check and two tables. In the alternative the check uses a publishing service principal; in Cinderline's choice it uses the viewer.",
    "caption": "The path is the same; the identity at the privilege check changes with the publish choice, and with it which tables the viewer can reach. Synthetic teaching example.",
-   "textEquivalent": "Alternative: shared data permissions: The design Cinderline did not choose: the viewer holds Can View only and every query runs as a publishing service principal, whose single grant bounds what any viewer can reach. Nodes: Supervisor: Can View on the page; no table grants of their own. (context); Published page: Published with share data permissions. (selected); SQL warehouse: Runs the dataset queries. (selected); Privilege check: as the publisher. Unity Catalog checks the publishing principal's grants. (selected); accepted.daily_line_rate: SELECT granted to the principal; rows returned. (selected); quarantine.inspections: No grant to the principal; unreachable by any viewer. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as publisher; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied.\n\nCinderline's choice: individual data permissions: Each viewer's own grants are checked. A supervisor whose group holds SELECT on the accepted table sees it; the quarantine table stays closed unless the viewer is a steward. Nodes: Supervisor: Can View on the page; SELECT only on the accepted objects. (selected); Published page: Published with individual data permissions. (selected); SQL warehouse: Runs the dataset queries; the viewer needs access to it. (selected); Privilege check: as the viewer. Unity Catalog checks the viewer's own grants. (warning); accepted.daily_line_rate: Viewer holds SELECT; rows returned. (selected); quarantine.inspections: Viewer lacks SELECT; the quarantine link fails for them. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as viewer; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied for this viewer.",
+   "textEquivalent": "Alternative: shared data permissions: The design Cinderline did not choose: the viewer holds Can View only and every query runs as a publishing service principal, whose data grants, reaching only the accepted objects, bound what any viewer can reach. Nodes: Supervisor: Can View on the page; no table grants of their own. (context); Published page: Published with share data permissions. (selected); SQL warehouse: Runs the dataset queries. (selected); Privilege check: as the publisher. Unity Catalog checks the publishing principal's grants. (selected); accepted.daily_line_rate: SELECT granted to the principal; rows returned. (selected); quarantine.inspections: No grant to the principal; unreachable by any viewer. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as publisher; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied.\n\nCinderline's choice: individual data permissions: Each viewer's own grants are checked. A supervisor whose group holds SELECT on the accepted table sees it; the quarantine table stays closed unless the viewer is a steward. Nodes: Supervisor: Can View on the page; SELECT only on the accepted objects. (selected); Published page: Published with individual data permissions. (selected); SQL warehouse: Runs the dataset queries; the viewer needs access to it. (selected); Privilege check: as the viewer. Unity Catalog checks the viewer's own grants. (warning); accepted.daily_line_rate: Viewer holds SELECT; rows returned. (selected); quarantine.inspections: Viewer lacks SELECT; the quarantine link fails for them. (excluded). Relationships: Supervisor → Published page: opens; Published page → SQL warehouse: runs datasets; SQL warehouse → Privilege check: as viewer; Privilege check → accepted.daily_line_rate: allowed; Privilege check → quarantine.inspections: denied for this viewer.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-bi-claim-share",
@@ -1341,7 +1377,7 @@
     {
      "id": "embedded",
      "title": "Alternative: shared data permissions",
-     "explanation": "The design Cinderline did not choose: the viewer holds Can View only and every query runs as a publishing service principal, whose single grant bounds what any viewer can reach.",
+     "explanation": "The design Cinderline did not choose: the viewer holds Can View only and every query runs as a publishing service principal, whose data grants, reaching only the accepted objects, bound what any viewer can reach.",
      "nodes": [
       {
        "id": "viewer",
@@ -2673,7 +2709,7 @@
    "revision": "1",
    "prompt": "Cinderline's analyst, who holds SELECT on the raw and quarantine schemas, publishes the morning page with shared data permissions. Explain what a supervisor with Can View can now reach, and what you would change before the security review.",
    "modelAnswer": "Every dataset now runs with the analyst's grants, so a supervisor with only Can View can reach any row those datasets return, through a filter, a table view or an export, including quarantine rows if any dataset touches that schema; the catalog never checks the supervisor. Before review I would republish with individual data permissions, as the access matrix assumes, so each supervisor's own SELECT on accepted.daily_line_rate decides what they see and the quarantine link works only for stewards, and record the mode and the publishing identity in the matrix.",
-   "reasoning": "Shared data permissions bound exposure by the publisher's grants and the datasets, so the fix is to change whose grants run the queries, not to add a filter. Keeping shared data permissions but publishing through the API as a service principal whose only grant is the accepted table is an acceptable alternative if the review records it.",
+   "reasoning": "Shared data permissions bound exposure by the publisher's grants and the datasets, so the fix is to change whose grants run the queries, not to add a filter. Keeping shared data permissions but publishing through the API as a service principal whose data grants reach only the accepted objects the page reads is an acceptable alternative if the review records it.",
    "conceptIds": [
     "dbxfe-bi-credentials-concept",
     "dbxfe-bi-viewer-credentials-concept"
@@ -2915,7 +2951,7 @@
   },
   {
    "id": "dbxfe-bi-credentials",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "Embedded credentials make the publisher the reader",
    "outcome": "Choose between embedded and individual data permissions for a page and name what each choice exposes and requires.",
    "explanation": "When a dashboard is published, the publisher chooses whose data permissions run its queries. With [[dbxfe-bi-credentials-concept|embedded credentials]], the documented shared data permissions option, every viewer's query runs as the publisher, so the catalog checks the publisher's grants and a viewer needs only Can View. With [[dbxfe-bi-viewer-credentials-concept|individual data permissions]], each viewer's own grants are checked and a viewer without SELECT gets no results. Follow the request in the diagram: the privilege check moves from the publisher to the viewer. Notice that under embedded credentials a filter is not a wall; whatever the publisher's queries can return, a viewer can reach.",
@@ -2936,13 +2972,13 @@
     "dbxfe-bi-credentials-self"
    ],
    "handbook": {
-    "markdown": "The share documentation describes the publish step as a choice, with shared data permissions the default: share data permissions, where the publisher's credentials determine access to the underlying data and queries run with the publisher's permissions, or individual data permissions, where each viewer must have explicit access to the underlying data to see results. The API exposes the same choice as `embed_credentials` on the publish call, and the API tutorial shows publishing as a service principal: obtain an OAuth token for the principal, call publish with `embed_credentials` true, and viewers then use the principal's permissions for data and compute while needing permission only on the dashboard object; the tutorial adds that audit logs then show the principal as the query executor.\n\nThe trade is exposure against administration. Embedded credentials mean one grant to maintain, a shared result cache that a schedule refreshes, and no per-viewer table privileges; they also mean that every row the publisher's datasets can return is reachable by anyone with Can View, through a filter, a table view or an export. If the publisher is a human analyst with SELECT on raw and quarantine schemas, the page has quietly widened that person's access to every viewer. Individual permissions mean each viewer needs the table grants and whatever compute access the current page requires, more administration and a per-user cache rather than a shared one, but the catalog decides per person.\n\nCinderline's rule: publish the morning page with individual data permissions, because the access matrix already grants each group exactly the rows it may read and the page must not widen that; the price is a per-user cache and grants to maintain. The quarantine link then works only for stewards who hold SELECT on the quarantine table. Shared data permissions would be defensible only through the API as a service principal whose sole data grant is the accepted table, and never from a personal login: the data team's development grants reach raw and quarantine schemas, and they leave when a person does. What to inspect: the published page's data-permission mode, the identity it was published as, and that identity's grants.",
+    "markdown": "The share documentation describes the publish step as a choice, with shared data permissions the default: share data permissions, where the publisher's credentials determine access to the underlying data and queries run with the publisher's permissions, or individual data permissions, where each viewer must have explicit access to the underlying data to see results. The API exposes the same choice as `embed_credentials` on the publish call, and the API tutorial shows publishing as a service principal: obtain an OAuth token for the principal, call publish with `embed_credentials` true, and viewers then use the principal's permissions for data and compute while needing permission only on the dashboard object; the tutorial adds that audit logs then show the principal as the query executor.\n\nThe trade is exposure against administration. Embedded credentials mean one identity's grants to maintain, a shared result cache that a schedule refreshes, and no per-viewer table privileges; they also mean that every row the publisher's datasets can return is reachable by anyone with Can View, through a filter, a table view or an export. If the publisher is a human analyst with SELECT on raw and quarantine schemas, the page has quietly widened that person's access to every viewer. Individual permissions mean each viewer needs the table grants and whatever compute access the current page requires, more administration and a per-user cache rather than a shared one, but the catalog decides per person.\n\nCinderline's rule: publish the morning page with individual data permissions, because the access matrix already grants each group exactly the rows it may read and the page must not widen that; the price is a per-user cache and grants to maintain. The quarantine link then works only for stewards who hold SELECT on the quarantine table. Shared data permissions would be defensible only through the API as a service principal whose data grants reach only the accepted objects the page reads, and never from a personal login: the data team's development grants reach raw and quarantine schemas, and they leave when a person does. What to inspect: the published page's data-permission mode, the identity it was published as, and that identity's grants.",
     "sourceSectionIds": [
      "dbxfe-bi-l01-access"
     ]
    },
    "recap": "Embedded credentials check the publisher's grants for every viewer; individual permissions check each viewer's own; embed only a least-privilege service principal, never a personal login.",
-   "changeNote": "New academy beat.",
+   "changeNote": "Corrected how this beat describes a publishing service principal: it had called SELECT on the accepted table the principal's only grant. It now says the principal's data grants reach only the accepted objects the page reads, and that embedding means one identity's grants to maintain. Source: Databricks SDK for Python 0.141.0 API reference (commit 9df82c7): publishing also requires the Databricks SQL access entitlement, and querying a table also needs USE_CATALOG and USE_SCHEMA.",
    "mediaIds": [],
    "samajh": {
     "text": "Socho ek society ka guard aur ek flat ki chaabi. Guard gate pe naam check karke andar aane deta hai; yeh page ka Can View hai. Par flat ke andar kya dikhega, woh chaabi tay karti hai. Embedded credentials ka matlab: page banane wale ne apni chaabi darwaze pe hi latka di, ab jo bhi gate paar kare, usi chaabi se saare kamre khol sakta hai. Individual permissions mein har mehmaan apni chaabi laata hai, aur jiske paas nahi hai, woh darwaze pe hi ruk jaata hai.",
@@ -2987,7 +3023,7 @@
   },
   {
    "id": "dbxfe-bi-refresh",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "A refresh cannot make data newer than its source",
    "outcome": "Place a dashboard refresh relative to the job that publishes its table and predict what a snapshot and the page show when the order is wrong.",
    "explanation": "A [[dbxfe-bi-refresh-concept|refresh schedule]] re-runs a page's dataset queries on a cadence, refreshes the shared cache when the page uses shared data permissions, and can send subscribers a snapshot by email, Slack or Microsoft Teams. What it cannot do is produce rows the nightly job has not published. In the diagram, a 06:30 refresh after a 02:10 job snapshots Tuesday; the same refresh before a job that finishes at 08:20 snapshots Monday and posts it to the supervisors' channel at 06:35 without a word. Notice that the trigger belongs after the job, not on the clock.",
@@ -3009,13 +3045,13 @@
     "dbxfe-bi-refresh-question"
    ],
    "handbook": {
-    "markdown": "The schedule documentation describes a periodic cadence: at each scheduled update all the SQL that defines the datasets runs, and for a page published with shared data permissions the shared cache is refreshed. Subscribers additionally receive a snapshot by email, Slack or Microsoft Teams, and a subscriber can choose to refresh data without receiving the email. Each run executes the page's dataset queries on the dashboard's warehouse, so it costs compute and returns whatever the tables hold at that moment.\n\nThat last clause is the design constraint. Cinderline's nightly job normally completes at 02:10; the page's schedule runs at 06:30 and posts a snapshot to the supervisors' Teams channel at 06:35. On a slow night the job finishes at 08:20. The schedule does not wait, does not fail and does not know the job was late: it snapshots Monday's rows and posts them on Wednesday morning with no operator note. Supervisors who open the page at 07:45 run their own queries under individual data permissions and see what the table holds, which is still Monday.\n\nTwo mitigations belong together. First, make the freshness line read the publish-run table, so lateness is visible in words on the page and inside every snapshot. Second, trigger the refresh from the job rather than the clock: the documented dashboard task, added to the nightly job after the publishing task, refreshes the dashboard and can send a snapshot to its own subscriber list, and it needs a serverless or pro SQL warehouse. Where that is not available, the schedule sits after the job's expected completion plus a buffer that the operator reviews when the job's duration drifts.\n\nWhat to inspect on a doubtful morning: the schedule's or task's last run time and warehouse, the published table's maximum business day, and the snapshot's send time relative to the job. A per-user cache under individual data permissions is a cost and permission question, not a freshness one.",
+    "markdown": "The schedule documentation describes a periodic cadence: at each scheduled update all the SQL that defines the datasets runs, and for a page published with shared data permissions the shared cache is refreshed. Subscribers additionally receive a snapshot by email, Slack or Microsoft Teams, and a subscriber can choose to refresh data without receiving the email. Each run executes the page's dataset queries on the dashboard's warehouse, or on the warehouse the schedule itself names, so it costs compute and returns whatever the tables hold at that moment.\n\nThat last clause is the design constraint. Cinderline's nightly job normally completes at 02:10; the page's schedule runs at 06:30 and posts a snapshot to the supervisors' Teams channel at 06:35. On a slow night the job finishes at 08:20. The schedule does not wait, does not fail and does not know the job was late: it snapshots Monday's rows and posts them on Wednesday morning with no operator note. Supervisors who open the page at 07:45 run their own queries under individual data permissions and see what the table holds, which is still Monday.\n\nTwo mitigations belong together. First, make the freshness line read the publish-run table, so lateness is visible in words on the page and inside every snapshot. Second, trigger the refresh from the job rather than the clock: the documented dashboard task, added to the nightly job after the publishing task, refreshes the dashboard and can send a snapshot to its own subscriber list, and it needs a serverless or pro SQL warehouse. Where that is not available, the schedule sits after the job's expected completion plus a buffer that the operator reviews when the job's duration drifts.\n\nWhat to inspect on a doubtful morning: the schedule's or task's last run time and warehouse, the published table's maximum business day, and the snapshot's send time relative to the job. A per-user cache under individual data permissions is a cost and permission question, not a freshness one.",
     "sourceSectionIds": [
      "dbxfe-bi-l01-freshness"
     ]
    },
    "recap": "A schedule or snapshot shows whatever the table holds when it runs; trigger it after the job and let the freshness line say when it ran early.",
-   "changeNote": "New academy beat.",
+   "changeNote": "Corrected this beat's handbook, which had said every scheduled run uses the dashboard's warehouse: it now says a run uses the dashboard's warehouse or a warehouse the schedule itself names. Source: Databricks SDK for Python 0.141.0 API reference (commit 9df82c7), where a dashboard schedule has its own optional warehouse_id field.",
    "mediaIds": []
   },
   {

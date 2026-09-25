@@ -274,6 +274,28 @@
    "context": "Databricks SDK for Python 0.141.0: account-level failover groups and workspace sets.",
    "caveat": "Docstrings only; release stage, regions and cost are not stated there and remain verification items.",
    "reviewedEvidence": "Page source retrieved on 2026-09-23 from raw.githubusercontent.com at tag v0.141.0 of the databricks/databricks-sdk-py repository (the same module is shipped in the databricks-sdk 0.141.0 wheel on PyPI), and the passages below checked against the retrieved text; the rendered documentation site is blocked by the sandbox egress proxy and was not fetched. Passages relied on: a failover group manages disaster recovery across workspace sets and reports replication_point, the latest point in time to which data has been replicated; all workspaces in a workspace set must be in the Mission Critical tier; replicate_workspace_assets enables control plane DR for notebooks, jobs, clusters and similar assets and defaults to false."
+  },
+  {
+   "id": "dbxfe-operations-source-sdk-job-notification-settings",
+   "title": "Databricks SDK for Python v0.141.0: service/jobs.py, job notification fields and notification settings",
+   "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/jobs.py",
+   "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "The Jobs API notification fields (on_start, on_success, on_failure recipients) and the notification settings that mute on_failure notifications for canceled or skipped runs.",
+   "caveat": "API reference docstrings generated from the API specification; interface scope only. They state which runs each notification field covers and what the mute settings suppress, not delivery timing or user-interface wording.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/jobs.py (tag v0.141.0): JobNotificationSettings.no_alert_for_canceled_runs: 'If true, do not send notifications to recipients specified in ``on_failure`` if the run is canceled.'; no_alert_for_skipped_runs: 'If true, do not send notifications to recipients specified in ``on_failure`` if the run is skipped.'; JobEmailNotifications.on_success: 'A list of email addresses to be notified when a run successfully completes.'; on_failure: 'A list of email addresses to be notified when a run unsuccessfully completes. A run is considered to have completed unsuccessfully if it ends with an ``INTERNAL_ERROR`` ``life_cycle_state`` or a ``FAILED``, or ``TIMED_OUT`` result_state.' Interface scope: the Jobs API reference's field semantics. on_failure's own definition lists INTERNAL_ERROR, FAILED and TIMED_OUT, and the mute settings show that canceled and skipped runs also reach on_failure recipients unless muted; start and success notifications are separate fields. Delivery timing and user-interface wording were not read."
+  },
+  {
+   "id": "dbxfe-operations-source-delta-vacuum",
+   "title": "Delta Lake 4.0.0 documentation source: Table utility commands, 'Remove files no longer referenced by a Delta table'",
+   "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-utility.md",
+   "publisher": "Delta Lake project (delta-io/delta repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source Delta Lake 4.0.0: which data files VACUUM removes and its default retention threshold.",
+   "caveat": "Open-source Delta Lake semantics at one release; Databricks runs its own Delta implementation and platform defaults can differ.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-utility.md (tag v4.0.0): 'You can remove files no longer referenced by a Delta table and are older than the retention threshold ... The default retention threshold for the files is 7 days.' Open-source scope: VACUUM removes data files the table no longer references once they pass the retention threshold, not every file older than 7 days; Databricks runs its own Delta implementation and its defaults were not read here."
   }
  ],
  "claims": [
@@ -309,12 +331,13 @@
   },
   {
    "id": "dbxfe-operations-claim-notify",
-   "description": "Job failure notifications cover runs ending with INTERNAL_ERROR, FAILED or TIMED_OUT; duration warnings need a RUN_DURATION_SECONDS health rule; destinations include email, Slack and webhooks.",
+   "description": "Job failure notifications cover runs ending with INTERNAL_ERROR, FAILED or TIMED_OUT, and canceled or skipped runs unless muted; duration warnings need a RUN_DURATION_SECONDS health rule; destinations include email, Slack and webhooks.",
    "kind": "documented",
    "sourceIds": [
     "dbxfe-operations-source-sdk-jobs",
     "dbxfe-operations-source-tf-job",
-    "dbxfe-operations-source-jobs-monitor"
+    "dbxfe-operations-source-jobs-monitor",
+    "dbxfe-operations-source-sdk-job-notification-settings"
    ],
    "context": "Jobs API docstrings, the Terraform job resource and the monitoring page."
   },
@@ -342,7 +365,8 @@
    "kind": "documented",
    "sourceIds": [
     "dbxfe-operations-source-history",
-    "dbxfe-operations-source-delta-utility"
+    "dbxfe-operations-source-delta-utility",
+    "dbxfe-operations-source-delta-vacuum"
    ],
    "context": "Databricks on AWS and open-source Delta Lake 4.0.0."
   },
@@ -836,11 +860,12 @@
     "managed-service claim"
    ],
    "definition": "The conditions under which a platform feature's promise holds, as its documentation states them, and what it leaves to the team.",
-   "example": "A failure notification covering FAILED, TIMED_OUT and internal-error runs, never a successful run with wrong data.",
+   "example": "A failure notification covering FAILED, TIMED_OUT and internal-error runs, and canceled or skipped runs unless muted, never a successful run with wrong data.",
    "sourceIds": [
     "dbxfe-operations-source-sdk-jobs",
     "dbxfe-operations-source-managed-dr",
-    "dbxfe-operations-source-dr"
+    "dbxfe-operations-source-dr",
+    "dbxfe-operations-source-sdk-job-notification-settings"
    ]
   },
   {
@@ -1103,7 +1128,7 @@
    "title": "Which signal could see INC-0412",
    "alt": "Which signal could see INC-0412. The run ended SUCCESS in 31 minutes, so neither the failure notification nor the duration warning had anything to report.",
    "caption": "Job notifications watch the run; only a check on the promise sees a successful run that wrote a wrong figure. Synthetic teaching example.",
-   "textEquivalent": "Job signals only: The run ended SUCCESS in 31 minutes, so neither the failure notification nor the duration warning had anything to report. Nodes: Run r-7731: SUCCESS. Ended SUCCESS at 02:31 after 31 minutes. (selected); Failure notification: not sent. Sent only for FAILED, TIMED_OUT or internal-error runs. (excluded); Duration warning: not sent. Rule fires above 45 minutes; the run took 31. (excluded); 06:00 review: Uses Line 3's 0.4% as if it were right. (warning). Relationships: Run r-7731 → Failure notification: ended SUCCESS; Run r-7731 → Duration warning: 31 min; Run r-7731 → 06:00 review: publishes.\n\nPromise alert added: A SQL alert runs the reconciliation query after publish, triggers on the Line 3 mismatch and pages the rota before the review. Nodes: Run r-7731: SUCCESS. Ended SUCCESS at 02:31. (selected); Reconciliation query: mismatch. Line 3 published 0.4% against 3.1% recounted from raw. (warning); SQL alert: TRIGGERED 02:40. Condition met: one line disagrees by more than 0.05 points. (selected); Data platform on-call: Paged with the runbook link. (selected); 06:00 review: Sees Line 3 labelled under review. (selected). Relationships: Run r-7731 → Reconciliation query: then runs; Reconciliation query → SQL alert: evaluated by; SQL alert → Data platform on-call: pages; Data platform on-call → 06:00 review: labels figure.",
+   "textEquivalent": "Job signals only: The run ended SUCCESS in 31 minutes, so neither the failure notification nor the duration warning had anything to report. Nodes: Run r-7731: SUCCESS. Ended SUCCESS at 02:31 after 31 minutes. (selected); Failure notification: not sent. Sent for FAILED, TIMED_OUT or internal-error runs, and for canceled or skipped runs unless muted; not for SUCCESS. (excluded); Duration warning: not sent. Rule fires above 45 minutes; the run took 31. (excluded); 06:00 review: Uses Line 3's 0.4% as if it were right. (warning). Relationships: Run r-7731 → Failure notification: ended SUCCESS; Run r-7731 → Duration warning: 31 min; Run r-7731 → 06:00 review: publishes.\n\nPromise alert added: A SQL alert runs the reconciliation query after publish, triggers on the Line 3 mismatch and pages the rota before the review. Nodes: Run r-7731: SUCCESS. Ended SUCCESS at 02:31. (selected); Reconciliation query: mismatch. Line 3 published 0.4% against 3.1% recounted from raw. (warning); SQL alert: TRIGGERED 02:40. Condition met: one line disagrees by more than 0.05 points. (selected); Data platform on-call: Paged with the runbook link. (selected); 06:00 review: Sees Line 3 labelled under review. (selected). Relationships: Run r-7731 → Reconciliation query: then runs; Reconciliation query → SQL alert: evaluated by; SQL alert → Data platform on-call: pages; Data platform on-call → 06:00 review: labels figure.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-operations-claim-notify",
@@ -1128,7 +1153,7 @@
       {
        "id": "fail",
        "label": "Failure notification",
-       "detail": "Sent only for FAILED, TIMED_OUT or internal-error runs.",
+       "detail": "Sent for FAILED, TIMED_OUT or internal-error runs, and for canceled or skipped runs unless muted; not for SUCCESS.",
        "status": "excluded",
        "value": "not sent"
       },
@@ -2368,7 +2393,7 @@
    "title": "Promises and their edges",
    "alt": "Promises and their edges. Every row has a scope column taken from documentation and a column of what Cinderline still owns.",
    "caption": "Each managed promise with its documented scope and what stays with the team; then what a replication point means at failover. Synthetic teaching example.",
-   "textEquivalent": "Promise, scope, still yours: Every row has a scope column taken from documentation and a column of what Cinderline still owns. Table columns: Promise | Documented scope | Still Cinderline's. Rows: Control plane high availability | 15-minute RTO, 0 RPO for the control plane | Data in its own storage and that data's RPO; Job failure notification | Runs ending FAILED, TIMED_OUT or internal error | Successful runs that wrote wrong data; Managed disaster recovery | Opted-in metadata, managed tables, workspace assets; gated | External data, unopted categories, drills, replication gap; System tables | Each table's retention and region | Evidence it must keep longer; Time travel | Versions whose log and files are retained | Older versions and other failure domains.\n\nFailover at 14:00: A replica is only as recent as its replication point; writes after it are the failover's data-loss window. Table columns: Item | Time | At failover. Rows: Primary region fails | 14:00 | Writes stop; Replication point | 13:52 | Secondary holds data up to here; Writes 13:52 to 14:00 | 8 minutes | Not in secondary; replay from raw files and queue; Initial bootstrap | Up to two weeks | No protection until the group is active.",
+   "textEquivalent": "Promise, scope, still yours: Every row has a scope column taken from documentation and a column of what Cinderline still owns. Table columns: Promise | Documented scope | Still Cinderline's. Rows: Control plane high availability | 15-minute RTO, 0 RPO for the control plane | Data in its own storage and that data's RPO; Job failure notification | Runs ending FAILED, TIMED_OUT or internal error; canceled or skipped unless muted | Successful runs that wrote wrong data; Managed disaster recovery | Opted-in metadata, managed tables, workspace assets; gated | External data, unopted categories, drills, replication gap; System tables | Each table's retention and region | Evidence it must keep longer; Time travel | Versions whose log and files are retained | Older versions and other failure domains.\n\nFailover at 14:00: A replica is only as recent as its replication point; writes after it are the failover's data-loss window. Table columns: Item | Time | At failover. Rows: Primary region fails | 14:00 | Writes stop; Replication point | 13:52 | Secondary holds data up to here; Writes 13:52 to 14:00 | 8 minutes | Not in secondary; replay from raw files and queue; Initial bootstrap | Up to two weeks | No protection until the group is active.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-operations-claim-hadr",
@@ -2401,7 +2426,7 @@
        ],
        [
         "Job failure notification",
-        "Runs ending FAILED, TIMED_OUT or internal error",
+        "Runs ending FAILED, TIMED_OUT or internal error; canceled or skipped unless muted",
         "Successful runs that wrote wrong data"
        ],
        [
@@ -2997,7 +3022,7 @@
     {
      "id": "dbxfe-operations-backup-question-b",
      "text": "A mistaken DELETE discovered twelve days later.",
-     "rationale": "VACUUM has removed files older than the 7-day retention, so time travel to that version fails."
+     "rationale": "VACUUM has removed the files the DELETE stopped referencing, now past the 7-day retention, so time travel to that version fails."
     },
     {
      "id": "dbxfe-operations-backup-question-c",
@@ -3228,7 +3253,7 @@
   },
   {
    "id": "dbxfe-operations-alerts",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "Alert on the reader's promise, not only on the job",
    "outcome": "Choose alerts that fire on broken reader promises and state what each notification type can and cannot see.",
    "explanation": "A job failure notification fires when a run ends FAILED, TIMED_OUT or with an internal error. On Tuesday the run ended SUCCESS, so nothing fired, and a duration warning stayed silent because 31 minutes was under its 45-minute rule. Only a [[dbxfe-operations-alert-concept|symptom alert]] on the promise itself could see the problem: a SQL alert comparing each line's published rate with a recount from raw. Notice in the second state that it triggers at 02:40, three hours before the review, and pages an owner who can act.",
@@ -3251,13 +3276,13 @@
    ],
    "hint": "Ask which signal looks at the published values rather than at the run.",
    "handbook": {
-    "markdown": "Monitoring answers two questions: what is broken (the symptom a reader would notice) and why (a cause). Pages should fire on symptoms or imminent real problems, because those are what readers feel and what a human must act on.\n\nJob notifications are cause-side signals with a documented scope. The Jobs API sends failure notifications when a run ends with an INTERNAL_ERROR life-cycle state or a FAILED or TIMED_OUT result state. A duration warning needs a RUN_DURATION_SECONDS health rule; without one it never fires. Keep both, because a failed run is worth knowing about, but they cannot see a successful run that wrote a wrong number.\n\nA Databricks SQL alert periodically runs a query, evaluates a condition on its result and notifies users or notification destinations. Cinderline's promise alert runs after publish:\n\n```sql\n-- Reconciliation for the latest production day; one row per line that disagrees\nSELECT g.line_id, g.scrap_pct AS published, r.scrap_pct AS recount\nFROM gold.daily_scrap_rate AS g\nJOIN recon.raw_recount AS r\n  ON g.line_id = r.line_id AND g.prod_date = r.prod_date\nWHERE g.prod_date = current_date() - INTERVAL 1 DAY\n  AND abs(g.scrap_pct - r.scrap_pct) > 0.05;  -- percentage points\n```\n\nBoth columns hold percentages (3.1 means 3.1%), so 0.05 is the correctness objective's tolerance of 0.05 percentage points; had they held fractions (0.031), the same tolerance would be 0.0005. The alert condition is \"row count greater than 0\". Two definition details matter. The empty-result state decides what happens when the query returns nothing; here \"nothing\" means every line reconciled, so OK is right, but for a query that should always return a row (a gate's own record), set an empty result to TRIGGERED so that a check that never ran also pages. And without a rearm interval a triggered alert is not triggered again, so a mismatch that persists overnight stays silent after the first page.\n\nEvery page names its owner and its runbook. An alert nobody is accountable for is noise with a timestamp.",
+    "markdown": "Monitoring answers two questions: what is broken (the symptom a reader would notice) and why (a cause). Pages should fire on symptoms or imminent real problems, because those are what readers feel and what a human must act on.\n\nJob notifications are cause-side signals with a documented scope. The Jobs API sends failure notifications when a run ends with an INTERNAL_ERROR life-cycle state or a FAILED or TIMED_OUT result state, and also for canceled or skipped runs unless the job's notification settings mute them. A duration warning needs a RUN_DURATION_SECONDS health rule; without one it never fires. Keep both, because a failed run is worth knowing about, but they cannot see a successful run that wrote a wrong number.\n\nA Databricks SQL alert periodically runs a query, evaluates a condition on its result and notifies users or notification destinations. Cinderline's promise alert runs after publish:\n\n```sql\n-- Reconciliation for the latest production day; one row per line that disagrees\nSELECT g.line_id, g.scrap_pct AS published, r.scrap_pct AS recount\nFROM gold.daily_scrap_rate AS g\nJOIN recon.raw_recount AS r\n  ON g.line_id = r.line_id AND g.prod_date = r.prod_date\nWHERE g.prod_date = current_date() - INTERVAL 1 DAY\n  AND abs(g.scrap_pct - r.scrap_pct) > 0.05;  -- percentage points\n```\n\nBoth columns hold percentages (3.1 means 3.1%), so 0.05 is the correctness objective's tolerance of 0.05 percentage points; had they held fractions (0.031), the same tolerance would be 0.0005. The alert condition is \"row count greater than 0\". Two definition details matter. The empty-result state decides what happens when the query returns nothing; here \"nothing\" means every line reconciled, so OK is right, but for a query that should always return a row (a gate's own record), set an empty result to TRIGGERED so that a check that never ran also pages. And without a rearm interval a triggered alert is not triggered again, so a mismatch that persists overnight stays silent after the first page.\n\nEvery page names its owner and its runbook. An alert nobody is accountable for is noise with a timestamp.",
     "sourceSectionIds": [
      "dbxfe-operations-l01-ownership"
     ]
    },
    "recap": "Keep job notifications, but only a check on the reader's promise sees a successful run that wrote a wrong figure.",
-   "changeNote": "New academy beat.",
+   "changeNote": "We corrected our description of job failure notifications: they are also sent for canceled or skipped runs unless muted, not only for FAILED, TIMED_OUT or internal-error runs, and still not for a run that ends SUCCESS (the visual's failure-notification node and the handbook). Source: JobNotificationSettings in the Jobs API reference, Databricks SDK for Python v0.141.0.",
    "mediaIds": []
   },
   {
@@ -3580,7 +3605,7 @@
   },
   {
    "id": "dbxfe-operations-scope",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "A managed promise covers only what its page names",
    "outcome": "Restate a managed-service claim with its documented scope, its preconditions and what it leaves to the team.",
    "explanation": "'Databricks handles DR' is a claim with no edges. Its [[dbxfe-operations-scope-concept|documented scope]] has edges: the deployment guide describes control plane high availability with a 15-minute RTO and 0 RPO, yet customer data lives in storage Cinderline controls, and Cinderline sets its RPO. Managed disaster recovery replicates only opted-in categories, needs a workspace and a metastore per region, and is gated. Notice in the second state that a replica's replication point is itself a data-loss window.",
@@ -3606,13 +3631,13 @@
     "dbxfe-operations-scope-self"
    ],
    "handbook": {
-    "markdown": "Every managed feature makes a promise, and its documentation states the conditions under which the promise holds. Operations work reads those conditions and writes down what remains with the team. Five examples from this module:\n\n- **Control plane high availability.** The deployment guide describes a 15-minute RTO and 0 RPO for the control plane. The disaster recovery page says Databricks does not store your primary customer data, which lives in storage you control, and that you are responsible for defining its RPO.\n- **Job failure notifications.** Runs ending with an internal error, FAILED or TIMED_OUT. Not a successful run with wrong output.\n- **Managed disaster recovery.** Replicates Unity Catalog metadata, managed table data and workspace assets that you opt into, continuously, to a second region, with a stable URL and failover from the account console. You bring a workspace and a metastore in each region; access is gated through the account team; the first bootstrap of workspace assets can take up to two weeks for large workspaces. The SDK's failover group reports a replication point, the latest time to which data has been replicated, and requires Mission Critical tier workspaces. Release status, regions and cost are verification items.\n- **System tables.** Each table documents its retention and region; audit events for a deleted workspace older than 14 days are removed.\n- **Time travel.** Versions whose log and files are retained.\n\nTwo habits follow. First, quote scope, not adjectives: \"replicates opted-in managed tables continuously\" instead of \"handles DR\". Second, turn every precondition into a check: is the failover group active, which catalogs are opted in, what is the current replication point, when was failover last drilled. The writes between the replication point and a failure are that failover's data-loss window; name how they are replayed, just as for a table restore.",
+    "markdown": "Every managed feature makes a promise, and its documentation states the conditions under which the promise holds. Operations work reads those conditions and writes down what remains with the team. Five examples from this module:\n\n- **Control plane high availability.** The deployment guide describes a 15-minute RTO and 0 RPO for the control plane. The disaster recovery page says Databricks does not store your primary customer data, which lives in storage you control, and that you are responsible for defining its RPO.\n- **Job failure notifications.** Runs ending with an internal error, FAILED or TIMED_OUT, and canceled or skipped runs unless muted. Not a successful run with wrong output.\n- **Managed disaster recovery.** Replicates Unity Catalog metadata, managed table data and workspace assets that you opt into, continuously, to a second region, with a stable URL and failover from the account console. You bring a workspace and a metastore in each region; access is gated through the account team; the first bootstrap of workspace assets can take up to two weeks for large workspaces. The SDK's failover group reports a replication point, the latest time to which data has been replicated, and requires Mission Critical tier workspaces. Release status, regions and cost are verification items.\n- **System tables.** Each table documents its retention and region; audit events for a deleted workspace older than 14 days are removed.\n- **Time travel.** Versions whose log and files are retained.\n\nTwo habits follow. First, quote scope, not adjectives: \"replicates opted-in managed tables continuously\" instead of \"handles DR\". Second, turn every precondition into a check: is the failover group active, which catalogs are opted in, what is the current replication point, when was failover last drilled. The writes between the replication point and a failure are that failover's data-loss window; name how they are replayed, just as for a table restore.",
     "sourceSectionIds": [
      "dbxfe-operations-l01-backup"
     ]
    },
    "recap": "Quote a managed promise with its documented scope and preconditions, and list what the team still owns.",
-   "changeNote": "New academy beat.",
+   "changeNote": "We corrected our description of job failure notifications: the table row and the handbook bullet now include canceled or skipped runs unless muted, not only FAILED, TIMED_OUT or internal-error runs. Source: JobNotificationSettings in the Jobs API reference, Databricks SDK for Python v0.141.0.",
    "mediaIds": []
   },
   {

@@ -29,7 +29,7 @@
         "Separate the denied-request sequence from the unreachable-request sequence, with evidence rows.",
         "Mark region, workspace type, tier, preview status and charges as unknown until verified; provision nothing."
       ],
-      "model": "### Accounts and planes\nControl plane: Databricks account. Classic workspace cinderline-prod: compute in Cinderline's VPC (two private subnets, one security group, no public IPs, outbound only), workspace storage bucket and cross-account role in Cinderline's AWS account. Serverless workspace cinderline-sls: compute and default storage in the Databricks account, same region, reached through an NCC.\n\n### Request paths\nBoth planes: browser to workspace URL, control plane to compute, Unity Catalog privilege check, then storage. Classic adds Cinderline's route tables, DNS and security groups on the execution and storage paths; serverless adds none of them.\n\n### Storage chains\nCinderline bucket: storage credential cinderline-lake-cred (role in Cinderline's account), external location for the prefix, bucket policy admitting the role, key policy for alias/cinderline-lake granting kms:Decrypt. Supplier bucket: role created in the supplier's account with the documented trust policy, supplier bucket and key policies admitting it, Cinderline credential pointing at that role ARN. RDS: a VPC endpoint service in front of the database, an NCC private endpoint rule accepted on the AWS side; classic reaches it through VPC routing instead.\n\n### Private connectivity\nFront-end: corporate interface endpoint, private access setting, private DNS. Back-end: interface endpoints for the control plane APIs and relay in the customer-managed VPC. Serverless outbound: NCC rules. Egress: firewall allowlist for classic; serverless egress control policy in dry-run first, then enforced, if available.\n\n### Diagnosis\nDenied: record the error, confirm the run-as principal, check USE CATALOG, USE SCHEMA, SELECT, then credential role and bucket policy, then key policy, rerun as the same principal, write the row. Unreachable: classify, DNS from the subnet, route, security group and NACL, endpoint policy and private access, firewall or NCC rule and egress policy log, retest.\n\n### Unknowns\nRegion availability of private endpoint rules and egress control, workspace type, Enterprise tier, the supplier's consent to its key policy change, networking charges, and the exact current requirement lists. Nothing in this note is provisioned.",
+      "model": "### Accounts and planes\nControl plane: Databricks account. Classic workspace cinderline-prod: compute in Cinderline's VPC (two private subnets, one security group with its documented same-group inbound rules, no public IPs, outbound connections to the relay), workspace storage bucket and cross-account role in Cinderline's AWS account. Serverless workspace cinderline-sls: compute and default storage in the Databricks account, same region, reached through an NCC.\n\n### Request paths\nBoth planes: browser to workspace URL, control plane to compute, Unity Catalog privilege check, then storage. Classic adds Cinderline's route tables, DNS and security groups on the execution and storage paths; serverless adds none of them.\n\n### Storage chains\nCinderline bucket: storage credential cinderline-lake-cred (role in Cinderline's account), external location for the prefix, bucket policy admitting the role, key policy for alias/cinderline-lake granting kms:Decrypt. Supplier bucket: role created in the supplier's account with the documented trust policy, supplier bucket and key policies admitting it, Cinderline credential pointing at that role ARN. RDS: a VPC endpoint service in front of the database, an NCC private endpoint rule accepted on the AWS side; classic reaches it through VPC routing instead.\n\n### Private connectivity\nFront-end: corporate interface endpoint, private access setting, private DNS. Back-end: interface endpoints for the control plane APIs and relay in the customer-managed VPC. Serverless outbound: NCC rules. Egress: firewall allowlist for classic; serverless egress control policy in dry-run first, then enforced, if available.\n\n### Diagnosis\nDenied: record the error, confirm the run-as principal, check USE CATALOG, USE SCHEMA, SELECT, then credential role and bucket policy, then key policy, rerun as the same principal, write the row. Unreachable: classify, DNS from the subnet, route, security group and NACL, endpoint policy and private access, firewall or NCC rule and egress policy log, retest.\n\n### Unknowns\nRegion availability of private endpoint rules and egress control, workspace type, Enterprise tier, the supplier's consent to its key policy change, networking charges, and the exact current requirement lists. Nothing in this note is provisioned.",
       "reasoning": "The note keeps the two accounts apart, gives each source a complete identity chain with the account that owns each policy, separates the two failure shapes so the operations team never applies a permission fix to a network fault, and turns every feature into a verification item rather than a promise.",
       "rubric": [
         {
@@ -134,7 +134,7 @@
       "context": "Databricks on AWS; IAM roles carried by classic compute instances.",
       "accessDate": "2026-09-23",
       "reviewDate": "2026-09-23",
-      "caveat": "Classic compute only; minimum S3 actions are quoted from the tutorial and must be checked against the current text. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+      "caveat": "Classic-compute mechanism, which the Databricks API reference also documents for Databricks SQL Serverless and through a workspace-level SQL warehouse setting that it says also applies to serverless notebooks and jobs; minimum S3 actions are quoted from the tutorial and must be checked against the current text. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
     },
     {
       "id": "dbxfe-aws-course-source-privatelink",
@@ -168,6 +168,61 @@
       "accessDate": "2026-09-23",
       "reviewDate": "2026-09-23",
       "caveat": "Announced as Public Preview on AWS in January 2025 and requiring the Enterprise tier; verify current status, products and region. Search-result title and snippet confirmed 2026-09-23; page body not fetched in this build (documentation host blocked by the sandbox egress proxy)."
+    },
+    {
+      "id": "dbxfe-aws-course-source-tf-firewall-guide",
+      "title": "Databricks Terraform provider v1.134.0: Provisioning AWS Databricks workspace with a AWS Firewall (guide)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/guides/aws-e2-firewall-workspace.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks-published Terraform provider guide at the v1.134.0 release commit; its Security Group section lists the rules the security groups of a customer-managed VPC must have.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "A provider guide read at a pinned commit, not the current docs.databricks.com page. It documents security-group requirements for the network configuration interface; it establishes no region, availability or current port list. Relied on only to correct the outbound-only security-group teaching. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/guides/aws-e2-firewall-workspace.md: 'Databricks must have access to at least one AWS security group and no more than five security groups. ... ***Ingress (inbound):*** Required for all workspaces (these can be separate rules or combined into one): ... - Allow TCP on all ports when the traffic source uses the same security group ... - Allow UDP on all ports when the traffic source uses the same security group'. Scope: Databricks-published Terraform documentation of the security-group requirements for a network configuration (interface requirement); not a read of the current customer-managed VPC page."
+    },
+    {
+      "id": "dbxfe-aws-course-source-sdk-networks",
+      "title": "Databricks SDK for Python: service/provisioning.py (NetworksAPI)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/provisioning.py",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Generated Account API client at a pinned commit; NetworksAPI docstring for customer-managed VPC network configurations.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "An API reference docstring: it shows the network configuration is optional when a workspace is created; it does not establish defaults, regions or availability. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/provisioning.py: 'These APIs manage network configurations for customer-managed VPCs (optional). Its ID is used when creating a new workspace if you use customer-managed VPCs.' Scope: API reference docstring (interface only)."
+    },
+    {
+      "id": "dbxfe-aws-course-source-tf-instance-profile",
+      "title": "Databricks Terraform provider v1.134.0: databricks_instance_profile resource",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/instance_profile.md",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Databricks-published Terraform resource documentation at the v1.134.0 release commit, including its section on usage with Databricks SQL serverless.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "Interface documentation read at a pinned commit: it documents that the instance-profile interface serves Databricks SQL serverless and that Databricks asks users to switch to Unity Catalog storage credentials; it does not establish availability or whether a given warehouse uses a profile. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/instance_profile.md: 'Please switch to ... with Unity Catalog to manage storage credentials, which provides a better and faster way for managing credential security. ... Usage with Databricks SQL serverless ... When the instance profile ARN and its associated IAM role ARN don't match and the instance profile is intended for use with Databricks SQL serverless, the `iam_role_arn` parameter can be specified.' Scope: Terraform interface documentation; not a read of the current instance-profile or SQL data access pages."
+    },
+    {
+      "id": "dbxfe-aws-course-source-sdk-instance-profiles",
+      "title": "Databricks SDK for Python: service/compute.py (InstanceProfilesAPI)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/compute.py",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Generated Workspace API client at a pinned commit; InstanceProfilesAPI.add docstring.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "An API reference docstring: it documents registration by admins and the iam_role_arn field for use with Databricks SQL Serverless; it does not establish availability or current managed behaviour. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/compute.py: 'Registers an instance profile in Databricks. In the UI, you can then give users the permission to use this instance profile when launching clusters. ... This API is only available to admin users. ... This field is required if your role name and instance profile name do not match and you want to use the instance profile with `Databricks SQL Serverless <https://docs.databricks.com/sql/admin/serverless.html>`__.' Scope: API reference docstring (interface only)."
+    },
+    {
+      "id": "dbxfe-aws-course-source-sdk-sql-warehouses",
+      "title": "Databricks SDK for Python: service/sql.py (WarehousesAPI workspace warehouse configuration)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/sql.py",
+      "publisher": "Databricks",
+      "type": "primary reference",
+      "context": "Generated Workspace API client (v0.141.0) at a pinned commit; WarehousesAPI.get_workspace_warehouse_config and set_workspace_warehouse_config, and the instance_profile_arn field of the workspace configuration and of a single warehouse.",
+      "accessDate": "2026-09-25",
+      "reviewDate": "2026-09-25",
+      "caveat": "An API reference docstring: it documents that the SQL warehouse instance profile is a workspace-level setting and what the API says it applies to; it does not establish availability, current console behaviour or whether a given workspace names a profile. Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/sql.py: 'Deprecated. Instance profile used to pass IAM role to the cluster ... AWS Only: The instance profile used to pass an IAM role to the SQL warehouses. This configuration is also applied to the workspace's serverless compute for notebooks and jobs. ... Sets the workspace level configuration that is shared by all SQL warehouses in a workspace.' The first fragment documents the per-warehouse field (EndpointInfo; WarehousesAPI.create and edit); the second documents the workspace configuration's field (GetWorkspaceWarehouseConfigResponse; set_workspace_warehouse_config). Scope: API reference docstring (interface only)."
     }
   ],
   "claims": [
@@ -182,10 +237,12 @@
     },
     {
       "id": "dbxfe-aws-course-claim-vpc",
-      "description": "A customer-managed VPC is named at workspace creation with at least two subnets and one security group; secure cluster connectivity gives nodes no public IP and opens no inbound ports; back-end and front-end PrivateLink on classic workspaces require a customer-managed VPC.",
+      "description": "A customer-managed VPC is named at workspace creation with at least two subnets and one security group; secure cluster connectivity gives nodes no public IP and opens no inbound ports beyond the documented same-security-group rules; back-end and front-end PrivateLink on classic workspaces require a customer-managed VPC.",
       "kind": "documented",
       "sourceIds": [
-        "dbxfe-aws-course-source-vpc"
+        "dbxfe-aws-course-source-vpc",
+        "dbxfe-aws-course-source-tf-firewall-guide",
+        "dbxfe-aws-course-source-sdk-networks"
       ],
       "context": "Classic compute plane networking on AWS."
     },
@@ -203,9 +260,12 @@
       "description": "An instance profile is an IAM role attached to classic compute's EC2 instances, registered in the workspace by an admin, with ListBucket and GetObject as minimum read actions and PutObject and DeleteObject used by Delta writes.",
       "kind": "documented",
       "sourceIds": [
-        "dbxfe-aws-course-source-profile"
+        "dbxfe-aws-course-source-profile",
+        "dbxfe-aws-course-source-tf-instance-profile",
+        "dbxfe-aws-course-source-sdk-instance-profiles",
+        "dbxfe-aws-course-source-sdk-sql-warehouses"
       ],
-      "context": "Classic compute only on AWS."
+      "context": "Classic-compute mechanism on AWS; the Databricks API reference also documents instance profiles for Databricks SQL Serverless and a workspace-level SQL warehouse instance-profile setting that it says also applies to serverless compute for notebooks and jobs."
     },
     {
       "id": "dbxfe-aws-course-claim-privatelink",

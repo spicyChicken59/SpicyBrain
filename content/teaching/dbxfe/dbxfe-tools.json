@@ -42,7 +42,7 @@
    "publishedAt": null,
    "context": "Open-source Python SDK for MCP clients and servers, release 2.2.0, with its mcp-types 2.2.0 schema package; metadata and source read locally.",
    "caveat": "One SDK's implementation, not the specification; other SDKs and servers may differ and a later release may change these details.",
-   "reviewedEvidence": "Wheel downloaded from PyPI with pip on 2026-09-23 and its metadata and source read locally in this build (PyPI is reachable from the sandbox; the PyPI web page itself was not fetched). Passage relied on: the README says MCP lets servers expose data and functionality to LLM applications, that servers expose tools, resources and prompts to MCP hosts, and that the SDK speaks the stdio, Streamable HTTP and SSE transports, a URL meaning Streamable HTTP; a server tool's input schema is derived from a Python function's type hints; the server's bearer-token check rejects a missing, expired or wrong-audience token (the RFC 8707 resource must equal the server's own URL when configured) with 401 invalid_token and a token without the endpoint's required scopes with 403 insufficient_scope, and publishes RFC 9728 protected resource metadata; handlers can read the verified token from request context, and the tool decorator has no per-tool authorization setting; mcp-types 2.2.0 lists protocol revisions 2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25 and 2026-07-28."
+   "reviewedEvidence": "Wheel downloaded from PyPI with pip on 2026-09-23 and its metadata and source read locally in this build (PyPI is reachable from the sandbox; the PyPI web page itself was not fetched). Passage relied on: the README says MCP lets servers expose data and functionality to LLM applications, that servers expose tools, resources and prompts to MCP hosts, and that the SDK speaks the stdio, Streamable HTTP and SSE transports, a URL meaning Streamable HTTP; a server tool's input schema is derived from a Python function's type hints; the server's bearer-token check rejects a missing or expired token with 401 invalid_token (a token whose RFC 8707 resource is not the server's own URL is refused by the SDK's own comparison only when AuthSettings.validate_token_resource is enabled, and otherwise only if the token verifier rejects it; corrected on 2026-09-25 from dbxfe-tools-source-mcp-sdk-auth-settings and dbxfe-tools-source-mcp-sdk-token-verifier; earlier wording remains in git history) and a token without the endpoint's required scopes with 403 insufficient_scope, and publishes RFC 9728 protected resource metadata; handlers can read the verified token from request context, and the tool decorator has no per-tool authorization setting; mcp-types 2.2.0 lists protocol revisions 2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25 and 2026-07-28."
   },
   {
    "id": "dbxfe-tools-source-mcp-databricks",
@@ -141,7 +141,7 @@
    "publishedAt": null,
    "context": "Widely used Python HTTP client; the Retry class documentation in the installed 2.6.3 source.",
    "caveat": "One client library's defaults; other clients differ, and no client setting makes a server operation idempotent.",
-   "reviewedEvidence": "Installed package source read locally in this build on 2026-09-23. Passage relied on: Retry's allowed_methods defaults to the methods considered idempotent (multiple requests with the same parameters end with the same state), DELETE, GET, HEAD, OPTIONS, PUT and TRACE, so POST is not retried by default, and None retries any verb; between attempts after the second try it sleeps backoff_factor times 2 to the power of previous retries, optionally plus jitter, never longer than backoff_max, and backoff is disabled by default."
+   "reviewedEvidence": "Installed package source read locally in this build on 2026-09-23. Passage relied on: Retry's allowed_methods defaults to the methods considered idempotent (multiple requests with the same parameters end with the same state), DELETE, GET, HEAD, OPTIONS, PUT and TRACE, so a POST is not retried by default after a read error or a retryable status (a connection error, raised before the request is sent, is retried for any method; narrowed on 2026-09-25 from dbxfe-tools-source-urllib3-retry), and None retries any verb; between attempts after the second try it sleeps backoff_factor times 2 to the power of previous retries, optionally plus jitter, never longer than backoff_max, and backoff is disabled by default."
   },
   {
    "id": "dbxfe-tools-source-tracing",
@@ -153,6 +153,61 @@
    "context": "Databricks on AWS; MLflow GenAI tracing.",
    "caveat": "Tracing supports diagnosis; it is not an access-control or retention guarantee, and an audit record has different owners and rules.",
    "reviewedEvidence": "Reviewed for the GenAI module on 2026-09-19 and recorded in that module's source record; the URL answered HTTP 200 in the course's 2026-09-20 availability probe; not re-searched or re-read for this record because the session's search budget was exhausted and the documentation host is blocked by the sandbox egress proxy. Passage relied on, as recorded there: the tracing overview describes intermediate component inputs, outputs, latency, token usage and execution flow for diagnosis."
+  },
+  {
+   "id": "dbxfe-tools-source-mcp-sdk-auth-settings",
+   "title": "MCP Python SDK v2.2.0: src/mcp/server/auth/settings.py (AuthSettings.validate_token_resource)",
+   "url": "https://github.com/modelcontextprotocol/python-sdk/blob/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/settings.py",
+   "publisher": "Model Context Protocol project (python-sdk, open-source SDK repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Server authorization settings of the MCP Python SDK 2.2.0: whether the bearer middleware compares a token's RFC 8707 resource indicator with the server's own URL.",
+   "caveat": "One SDK release, implementation scope only; other SDKs and servers may differ, and the stated 3.0 default is a plan, not released behaviour.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/settings.py (tag v2.2.0): 'validate_token_resource: bool | None = Field( default=None,' ... 'set it to False when your token' ... 'verifier checks the token's audience itself. With `resource_server_url` set, leaving it unset warns' ... 'and behaves as False' ... '`AuthSettings.validate_token_resource` is not set, so bearer tokens are not checked' ... 'against `resource_server_url`; it will default to True in 3.0'; and from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/lowlevel/server.py: 'resource_server_url=auth.resource_server_url if auth.validate_token_resource else None,' Implementation scope: in 2.2.0 the bearer middleware compares the token audience with the server URL only when validate_token_resource is True; left unset with resource_server_url configured, it warns and skips that comparison, leaving the audience to the token verifier, so the module no longer teaches that the SDK refuses a wrong-audience token by default."
+  },
+  {
+   "id": "dbxfe-tools-source-mcp-spec-authorization",
+   "title": "Authorization: Model Context Protocol specification, revision 2025-11-25 (specification source)",
+   "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/basic/authorization.mdx",
+   "publisher": "Model Context Protocol project (specification source repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Token handling requirements for MCP servers on HTTP transports: audience validation and the status code for invalid or expired tokens.",
+   "caveat": "A specification states requirements for implementations and enforces nothing; an SDK may leave a requirement to configuration.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/a99bdd15ea9ff96bf4d758aac907bbb27e9329dc/docs/specification/2025-11-25/basic/authorization.mdx: 'MCP servers **MUST** validate that access tokens were issued specifically for them as the intended audience,' ... 'Invalid or expired tokens **MUST** receive a HTTP 401' Specification scope: a requirement on servers, not a description of any SDK default."
+  },
+  {
+   "id": "dbxfe-tools-source-urllib3-retry",
+   "title": "urllib3 2.6.3: src/urllib3/util/retry.py (connection errors, read errors and allowed_methods)",
+   "url": "https://github.com/urllib3/urllib3/blob/0248277dd7ac0239204889ca991353ad3e3a1ddc/src/urllib3/util/retry.py",
+   "publisher": "urllib3 maintainers (open-source repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "How Retry.increment classifies a connect timeout and a read timeout, and which of them allowed_methods gates.",
+   "caveat": "One client library release, implementation scope only; no client setting makes a server operation idempotent.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/urllib3/urllib3/0248277dd7ac0239204889ca991353ad3e3a1ddc/src/urllib3/util/retry.py (tag 2.6.3): 'These are errors raised before the request is sent to the remote server, which we assume has not triggered the server to process the request.' ... 'return isinstance(err, ConnectTimeoutError)' ... 'return isinstance(err, (ReadTimeoutError, ProtocolError))' ... 'def is_retry(' ... 'if not self._is_method_retryable(method): return False' ... 'if read is False or method is None or not self._is_method_retryable(method):' Implementation scope: allowed_methods gates read-error and status retries; a connect timeout is retried for any method, so the module limits every not-POST statement to a read timeout or a retryable status. Executed in this build with the 2.6.3 wheel: under Retry(3) a POST to a closed port was retried three times, a POST whose reply never came was not retried, and a GET was."
+  },
+  {
+   "id": "dbxfe-tools-source-mcp-sdk-token-verifier",
+   "title": "MCP Python SDK v2.2.0: src/mcp/server/auth/provider.py (TokenVerifier.verify_token)",
+   "url": "https://github.com/modelcontextprotocol/python-sdk/blob/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/provider.py",
+   "publisher": "Model Context Protocol project (python-sdk, open-source SDK repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "The token verifier interface of the MCP Python SDK 2.2.0, and how the bearer middleware treats a token the verifier rejects.",
+   "caveat": "One SDK release, implementation scope only; what a verifier checks is the server author's code, not an SDK guarantee.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/provider.py (tag v2.2.0): 'With `AuthSettings.validate_token_resource` the bearer middleware then refuses any token whose resource is not `resource_server_url`; without it, confirming the token was issued for this server (for example by passing the expected audience to your JWT library) is up to the verifier.' and from https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/9972c21aa42054fb1450c5fc614761ed11847ec6/src/mcp/server/auth/middleware/bearer_auth.py: 'auth_info = await self.token_verifier.verify_token(token)' ... 'if not auth_info: return None' Implementation scope: a token the verifier rejects is not authenticated and receives 401, so a verifier that checks the audience refuses a token issued for another server even with validate_token_resource unset or False; an executed run of mcp 2.2.0 in this build returned 401 for such a token in both cases, and 200 when neither the setting nor the verifier checked the audience."
+  },
+  {
+   "id": "dbxfe-tools-source-devhub-genie",
+   "title": "Genie Agents: Databricks developer documentation source (src/content/docs/agents/genie.md)",
+   "url": "https://github.com/databricks/devhub/blob/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/genie.md",
+   "publisher": "Databricks (databricks/devhub, source of developers.databricks.com)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Databricks' developer documentation page on embedding a Genie Agent in an app; used here only for the product's current name.",
+   "caveat": "Documentation source at one commit; it gives the current and former product names but does not describe the managed MCP server for Genie, its availability or its status.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/devhub/35f4745b018baf9b17d30583ec2a6fdfe4689605/src/content/docs/agents/genie.md: 'A **Genie Agent** (formerly Genie space) is a Databricks natural-language interface over Unity Catalog tables' Scope: product naming in Databricks' own developer documentation source; the repository owner's direct read of docs.databricks.com/aws/en/genie-agents/ (decision dbxfe-ai-assist-claim-agents) confirms the former-name note. API identifiers such as the /api/2.0/mcp/genie/<space-id> path keep their spelling."
   }
  ],
  "claims": [
@@ -187,20 +242,24 @@
   },
   {
    "id": "dbxfe-tools-claim-mcp-auth",
-   "description": "In the MCP Python SDK 2.2.0 an HTTP server's bearer-token check rejects a missing, expired or wrong-audience token with 401 and a token without the endpoint's required scopes with 403 insufficient_scope; per-tool decisions are left to handler code, which can read the verified token.",
+   "description": "In the MCP Python SDK 2.2.0 an HTTP server's bearer-token check rejects a missing or expired token, or one its token verifier rejects, with 401 and a token without the endpoint's required scopes with 403 insufficient_scope; the SDK itself compares a token's resource with the server's URL, rejecting a token issued for another resource with 401, only when AuthSettings.validate_token_resource is enabled, and otherwise leaves that audience check, which the MCP specification requires of servers, to the configured token verifier; per-tool decisions are left to handler code, which can read the verified token.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-tools-source-mcp-sdk"
+    "dbxfe-tools-source-mcp-sdk",
+    "dbxfe-tools-source-mcp-sdk-auth-settings",
+    "dbxfe-tools-source-mcp-spec-authorization",
+    "dbxfe-tools-source-mcp-sdk-token-verifier"
    ],
    "context": "One SDK release; other implementations may differ."
   },
   {
    "id": "dbxfe-tools-claim-databricks-mcp",
-   "description": "Databricks-managed MCP servers are addressed on the workspace host under /api/2.0/mcp/ for Unity Catalog functions, vector search indexes, Genie spaces and external servers through a connection, and are called with the caller's Databricks credentials as a bearer token; custom MCP servers hosted on Databricks Apps require OAuth, and a calling service principal needs permission to query the app.",
+   "description": "Databricks-managed MCP servers are addressed on the workspace host under /api/2.0/mcp/ for Unity Catalog functions, vector search indexes, Genie Agents (formerly Genie spaces) and external servers through a connection, and are called with the caller's Databricks credentials as a bearer token; custom MCP servers hosted on Databricks Apps require OAuth, and a calling service principal needs permission to query the app.",
    "kind": "documented",
    "sourceIds": [
     "dbxfe-tools-source-databricks-mcp",
-    "dbxfe-tools-source-mcp-databricks"
+    "dbxfe-tools-source-mcp-databricks",
+    "dbxfe-tools-source-devhub-genie"
    ],
    "context": "Read from the databricks-mcp 0.9.2 client; server types, status and regions to be verified."
   },
@@ -244,10 +303,11 @@
   },
   {
    "id": "dbxfe-tools-claim-retry",
-   "description": "urllib3's Retry retries by default only methods considered idempotent (DELETE, GET, HEAD, OPTIONS, PUT, TRACE), not POST, with exponential backoff capped by backoff_max and disabled by default.",
+   "description": "urllib3's Retry retries read errors and retryable statuses by default only for methods considered idempotent (DELETE, GET, HEAD, OPTIONS, PUT, TRACE), not POST, while connection errors, raised before the request is sent, are retried for any method; exponential backoff is capped by backoff_max and disabled by default.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-tools-source-urllib3"
+    "dbxfe-tools-source-urllib3",
+    "dbxfe-tools-source-urllib3-retry"
    ],
    "context": "urllib3 2.6.3."
   },
@@ -507,11 +567,12 @@
     "Databricks managed MCP",
     "custom MCP server"
    ],
-   "definition": "On Databricks, MCP servers run by the platform for Unity Catalog functions, vector search, Genie spaces (natural-language question interfaces over chosen tables) or external connections, versus servers a team hosts itself, for example as an app.",
+   "definition": "On Databricks, MCP servers run by the platform for Unity Catalog functions, vector search, Genie Agents (formerly Genie spaces, natural-language question interfaces over chosen tables) or external connections, versus servers a team hosts itself, for example as an app.",
    "example": "Functions in cinderline.maint would be reached at /api/2.0/mcp/functions/cinderline/maint on the workspace host.",
    "sourceIds": [
     "dbxfe-tools-source-mcp-databricks",
-    "dbxfe-tools-source-databricks-mcp"
+    "dbxfe-tools-source-databricks-mcp",
+    "dbxfe-tools-source-devhub-genie"
    ]
   },
   {
@@ -569,7 +630,7 @@
     "retry-safe methods"
    ],
    "definition": "Methods whose repeated identical requests leave the server in the same state as one request, which client libraries treat as safe to retry.",
-   "example": "urllib3 retries GET and PUT by default but not POST.",
+   "example": "urllib3 retries a GET or PUT whose reply timed out by default, but not a POST.",
    "sourceIds": [
     "dbxfe-tools-source-urllib3"
    ]
@@ -3159,7 +3220,7 @@
   },
   {
    "id": "dbxfe-tools-timeout",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "A timeout means the outcome is unknown, not that nothing happened",
    "outcome": "Explain why a timed-out write may already have committed, and plan a bounded retry that cannot duplicate the effect.",
    "explanation": "A [[dbxfe-tools-timeout-concept|timeout]] tells the caller only that no reply arrived in time. In the lab, the draft store wrote D3 on C17's first attempt, but the reply took 2.5 seconds against a 2-second limit; two more attempts were also late, so the gate reported timed_out with outcome unknown while D3 already existed. A [[dbxfe-tools-retry-concept|bounded retry]] of three attempts, waiting 0.5 then 1 second, is safe only because every attempt carried the same key. Notice that C18 later found D3 instead of writing a fourth draft.",
@@ -3180,14 +3241,14 @@
     "dbxfe-tools-timeout-question"
    ],
    "handbook": {
-    "markdown": "### Timeouts, retries and unknown outcomes\nSet a timeout at each hop (client to gate, gate to handler, handler to target) and an overall deadline. When one fires, three things may be true: the request never arrived, it arrived and failed, or it succeeded and only the reply was lost. The caller cannot tell which.\n\n**Retry only what may succeed later and cannot duplicate.** Retry timeouts and temporary unavailability; never retry a schema refusal, a permission denial or a key conflict. Bound the attempts and grow the wait: Lab L22 uses three attempts and 500 × 2^(attempt − 1) ms between them. General-purpose clients encode the same caution: urllib3's `Retry` retries by default only methods considered idempotent (GET, HEAD, PUT, DELETE, OPTIONS, TRACE), not POST.\n\n| Call | Attempt log | Elapsed | Decision |\n|---|---|---|---|\n| C16 | 3500 ms timeout, wait 500; 300 ms reply | 2800 ms | allowed after retry, D2 |\n| C17 | 2500 timeout, wait 500; 2500 timeout, wait 1000; 2500 timeout | 7500 ms | timed_out, D3 exists |\n\n**Report the truth.** C17 returns 'no reply within 2000 ms after 3 attempts; safe to retry with the same key' and marks the key `in_doubt`. Saying 'failed' would invite a resubmission with a new key and a duplicate.\n\n**Reconcile.** For an in-doubt key, retry with the same key (C18 found D3) or read the target by key before telling the user anything.\n\n**Limits:** the lab's latencies are scripted on an event clock. Real networks add partial failures, reordering and targets that commit minutes later, so size timeouts from measured latency, not from these numbers.",
+    "markdown": "### Timeouts, retries and unknown outcomes\nSet a timeout at each hop (client to gate, gate to handler, handler to target) and an overall deadline. When one fires, three things may be true: the request never arrived, it arrived and failed, or it succeeded and only the reply was lost. The caller cannot tell which.\n\n**Retry only what may succeed later and cannot duplicate.** Retry timeouts and temporary unavailability; never retry a schema refusal, a permission denial or a key conflict. Bound the attempts and grow the wait: Lab L22 uses three attempts and 500 × 2^(attempt − 1) ms between them. General-purpose clients encode the same caution: urllib3's `Retry` retries a read timeout or a retryable status by default only for methods considered idempotent (GET, HEAD, PUT, DELETE, OPTIONS, TRACE), not POST; a connection error, raised before the request is sent, is retried for any method.\n\n| Call | Attempt log | Elapsed | Decision |\n|---|---|---|---|\n| C16 | 3500 ms timeout, wait 500; 300 ms reply | 2800 ms | allowed after retry, D2 |\n| C17 | 2500 timeout, wait 500; 2500 timeout, wait 1000; 2500 timeout | 7500 ms | timed_out, D3 exists |\n\n**Report the truth.** C17 returns 'no reply within 2000 ms after 3 attempts; safe to retry with the same key' and marks the key `in_doubt`. Saying 'failed' would invite a resubmission with a new key and a duplicate.\n\n**Reconcile.** For an in-doubt key, retry with the same key (C18 found D3) or read the target by key before telling the user anything.\n\n**Limits:** the lab's latencies are scripted on an event clock. Real networks add partial failures, reordering and targets that commit minutes later, so size timeouts from measured latency, not from these numbers.",
     "sourceSectionIds": [
      "dbxfe-tools-l01-retries",
      "dbxfe-tools-l01-example"
     ]
    },
    "recap": "After a timeout assume the effect may exist; retry a bounded number of times, always with the same key.",
-   "changeNote": "New academy beat.",
+   "changeNote": "The handbook no longer says urllib3 never retries a POST by default: urllib3 2.6.3's retry code (src/urllib3/util/retry.py at its release tag) limits only read timeouts and retryable statuses to idempotent methods, and retries a connection error, raised before the request is sent, for any method, POST included.",
    "mediaIds": [],
    "samajh": {
     "text": "Doctor ke clinic phone kiya appointment ke liye; receptionist 'haan, likh rahi hoon...' bol hi rahi thi ki call kat gayi. Appointment bani ya nahi? Dobara call karke naya slot mat lo, warna do appointments ban sakti hain. Pehle poocho: 'Mere naam pe kal 5 baje ki booking hai kya?'",
@@ -3272,10 +3333,10 @@
   },
   {
    "id": "dbxfe-tools-layers",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "MCP authorization checks the token; the handler still decides the action",
    "outcome": "Place the checks for an MCP-exposed tool at the transport, the server handler and the target system, and diagnose which layer refused a call.",
-   "explanation": "For HTTP transports, MCP authorization is OAuth-based. In the MCP Python SDK the server refuses a missing, expired or wrong-audience token with 401 and a token lacking the endpoint's required scopes with 403 insufficient_scope. That proves who connected and with which scopes; it says nothing about whether this user may draft for machine C4. Notice the three [[dbxfe-tools-layers-concept|layers]]: the door (the token), the handler (this call's arguments) and the target (its own grants, such as EXECUTE on a Unity Catalog function). Each can refuse independently.",
+   "explanation": "For HTTP transports, MCP authorization is OAuth-based. In the MCP Python SDK the server refuses a missing or expired token with 401 and a token lacking the endpoint's required scopes with 403 insufficient_scope; it refuses a token issued for another server only once audience validation is enabled, as the specification requires. That proves who connected and with which scopes; it says nothing about whether this user may draft for machine C4. Notice the three [[dbxfe-tools-layers-concept|layers]]: the door (the token), the handler (this call's arguments) and the target (its own grants, such as EXECUTE on a Unity Catalog function). Each can refuse independently.",
    "lessonId": "dbxfe-tools-l01",
    "sectionId": "dbxfe-tools-l01-mcp",
    "conceptIds": [
@@ -3294,13 +3355,13 @@
     "dbxfe-tools-layers-question"
    ],
    "handbook": {
-    "markdown": "### Where authorization happens with MCP\n**Door (transport).** For HTTP transports MCP uses OAuth-based authorization. In the MCP Python SDK 2.2.0, a server configured to verify tokens refuses a missing, expired or wrong-audience token with `401 invalid_token` and a token lacking the endpoint's required scopes with `403 insufficient_scope`, and publishes protected resource metadata so clients can find the authorization server. The required scopes apply to the whole endpoint.\n\n**Handler (this call).** The tool handler reads the verified token (the SDK exposes it through request context), maps it to a user, binds the arguments to entities (C4 → South) and checks that user's grant, as Lab L22's gate does. The SDK's tool decorator has no per-tool permission setting, so this code is yours.\n\n**Target (its own grants).** The system behind the handler applies its own permissions to whoever calls it. A Unity Catalog function requires `EXECUTE` on the function plus `USE CATALOG` and `USE SCHEMA` on its parents.\n\n**On Databricks.** The Databricks-authored databricks-mcp 0.9.2 client reaches managed MCP servers on the workspace host at `/api/2.0/mcp/functions/<catalog>/<schema>`, `/api/2.0/mcp/vector-search/<catalog>/<schema>`, `/api/2.0/mcp/genie/<space-id>` and `/api/2.0/mcp/external/<connection>`, sending the caller's Databricks credentials as a bearer token, so the platform evaluates that principal's permissions on those objects. Custom servers hosted on Databricks Apps require OAuth, and a calling service principal needs permission to query the app. Read server types, preview status and regions from the current MCP on Databricks documentation.\n\n**stdio.** A local server started as a subprocess runs with whatever credentials its environment gives it, so the host's process identity matters as much as any token.\n\n**Diagnose by layer:** 401 or 403 at the door, a handler refusal naming the entity, or a target error naming the privilege.",
+    "markdown": "### Where authorization happens with MCP\n**Door (transport).** For HTTP transports MCP uses OAuth-based authorization. In the MCP Python SDK 2.2.0, a server configured to verify tokens refuses a missing or expired token, or one its token verifier rejects, with `401 invalid_token` and a token lacking the endpoint's required scopes with `403 insufficient_scope`; with a resource server URL configured it publishes protected resource metadata so clients can find the authorization server. The required scopes apply to the whole endpoint. The SDK itself compares a token's resource with the server's own URL, and refuses a token issued for another server with `401`, only when `AuthSettings.validate_token_resource` is set to `True`. Left unset with a resource server URL configured, 2.2.0 warns and skips that comparison, so a token issued for another server is refused only if your token verifier rejects it. The MCP specification requires servers to validate that a token was issued for them, so enable it, or check the audience in your token verifier.\n\n**Handler (this call).** The tool handler reads the verified token (the SDK exposes it through request context), maps it to a user, binds the arguments to entities (C4 → South) and checks that user's grant, as Lab L22's gate does. The SDK's tool decorator has no per-tool permission setting, so this code is yours.\n\n**Target (its own grants).** The system behind the handler applies its own permissions to whoever calls it. A Unity Catalog function requires `EXECUTE` on the function plus `USE CATALOG` and `USE SCHEMA` on its parents.\n\n**On Databricks.** The Databricks-authored databricks-mcp 0.9.2 client reaches managed MCP servers on the workspace host at `/api/2.0/mcp/functions/<catalog>/<schema>`, `/api/2.0/mcp/vector-search/<catalog>/<schema>`, `/api/2.0/mcp/genie/<space-id>` and `/api/2.0/mcp/external/<connection>`, sending the caller's Databricks credentials as a bearer token, so the platform evaluates that principal's permissions on those objects. Custom servers hosted on Databricks Apps require OAuth, and a calling service principal needs permission to query the app. Read server types, preview status and regions from the current MCP on Databricks documentation.\n\n**stdio.** A local server started as a subprocess runs with whatever credentials its environment gives it, so the host's process identity matters as much as any token.\n\n**Diagnose by layer:** 401 or 403 at the door, a handler refusal naming the entity, or a target error naming the privilege.",
     "sourceSectionIds": [
      "dbxfe-tools-l01-mcp"
     ]
    },
    "recap": "A token proves who connected and with which scopes; the handler and the target still decide each action.",
-   "changeNote": "New academy beat.",
+   "changeNote": "The door layer no longer says the MCP Python SDK refuses a token issued for another server by default: the SDK's source at tag v2.2.0 (auth settings and token verifier) shows that check happens only when validate_token_resource is enabled or your token verifier checks the audience, which the MCP specification (2025-11-25, authorization) requires servers to do. The managed-server concept now uses the name in Databricks' developer documentation: Genie Agents (formerly Genie spaces).",
    "mediaIds": [],
    "hint": "Ask which layer is the first to see machine C4."
   },
@@ -3446,7 +3507,7 @@
    "revision": "1",
    "prompt": "Why does an MCP server refuse a valid token that another server's authorization issued?",
    "answer": "Its audience names a different resource; accepting it would let a token meant for one service act on another.",
-   "explanation": "In the MCP Python SDK 2.2.0 the server's bearer check compares the token's RFC 8707 resource indicator with the server's own URL when a resource server URL is configured and refuses a mismatch with 401, and the server publishes RFC 9728 protected resource metadata so clients know where to obtain a token for it. The same reasoning applies in the other direction: a tool server that forwarded the tokens it received to downstream APIs would let one audience's token act elsewhere, so each hop should hold a token issued for that hop.",
+   "explanation": "The MCP specification requires servers to validate that a token was issued for them as its audience. In the MCP Python SDK 2.2.0 the server's bearer check compares the token's RFC 8707 resource indicator with the server's own URL, and refuses a mismatch with 401, only when AuthSettings.validate_token_resource is enabled; left unset with a resource server URL configured, it warns and leaves the audience to the token verifier. With a resource server URL configured, the server publishes RFC 9728 protected resource metadata so clients know where to obtain a token for it. The same reasoning applies in the other direction: a tool server that forwarded the tokens it received to downstream APIs would let one audience's token act elsewhere, so each hop should hold a token issued for that hop.",
    "lessonId": "dbxfe-tools-l01",
    "sectionId": "dbxfe-tools-l01-mcp",
    "conceptIds": [
@@ -3461,10 +3522,10 @@
   },
   {
    "id": "dbxfe-tools-extension-methods",
-   "revision": "1",
+   "revision": "2",
    "prompt": "Why will a generic HTTP client's retry setting not protect a draft-creating POST?",
-   "answer": "urllib3 retries by default only methods considered idempotent, which excludes POST, and forcing POST retries without a key can duplicate the effect.",
-   "explanation": "urllib3 2.6.3's Retry documents allowed_methods as the methods considered idempotent, meaning multiple identical requests leave the same state: DELETE, GET, HEAD, OPTIONS, PUT and TRACE. POST is absent, so a timed-out POST is not retried unless allowed_methods is set to None or includes it. Doing that without a stable idempotency key is exactly Lab L22's fresh-key shortcut: two drafts for one intent. The library's backoff sleeps backoff_factor times 2 to the power of previous retries, is disabled by default, and is capped by backoff_max.",
+   "answer": "urllib3 retries a timed-out reply by default only for methods considered idempotent, which excludes POST, and forcing POST retries without a key can duplicate the effect.",
+   "explanation": "urllib3 2.6.3's Retry documents allowed_methods as the methods considered idempotent, meaning multiple identical requests leave the same state: DELETE, GET, HEAD, OPTIONS, PUT and TRACE. POST is absent, so a POST whose reply timed out (a read timeout) is not retried unless allowed_methods is set to None or includes it; a connect timeout, raised before the request is sent, is retried for any method. Setting allowed_methods that way without a stable idempotency key is exactly Lab L22's fresh-key shortcut: two drafts for one intent. The library's backoff sleeps backoff_factor times 2 to the power of previous retries, is disabled by default, and is capped by backoff_max.",
    "lessonId": "dbxfe-tools-l01",
    "sectionId": "dbxfe-tools-l01-retries",
    "conceptIds": [

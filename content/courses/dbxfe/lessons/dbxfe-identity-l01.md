@@ -58,7 +58,7 @@ For four stored inspections, Maya in plant-eu-analysts receives the two EU rows 
 
 <!-- section:dbxfe-identity-l01-audit -->
 
-The audit log system table, system.access.audit, ties each event to a time, a service and action, the acting identity, request parameters, a source address and a response. An account admin enables the access schema; grant reading it to a security group only. On AWS, audit logs can also be delivered as JSON files to the account's bucket, usually within minutes and sometimes later, so record when each query ran.
+The audit log system table, system.access.audit, ties each event to a time, a service and action, the acting identity, request parameters, a source address and a response. An account admin or a metastore admin enables the access schema; grant reading it to a security group only. On AWS, audit logs can also be delivered as JSON files to the account's bucket, usually within minutes and sometimes later, so record when each query ran.
 
 After a token exposure: revoke first; fix the exposure window from the moment the token could be copied to its revocation; query the owner's rows inside that window for unfamiliar addresses and actions; list everything the identity could reach; rotate every secret it could read; then remove the cause. Audit rows show what an identity did, not what anyone did with the data afterwards.
 

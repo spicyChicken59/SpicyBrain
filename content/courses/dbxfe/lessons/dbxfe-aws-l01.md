@@ -13,7 +13,7 @@ Follow one query: an analyst runs `SELECT` on `quality.accepted.inspections`. Th
 
 <!-- section:dbxfe-aws-l01-classic -->
 
-A classic workspace takes a **customer-managed VPC** at creation; the documentation asks for at least two subnets and one security group and states network ACL and DNS requirements. **Secure cluster connectivity** means nodes get no public IP and need no inbound port: each node opens an outbound connection to the control plane's relay. A launch therefore depends only on the outbound side: a route from the subnet to a NAT gateway or interface endpoints, DNS answers for the workspace and relay hostnames, and outbound security group rules and network ACLs. Inbound rules change nothing.
+A classic workspace can take a **customer-managed VPC** at creation; the documentation asks for at least two subnets and one security group and states network ACL and DNS requirements. **Secure cluster connectivity** means nodes get no public IP and need no inbound port open to anything outside their own security group: each node opens an outbound connection to the control plane's relay. Reaching the relay therefore depends on the outbound side: a route from the subnet to a NAT gateway or interface endpoints, DNS answers for the workspace and relay hostnames, and outbound security group rules and network ACLs. The documented security-group rules also require inbound TCP and UDP from the same group, for traffic between the workspace's own nodes; inbound rules from anywhere else change nothing.
 
 **Egress** is where classic deployments quietly break, because every dependency is an outbound connection: the control plane, S3 (ideally via a gateway endpoint), the regional AWS services the documentation lists, any package index, any external source. The open shape routes everything to a NAT gateway; the restricted shape replaces that route with an egress firewall allowlist plus VPC endpoints. A `%pip install` that times out while S3 reads succeed is an allowlist gap, not a denial. Keep a ledger of allowlist entries with reason and verification date.
 
@@ -32,7 +32,7 @@ GRANT USE SCHEMA ON SCHEMA quality.accepted TO `<job-nightly-application-id>`;
 GRANT SELECT ON TABLE quality.accepted.inspections TO `<job-nightly-application-id>`;
 ```
 
-A missing grant returns `PERMISSION_DENIED` naming the principal and privilege, with no AWS call made. If all three hold, Databricks assumes the credential's role and S3 evaluates the role and bucket policies; a refusal here is an `AccessDenied` from AWS. Serverless compute has no instance to carry a role, so the credential path is its only storage path.
+A missing grant returns `PERMISSION_DENIED` naming the principal and privilege, with no AWS call made. If all three hold, Databricks assumes the credential's role and S3 evaluates the role and bucket policies; a refusal here is an `AccessDenied` from AWS. On serverless, plan the credential path as the storage path, but do not assume no instance profile is involved: the Databricks API reference also documents registering one for Databricks SQL Serverless, and a workspace SQL warehouse setting that passes a profile's role to every SQL warehouse in the workspace and, it says, to serverless compute for notebooks and jobs.
 
 **Keys.** Databricks documents two customer-managed key use cases, managed services and workspace storage, on the Enterprise tier; a data bucket's own SSE-KMS key is a third matter whose policy must admit every reading identity, including the credential's role.
 <!-- section:dbxfe-aws-l01-serverless -->
@@ -71,7 +71,7 @@ This lesson is a schematic. It certifies no network design; no route, role, endp
 
 <!-- section:dbxfe-aws-l01-sources -->
 
-The Databricks on AWS pages for the high-level architecture, workspace creation, classic and serverless networking, the customer-managed VPC, PrivateLink, Unity Catalog cloud storage, instance profiles, encryption keys and serverless egress control were confirmed by search-result title and snippet on 23 September 2026; their bodies were not fetched in this build because the sandbox blocks the documentation host, and each source record says so. Documented mechanisms, original guidance and fictional Cinderline records are labelled separately.
+The Databricks on AWS pages for the high-level architecture, workspace creation, classic and serverless networking, the customer-managed VPC, PrivateLink, Unity Catalog cloud storage, instance profiles, encryption keys and serverless egress control were confirmed by search-result title and snippet on 23 September 2026; their bodies were not fetched in this build because the sandbox blocks the documentation host, and each source record says so. The 25 September 2026 corrections to the security-group and instance-profile teaching rest on the Databricks Terraform provider (v1.134.0) and the Databricks SDK for Python, read at pinned commits; those reads establish interfaces and documented requirements, not availability. Documented mechanisms, original guidance and fictional Cinderline records are labelled separately.
 
 <!-- section:dbxfe-aws-l01-links -->
 

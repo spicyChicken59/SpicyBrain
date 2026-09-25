@@ -85,7 +85,7 @@
       "reviewedAt": "2026-09-23",
       "publishedAt": "2026-09-21",
       "context": "Databricks on Google Cloud; account-level provisioning with a Google service account, a customer-managed VPC with Cloud NAT, and classic workspace creation.",
-      "caveat": "A provider guide provided as-is, not the product documentation; its examples pin old provider versions and example regions and defer networking detail to the customer-managed VPC page.",
+      "caveat": "A provider guide provided as-is, not the product documentation; its examples pin old provider versions and example regions and defer networking detail to the customer-managed VPC page. Its statement that account-level APIs can only be authenticated using Google-issued OIDC tokens is not relied on: the provider's own index documents service-principal authentication at the account level in all supported clouds, and its resource pages scope the Google-issued OIDC requirement to creating or updating those resources (dbxfe-gcp-source-tf-index, dbxfe-gcp-source-tf-oidc-workspaces, dbxfe-gcp-source-tf-oidc-networks, dbxfe-gcp-source-tf-oidc-vpce).",
       "reviewedEvidence": "File read in full on 2026-09-23 from the provider's v1.133.0 tag (release dated 2026-09-21 in the provider changelog) through its raw URL, which this build can reach although the documentation host is blocked; its SHA-256 matches the same file in the v1.133.0 module archive from the Go module proxy and on the main branch. Passages relied on: a customer service account is added to the account console as an account admin and impersonated by listed principals; the Databricks Workspace Creator custom role lists permissions to create IAM roles and service accounts, read and set the project's IAM policy, enable services, read networks and subnetworks and set subnetwork IAM, read and create firewall rules, and read forwarding rules when PSC is used; account-level APIs are called by account owners and admins and authenticated only with Google-issued OIDC tokens; the example VPC is custom mode, its subnet enables Private Google Access, and a Cloud Router and Cloud NAT are created before the workspace for outbound traffic; pod and service ranges and gke_config are deprecated and no longer supported."
     },
     {
@@ -184,7 +184,7 @@
       "reviewedAt": "2026-09-23",
       "publishedAt": null,
       "context": "Terraform that implements back-end PSC, the VPC, private access settings and the workspace for Databricks on Google Cloud.",
-      "caveat": "Template code on the main branch; its names, defaults and hardening choices are the template's, not requirements, and the firewall rule definitions it depends on were not readable.",
+      "caveat": "Template code on the main branch; its names, defaults and hardening choices are the template's, not requirements, and the firewall rule definitions it depends on were not readable. That was on 2026-09-23; the firewall definitions were read on 2026-09-25 at commit a3403d9 and are recorded as dbxfe-gcp-source-sra-firewall.",
       "reviewedEvidence": "psc.tf (SHA-256 530948d9...), vpc.tf (918ac3a2...), workspace.tf (3786894a...) and variables.tf read in full on 2026-09-23 from the main branch through raw URLs, which this build can reach although the documentation host is blocked. Passages relied on: two internal addresses and two forwarding rules in the customer VPC target the relay and workspace service attachments and are registered as Databricks VPC endpoints for the relay and the REST API; a private Cloud DNS zone for gcp.databricks.com, visible to the workspace VPC, holds A records for the workspace URL, its dp- prefixed variant and tunnel.<region>.gcp.databricks.com, which cluster VMs use to establish the secure tunnel back to the control plane; no Cloud Router or Cloud NAT is created when PSC is used; serverless workspaces set compute_mode and skip the project container and network configuration; storage CMEK applies to classic workspaces only and managed-services CMEK to both; the workspace depends on an ingress firewall rule for the Databricks subnet, and hardened egress without PSC needs the region's control-plane IP addresses."
     },
     {
@@ -274,6 +274,83 @@
       "context": "Google Cloud VPC Service Controls service perimeters.",
       "caveat": "API description only; whether and how Databricks on Google Cloud supports perimeters is not stated in any source read here.",
       "reviewedEvidence": "Fetched on 2026-09-23 from the URL above, which this build can reach although docs.cloud.google.com and the Databricks documentation host are blocked; revision 20260903; the ServicePerimeter description read. Passage relied on: a service perimeter describes a set of Google Cloud resources that can freely import and export data amongst themselves but not export outside it; a request with a source inside the perimeter and a target outside is blocked; a project or VPC network can belong to only one regular perimeter."
+    },
+    {
+      "id": "dbxfe-gcp-source-tf-oidc-workspaces",
+      "title": "Databricks Terraform provider v1.133.0: databricks_mws_workspaces resource (GCP authentication note)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_workspaces.md",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Databricks-published Terraform provider documentation at the v1.133.0 release commit; its Google Cloud note on how the account-level provider must authenticate to create or update this resource.",
+      "caveat": "Interface documentation read at a pinned commit, not the current Databricks authentication page. Relied on only to narrow the account-API authentication sentence to the resources the note names.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_workspaces.md: 'On GCP, the provider must be authenticated with a Google-issued OIDC token (not a Databricks OAuth token), because creating or updating this resource triggers operations against your GCP project.' Scope: Terraform interface documentation of the authentication the provider needs for this resource on Google Cloud; it does not describe every account-level API."
+    },
+    {
+      "id": "dbxfe-gcp-source-tf-oidc-networks",
+      "title": "Databricks Terraform provider v1.133.0: databricks_mws_networks resource (GCP authentication note)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_networks.md",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Databricks-published Terraform provider documentation at the v1.133.0 release commit; its Google Cloud note on how the account-level provider must authenticate to create or update this resource.",
+      "caveat": "Interface documentation read at a pinned commit, not the current Databricks authentication page. Relied on only to narrow the account-API authentication sentence to the resources the note names.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_networks.md: 'On GCP, the provider must be authenticated with a Google-issued OIDC token (not a Databricks OAuth token), because creating or updating this resource triggers operations against your GCP project.' Scope: Terraform interface documentation of the authentication the provider needs for this resource on Google Cloud; it does not describe every account-level API."
+    },
+    {
+      "id": "dbxfe-gcp-source-tf-oidc-vpce",
+      "title": "Databricks Terraform provider v1.133.0: databricks_mws_vpc_endpoint resource (GCP authentication note)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_vpc_endpoint.md",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Databricks-published Terraform provider documentation at the v1.133.0 release commit; its Google Cloud note on how the account-level provider must authenticate to create or update this resource.",
+      "caveat": "Interface documentation read at a pinned commit, not the current Databricks authentication page. Relied on only to narrow the account-API authentication sentence to the resources the note names.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/resources/mws_vpc_endpoint.md: 'On GCP, the provider must be authenticated with a Google-issued OIDC token (not a Databricks OAuth token), because creating or updating this resource triggers operations against your GCP project (such as validating the PSC endpoint).' Scope: Terraform interface documentation of the authentication the provider needs for this resource on Google Cloud; it does not describe every account-level API."
+    },
+    {
+      "id": "dbxfe-gcp-source-tf-index",
+      "title": "Databricks Terraform provider v1.133.0: provider documentation index (authentication)",
+      "url": "https://github.com/databricks/terraform-provider-databricks/blob/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/index.md",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Databricks-published Terraform provider documentation index at the v1.133.0 release commit; authentication options for account-level and workspace-level providers.",
+      "caveat": "Interface documentation read at a pinned commit, not the current Databricks authentication page. Relied on only to show that account-level calls are not limited to Google-issued OIDC tokens on every cloud.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/f745277dcc312b8ef43f07f4494545f2f0d25b7e/docs/index.md: 'You can use the `client_id` + `client_secret` attributes to authenticate with a Databricks-managed service principal at both the account and workspace levels in all supported clouds.' Scope: Terraform provider authentication interface; it establishes no region, entitlement or account setting."
+    },
+    {
+      "id": "dbxfe-gcp-source-sdk-gcp-key",
+      "title": "Databricks SDK for Python v0.141.0: service/provisioning.py (GcpKeyInfo)",
+      "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/provisioning.py",
+      "publisher": "Databricks",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Generated Account API client at the v0.141.0 release commit; GcpKeyInfo and CreateGcpKeyInfo docstrings for customer-managed keys on Google Cloud.",
+      "caveat": "An API reference docstring: it describes the key's service account and the manual option; it establishes no tier, region or default for manual. Relied on only to state the manual condition in the key-account rationale.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/provisioning.py: 'When true, Databricks will not use OAuth to grant the service account access to the KMS key. The customer is responsible for granting access manually.' Scope: API reference docstring (interface only)."
+    },
+    {
+      "id": "dbxfe-gcp-source-sra-firewall",
+      "title": "Databricks Security Reference Architecture templates: Google Cloud workspace module firewall rules (vpc-firewall.tf, workspace.tf)",
+      "url": "https://github.com/databricks/terraform-databricks-sra/blob/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/vpc-firewall.tf",
+      "publisher": "Databricks (terraform-databricks-sra, open-source security reference architecture templates)",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Terraform in Databricks' reference architecture that creates the VPC firewall rules for a classic Google Cloud workspace: the Databricks subnet's ingress rule before the workspace and, when the network is hardened, egress rules.",
+      "caveat": "Databricks-authored template code (companion material), not product documentation: its names, priorities and hardening choices are the template's and it is not a complete list of the rules Databricks requires. Relied on only for the subnet ingress rule the template pre-creates and the hardened egress rule to the region's control-plane IP addresses when PSC is not used.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/vpc-firewall.tf: '# Pre-create the intra-subnet ingress rule that Databricks would otherwise # auto-create on the workspace's VPC.' ... '# caller is responsible for all GCP-side networking, including the subnet # ingress rule Databricks requires.' ... 'count = (var.harden_network && !var.use_psc && !var.serverless_workspace_deployment) ? 1 : 0' ... 'destination_ranges = var.databricks_control_plane_ips'; from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/workspace.tf at the same commit: 'depends_on = [ google_compute_firewall.db_subnet_ingress, ]'; and from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/variables.tf: 'Databricks control-plane IPs for your region. Required when harden_network = true and use_psc = false.' Scope: a Databricks-authored reference template (open-source companion code); it shows what the template creates and what its comments say, not the product's documented requirements."
+    },
+    {
+      "id": "dbxfe-gcp-source-kms",
+      "title": "Cloud Key Management Service API v1 discovery document (revision 20260917): crypto key IAM policy",
+      "url": "https://www.googleapis.com/discovery/v1/apis/cloudkms/v1/rest",
+      "publisher": "Google",
+      "reviewedAt": "2026-09-25",
+      "publishedAt": null,
+      "context": "Google Cloud KMS access control: a crypto key's own IAM policy, read and replaced through getIamPolicy and setIamPolicy.",
+      "caveat": "API descriptions only, read live; they name no role for Databricks' key account and do not describe the grant Databricks makes through OAuth. Relied on only to show that a Cloud KMS key carries its own IAM policy of role bindings, where a grant on the key is recorded.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://www.googleapis.com/discovery/v1/apis/cloudkms/v1/rest (revision 20260917): the cryptoKeys resource pattern '^projects/[^/]+/locations/[^/]+/keyRings/[^/]+/cryptoKeys/[^/]+$'; setIamPolicy: 'Sets the access control policy on the specified resource. Replaces any existing policy.'; getIamPolicy: 'Gets the access control policy for a resource. Returns an empty policy if the resource exists and does not have a policy set.'; Policy: 'An Identity and Access Management (IAM) policy, which specifies access controls for Google Cloud resources. A `Policy` is a collection of `bindings`. A `binding` binds one or more `members`, or principals, to a single `role`.' Scope: Google's API reference for Cloud KMS access control (interface only)."
     }
   ],
   "claims": [
@@ -290,13 +367,17 @@
     },
     {
       "id": "dbxfe-gcp-claim-workspace",
-      "description": "A classic Databricks workspace on Google Cloud names, as its cloud resource container, the project it uses to instantiate the workspace's cloud resources, plus a region; its network configuration records the project that holds the VPC and subnet; by default Databricks creates a VPC in that project for each workspace, a customer-managed VPC is recommended and an existing workspace cannot be migrated to one; account-level APIs are called by account admins with Google-issued OIDC tokens at accounts.gcp.databricks.com.",
+      "description": "A classic Databricks workspace on Google Cloud names, as its cloud resource container, the project it uses to instantiate the workspace's cloud resources, plus a region; its network configuration records the project that holds the VPC and subnet; by default Databricks creates a VPC in that project for each workspace, a customer-managed VPC is recommended and an existing workspace cannot be migrated to one; account-level APIs at accounts.gcp.databricks.com are called by account admins, and creating or updating workspaces, network configurations and VPC endpoints through them requires a Google-issued OIDC token rather than a Databricks OAuth token.",
       "kind": "documented",
       "sourceIds": [
         "dbxfe-gcp-source-tf-workspaces",
         "dbxfe-gcp-source-tf-workspace",
         "dbxfe-gcp-source-sdk-provisioning",
-        "dbxfe-gcp-source-architecture"
+        "dbxfe-gcp-source-architecture",
+        "dbxfe-gcp-source-tf-oidc-workspaces",
+        "dbxfe-gcp-source-tf-oidc-networks",
+        "dbxfe-gcp-source-tf-oidc-vpce",
+        "dbxfe-gcp-source-tf-index"
       ],
       "context": "Databricks on Google Cloud classic workspaces; region, tier and entitlement must be verified."
     },
@@ -322,7 +403,11 @@
         "dbxfe-gcp-source-tf-workspace",
         "dbxfe-gcp-source-tf-uc",
         "dbxfe-gcp-source-sdk-provisioning",
-        "dbxfe-gcp-source-compute"
+        "dbxfe-gcp-source-compute",
+        "dbxfe-gcp-source-tf-oidc-workspaces",
+        "dbxfe-gcp-source-tf-oidc-networks",
+        "dbxfe-gcp-source-tf-oidc-vpce",
+        "dbxfe-gcp-source-tf-index"
       ],
       "context": "Identities in a Databricks on Google Cloud deployment; the default classic VM account is not settled by these sources."
     },
@@ -367,7 +452,8 @@
       "sourceIds": [
         "dbxfe-gcp-source-compute",
         "dbxfe-gcp-source-tf-workspace",
-        "dbxfe-gcp-source-sra-psc"
+        "dbxfe-gcp-source-sra-psc",
+        "dbxfe-gcp-source-sra-firewall"
       ],
       "context": "VPC firewall rules; the rules Databricks requires must be read from the current customer-managed VPC page."
     },
@@ -424,7 +510,9 @@
       "sourceIds": [
         "dbxfe-gcp-source-sdk-provisioning",
         "dbxfe-gcp-source-sra",
-        "dbxfe-gcp-source-sra-psc"
+        "dbxfe-gcp-source-sra-psc",
+        "dbxfe-gcp-source-sdk-gcp-key",
+        "dbxfe-gcp-source-kms"
       ],
       "context": "Customer-managed keys on Google Cloud; tier and region requirements must be verified."
     },
@@ -2962,7 +3050,7 @@
         {
           "id": "dbxfe-gcp-accounts-question-d",
           "text": "The service account that uses a customer-managed Cloud KMS key.",
-          "rationale": "The API describes it as existing within the Databricks control-plane project; Cinderline grants it use of the key."
+          "rationale": "The API describes it as existing within the Databricks control-plane project; with the manual option, Cinderline grants it use of the key."
         }
       ],
       "correctOptionId": "dbxfe-gcp-accounts-question-a",
@@ -3263,9 +3351,9 @@
     },
     {
       "id": "dbxfe-gcp-vpc-self",
-      "revision": "1",
+      "revision": "2",
       "prompt": "Cinderline's classic clusters stopped starting after the network team 'tidied up' unused routers in cl-net-host. A colleague proposes adding ingress firewall rules. Explain why that will not help and what you would check instead, in order.",
-      "modelAnswer": "The nodes open outbound connections to the relay, so an ingress rule is never consulted for the start. Check, in order: whether a Cloud Router with a NAT covering dbx-nodes-use4 still exists in us-east4 (the tidy-up is the recorded change); whether the relay hostname resolves from the subnet; whether any egress firewall rule with a lower priority number denies the connection; then retest one start in the same subnet and record the result. If back-end PSC is in use instead of NAT, check the endpoints and their DNS records in place of the NAT.",
+      "modelAnswer": "The nodes open outbound connections to the relay, so no ingress rule from another source is consulted to reach it. The ingress rule for traffic within the Databricks subnet is a separate matter and stays in place: Databricks' reference template creates it before the workspace, noting that Databricks would otherwise create it. Check, in order: whether a Cloud Router with a NAT covering dbx-nodes-use4 still exists in us-east4 (the tidy-up is the recorded change); whether the relay hostname resolves from the subnet; whether any egress firewall rule with a lower priority number denies the connection; then retest one start in the same subnet and record the result. If back-end PSC is in use instead of NAT, check the endpoints and their DNS records in place of the NAT.",
       "reasoning": "The order follows the recorded change first and then the packet's path outward, and each check is read-only and cheap; starting from firewall logs is acceptable when the change record is missing.",
       "conceptIds": [
         "dbxfe-gcp-vpc-concept",
@@ -3447,7 +3535,7 @@
     },
     {
       "id": "dbxfe-gcp-accounts",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "A service account's email names the project that owns it",
       "outcome": "Identify the owning project and purpose of each service account in a Databricks on Google Cloud deployment.",
       "explanation": "Google builds a [[dbxfe-gcp-sa-concept|service account]]'s email from the project that owns it and a name, so read the table's second column that way. The provisioning account lives in Cinderline's cl-admin-tools. The [[dbxfe-gcp-workspace-sa-concept|workspace service account]], db-<workspace-id>@prod-gcp-<region>.iam.gserviceaccount.com, lives in a Databricks project. The storage credential's account is Databricks-managed, and the account used with a customer-managed key exists in the Databricks control-plane project. Notice the unknown row: which account Databricks attaches to classic VMs by default is not settled by the sources read here.",
@@ -3475,13 +3563,13 @@
       ],
       "hint": "Look at the part of each email after the @ sign.",
       "handbook": {
-        "markdown": "**Reading an email.** Google's IAM API says the creator of a service account names the owning project and an account name, and IAM builds the email from them; the account's `projectId` is the owner. `dbx-provisioner@cl-admin-tools.iam.gserviceaccount.com` is therefore Cinderline's, and `db-8811223344556677@prod-gcp-us-east4.iam.gserviceaccount.com` (synthetic workspace ID, documented format) is owned by `prod-gcp-us-east4`, a Databricks project.\n\n**Provisioner.** Databricks' Google Cloud guide creates this account in the customer's project, adds it to the account console as an account admin and lets listed people impersonate it through `roles/iam.serviceAccountTokenCreator`. Account APIs accept only Google-issued OIDC tokens. Its custom Workspace Creator role is evidence of what creation touches: creating IAM roles and service accounts, reading and setting the project's IAM policy, enabling services, reading networks, setting subnetwork IAM, creating firewall rules, and reading forwarding rules for PSC.\n\n**Workspace account.** Databricks creates it per workspace. Given the creator's permission to set the project's IAM policy, expect it to hold roles in Cinderline's project after creation; which roles is unknown until verified, so capture the project IAM policy before and after creation.\n\n**Storage credential account.** The SDK calls it a Databricks-created Google Cloud Storage service account with a credential ID and an email; Cinderline binds that email on buckets.\n\n**Key account.** For a customer-managed key, the API says the service account with access to the key exists within the Databricks control-plane project; with `manual` set, Databricks will not use OAuth to grant itself access, and Cinderline grants it.\n\n**Cluster account.** A classic cluster's `gcp_attributes.google_service_account` authenticates the cluster to Cloud Storage and BigQuery. Compute Engine attaches at most one service account per VM, and code on the VM reads its tokens through the metadata server, so every workload on that cluster acts as that account.",
+        "markdown": "**Reading an email.** Google's IAM API says the creator of a service account names the owning project and an account name, and IAM builds the email from them; the account's `projectId` is the owner. `dbx-provisioner@cl-admin-tools.iam.gserviceaccount.com` is therefore Cinderline's, and `db-8811223344556677@prod-gcp-us-east4.iam.gserviceaccount.com` (synthetic workspace ID, documented format) is owned by `prod-gcp-us-east4`, a Databricks project.\n\n**Provisioner.** Databricks' Google Cloud guide creates this account in the customer's project, adds it to the account console as an account admin and lets listed people impersonate it through `roles/iam.serviceAccountTokenCreator`. Creating or updating a workspace, network configuration or VPC endpoint requires a Google-issued OIDC token rather than a Databricks OAuth token, because those calls trigger operations against the customer's project. The provisioner's custom Workspace Creator role is evidence of what creation touches: creating IAM roles and service accounts, reading and setting the project's IAM policy, enabling services, reading networks, setting subnetwork IAM, creating firewall rules, and reading forwarding rules for PSC.\n\n**Workspace account.** Databricks creates it per workspace. Given the creator's permission to set the project's IAM policy, expect it to hold roles in Cinderline's project after creation; which roles is unknown until verified, so capture the project IAM policy before and after creation.\n\n**Storage credential account.** The SDK calls it a Databricks-created Google Cloud Storage service account with a credential ID and an email; Cinderline binds that email on buckets.\n\n**Key account.** For a customer-managed key, the API says the service account with access to the key exists within the Databricks control-plane project; with `manual` set, Databricks will not use OAuth to grant itself access, and Cinderline grants it.\n\n**Cluster account.** A classic cluster's `gcp_attributes.google_service_account` authenticates the cluster to Cloud Storage and BigQuery. Compute Engine attaches at most one service account per VM, and code on the VM reads its tokens through the metadata server, so every workload on that cluster acts as that account.",
         "sourceSectionIds": [
           "dbxfe-gcp-l01-identities"
         ]
       },
       "recap": "Read a service account's owner off its email domain, then find the grant it needs on something Cinderline owns.",
-      "changeNote": "New academy beat.",
+      "changeNote": "Two corrections to our teaching. The handbook's sentence on account-API sign-in was narrowed: the Databricks Terraform provider documentation (v1.133.0) requires a Google-issued OIDC token for creating or updating workspaces, network configurations and VPC endpoints, and documents service-principal sign-in at account level. The check's key-account rationale now says that Cinderline grants that account use of the key when the manual option is set, as the Databricks SDK for Python (v0.141.0) describes.",
       "mediaIds": []
     },
     {
@@ -3520,7 +3608,7 @@
     },
     {
       "id": "dbxfe-gcp-vpc",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "Classic compute needs one regional subnet and a way out",
       "outcome": "List what a customer-managed VPC must hand a classic workspace on Google Cloud and predict the failure when its outbound path is removed.",
       "explanation": "A [[dbxfe-gcp-vpc-concept|customer-managed VPC]] is registered as a network configuration naming the VPC's project, the VPC and one subnet in the workspace's region. Compute Engine nodes take their addresses from that subnet, whose netmask must fall between /29 and /9 and which no other workspace or resource may share. Nodes need outbound access through [[dbxfe-gcp-nat-concept|Cloud NAT]] or a similar appliance unless back-end PSC carries control-plane traffic. Notice in the second state that deleting the NAT stops cluster starts while the subnet, Private Google Access and firewall rules look unchanged.",
@@ -3548,7 +3636,7 @@
         ]
       },
       "recap": "One regional subnet (/29 to /9) that nothing else shares, plus an outbound path; removing the NAT stalls starts without any refusal.",
-      "changeNote": "New academy beat.",
+      "changeNote": "The self-check's model answer was narrowed: ingress rules from other sources do not help the nodes' outbound connection to the relay, but the ingress rule for traffic within the Databricks subnet stays in place. Source: Databricks' reference architecture template (vpc-firewall.tf), which creates that rule and notes that Databricks would otherwise create it.",
       "mediaIds": []
     },
     {

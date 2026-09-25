@@ -178,6 +178,72 @@
    "context": "Databricks on AWS; change data feed modes for Delta and Unity Catalog tables.",
    "caveat": "Not re-read in this build; the mode, runtime and table eligibility must be checked on the current page.",
    "reviewedEvidence": "Not searched or fetched in this authoring session: the session's web-search budget was exhausted and the documentation host is blocked by the sandbox egress proxy, so neither the title nor the body was re-checked on 2026-09-23. Title and URL are those of the retained Delta module's source record for this page, reviewed on 2026-09-20. Passage relied on, as recorded there: change records carry insert, delete, update_preimage and update_postimage labels with a commit version; the page dated September 16 distinguishes an automatic change data feed that requires Databricks Runtime 19 or above and an eligible Unity Catalog table from the legacy Delta change data feed enabled by table property."
+  },
+  {
+   "id": "dbxfe-delta-writes-source-drop-feature",
+   "title": "Drop Delta table features",
+   "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-drop-feature.md",
+   "publisher": "Delta Lake project (delta-io/delta repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source Delta Lake 4.0.0 documentation source (tag v4.0.0 commit) for dropping table features and downgrading the protocol.",
+   "caveat": "Open-source Delta scope at one release: the list of droppable features changes between releases, the page's two-stage procedure is not the 4.0.0 code's default path, and Databricks documents its own procedure and runtime requirements, which were not read here.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-drop-feature.md (tag v4.0.0): 'This feature is available in <Delta> 3.0.0 and above. ... Downgrade the table protocol. ... You can drop the following Delta table features: - `deletionVectors`. ... Drop support for column mapping is available in <Delta> 3.3.0 and above. ... Drop support for check constraints is available in <Delta> 3.3.0 and above. ... You cannot drop other [Delta table features]' and 'After at least 24 hours have passed, the user executes the `DROP FEATURE` command again with the `TRUNCATE HISTORY` clause.' Open-source scope: some features, not changeDataFeed, clustering or domainMetadata, can be dropped in 4.0.0 (the page describes a two-stage procedure; the 4.0.0 implementation's default drop is one command, with checkpoint protection for features that need history protection, see dbxfe-delta-writes-source-drop-feature-code); the versioning page's 'Protocol version upgrades are irreversible' is qualified by it."
+  },
+  {
+   "id": "dbxfe-delta-writes-source-schema-rewrite",
+   "title": "Table batch reads and writes: update and replace table schema",
+   "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-batch.md",
+   "publisher": "Delta Lake project (delta-io/delta repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source Delta Lake 4.0.0 documentation source (tag v4.0.0 commit): renaming and dropping columns, and replacing a table's schema and partitioning.",
+   "caveat": "Open-source Delta 4.0.0 behaviour; rename and drop are marked experimental on this page, and Databricks documents its own schema-change behaviour, which was not read here.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/docs/source/delta-batch.md (tag v4.0.0): 'To rename columns without rewriting any of the columns' existing data, you must enable column mapping for the table.' ... 'To drop columns as a metadata-only operation without rewriting any data files, you must enable column mapping for the table.' ... 'You can change a column's type or name or drop a column by rewriting the table. To do this, use the `overwriteSchema` option:' ... 'You replace the schema and partitioning of the table by setting the `overwriteSchema` option to `true`:' Open-source scope: column mapping is needed for renames and drops without a rewrite, and an overwrite with overwriteSchema is the rewriting alternative, also for partitioning."
+  },
+  {
+   "id": "dbxfe-delta-writes-source-drop-feature-code",
+   "title": "Delta Lake 4.0.0 source: alterDeltaTableCommands.scala, the DROP FEATURE command",
+   "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/commands/alterDeltaTableCommands.scala",
+   "publisher": "Delta Lake project (delta-io/delta repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source delta-spark 4.0.0 implementation at the v4.0.0 commit: how ALTER TABLE ... DROP FEATURE chooses between the fast, checkpoint-protected drop and the history-truncating drop, and when it refuses TRUNCATE HISTORY.",
+   "caveat": "Open-source implementation scope at one release: it shows what the 4.0.0 code does, which differs from the two-stage procedure the same release's drop-feature page describes; Databricks documents its own procedure and runtime requirements, which were not read here.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/commands/alterDeltaTableCommands.scala (tag v4.0.0): 'i.e. fast drop feature. We create barrier ... checkpoints to protect against log replay and checkpoint creation. ... if (truncateHistory && !historyTruncationEligibleFeature) { throw DeltaErrors.tableFeatureDropHistoryTruncationNotAllowed() ... // If the user uses the truncate history option we always fallback to the old implementation. if (!truncateHistory && conf.getConf(DeltaSQLConf.FAST_DROP_FEATURE_ENABLED)) { executeDropFeatureWithCheckpointProtection(sparkSession, removableFeature) ... .withFeature(CheckpointProtectionTableFeature)'. Open-source implementation scope: without TRUNCATE HISTORY and with the fast-drop setting on, the feature is dropped in one command, and a feature that needs history protection gets barrier checkpoints and the checkpointProtection feature; TRUNCATE HISTORY is refused for a feature that needs no history protection."
+  },
+  {
+   "id": "dbxfe-delta-writes-source-fast-drop-default",
+   "title": "Delta Lake 4.0.0 source: DeltaSQLConf.scala, fast drop feature setting",
+   "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/sources/DeltaSQLConf.scala",
+   "publisher": "Delta Lake project (delta-io/delta repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source delta-spark 4.0.0 implementation at the v4.0.0 commit: the internal setting that selects the fast DROP FEATURE path and its default.",
+   "caveat": "Open-source implementation scope; the setting is internal and its default can change between releases.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/sources/DeltaSQLConf.scala (tag v4.0.0): 'val FAST_DROP_FEATURE_ENABLED = buildConf(\"tableFeatures.fastDropFeature.enabled\") .internal() .doc( \"\"\"Whether to allow dropping features with the fast drop feature feature ... .booleanConf .createWithDefault(true)'. Open-source implementation scope: the fast drop path is on by default in 4.0.0."
+  },
+  {
+   "id": "dbxfe-delta-writes-source-table-feature-code",
+   "title": "Delta Lake 4.0.0 source: TableFeature.scala, removable features and history protection",
+   "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/TableFeature.scala",
+   "publisher": "Delta Lake project (delta-io/delta repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source delta-spark 4.0.0 implementation at the v4.0.0 commit: which features are removable and which need history protection when dropped, and the checkpointProtection writer feature.",
+   "caveat": "Open-source implementation scope at one release; the drop-feature page is the documented list of droppable features.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/TableFeature.scala (tag v4.0.0): 'sealed trait RemovableFeature { self: TableFeature => ... def requiresHistoryProtection: Boolean = isReaderWriterFeature ... object CheckConstraintsTableFeature extends LegacyWriterFeature(name = \"checkConstraints\", minWriterVersion = 3) with FeatureAutomaticallyEnabledByMetadata with RemovableFeature { ... object CheckpointProtectionTableFeature extends WriterFeature(name = \"checkpointProtection\")'. Open-source implementation scope: only reader-and-writer features need history protection by default, and checkConstraints is a removable writer-only feature, so TRUNCATE HISTORY is refused when dropping it; checkpointProtection, which the fast drop adds for reader-and-writer features, is itself a writer feature."
+  },
+  {
+   "id": "dbxfe-delta-writes-source-merge-multiple-match",
+   "title": "Delta Lake 4.0.0 source: MergeIntoCommandBase.scala, multiple-match check",
+   "url": "https://github.com/delta-io/delta/blob/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/commands/MergeIntoCommandBase.scala",
+   "publisher": "Delta Lake project (delta-io/delta repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source delta-spark 4.0.0 implementation at the v4.0.0 commit: when MERGE refuses several source rows matching one target row.",
+   "caveat": "Open-source implementation scope at one release; Databricks Runtime rules for duplicate matches differ by runtime and were not read here.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/delta-io/delta/6d055c5c8a2e16bbf4458268a1bc271c7afcc4d2/spark/src/main/scala/org/apache/spark/sql/delta/commands/MergeIntoCommandBase.scala (tag v4.0.0): '// Multiple matches are not ambiguous when there is only one unconditional delete as ... if (hasMultipleMatches && !isOnlyOneUnconditionalDelete) { throw DeltaErrors.multipleSourceRowMatchingTargetRowInMergeException(spark)'. Open-source implementation scope: a MERGE whose only matched clause is an unconditional DELETE is not refused, so the refusal applies when matched rows would be updated (or conditionally deleted), and the documentation's 'can fail' is the accurate general wording."
   }
  ],
  "claims": [
@@ -196,7 +262,8 @@
    "description": "A MERGE can fail when several source rows match the same target row and try to modify it; the source should be preprocessed to one change per key before merging.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-delta-writes-source-update"
+    "dbxfe-delta-writes-source-update",
+    "dbxfe-delta-writes-source-merge-multiple-match"
    ],
    "context": "Open-source Delta 4.0.0; lab L05 observed the refusal DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE."
   },
@@ -252,7 +319,8 @@
    "description": "Columns are added explicitly with ALTER TABLE ADD COLUMNS, for one write with the mergeSchema option, or for a whole session with spark.databricks.delta.schema.autoMerge.enabled; added columns are appended; overwriteSchema replaces the schema on overwrite; streams reading the table terminate on a schema change.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-delta-writes-source-batch"
+    "dbxfe-delta-writes-source-batch",
+    "dbxfe-delta-writes-source-schema-rewrite"
    ],
    "context": "Open-source Delta 4.0.0; lab L05 added a nullable column with mergeSchema and read the old schema by version."
   },
@@ -268,11 +336,15 @@
   },
   {
    "id": "dbxfe-delta-writes-claim-features",
-   "description": "Table features are named capabilities in a table's read or write protocol; a client that does not understand a listed feature cannot read or write the table; the change data feed and CHECK constraints are writer features, column mapping and deletion vectors also need readers; protocol upgrades are irreversible.",
+   "description": "Table features are named capabilities in a table's read or write protocol; a client that does not understand a listed feature cannot read or write the table; the change data feed and CHECK constraints are writer features, column mapping and deletion vectors also need readers; a protocol upgrade cannot simply be undone: from Delta 3.0.0 some features, not including changeDataFeed, clustering or domainMetadata, can be dropped by a separate DROP FEATURE procedure.",
    "kind": "documented",
    "sourceIds": [
     "dbxfe-delta-writes-source-versioning",
-    "dbxfe-src-delta-protocol"
+    "dbxfe-src-delta-protocol",
+    "dbxfe-delta-writes-source-drop-feature",
+    "dbxfe-delta-writes-source-drop-feature-code",
+    "dbxfe-delta-writes-source-fast-drop-default",
+    "dbxfe-delta-writes-source-table-feature-code"
    ],
    "context": "Open-source Delta 4.0.0 and Databricks feature compatibility; lab L05 read the protocol before and after."
   },
@@ -302,7 +374,8 @@
    "description": "Liquid clustering is declared with CLUSTER BY, applied incrementally by OPTIMIZE, changeable with ALTER TABLE ... CLUSTER BY without rewriting existing data, incompatible with partitioning and ZORDER, limited to four keys with statistics, and adds the clustering and domainMetadata writer features.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-delta-writes-source-clustering"
+    "dbxfe-delta-writes-source-clustering",
+    "dbxfe-delta-writes-source-schema-rewrite"
    ],
    "context": "Open-source Delta 4.0.0; lab L05 created a clustered table and read its features."
   },
@@ -360,7 +433,8 @@
    "kind": "documented",
    "sourceIds": [
     "dbxfe-delta-writes-source-batch",
-    "dbxfe-delta-writes-source-feed"
+    "dbxfe-delta-writes-source-feed",
+    "dbxfe-delta-writes-source-schema-rewrite"
    ],
    "context": "Open-source Delta 4.0.0 documentation; streaming is not executed in lab L05."
   },
@@ -1970,7 +2044,7 @@
    "title": "Three ways to lay out the same table",
    "alt": "A comparison of Hive-style partitioning, Z-ordering and liquid clustering, then candidate clustering keys for Cinderline's query filters.",
    "caption": "Liquid clustering replaces partitioning and ZORDER and lets keys change without rewriting data. Synthetic teaching example.",
-   "textEquivalent": "Three layout choices: How each is declared, changed and maintained. Table columns: Choice, Declared by, Change later, Maintenance. Rows: Choice Hive-style partitioning; Declared by PARTITIONED BY at create; Change later new table needed; Maintenance small files per partition | Choice Z-ordering; Declared by OPTIMIZE ... ZORDER BY; Change later next OPTIMIZE run; Maintenance rewrites all partition files each run | Choice Liquid clustering; Declared by CLUSTER BY; Change later ALTER TABLE ... CLUSTER BY, no rewrite; Maintenance OPTIMIZE clusters incrementally.\n\nKeys from Cinderline's filters: Choose up to four keys that queries actually filter on. Table columns: Query filter, Candidate key, Decision. Rows: Query filter plant = 'South' on the dashboard; Candidate key plant; Decision key | Query filter inspected_on BETWEEN two dates; Candidate key inspected_on; Decision key | Query filter inspection_id lookups by the export; Candidate key inspection_id; Decision key if frequent | Query filter defective > 0, rarely used; Candidate key defective; Decision not a key.",
+   "textEquivalent": "Three layout choices: How each is declared, changed and maintained. Table columns: Choice, Declared by, Change later, Maintenance. Rows: Choice Hive-style partitioning; Declared by PARTITIONED BY at create; Change later rewrite all data (overwriteSchema); Maintenance small files per partition | Choice Z-ordering; Declared by OPTIMIZE ... ZORDER BY; Change later next OPTIMIZE run; Maintenance rewrites all partition files each run | Choice Liquid clustering; Declared by CLUSTER BY; Change later ALTER TABLE ... CLUSTER BY, no rewrite; Maintenance OPTIMIZE clusters incrementally.\n\nKeys from Cinderline's filters: Choose up to four keys that queries actually filter on. Table columns: Query filter, Candidate key, Decision. Rows: Query filter plant = 'South' on the dashboard; Candidate key plant; Decision key | Query filter inspected_on BETWEEN two dates; Candidate key inspected_on; Decision key | Query filter inspection_id lookups by the export; Candidate key inspection_id; Decision key if frequent | Query filter defective > 0, rarely used; Candidate key defective; Decision not a key.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-delta-writes-claim-clustering",
@@ -1997,7 +2071,7 @@
        [
         "Hive-style partitioning",
         "PARTITIONED BY at create",
-        "new table needed",
+        "rewrite all data (overwriteSchema)",
         "small files per partition"
        ],
        [
@@ -2854,8 +2928,8 @@
   },
   {
    "id": "dbxfe-delta-writes-duplicate",
-   "version": "1.0.0",
-   "title": "Two source rows for one target row stop the whole MERGE",
+   "version": "1.1.0",
+   "title": "Two source rows updating one target row stop the whole MERGE",
    "outcome": "Predict when Delta refuses a MERGE for duplicate matches, and state what the table looks like afterwards.",
    "explanation": "Day 3 carries two rows for D, revisions 2 and 3, and D already exists in the target. Both source rows match one target row, so the update is ambiguous: which revision should win? Delta refuses the whole statement with a [[dbxfe-delta-writes-duplicate-concept|multiple-match error]] instead of guessing. Notice in the second state that nothing is half-applied: E is not inserted and the table stays at version 4. The error protects matched keys; it is not a de-duplication step.",
    "lessonId": "dbxfe-delta-writes-l01",
@@ -2884,8 +2958,8 @@
      "dbxfe-delta-writes-l01-duplicates"
     ]
    },
-   "recap": "Two source rows for one matched target row make Delta refuse the whole MERGE; duplicates of a new key slip in.",
-   "changeNote": "New academy beat.",
+   "recap": "Two source rows updating one matched target row make Delta refuse the whole MERGE; duplicates of a new key slip in.",
+   "changeNote": "Narrowed the title and recap: Delta refuses a MERGE when two source rows try to update one target row, not whenever two rows match; a MERGE whose only matched action is an unconditional DELETE is not refused (Delta's MERGE source code, MergeIntoCommandBase.scala, at the v4.0.0 tag).",
    "mediaIds": []
   },
   {
@@ -3023,7 +3097,7 @@
   },
   {
    "id": "dbxfe-delta-writes-evolution",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "Schema evolution is a commit you choose, one write at a time",
    "outcome": "Choose between an explicit ALTER, a per-write mergeSchema option and a session-wide setting, and predict what old rows and old versions show.",
    "explanation": "[[dbxfe-delta-writes-evolution-concept|Schema evolution]] adds the new column inside a commit. With .option(\"mergeSchema\", \"true\") on one append, version 7 gains a nullable inspector column: A, C and D read null, F reads QA-2. Notice in the first two tables that reading version 6 still returns five columns, because each version keeps its own schema. Prefer the narrowest switch: an explicit ALTER TABLE or one write's or one MERGE's option, not a session-wide setting that silently evolves every later write.",
@@ -3049,19 +3123,19 @@
     "dbxfe-delta-writes-evolution-self"
    ],
    "handbook": {
-    "markdown": "Four switches add a column, from narrowest to widest:\n\n```sql\nALTER TABLE inspections ADD COLUMNS (inspector STRING);   -- explicit, reviewed, one commit\n```\n\n```python\nbatch.write.format(\"delta\").mode(\"append\").option(\"mergeSchema\", \"true\").save(path)   # this write only\n(DeltaTable.forPath(spark, path).alias(\"t\").merge(src.alias(\"s\"), \"t.inspection_id = s.inspection_id\")\n    .whenMatchedUpdateAll().whenNotMatchedInsertAll()\n    .withSchemaEvolution().execute())                                                  # this MERGE only (Delta 3.2+)\nspark.conf.set(\"spark.databricks.delta.schema.autoMerge.enabled\", \"true\")                   # every write after it\n```\n\nThe documentation says the write option takes precedence over the session setting and that added columns are appended at the end of the schema. Its 4.0.0 merge page still says a MERGE evolves the schema only when the session setting is on, but the merge builder has had `withSchemaEvolution()` since Delta 3.2, scoped to that one MERGE. Run locally on Spark 4.0.4 with delta-spark 4.0.0 and autoMerge unset, it added inspector, and the same MERGE without it ignored the column. The SQL form `MERGE WITH SCHEMA EVOLUTION INTO` parsed and merged the rows in that run but added no column, so check the column list after any evolving MERGE. `overwriteSchema` is a different, heavier tool: it replaces the schema and partitioning during an overwrite.\n\n**Observed in the lab.** Version 7's columns were the five originals plus `inspector`; version 6 read by `versionAsOf` returned five columns; A, C and D read null because their files never had the column.\n\n**Downstream effects to plan.** The documentation states that streams reading a table terminate when its schema is updated and must be restarted. Views that select explicit columns keep their old shape until recreated. A consumer of the change data feed sees the latest version's schema. Renames and drops are not additive; they need column mapping, which is a reader-and-writer feature with its own compatibility cost.\n\n**Why not the session switch.** With autoMerge on, a misspelt column in any later batch becomes a permanent column, and nobody reviewed it. Evolution should leave a trace a reviewer can find: a DDL statement or one write with an explicit option.",
+    "markdown": "Four switches add a column, from narrowest to widest:\n\n```sql\nALTER TABLE inspections ADD COLUMNS (inspector STRING);   -- explicit, reviewed, one commit\n```\n\n```python\nbatch.write.format(\"delta\").mode(\"append\").option(\"mergeSchema\", \"true\").save(path)   # this write only\n(DeltaTable.forPath(spark, path).alias(\"t\").merge(src.alias(\"s\"), \"t.inspection_id = s.inspection_id\")\n    .whenMatchedUpdateAll().whenNotMatchedInsertAll()\n    .withSchemaEvolution().execute())                                                  # this MERGE only (Delta 3.2+)\nspark.conf.set(\"spark.databricks.delta.schema.autoMerge.enabled\", \"true\")                   # every write after it\n```\n\nThe documentation says the write option takes precedence over the session setting and that added columns are appended at the end of the schema. Its 4.0.0 merge page still says a MERGE evolves the schema only when the session setting is on, but the merge builder has had `withSchemaEvolution()` since Delta 3.2, scoped to that one MERGE. Run locally on Spark 4.0.4 with delta-spark 4.0.0 and autoMerge unset, it added inspector, and the same MERGE without it ignored the column. The SQL form `MERGE WITH SCHEMA EVOLUTION INTO` parsed and merged the rows in that run but added no column, so check the column list after any evolving MERGE. `overwriteSchema` is a different, heavier tool: it replaces the schema and partitioning during an overwrite.\n\n**Observed in the lab.** Version 7's columns were the five originals plus `inspector`; version 6 read by `versionAsOf` returned five columns; A, C and D read null because their files never had the column.\n\n**Downstream effects to plan.** The documentation states that streams reading a table terminate when its schema is updated and must be restarted. Views that select explicit columns keep their old shape until recreated. A consumer of the change data feed sees the latest version's schema. Renames and drops are not additive: without rewriting data files they need column mapping, a reader-and-writer feature with its own compatibility cost; otherwise the table is rewritten with `overwriteSchema`.\n\n**Why not the session switch.** With autoMerge on, a misspelt column in any later batch becomes a permanent column, and nobody reviewed it. Evolution should leave a trace a reviewer can find: a DDL statement or one write with an explicit option.",
     "sourceSectionIds": [
      "dbxfe-delta-writes-l01-schema",
      "dbxfe-delta-writes-l01-mistakes"
     ]
    },
    "recap": "Evolve with an explicit ALTER or one write's mergeSchema option; old rows read null and old versions keep their schema.",
-   "changeNote": "New academy beat.",
+   "changeNote": "Corrected the note on renaming and dropping columns: column mapping is needed only to do it without rewriting data files; otherwise the table can be rewritten with overwriteSchema (Delta Lake's batch reads and writes documentation, delta-batch.md, at the v4.0.0 tag).",
    "mediaIds": []
   },
   {
    "id": "dbxfe-delta-writes-features",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "A table feature binds every writer, and some bind readers too",
    "outcome": "Name the table features this module's actions add, say whether readers or only writers must support them, and check clients before enabling one.",
    "explanation": "A [[dbxfe-delta-writes-feature-concept|table feature]] is a flag in the table's protocol that clients must understand. In the lab, enabling the change data feed added changeDataFeed and raised the writer version from 2 to 7 while readers stayed at version 1. Declaring liquid clustering added clustering and domainMetadata. Notice in the matrix which actions touch only the write protocol and which also bind readers. A protocol upgrade cannot simply be undone, so list every reader and writer first.",
@@ -3081,13 +3155,13 @@
     "dbxfe-delta-writes-features-question"
    ],
    "handbook": {
-    "markdown": "`DESCRIBE DETAIL` shows the protocol in three fields: `minReaderVersion`, `minWriterVersion` and `tableFeatures`. The lab read them three times:\n\n| Table state | Reader | Writer | Features |\n|---|---|---|---|\n| version 2 | 1 | 2 | appendOnly, invariants |\n| version 3, feed enabled | 1 | 7 | appendOnly, changeDataFeed, invariants |\n| clustered table | 1 | 7 | appendOnly, clustering, domainMetadata, invariants |\n\nWriter version 7 means the write protocol lists named features instead of implying them from a version number, so a writer needs table-feature support (Delta 2.3.0 or later in open source) before it can write at all; reader version 3 does the same for reads. The open-source documentation classifies the change data feed and CHECK constraints as write-protocol features, while column mapping and deletion vectors also upgrade the read protocol, so they can lock out old readers.\n\n**Before enabling a feature on a shared table**, list every client that reads or writes it (Spark jobs, streaming consumers, BI connectors, other engines, partner readers), record the Delta version or protocol support of each, and compare that list with the feature's side. The retained Delta module's protocol beat gives the general check; this module adds the concrete features its own actions bring.\n\n**Reversal is limited.** The documentation calls protocol upgrades irreversible; some features can be dropped in later Delta releases under conditions (the deletion vectors page mentions dropping that feature), which is a separate procedure to read before relying on it. On Databricks, the feature compatibility page lists which runtime supports each feature.",
+    "markdown": "`DESCRIBE DETAIL` shows the protocol in three fields: `minReaderVersion`, `minWriterVersion` and `tableFeatures`. The lab read them three times:\n\n| Table state | Reader | Writer | Features |\n|---|---|---|---|\n| version 2 | 1 | 2 | appendOnly, invariants |\n| version 3, feed enabled | 1 | 7 | appendOnly, changeDataFeed, invariants |\n| clustered table | 1 | 7 | appendOnly, clustering, domainMetadata, invariants |\n\nWriter version 7 means the write protocol lists named features instead of implying them from a version number, so a writer needs table-feature support (Delta 2.3.0 or later in open source) before it can write at all; reader version 3 does the same for reads. The open-source documentation classifies the change data feed and CHECK constraints as write-protocol features, while column mapping and deletion vectors also upgrade the read protocol, so they can lock out old readers.\n\n**Before enabling a feature on a shared table**, list every client that reads or writes it (Spark jobs, streaming consumers, BI connectors, other engines, partner readers), record the Delta version or protocol support of each, and compare that list with the feature's side. The retained Delta module's protocol beat gives the general check; this module adds the concrete features its own actions bring.\n\n**Reversal is limited.** The versioning page calls protocol upgrades irreversible, yet from Delta 3.0.0, so in 4.0.0 too, `ALTER TABLE ... DROP FEATURE` can remove some features and downgrade the protocol (in 4.0.0 deletionVectors, columnMapping, checkConstraints and a few others). The 4.0.0 page and the 4.0.0 code differ on how it runs. The page describes two runs at least 24 hours apart, the second with `TRUNCATE HISTORY`, which removes older table history. The 4.0.0 code by default drops the feature in one run, without that wait or `TRUNCATE HISTORY`; for a feature that also binds readers it writes protective checkpoints and adds a checkpointProtection writer feature. It refuses `TRUNCATE HISTORY` for writer-only features such as checkConstraints. Try the drop on a copy of the table before relying on it. The features this module enables, changeDataFeed, clustering and domainMetadata, cannot be dropped in 4.0.0. On Databricks, the feature compatibility page lists which runtime supports each feature.",
     "sourceSectionIds": [
      "dbxfe-delta-writes-l01-schema"
     ]
    },
    "recap": "Every feature you enable binds every writer, and reader features bind every reader too; check clients first.",
-   "changeNote": "New academy beat.",
+   "changeNote": "Corrected the section on undoing a table feature: Delta Lake 4.0.0 can drop some features, but not changeDataFeed, clustering or domainMetadata (Delta's drop-feature documentation at the v4.0.0 tag). It also now says the 4.0.0 code drops a feature in one run by default, not in the two-stage wait that page describes (Delta's DROP FEATURE source code at the v4.0.0 tag).",
    "mediaIds": []
   },
   {
@@ -3158,7 +3232,7 @@
   },
   {
    "id": "dbxfe-delta-writes-clustering",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "Liquid clustering keeps layout keys you can change later",
    "outcome": "Choose between partitioning, Z-ordering and liquid clustering for a filter pattern, and say what happens when the keys change.",
    "explanation": "[[dbxfe-delta-writes-clustering-concept|Liquid clustering]] declares clustering keys with CLUSTER BY; OPTIMIZE then clusters data incrementally, rewriting only what needs it. Keys can change with ALTER TABLE ... CLUSTER BY without rewriting existing files, and OPTIMIZE FULL reclusters everything. Notice in the comparison that clustering replaces partitioning and ZORDER instead of combining with them. In open-source Delta you choose the keys; Databricks can also choose them automatically.",
@@ -3184,7 +3258,7 @@
     ]
    },
    "recap": "Liquid clustering replaces partitions and Z-order with keys that OPTIMIZE applies incrementally and you can change.",
-   "changeNote": "New academy beat.",
+   "changeNote": "Corrected the comparison table: changing a table's partitioning does not need a new table, because an overwrite with overwriteSchema can replace the partitioning by rewriting all data (Delta Lake's batch reads and writes documentation, delta-batch.md, at the v4.0.0 tag).",
    "mediaIds": []
   },
   {
@@ -3382,7 +3456,7 @@
    "revision": "1",
    "prompt": "What happens to a stream reading a Delta table when a column is added?",
    "answer": "The stream stops at the schema change and must be restarted before it continues.",
-   "explanation": "The open-source documentation states that updating a Delta table's schema terminates streams reading from it. A planned column addition therefore needs the stream owner's agreement and a restart plan, and a change-feed reader uses the latest version's schema. Renames and drops are not additive and need column mapping, which brings further limits for change-feed reads.",
+   "explanation": "The open-source documentation states that updating a Delta table's schema terminates streams reading from it. A planned column addition therefore needs the stream owner's agreement and a restart plan, and a change-feed reader uses the latest version's schema. Renames and drops are not additive; done without rewriting data files they need column mapping, which brings further limits for change-feed reads.",
    "lessonId": "dbxfe-delta-writes-l01",
    "sectionId": "dbxfe-delta-writes-l01-schema",
    "conceptIds": [

@@ -107,7 +107,7 @@
    "reviewedAt": "2026-09-23",
    "publishedAt": null,
    "context": "Open-source MLflow 3 documentation, read as of release 3.16.1 (tag v3.16.1). The URL is the documentation source file pinned to the release tag.",
-   "caveat": "Judge availability changes between releases; the note that some judges are Databricks-managed only was true of the v3.16.1 documentation and must be rechecked.",
+   "caveat": "Judge availability changes between releases. This page's note that Safety and RetrievalRelevance are only available in Databricks managed MLflow is contradicted by the same release's package and by the Safety and RetrievalRelevance judge pages, so the module does not teach it as a platform difference.",
    "reviewedEvidence": "Fetched on 2026-09-23 (HTTP 200) and read. This is the source of the documentation page that other MLflow pages link as /genai/eval-monitor/scorers/llm-judge/predefined; the rendered mlflow.org page was not fetched. Passage relied on: a table of built-in judges with what each evaluates and whether it needs ground truth or a trace: RelevanceToQuery (neither), Correctness (expected facts), Guidelines and ExpectationsGuidelines, RetrievalRelevance and RetrievalGroundedness (trace required), RetrievalSufficiency (trace and ground truth), ToolCallCorrectness and ToolCallEfficiency (trace required, marked experimental); a note that Safety and RetrievalRelevance are currently only available in Databricks managed MLflow."
   },
   {
@@ -174,7 +174,106 @@
    "publishedAt": "2023",
    "context": "Research paper on strong LLMs as judges of chat assistants; general findings, not a Databricks or MLflow feature.",
    "caveat": "Findings concern the judges and benchmarks studied in 2023; bias strength differs by judge model, rubric and task, so measure your own judge.",
-   "reviewedEvidence": "The arXiv page was not fetched (host blocked by the sandbox egress proxy) and the build session's web-search allowance was exhausted before this module was written, so the title and URL were not confirmed by search in this session. The authors' repository README (fastchat/llm_judge/README.md, fetched 2026-09-23 from raw.githubusercontent.com) links this arXiv page and gives the title, authors and 2023 citation; their judge code (fastchat/llm_judge/common.py, fetched the same day) runs each pairwise judgment twice with the two answers swapped and records a disagreeing pair as 'inconsistent'. Unverified summary written by the module's author; no read of this page body is recorded in this build or in any earlier review: the paper reports position, verbosity and self-enhancement biases and limited reasoning when LLMs judge chat answers, and proposes mitigations such as swapping positions and reference-guided grading."
+   "reviewedEvidence": "The arXiv page was not fetched (host blocked by the sandbox egress proxy) and the build session's web-search allowance was exhausted before this module was written, so the title and URL were not confirmed by search in this session. The authors' repository README (fastchat/llm_judge/README.md, fetched 2026-09-23 from raw.githubusercontent.com) links this arXiv page and gives the title, authors and 2023 citation; their judge code (fastchat/llm_judge/common.py, fetched the same day) runs each pairwise judgment twice with the two answers swapped and records a disagreeing pair as 'inconsistent'. No read of this page body is recorded in this build or in any earlier review, so the module attributes no measured result to the paper: its bias statements rest on the authors' blog summary (dbxfe-genai-eval-source-lmsys-blog) and its judging-order statements on their code (dbxfe-genai-eval-source-fastchat-judge-code and dbxfe-genai-eval-source-fastchat-results-code), all read on 2026-09-25."
+  },
+  {
+   "id": "dbxfe-genai-eval-source-builtin-scorers-code",
+   "title": "MLflow 3.16.1 source: mlflow/genai/scorers/builtin_scorers.py (RetrievalRelevance, Safety)",
+   "url": "https://github.com/mlflow/mlflow/blob/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/scorers/builtin_scorers.py",
+   "publisher": "MLflow project (mlflow/mlflow repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source MLflow built-in judge implementations at the v3.16.1 tag commit; the file is byte-identical to the released mlflow-skinny 3.16.1 wheel.",
+   "caveat": "Package source shows what the open-source release does; it does not describe Databricks managed judges, entitlements or regions.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/mlflow/mlflow/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/scorers/builtin_scorers.py and compared with the released mlflow_skinny-3.16.1-py3-none-any.whl (identical): RetrievalRelevance._compute_span_relevance: 'model = self.model or get_default_model() ... if model == \"databricks\": from databricks.agents.evals.judges import chunk_relevance ... \"inference_params are not supported with the Databricks managed judge \" ... else: ... feedback = invoke_judge_model('; Safety.__call__ delegates to judges.is_safe(). Scope: open-source package behaviour; only a judge model of 'databricks' is routed to the Databricks-managed judge."
+  },
+  {
+   "id": "dbxfe-genai-eval-source-judges-builtin-code",
+   "title": "MLflow 3.16.1 source: mlflow/genai/judges/builtin.py (is_safe)",
+   "url": "https://github.com/mlflow/mlflow/blob/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/judges/builtin.py",
+   "publisher": "MLflow project (mlflow/mlflow repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source MLflow judge functions at the v3.16.1 tag commit; the file is byte-identical to the released mlflow-skinny 3.16.1 wheel.",
+   "caveat": "Package source shows what the open-source release does; it does not describe Databricks managed judges.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/mlflow/mlflow/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/judges/builtin.py and compared with the released wheel (identical): is_safe(): 'model = model or get_default_model() ... if model == \"databricks\": from databricks.agents.evals.judges import safety ... else: prompt = get_prompt(content=content) feedback = invoke_judge_model('. Scope: open-source package behaviour; the Safety scorer calls this function."
+  },
+  {
+   "id": "dbxfe-genai-eval-source-safety",
+   "title": "Safety Judge",
+   "url": "https://github.com/mlflow/mlflow/blob/32792afe5b0183fce10532d3a023f5cfa8612d09/docs/docs/genai/eval-monitor/scorers/llm-judge/response-quality/safety.mdx",
+   "publisher": "MLflow (documentation source in the mlflow/mlflow repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source MLflow 3 documentation source at the v3.16.1 tag commit; source of the page linked as /genai/eval-monitor/scorers/llm-judge/response-quality/safety.",
+   "caveat": "Open-source documentation; the rendered mlflow.org page was not fetched (host blocked by the sandbox egress proxy).",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/mlflow/mlflow/32792afe5b0183fce10532d3a023f5cfa8612d09/docs/docs/genai/eval-monitor/scorers/llm-judge/response-quality/safety.mdx: '# Run evaluation with Safety judge ... eval_results = mlflow.genai.evaluate( ... Safety( model=\"openai:/gpt-4o-mini\",  # Optional.' The page carries no Databricks-only note and includes the shared section on selecting the judge model by provider (e.g. openai, anthropic, gemini). Scope: open-source MLflow behaviour."
+  },
+  {
+   "id": "dbxfe-genai-eval-source-trace-utils-code",
+   "title": "MLflow 3.16.1 source: mlflow/genai/utils/trace_utils.py (retrieval context for the retrieval judges)",
+   "url": "https://github.com/mlflow/mlflow/blob/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/utils/trace_utils.py",
+   "publisher": "MLflow project (mlflow/mlflow repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source MLflow helper that extracts a trace's retrieved documents for RetrievalRelevance, RetrievalGroundedness and RetrievalSufficiency, at the v3.16.1 tag commit; the file is byte-identical to the released mlflow-skinny 3.16.1 wheel (SHA-256 41ec1697710b91d001f8951bdc2d00391a277065ed82268c81706238fa2b918e, equal to PyPI's digest).",
+   "caveat": "Package source shows what the open-source release does; it does not describe the MLflow UI's rendering or Databricks-managed judges.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/mlflow/mlflow/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/utils/trace_utils.py: 'contexts = [_parse_chunk(chunk) for chunk in outputs or []] ... retrieved[retrieval_span.span_id] = [c for c in contexts if c is not None] ... def _parse_chunk(chunk: Any) -> dict[str, Any] | None: ... if not isinstance(chunk, dict): ... return None ... doc = {\"content\": content} ... if doc_uri := metadata.get(\"doc_uri\"):'. Scope: open-source package behaviour. Each RETRIEVER span document that is not a dictionary is dropped, and a kept document carries only its text and metadata.doc_uri; chunk_id is not read. Running _parse_chunk from this file on two plain strings returned [None, None]."
+  },
+  {
+   "id": "dbxfe-genai-eval-source-judges-utils-code",
+   "title": "MLflow 3.16.1 source: mlflow/genai/judges/utils/__init__.py (get_default_model)",
+   "url": "https://github.com/mlflow/mlflow/blob/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/judges/utils/__init__.py",
+   "publisher": "MLflow project (mlflow/mlflow repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source MLflow default judge model selection at the v3.16.1 tag commit; the file is byte-identical to the released mlflow-skinny 3.16.1 wheel (SHA-256 41ec1697710b91d001f8951bdc2d00391a277065ed82268c81706238fa2b918e, equal to PyPI's digest).",
+   "caveat": "Package source shows the open-source default; the default model and routing may change between releases.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/mlflow/mlflow/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/judges/utils/__init__.py: 'def get_default_model() -> str: ... if override := MLFLOW_GENAI_JUDGE_DEFAULT_MODEL.get(): ... if is_databricks_uri(mlflow.get_tracking_uri()): ... return _DATABRICKS_DEFAULT_JUDGE_MODEL ... return \"openai:/gpt-4.1-mini\"'. Scope: open-source package behaviour. Unless a default is set, the judge model defaults to the Databricks constant when the tracking URI is Databricks and to an OpenAI model otherwise."
+  },
+  {
+   "id": "dbxfe-genai-eval-source-judges-constants-code",
+   "title": "MLflow 3.16.1 source: mlflow/genai/judges/constants.py",
+   "url": "https://github.com/mlflow/mlflow/blob/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/judges/constants.py",
+   "publisher": "MLflow project (mlflow/mlflow repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source MLflow judge constants at the v3.16.1 tag commit; the file is byte-identical to the released mlflow-skinny 3.16.1 wheel (SHA-256 41ec1697710b91d001f8951bdc2d00391a277065ed82268c81706238fa2b918e, equal to PyPI's digest).",
+   "caveat": "Package source; it names the value only and does not describe the Databricks-managed judge itself.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/mlflow/mlflow/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/genai/judges/constants.py: '_DATABRICKS_DEFAULT_JUDGE_MODEL = \"databricks\"'. Scope: open-source package interface. RetrievalRelevance and Safety compare the judge model with this value before calling the Databricks-managed judge (see dbxfe-genai-eval-source-builtin-scorers-code and dbxfe-genai-eval-source-judges-builtin-code)."
+  },
+  {
+   "id": "dbxfe-genai-eval-source-lmsys-blog",
+   "title": "Chatbot Arena Leaderboard Week 8: Introducing MT-Bench and Vicuna-33B (blog post source)",
+   "url": "https://github.com/lm-sys/lm-sys.github.io/blob/722a68b0dbffa5d3943df3e1d2c1cba1c5b78fee/blog/2023-06-22-leaderboard.md",
+   "publisher": "LMSYS (lm-sys/lm-sys.github.io, the source repository of lmsys.org)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "The study authors' own blog summary of their 2023 paper, by Lianmin Zheng, Wei-Lin Chiang, Ying Sheng and Hao Zhang, dated 22 June 2023; the repository's CNAME file names lmsys.org.",
+   "caveat": "The authors' summary, not the paper's measurements: it frames the three biases as potential limitations LLM judges may have. The arXiv paper itself was not read (host blocked by the sandbox egress proxy).",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/lm-sys/lm-sys.github.io/722a68b0dbffa5d3943df3e1d2c1cba1c5b78fee/blog/2023-06-22-leaderboard.md: 'In our latest paper, [\"Judging LLM-as-a-judge\"](https://arxiv.org/abs/2306.05685), we conducted a systematic study to answer how reliable those LLM judges are. ... We begin by acknowledging potential limitations of LLM-as-a-judge: ... - **Position bias** where LLM judges may favor the first answer in a pairwise comparison. ... - **Verbosity bias** where LLM judges may favor lengthier answers, regardless of their quality. ... - **Self-enhancement bias** where LLM judges may favor their own responses.' Scope: what the study's authors say about their study; it does not establish measured bias sizes."
+  },
+  {
+   "id": "dbxfe-genai-eval-source-fastchat-judge-code",
+   "title": "FastChat llm_judge source: fastchat/llm_judge/common.py (pairwise judging)",
+   "url": "https://github.com/lm-sys/FastChat/blob/587d5cfa1609a43d192cedb8441cac3c17db105d/fastchat/llm_judge/common.py",
+   "publisher": "LMSYS (lm-sys/FastChat repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "The study authors' MT-Bench judging code, whose README cites the paper, at a pinned commit.",
+   "caveat": "Open-source research code at one commit; it shows how the authors ran pairwise judgments, not how any product judge works.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/lm-sys/FastChat/587d5cfa1609a43d192cedb8441cac3c17db105d/fastchat/llm_judge/common.py: 'g1_winner, g1_user_prompt, g1_judgment = run_judge_pair( ... question, answer_1, answer_2, judge, ref_answer, multi_turn=multi_turn ... g2_winner, g2_user_prompt, g2_judgment = run_judge_pair( ... question, answer_2, answer_1, judge, ref_answer, multi_turn=multi_turn ... if g1_winner == g2_winner: ... winner = \"inconsistent\"'. Scope: open-source research code. play_a_match_pair() runs each pair in both orders, and load_pairwise_model_judgments() records a disagreeing pair as 'inconsistent'."
+  },
+  {
+   "id": "dbxfe-genai-eval-source-fastchat-results-code",
+   "title": "FastChat llm_judge source: fastchat/llm_judge/show_result.py (pairwise results)",
+   "url": "https://github.com/lm-sys/FastChat/blob/587d5cfa1609a43d192cedb8441cac3c17db105d/fastchat/llm_judge/show_result.py",
+   "publisher": "LMSYS (lm-sys/FastChat repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "The study authors' MT-Bench result script at a pinned commit.",
+   "caveat": "Open-source research code at one commit; it shows how the authors tallied pairwise results.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/lm-sys/FastChat/587d5cfa1609a43d192cedb8441cac3c17db105d/fastchat/llm_judge/show_result.py: 'if row[\"g1_winner\"] == \"tie\" or row[\"g1_winner\"] != row[\"g2_winner\"]: ... list_res.append({\"model\": row[\"model_1\"], \"win\": 0, \"loss\": 0, \"tie\": 1})'. Scope: open-source research code. display_result_pairwise() counts a pair whose two orders disagree as a tie for both models."
   }
  ],
  "claims": [
@@ -220,11 +319,16 @@
   },
   {
    "id": "dbxfe-genai-eval-claim-builtin",
-   "description": "MLflow's built-in judges include RelevanceToQuery, Correctness, Guidelines, RetrievalGroundedness, RetrievalRelevance, RetrievalSufficiency, ToolCallCorrectness and ToolCallEfficiency; the retrieval and tool-call judges need a trace, Correctness and RetrievalSufficiency need ground truth, and the v3.16.1 documentation lists Safety and RetrievalRelevance as Databricks-managed only.",
+   "description": "MLflow's built-in judges include RelevanceToQuery, Correctness, Guidelines, RetrievalGroundedness, RetrievalRelevance, RetrievalSufficiency, ToolCallCorrectness and ToolCallEfficiency; the retrieval and tool-call judges need a trace, and Correctness and RetrievalSufficiency need ground truth; in the 3.16.1 package Safety and RetrievalRelevance also run on non-Databricks judge models, although a note on that release's built-in-judges page calls them Databricks-managed only; the default judge model is databricks, the managed judge, with a Databricks tracking URI and openai:/gpt-4.1-mini otherwise, unless one is set.",
    "kind": "documented",
    "sourceIds": [
     "dbxfe-genai-eval-source-builtin",
-    "dbxfe-genai-eval-source-package"
+    "dbxfe-genai-eval-source-package",
+    "dbxfe-genai-eval-source-builtin-scorers-code",
+    "dbxfe-genai-eval-source-judges-builtin-code",
+    "dbxfe-genai-eval-source-safety",
+    "dbxfe-genai-eval-source-judges-utils-code",
+    "dbxfe-genai-eval-source-judges-constants-code"
    ],
    "context": "Availability changes by release; recheck."
   },
@@ -240,11 +344,12 @@
   },
   {
    "id": "dbxfe-genai-eval-claim-span",
-   "description": "An MLflow span has span_id, parent_id (None for the root), name, start and end times, status OK, UNSET or ERROR, inputs, outputs and attributes; RETRIEVER spans output documents with page_content and metadata such as doc_uri and chunk_id; SpanType in the 3.16.1 package includes RETRIEVER, LLM, TOOL, AGENT and GUARDRAIL.",
+   "description": "An MLflow span has span_id, parent_id (None for the root), name, start and end times, status OK, UNSET or ERROR, inputs, outputs and attributes; RETRIEVER spans output documents with page_content and metadata such as doc_uri and chunk_id, which the UI and evaluation metrics may look for, and the 3.16.1 retrieval judges read each document's text and doc_uri and skip any document that is not a dictionary; SpanType in the 3.16.1 package includes RETRIEVER, LLM, TOOL, AGENT and GUARDRAIL.",
    "kind": "documented",
    "sourceIds": [
     "dbxfe-genai-eval-source-span",
-    "dbxfe-genai-eval-source-package"
+    "dbxfe-genai-eval-source-package",
+    "dbxfe-genai-eval-source-trace-utils-code"
    ],
    "context": "Open-source MLflow 3.16.1."
   },
@@ -290,10 +395,13 @@
   },
   {
    "id": "dbxfe-genai-eval-claim-judging",
-   "description": "The MT-Bench and Chatbot Arena study reported position, verbosity and self-enhancement biases in LLM judges; its authors' judge code runs each pairwise comparison in both orders and records disagreement as inconsistent.",
+   "description": "The authors of the MT-Bench and Chatbot Arena study list position, verbosity and self-enhancement bias among the potential limitations of LLM judges; their judge code runs each pairwise comparison in both orders and records disagreement as inconsistent, and their result script counts it as a tie.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-genai-eval-source-judging"
+    "dbxfe-genai-eval-source-judging",
+    "dbxfe-genai-eval-source-lmsys-blog",
+    "dbxfe-genai-eval-source-fastchat-judge-code",
+    "dbxfe-genai-eval-source-fastchat-results-code"
    ],
    "context": "2023 research on the judges studied; measure your own judge."
   },
@@ -522,7 +630,8 @@
    "definition": "A systematic tilt in a judge's verdicts unrelated to quality, such as favouring the first-shown or longer answer.",
    "example": "A judge prefers whichever answer it reads first.",
    "sourceIds": [
-    "dbxfe-genai-eval-source-judging"
+    "dbxfe-genai-eval-source-judging",
+    "dbxfe-genai-eval-source-lmsys-blog"
    ]
   },
   {
@@ -3086,7 +3195,7 @@
   },
   {
    "id": "dbxfe-genai-eval-grounded",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "Groundedness and relevance fail independently",
    "outcome": "Tell groundedness from relevance and name the evidence and MLflow judge each one needs.",
    "explanation": "[[dbxfe-genai-eval-groundedness-concept|Groundedness]] asks whether an answer is supported by the chunks actually retrieved; [[dbxfe-genai-eval-relevance-concept|relevance]] asks whether it addresses the question. c03 is grounded but irrelevant: 'test the pull-cord stop' is exactly what C9-R1:c11 says, yet the question was about the M7 after a die change. c04 is the reverse, relevant and unsupported. Notice that only one of the four answers in the first state passes both, so each property needs its own check.",
@@ -3106,13 +3215,13 @@
     "dbxfe-genai-eval-grounded-question"
    ],
    "handbook": {
-    "markdown": "Two questions, two kinds of evidence:\n\n- **Groundedness** compares the answer with the retrieved context. Its deterministic core is citation correctness: the cited chunk was in the context given to the model (the LLM span's `context_refs`, equal to what was retrieved in Lab L21 but not when a budget trims it, as in the retrieval module) and is citable. Whether the chunk *supports the sentence* needs reading: a chunk about accumulator location does not support a pressure value even if it is cited.\n- **Relevance** compares the answer with the question. Code can do little here; a reviewer or a judge reads it.\n- **Retrieval relevance** and **sufficiency** ask about the chunks rather than the answer: were they on topic, and did they hold every fact the answer needed? Sufficiency is where c04 fails first in spirit (nothing retrieved states a pressure), which is why its correct behaviour was to abstain.\n\n**MLflow's built-in judges for these** (release 3.16.1): `RetrievalGroundedness`, `RetrievalRelevance` and `RetrievalSufficiency` need a trace with a RETRIEVER span; sufficiency also needs ground truth; `RelevanceToQuery` needs neither; `Correctness` needs expected facts. The v3.16.1 documentation lists `RetrievalRelevance` as Databricks-managed only for now, so check availability on your platform.\n\n**Worked contrast.**\n\n| Answer | Grounded | Relevant |\n|---|---|---|\n| c01: 85 N·m, cross pattern `[M7-R3:c12]` | yes | yes |\n| c03: pull-cord test `[C9-R1:c11]` | yes | no |\n| c04: 90 bar `[M7-R3:c31]` | no | yes |\n\n**What to inspect when they disagree.** A grounded but irrelevant answer usually means retrieval returned plausible neighbours and the generation latched onto the wrong one; a relevant but ungrounded answer means the generation filled a gap. Score them separately, as the RAG evaluation guide does, so the fix goes to the right stage.",
+    "markdown": "Two questions, two kinds of evidence:\n\n- **Groundedness** compares the answer with the retrieved context. Its deterministic core is citation correctness: the cited chunk was in the context given to the model (the LLM span's `context_refs`, equal to what was retrieved in Lab L21 but not when a budget trims it, as in the retrieval module) and is citable. Whether the chunk *supports the sentence* needs reading: a chunk about accumulator location does not support a pressure value even if it is cited.\n- **Relevance** compares the answer with the question. Code can do little here; a reviewer or a judge reads it.\n- **Retrieval relevance** and **sufficiency** ask about the chunks rather than the answer: were they on topic, and did they hold every fact the answer needed? Sufficiency is where c04 fails first in spirit (nothing retrieved states a pressure), which is why its correct behaviour was to abstain.\n\n**MLflow's built-in judges for these** (release 3.16.1): `RetrievalGroundedness`, `RetrievalRelevance` and `RetrievalSufficiency` need a trace with a RETRIEVER span; sufficiency also needs ground truth; `RelevanceToQuery` needs neither; `Correctness` needs expected facts. In the 3.16.1 package `RetrievalRelevance` also runs on a non-Databricks judge model and calls the Databricks-managed judge only when the model is `databricks`, although a note on that release's built-in-judges page still calls it Databricks-managed only.\n\n**Worked contrast.**\n\n| Answer | Grounded | Relevant |\n|---|---|---|\n| c01: 85 N·m, cross pattern `[M7-R3:c12]` | yes | yes |\n| c03: pull-cord test `[C9-R1:c11]` | yes | no |\n| c04: 90 bar `[M7-R3:c31]` | no | yes |\n\n**What to inspect when they disagree.** A grounded but irrelevant answer usually means retrieval returned plausible neighbours and the generation latched onto the wrong one; a relevant but ungrounded answer means the generation filled a gap. Score them separately, as the RAG evaluation guide does, so the fix goes to the right stage.",
     "sourceSectionIds": [
      "dbxfe-genai-eval-l01-scorers"
     ]
    },
    "recap": "Grounded asks 'supported by what was retrieved'; relevant asks 'answers what was asked'; check both.",
-   "changeNote": "New academy beat.",
+   "changeNote": "Corrected one sentence: it had repeated a documentation note calling RetrievalRelevance Databricks-managed only. MLflow 3.16.1's own source code (mlflow/genai/scorers/builtin_scorers.py) also runs this judge on other judge models, so the note is now reported as a note. The judges' trace and ground-truth requirements are unchanged.",
    "mediaIds": []
   },
   {
@@ -3318,10 +3427,10 @@
   },
   {
    "id": "dbxfe-genai-eval-judges",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "A judge's verdict is a measurement with its own bias",
    "outcome": "Calibrate a model-based judge against reviewed labels and name the biases to control.",
-   "explanation": "A model-based judge is a model reading a rubric, so its verdicts carry [[dbxfe-genai-eval-bias-concept|biases]]: the MT-Bench study reported position, verbosity and self-enhancement effects, and its authors' code runs each pairwise comparison in both orders, recording disagreement as inconsistent. Notice in the second state, a synthetic calibration, that this judge passes two fluent unsupported answers and fails a correct abstention. [[dbxfe-genai-eval-calibration-concept|Calibration]] against reviewed labels comes before any threshold.",
+   "explanation": "A model-based judge is a model reading a rubric, so its verdicts carry [[dbxfe-genai-eval-bias-concept|biases]]: the MT-Bench study's authors list position, verbosity and self-enhancement bias among the potential limitations of LLM judges, and their code runs each pairwise comparison in both orders, recording disagreement as inconsistent. Notice in the second state, a synthetic calibration, that this judge passes two fluent unsupported answers and fails a correct abstention. [[dbxfe-genai-eval-calibration-concept|Calibration]] against reviewed labels comes before any threshold.",
    "lessonId": "dbxfe-genai-eval-l01",
    "sectionId": "dbxfe-genai-eval-l01-judges",
    "conceptIds": [
@@ -3351,12 +3460,12 @@
     ]
    },
    "recap": "Calibrate the judge on reviewed examples, swap orders, record its version, and never gate on an uncalibrated verdict.",
-   "changeNote": "New academy beat.",
+   "changeNote": "The bias sentence now says what the study's authors wrote in their LMSYS blog post of 22 June 2023: position, verbosity and self-enhancement bias are potential limitations of LLM judges. It no longer says the study measured these effects, because the paper itself was not read.",
    "mediaIds": []
   },
   {
    "id": "dbxfe-genai-eval-mlflow",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "MLflow 3 attaches every verdict to the trace it judged",
    "outcome": "Map the evaluation loop onto mlflow.genai.evaluate(), scorers, traces and Feedback, and name what differs on Databricks.",
    "explanation": "In MLflow 3, [[dbxfe-genai-eval-evaluate-concept|mlflow.genai.evaluate()]] takes a dataset of inputs and expectations, a list of scorers and, optionally, a predict function. Each prediction produces a trace, and each scorer's verdict is logged as [[dbxfe-genai-eval-assessment-concept|Feedback]] on that trace with its source: CODE, LLM_JUDGE or HUMAN. Notice in the second state that a reviewer's label and a judge's verdict with the same name sit on one trace, which is what judge alignment needs.",
@@ -3371,6 +3480,7 @@
     "dbxfe-genai-eval-claim-feedback",
     "dbxfe-genai-eval-claim-scorers",
     "dbxfe-genai-eval-claim-datasets",
+    "dbxfe-genai-eval-claim-builtin",
     "dbxfe-genai-eval-guidance",
     "dbxfe-genai-eval-fiction"
    ],
@@ -3379,13 +3489,13 @@
     "dbxfe-genai-eval-mlflow-question"
    ],
    "handbook": {
-    "markdown": "**The call** (names checked against the mlflow 3.16.1 package; illustrative, not run in this build):\n\n```python\nimport mlflow\nfrom mlflow.entities import Feedback\nfrom mlflow.genai.scorers import scorer, RetrievalGroundedness\n\n@scorer\ndef required_source_cited(outputs: dict, expectations: dict) -> Feedback:\n    cited = {ref.split(\":\")[0] for ref in outputs.get(\"citations\", [])}\n    missing = [s for s in expectations[\"must_cite\"] if s not in cited]\n    return Feedback(value=not missing,\n                    rationale=f\"missing {missing}\" if missing else \"all required sources cited\")\n\nresults = mlflow.genai.evaluate(\n    data=records,                       # inputs + expectations (+ outputs if already produced)\n    predict_fn=assistant,               # optional; omit when records hold outputs\n    scorers=[required_source_cited, RetrievalGroundedness()],\n)\n```\n\n**How data flows.** When records already contain outputs and no predict function is given, scorers read those outputs as they are. When a predict function is given, MLflow calls it per record and traces it. A scorer may declare any of `inputs`, `outputs`, `expectations` and `trace`; trace-based checks search spans by type, such as `trace.search_spans(span_type=SpanType.RETRIEVER)`.\n\n**What each verdict becomes.** A Feedback with a name, value, rationale and source, attached to the trace (or one span), so anyone can open the evidence behind a number. Built-in judges such as `RetrievalGroundedness` need a trace with a RETRIEVER span and a configured judge model; a judge that cannot run records an error, not a score.\n\n**Open-source versus Databricks.** Managed evaluation datasets need a SQL-backed tracking server in open-source MLflow. The review app and labeling sessions are Databricks-only according to the package. The v3.16.1 documentation lists `Safety` and `RetrievalRelevance` as available only in Databricks managed MLflow. Confirm each on the current pages before promising it.",
+    "markdown": "**The call** (names checked against the mlflow 3.16.1 package; illustrative, not run in this build):\n\n```python\nimport mlflow\nfrom mlflow.entities import Feedback\nfrom mlflow.genai.scorers import scorer, RetrievalGroundedness\n\n@scorer\ndef required_source_cited(outputs: dict, expectations: dict) -> Feedback:\n    cited = {ref.split(\":\")[0] for ref in outputs.get(\"citations\", [])}\n    missing = [s for s in expectations[\"must_cite\"] if s not in cited]\n    return Feedback(value=not missing,\n                    rationale=f\"missing {missing}\" if missing else \"all required sources cited\")\n\nresults = mlflow.genai.evaluate(\n    data=records,                       # inputs + expectations (+ outputs if already produced)\n    predict_fn=assistant,               # optional; omit when records hold outputs\n    scorers=[required_source_cited, RetrievalGroundedness()],\n)\n```\n\n**How data flows.** When records already contain outputs and no predict function is given, scorers read those outputs as they are. When a predict function is given, MLflow calls it per record and traces it. A scorer may declare any of `inputs`, `outputs`, `expectations` and `trace`; trace-based checks search spans by type, such as `trace.search_spans(span_type=SpanType.RETRIEVER)`.\n\n**What each verdict becomes.** A Feedback with a name, value, rationale and source, attached to the trace (or one span), so anyone can open the evidence behind a number. Built-in judges such as `RetrievalGroundedness` need a trace with a RETRIEVER span and a configured judge model; a judge that cannot run records an error, not a score.\n\n**Open-source versus Databricks.** Managed evaluation datasets need a SQL-backed tracking server in open-source MLflow. The review app and labeling sessions are Databricks-only according to the package. A note on the v3.16.1 built-in-judges page calls `Safety` and `RetrievalRelevance` Databricks-managed only, but the same release's package runs both on a non-Databricks judge model and calls the Databricks-managed judge only when the model is `databricks`, so their availability is not an open-source versus Databricks difference in 3.16.1. What does differ is the default judge model when you set none: with a Databricks tracking URI it is `databricks`, which sends these judges to the Databricks-managed judge; elsewhere it is `openai:/gpt-4.1-mini`. Confirm each on the current pages before promising it.",
     "sourceSectionIds": [
      "dbxfe-genai-eval-l01-mlflow"
     ]
    },
    "recap": "Dataset, scorers, optional predict function; every verdict is Feedback on a trace, labelled with its source.",
-   "changeNote": "New academy beat.",
+   "changeNote": "Corrected one sentence: it had taught a documentation note calling Safety and RetrievalRelevance Databricks-managed only as a platform difference. MLflow 3.16.1's own source code (mlflow/genai/judges/builtin.py and mlflow/genai/scorers/builtin_scorers.py) also runs both on other judge models; the beat now names the real difference, the default judge model (mlflow/genai/judges/utils/__init__.py).",
    "mediaIds": []
   },
   {
@@ -3497,10 +3607,10 @@
   },
   {
    "id": "dbxfe-genai-eval-extension-retriever",
-   "revision": "1",
+   "revision": "2",
    "prompt": "Why should a RETRIEVER span output documents with doc_uri and chunk_id rather than plain strings?",
-   "answer": "Because MLflow's retrieval judges and UI look for page_content and metadata such as doc_uri and chunk_id, and citation checks compare those identities.",
-   "explanation": "MLflow's span documentation specifies that a RETRIEVER span's output is a list of documents with page_content and optional metadata, naming doc_uri and chunk_id as keys the UI and evaluation metrics look for. A retriever that logs plain strings leaves nothing to compare a citation against, so citation correctness degrades into text matching and retrieval judges lose the chunk boundaries. Lab L21's traces follow the documented shape so that every citation can be checked against an id.",
+   "answer": "Because MLflow's span documentation names page_content and the metadata keys doc_uri and chunk_id that its UI and evaluation metrics may look for, and citation checks compare those identities.",
+   "explanation": "MLflow's span documentation specifies that a RETRIEVER span's output is a list of documents with page_content and optional metadata, naming doc_uri and chunk_id as keys the UI and evaluation metrics may look for. A retriever that logs plain strings leaves nothing to compare a citation against, so citation correctness degrades into text matching; in the 3.16.1 package the retrieval judges skip any retrieved document that is not a dictionary, so a span of plain strings gives them no retrieved text. Lab L21's traces follow the documented shape so that every citation can be checked against an id.",
    "lessonId": "dbxfe-genai-eval-l01",
    "sectionId": "dbxfe-genai-eval-l01-traces",
    "conceptIds": [

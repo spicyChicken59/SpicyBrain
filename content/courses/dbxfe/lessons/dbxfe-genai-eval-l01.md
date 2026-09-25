@@ -46,7 +46,7 @@ Rule 3 is the lab's: a superseded chunk returned beside the required one is not 
 
 <!-- section:dbxfe-genai-eval-l01-judges -->
 
-Deterministic checks decide recorded facts. Whether a cited chunk actually supports a sentence needs reading: a human reviewer first, on a sample with a written question, and a model-based judge only after it matches those labels on held-out items. Judges carry biases: a 2023 study of LLM judges reported position, verbosity and self-enhancement effects, and its authors ran pairwise judgments in both orders, recording disagreement as inconsistent. Record the judge's model and rubric version, because a changed judge is a changed instrument.
+Deterministic checks decide recorded facts. Whether a cited chunk actually supports a sentence needs reading: a human reviewer first, on a sample with a written question, and a model-based judge only after it matches those labels on held-out items. Judges carry biases: the authors of a 2023 study of LLM judges list position, verbosity and self-enhancement bias among the judges' potential limitations, and ran pairwise judgments in both orders, recording disagreement as inconsistent. Record the judge's model and rubric version, because a changed judge is a changed instrument.
 
 <!-- section:dbxfe-genai-eval-l01-mlflow -->
 
@@ -98,7 +98,7 @@ t04 is a reasoning failure whose earliest divergence is its first LLM span, the 
 - MLflow documentation: [LLM and Agent Evaluation](https://mlflow.org/docs/latest/genai/eval-monitor/), [LLM Tracing and Agent Observability](https://mlflow.org/docs/latest/genai/tracing/) and [LLM Judges and Scorers](https://mlflow.org/docs/latest/genai/eval-monitor/scorers/), read from their source at release 3.16.1.
 - MLflow's [Automatic Evaluation page source](https://raw.githubusercontent.com/mlflow/mlflow/v3.16.1/docs/docs/genai/eval-monitor/automatic-evaluations/index.mdx) at release 3.16.1.
 - Databricks: [Evaluate and improve](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/), for the managed platform.
-- Zheng and colleagues: [Judging LLM-as-a-judge with MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685), 2023.
+- Zheng and colleagues: [Judging LLM-as-a-judge with MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685), 2023, with the authors' own summary in [Chatbot Arena Leaderboard Week 8: Introducing MT-Bench and Vicuna-33B](https://github.com/lm-sys/lm-sys.github.io/blob/722a68b0dbffa5d3943df3e1d2c1cba1c5b78fee/blog/2023-06-22-leaderboard.md) and their [judging code](https://github.com/lm-sys/FastChat/blob/587d5cfa1609a43d192cedb8441cac3c17db105d/fastchat/llm_judge/common.py).
 
 Product names and availability change between releases; verify them on the current pages.
 

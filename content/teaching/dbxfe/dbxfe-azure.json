@@ -3,7 +3,7 @@
  "courseId": "dbxfe",
  "moduleId": "dbxfe-azure",
  "title": "Azure deployment and network boundaries",
- "summary": "A workspace resource with a locked managed group, two supported network patterns, two authorization chains and one query path: who owns each boundary on Azure, and how a denied request differs from an unreachable one.",
+ "summary": "A classic workspace resource with a locked managed group, two supported network patterns, two authorization chains and one query path: who owns each boundary on Azure, and how a denied request differs from an unreachable one.",
  "outcomes": [
   "Place the tenant, subscription, workspace resource, managed resource group, control plane and both compute planes, and say which of them Cinderline can change.",
   "Compare the default managed VNet with VNet injection by who creates, changes and diagnoses each network piece, including routes, NSG rules and private endpoints.",
@@ -20,7 +20,7 @@
  "optionalBridgeLessonIds": [
   "dbxfe-cloud-bridge"
  ],
- "editorialRationale": "Azure deployment teaching fails when it relabels an AWS picture, so the module starts from the objects Azure itself creates, a workspace resource with a locked managed resource group and Entra identities, then compares the two supported network patterns, follows egress, legacy keys, the access connector and private connectivity as separate boundaries, keeps application access apart from storage access, and ends with two ordered diagnoses, an evidence checklist and an explicit list of AWS differences that a later three-cloud lab can align. Tier, region and preview status stay verification items throughout.",
+ "editorialRationale": "Azure deployment teaching fails when it relabels an AWS picture, so the module starts from the objects Azure itself creates, a classic workspace resource with a locked managed resource group and Entra identities, then compares the two supported network patterns, follows egress, legacy keys, the access connector and private connectivity as separate boundaries, keeps application access apart from storage access, and ends with two ordered diagnoses, an evidence checklist and an explicit list of AWS differences that a later three-cloud lab can align. Tier, region and preview status stay verification items throughout.",
  "sources": [
   {
    "id": "dbxfe-azure-source-architecture",
@@ -395,6 +395,83 @@
    "context": "Databricks SDK for Python, release 0.141.0 on PyPI; API model docstrings for storage credentials, external locations, network connectivity configurations and the Private Link validation error.",
    "caveat": "API reference text in the SDK names fields, states and behaviours, not recommended settings; product behaviour is confirmed in the current documentation for the workspace's cloud and region.",
    "reviewedEvidence": "Read in this session: the wheel databricks_sdk-0.141.0-py3-none-any.whl was downloaded from PyPI on 2026-09-23, its SHA-256 matched the index (053ddd3702b5ed99e01951915fc3421565fc72f82f41623d51e13a0209ba2b79), and these docstrings were read locally. Passage relied on: StorageCredentialsAPI and ExternalLocationsAPI: each object is subject to Unity Catalog access-control policies, and a user without access fails before Unity Catalog attempts to authenticate to the cloud tenant on the user's behalf; storage_credentials.create takes azure_managed_identity with access_connector_id in the form /subscriptions/{guid}/resourceGroups/{rg-name}/providers/Microsoft.Databricks/accessConnectors/{connector-name}, and managed_identity_id only for user-assigned identities; an external location can enable fallback mode, falling back to cluster credentials when Unity Catalog credentials are not sufficient. NetworkConnectivityAPI: an NCC provides stable Azure service subnets for storage firewalls and Databricks-managed private endpoints, shared by workspaces in the same Azure region within one account; NccAzurePrivateEndpointRule states are PENDING, ESTABLISHED, REJECTED, DISCONNECTED and EXPIRED (created but not approved within 14 days), rules are effective only when ESTABLISHED, and root DBFS storage needs one blob and one dfs endpoint. errors.private_link: an Azure login redirect carrying private-link-validation-error raises PrivateLinkValidationError, a PermissionDenied subclass whose message says the workspace has Azure Private Link enabled and is not accessible from the current network."
+  },
+  {
+   "id": "dbxfe-azure-source-outbound-md",
+   "title": "Microsoft docs source: Default outbound access in Azure (MicrosoftDocs/azure-docs at a pinned commit)",
+   "url": "https://github.com/MicrosoftDocs/azure-docs/blob/194fd50fff08b4caa875f2a5b384a74fb8dbb911/articles/virtual-network/ip-services/default-outbound-access.md",
+   "publisher": "Microsoft (azure-docs source repository on GitHub)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Markdown source of the Default Outbound Access page at a pinned commit; its What's affected and Limitations of private subnets sections.",
+   "caveat": "Azure platform behaviour only: it defers delegated PaaS subnets to the service's own documentation, so Azure Databricks' outbound requirement for injected workspaces is not settled by this page. Relied on to correct the firewall-or-NAT teaching.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/194fd50fff08b4caa875f2a5b384a74fb8dbb911/articles/virtual-network/ip-services/default-outbound-access.md: 'For the API version released after March 31, 2026, subnets in new virtual networks have defaultOutboundAccess set to false by default. ... Existing virtual networks aren't changed. ... In configurations using User Defined Routes (UDRs), any configured routes with next hop type Internet break in a Private subnet. ... Unless an explicit outbound connectivity method is also configured for the source of the connection to these destinations, attempts to connect to these destinations fail, because default outbound access isn't available by default in a Private subnet. ... Private subnets aren't applicable to delegated or managed subnets used for hosting PaaS services. In these scenarios, outbound connectivity is managed by the individual service.' Scope: Azure Virtual Network documentation source (Azure platform behaviour); it does not establish Azure Databricks' own outbound requirements for delegated workspace subnets."
+  },
+  {
+   "id": "dbxfe-azure-source-tf-msi",
+   "title": "Databricks Terraform provider v1.134.0: provider documentation, Authenticating with Azure MSI",
+   "url": "https://github.com/databricks/terraform-provider-databricks/blob/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/index.md",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Databricks-published Terraform provider index page at a pinned commit; its section on authenticating with Azure managed identities.",
+   "caveat": "Authentication interface documentation read at a pinned commit; relied on only to correct the claim that a managed identity never becomes a Databricks principal.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/index.md: 'Both `SystemAssigned` and `UserAssigned` identities work, as long as they have `Contributor` role on subscription level and created the workspace resource, or directly added to workspace through [databricks_service_principal]'. Scope: Databricks-published Terraform provider documentation (authentication interface); it shows a managed identity can act as a Databricks principal once added, and says nothing about how the account's provisioning method treats managed identities."
+  },
+  {
+   "id": "dbxfe-azure-source-tf-uc-azure",
+   "title": "Databricks Terraform provider v1.134.0: Unity Catalog set-up on Azure (guide)",
+   "url": "https://github.com/databricks/terraform-provider-databricks/blob/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/guides/unity-catalog-azure.md",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Databricks-published Terraform provider guide at a pinned commit; its Configure external locations and credentials section.",
+   "caveat": "A reference configuration, not a statement of minimum permissions; relied on only to remove the claim that the data role is the connector identity's only Azure permission.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/guides/unity-catalog-azure.md: 'First, create the required objects in Azure. ... role_definition_name = \"Storage Account Contributor\" ... role_definition_name = \"Storage Blob Data Contributor\" ... role_definition_name = \"Storage Queue Data Contributor\" ... role_definition_name = \"EventGrid EventSubscription Contributor\"'. Scope: Databricks-published Terraform provider guide (a reference configuration for the Unity Catalog interface on Azure); it lists the role assignments it creates for the access connector's identity but does not say which of them each operation needs."
+  },
+  {
+   "id": "dbxfe-azure-source-rest-databricks",
+   "title": "Azure REST API specification: Microsoft.Databricks stable 2026-01-01 (openapi.json)",
+   "url": "https://github.com/Azure/azure-rest-api-specs/blob/2094b1ceebc1009888dbcd926eeec827ec11f04b/specification/databricks/resource-manager/Microsoft.Databricks/Databricks/stable/2026-01-01/openapi.json",
+   "publisher": "Microsoft (azure-rest-api-specs repository on GitHub)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Resource provider specification for Microsoft.Databricks/workspaces and accessConnectors at a pinned commit; WorkspaceProperties.computeMode, managedResourceGroupId and accessConnector.",
+   "caveat": "An interface specification: it shows a Serverless compute mode that does not accept a managed resource group and a workspace property that names an access connector resource; it establishes no availability, release status or portal behaviour.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/Azure/azure-rest-api-specs/2094b1ceebc1009888dbcd926eeec827ec11f04b/specification/databricks/resource-manager/Microsoft.Databricks/Databricks/stable/2026-01-01/openapi.json: 'The workspace compute mode. Required on create, cannot be changed. Possible values include: 'Serverless', 'Hybrid' ... The managed resource group Id. Required in Hybrid ComputeMode workspace. Not allowed in Serverless ComputeMode workspace. ... Access Connector Resource that is going to be associated with Databricks Workspace. Not allowed in Serverless ComputeMode workspace. ... The resource ID of Azure Databricks Access Connector Resource.' Scope: Microsoft.Databricks resource provider REST specification, stable 2026-01-01 (interface only); it establishes neither the availability or release status of either compute mode nor portal behaviour."
+  },
+  {
+   "id": "dbxfe-azure-source-azurerm-workspace",
+   "title": "AzureRM Terraform provider: azurerm_databricks_workspace resource documentation",
+   "url": "https://github.com/hashicorp/terraform-provider-azurerm/blob/bfc230056c3286f5e4935b38564f7ef813f97ac6/website/docs/r/databricks_workspace.html.markdown",
+   "publisher": "HashiCorp (terraform-provider-azurerm repository on GitHub)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Resource documentation at a pinned commit; default_storage_firewall_enabled and access_connector_id arguments.",
+   "caveat": "Interface documentation for deploying the workspace resource with Terraform; it does not describe the Azure portal flow.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/hashicorp/terraform-provider-azurerm/bfc230056c3286f5e4935b38564f7ef813f97ac6/website/docs/r/databricks_workspace.html.markdown: 'Disallow public access to default storage account. ... Access Connector ID to use when default storage account firewall is enabled. ... The `access_connector_id` field is only required if `default_storage_firewall_enabled` is set to `true`.' Scope: AzureRM Terraform provider documentation of the Microsoft.Databricks/workspaces resource (interface only); it does not describe the Azure portal flow or which connector the portal uses."
+  },
+  {
+   "id": "dbxfe-azure-source-routing-diagnose",
+   "title": "Microsoft docs source: Diagnose a virtual machine routing problem (MicrosoftDocs/azure-docs at a pinned commit)",
+   "url": "https://github.com/MicrosoftDocs/azure-docs/blob/194fd50fff08b4caa875f2a5b384a74fb8dbb911/articles/virtual-network/diagnose-network-routing-problem.md",
+   "publisher": "Microsoft (azure-docs source repository on GitHub)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Markdown source of the Azure Virtual Network article on diagnosing routing problems at a pinned commit; its introduction on effective routes for a network interface.",
+   "caveat": "Azure platform behaviour only; it says nothing about which Azure roles a Databricks engineer holds on cluster network interfaces, so the module keeps 'where your permissions allow'. Relied on for the advice to read a node's effective routes, not only the route table.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/194fd50fff08b4caa875f2a5b384a74fb8dbb911/articles/virtual-network/diagnose-network-routing-problem.md: 'In this article, you learn how to diagnose routing problems by viewing the effective routes for a network interface in a virtual machine (VM). ... The effective routes for a network interface are a combination of Azure's default routes, custom routes you define, and any routes propagated from your on-premises network through an Azure VPN gateway using the border gateway protocol (BGP).' Scope: Azure Virtual Network documentation source (Azure platform behaviour); it establishes that a virtual machine network interface's effective routes can be viewed and combine default, custom and propagated routes, not any Azure Databricks behaviour."
+  },
+  {
+   "id": "dbxfe-azure-source-tf-mws-workspaces",
+   "title": "Databricks Terraform provider v1.134.0: databricks_mws_workspaces resource documentation",
+   "url": "https://github.com/databricks/terraform-provider-databricks/blob/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/mws_workspaces.md",
+   "publisher": "Databricks",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Databricks-published Terraform provider resource page at a pinned commit; its attribute reference for effective_compute_mode.",
+   "caveat": "Terminology only: this is the account-level workspace resource for AWS and GCP (the page says Azure workspaces are created with azurerm_databricks_workspace); it is relied on only to map the Microsoft.Databricks API's Hybrid compute mode to the word 'classic workspace', not for any Azure behaviour.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-provider-databricks/b1d7b859dbc32f176358e526e7f5336dda1830c6/docs/resources/mws_workspaces.md: '`effective_compute_mode` - (String) The effective compute mode for the workspace. This is either `SERVERLESS` for serverless workspaces or `HYBRID` for classic workspaces.' Scope: Databricks-published Terraform provider documentation, v1.134.0, databricks_mws_workspaces (account API interface for AWS and GCP); it establishes Databricks' naming of the HYBRID compute mode as a classic workspace and nothing about Azure availability or behaviour."
   }
  ],
  "claims": [
@@ -423,10 +500,12 @@
   },
   {
    "id": "dbxfe-azure-claim-workspace",
-   "description": "Creating an Azure Databricks workspace provisions a managed resource group holding the resources the workspace needs, such as virtual machines, storage accounts and networking components; the creating user becomes a workspace admin; creation can take minutes to hours.",
+   "description": "Creating a classic Azure Databricks workspace provisions a managed resource group holding the resources the workspace needs, such as virtual machines, storage accounts and networking components; the creating user becomes a workspace admin; creation can take minutes to hours; the Microsoft.Databricks API's Serverless compute mode does not accept a managed resource group.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-azure-source-workspace"
+    "dbxfe-azure-source-workspace",
+    "dbxfe-azure-source-rest-databricks",
+    "dbxfe-azure-source-tf-mws-workspaces"
    ],
    "context": "Workspace resource and managed resource group on Azure."
   },
@@ -447,7 +526,8 @@
    "sourceIds": [
     "dbxfe-azure-source-admin",
     "dbxfe-azure-source-scim",
-    "dbxfe-azure-source-aim"
+    "dbxfe-azure-source-aim",
+    "dbxfe-azure-source-tf-msi"
    ],
    "context": "Azure Databricks identities from Microsoft Entra ID; confirm the account's provisioning method."
   },
@@ -491,10 +571,11 @@
   },
   {
    "id": "dbxfe-azure-claim-routing",
-   "description": "Azure chooses a route by longest prefix match; next hop types include Virtual network, Internet, None and Virtual appliance, and a 0.0.0.0/0 route to a virtual appliance lets it inspect traffic; Internet-bound traffic to Azure services travels the Azure backbone; service tags can be route prefixes, up to 25 such routes per table.",
+   "description": "Azure chooses a route by longest prefix match; next hop types include Virtual network, Internet, None and Virtual appliance, and a 0.0.0.0/0 route to a virtual appliance lets it inspect traffic; Internet-bound traffic to Azure services travels the Azure backbone; service tags can be route prefixes, up to 25 such routes per table; the effective routes of a virtual machine network interface combine default, custom and propagated routes and can be viewed to diagnose routing.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-azure-source-routing"
+    "dbxfe-azure-source-routing",
+    "dbxfe-azure-source-routing-diagnose"
    ],
    "context": "Azure Virtual Network routing; limits change."
   },
@@ -503,7 +584,8 @@
    "description": "For API versions released after March 31, 2026, subnets in new virtual networks are private by default, so virtual machines need an explicit outbound method such as a NAT gateway or a route to a firewall; existing virtual networks are unchanged.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-azure-source-outbound"
+    "dbxfe-azure-source-outbound",
+    "dbxfe-azure-source-outbound-md"
    ],
    "context": "Azure default outbound access retirement; check each subnet's setting."
   },
@@ -536,7 +618,8 @@
    "sourceIds": [
     "dbxfe-azure-source-identities",
     "dbxfe-azure-source-adls",
-    "dbxfe-azure-source-sdk"
+    "dbxfe-azure-source-sdk",
+    "dbxfe-azure-source-tf-uc-azure"
    ],
    "context": "Unity Catalog storage access on Azure; steps and role choices are on the current pages."
   },
@@ -610,10 +693,12 @@
   },
   {
    "id": "dbxfe-azure-claim-firewall",
-   "description": "The workspace storage account in the managed resource group holds workspace system data and the DBFS root; enabling its firewall support blocks public access, Databricks reaches it through an access connector it creates, serverless must use service or private endpoints, and the trusted-services setting admits any Azure Databricks access connector in the same tenant.",
+   "description": "The workspace storage account in the managed resource group holds workspace system data and the DBFS root; enabling its firewall support blocks public access, Databricks reaches it through an access connector associated with the workspace, serverless must use service or private endpoints, and the trusted-services setting admits any Azure Databricks access connector in the same tenant.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-azure-source-firewall"
+    "dbxfe-azure-source-firewall",
+    "dbxfe-azure-source-rest-databricks",
+    "dbxfe-azure-source-azurerm-workspace"
    ],
    "context": "Workspace storage account firewall on Azure; availability and steps are verified on the current page."
   },
@@ -656,12 +741,14 @@
     "subscription",
     "resource group"
    ],
-   "definition": "The resource group Azure provisions with a Databricks workspace resource to hold its storage account, networking components and cluster virtual machines, protected by a system deny assignment.",
+   "definition": "The resource group Azure provisions with a classic Databricks workspace resource to hold its storage account, networking components and cluster virtual machines, protected by a system deny assignment.",
    "example": "rg-dbw-prod-managed holds the workspace storage account and default VNet of dbw-cinderline-prod; Cinderline can read it but not edit it.",
    "sourceIds": [
     "dbxfe-azure-source-workspace",
     "dbxfe-azure-source-denyassign",
-    "dbxfe-azure-source-denyqa"
+    "dbxfe-azure-source-denyqa",
+    "dbxfe-azure-source-rest-databricks",
+    "dbxfe-azure-source-tf-mws-workspaces"
    ]
   },
   {
@@ -977,10 +1064,12 @@
     "workspace storage account firewall",
     "trusted services"
    ],
-   "definition": "The documented option that blocks public network access to the workspace storage account in the managed resource group and admits Databricks through an access connector it creates.",
+   "definition": "The documented option that blocks public network access to the workspace storage account in the managed resource group and admits Databricks through an access connector associated with the workspace.",
    "example": "After enabling it, the workspace storage account of dbw-cinderline-sec answers only authorized resources, serverless through service or private endpoints.",
    "sourceIds": [
-    "dbxfe-azure-source-firewall"
+    "dbxfe-azure-source-firewall",
+    "dbxfe-azure-source-rest-databricks",
+    "dbxfe-azure-source-azurerm-workspace"
    ]
   },
   {
@@ -1004,11 +1093,12 @@
     "explicit outbound connectivity",
     "defaultOutboundAccess"
    ],
-   "definition": "Azure's change under which subnets of VNets created with API versions released after March 31, 2026 have no default outbound access, so virtual machines need an explicit outbound method.",
-   "example": "A new vnet-cinderline-data needs a NAT gateway or a route to a firewall before injected clusters reach public endpoints.",
+   "definition": "Azure's change under which subnets of VNets created with API versions released after March 31, 2026 have no default outbound access unless configured otherwise, so virtual machines need an explicit outbound method.",
+   "example": "In a new vnet-cinderline-data with private subnets, the Internet-next-hop service-tag routes of rt-dbw-egress fail until an explicit outbound method such as a NAT gateway is added, even though 0.0.0.0/0 goes to the firewall.",
    "sourceIds": [
     "dbxfe-azure-source-outbound",
-    "dbxfe-azure-source-vnet"
+    "dbxfe-azure-source-vnet",
+    "dbxfe-azure-source-outbound-md"
    ]
   },
   {
@@ -1206,8 +1296,8 @@
    "kind": "table",
    "title": "Which Entra identities reach the Databricks account",
    "alt": "Which Entra identities reach the Databricks account. The SCIM connector syncs users and groups; the nested group and the Entra service principal stay behind.",
-   "caption": "SCIM provisioning and automatic identity management bring different identities into the account; the managed identity never becomes a Databricks principal. Synthetic teaching example.",
-   "textEquivalent": "SCIM provisioning only: The SCIM connector syncs users and groups; the nested group and the Entra service principal stay behind. Columns: Identity; Entra object; In the Databricks account; Azure role needed for queries. Rows: Analyst ana — User in grp-quality-analysts — Yes, synced — None; grp-quality-analysts — Security group — Yes, synced — None; grp-line-leads — Group nested inside it — No: nested groups not synced — None; sp-job-nightly — Application service principal — No: add it another way — None; ac-cinderline-uc identity — Managed identity service principal — Never: not a Databricks principal — Data role on the lake.\n\nAutomatic identity management: Users, groups, memberships, nested groups and service principals sync; the managed identity stays an Azure-side identity. Columns: Identity; Entra object; In the Databricks account; Azure role needed for queries. Rows: Analyst ana — User in grp-quality-analysts — Yes, synced — None; grp-quality-analysts — Security group — Yes, with memberships — None; grp-line-leads — Group nested inside it — Yes: nested groups sync — None; sp-job-nightly — Application service principal — Yes, synced — None; ac-cinderline-uc identity — Managed identity service principal — Never: not a Databricks principal — Data role on the lake.",
+   "caption": "SCIM provisioning and automatic identity management bring different identities into the account; the access connector's managed identity is not provisioned here and is used only through the storage credential. Synthetic teaching example.",
+   "textEquivalent": "SCIM provisioning only: The SCIM connector syncs users and groups; the nested group and the Entra service principal stay behind. Columns: Identity; Entra object; In the Databricks account; Azure role needed for queries. Rows: Analyst ana — User in grp-quality-analysts — Yes, synced — None; grp-quality-analysts — Security group — Yes, synced — None; grp-line-leads — Group nested inside it — No: nested groups not synced — None; sp-job-nightly — Application service principal — No: add it another way — None; ac-cinderline-uc identity — Managed identity service principal — No: not provisioned; used through the storage credential — Data role on the lake.\n\nAutomatic identity management: Users, groups, memberships, nested groups and service principals sync; the managed identity stays an Azure-side identity. Columns: Identity; Entra object; In the Databricks account; Azure role needed for queries. Rows: Analyst ana — User in grp-quality-analysts — Yes, synced — None; grp-quality-analysts — Security group — Yes, with memberships — None; grp-line-leads — Group nested inside it — Yes: nested groups sync — None; sp-job-nightly — Application service principal — Yes, synced — None; ac-cinderline-uc identity — Managed identity service principal — No: not provisioned; used through the storage credential — Data role on the lake.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-azure-claim-identity",
@@ -1257,7 +1347,7 @@
        [
         "ac-cinderline-uc identity",
         "Managed identity service principal",
-        "Never: not a Databricks principal",
+        "No: not provisioned; used through the storage credential",
         "Data role on the lake"
        ]
       ]
@@ -1304,7 +1394,7 @@
        [
         "ac-cinderline-uc identity",
         "Managed identity service principal",
-        "Never: not a Databricks principal",
+        "No: not provisioned; used through the storage credential",
         "Data role on the lake"
        ]
       ]
@@ -1962,9 +2052,9 @@
    "id": "dbxfe-azure-connector-visual",
    "kind": "nodes",
    "title": "From access connector to external table",
-   "alt": "From access connector to external table. Each link names the one before it, and the only Azure permission is the role assignment on the storage account.",
-   "caption": "The only Azure permission in the chain is the role assignment for the connector's managed identity; the Unity Catalog objects name it. Synthetic teaching example.",
-   "textEquivalent": "Chain complete: Each link names the one before it, and the only Azure permission is the role assignment on the storage account. Nodes: Access connector: ac-cinderline-uc. Microsoft.Databricks/accessConnectors in rg-cinderline-data. (selected); Managed identity: System-assigned; no secret anyone holds. (selected); Role assignment: Storage Blob Data Contributor. On stcinderlinelake, for the managed identity. (selected); Storage credential: cinderline_lake_cred. Names the connector's resource ID. (selected); External location: cinderline_quality. abfss://quality@stcinderlinelake.dfs.core.windows.net/accepted (selected); External table: quality.accepted.inspections. Stored under the location's path. (selected). Relationships: Access connector → Managed identity: carries; Managed identity → Role assignment: holds; Storage credential → Access connector: names; External location → Storage credential: uses; External table → External location: stored under.\n\nRole assignment removed: Every Unity Catalog object is unchanged and valid; reads now fail at the storage account. Nodes: Access connector: ac-cinderline-uc. Unchanged. (selected); Managed identity: Unchanged, but holds no data role. (warning); Role assignment: none. Removed during a cleanup. (excluded); Storage credential: cinderline_lake_cred. Unchanged; still names the connector. (selected); External location: cinderline_quality. Unchanged. (selected); External table: quality.accepted.inspections. Reads fail with a 403 from storage. (warning). Relationships: Access connector → Managed identity: carries; Managed identity → Role assignment: holds nothing; Storage credential → Access connector: names; External location → Storage credential: uses; External table → External location: stored under.",
+   "alt": "From access connector to external table. Each link names the one before it, and the Azure permission that authorizes reads is the role assignment on the storage account.",
+   "caption": "The Azure permission that authorizes reads in the chain is the data role assignment for the connector's managed identity; the Unity Catalog objects name it. Synthetic teaching example.",
+   "textEquivalent": "Chain complete: Each link names the one before it, and the Azure permission that authorizes reads is the role assignment on the storage account. Nodes: Access connector: ac-cinderline-uc. Microsoft.Databricks/accessConnectors in rg-cinderline-data. (selected); Managed identity: System-assigned; no secret anyone holds. (selected); Role assignment: Storage Blob Data Contributor. On stcinderlinelake, for the managed identity. (selected); Storage credential: cinderline_lake_cred. Names the connector's resource ID. (selected); External location: cinderline_quality. abfss://quality@stcinderlinelake.dfs.core.windows.net/accepted (selected); External table: quality.accepted.inspections. Stored under the location's path. (selected). Relationships: Access connector → Managed identity: carries; Managed identity → Role assignment: holds; Storage credential → Access connector: names; External location → Storage credential: uses; External table → External location: stored under.\n\nRole assignment removed: Every Unity Catalog object is unchanged and valid; reads now fail at the storage account. Nodes: Access connector: ac-cinderline-uc. Unchanged. (selected); Managed identity: Unchanged, but holds no data role. (warning); Role assignment: none. Removed during a cleanup. (excluded); Storage credential: cinderline_lake_cred. Unchanged; still names the connector. (selected); External location: cinderline_quality. Unchanged. (selected); External table: quality.accepted.inspections. Reads fail with a 403 from storage. (warning). Relationships: Access connector → Managed identity: carries; Managed identity → Role assignment: holds nothing; Storage credential → Access connector: names; External location → Storage credential: uses; External table → External location: stored under.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-azure-claim-connector",
@@ -1977,7 +2067,7 @@
     {
      "id": "chain",
      "title": "Chain complete",
-     "explanation": "Each link names the one before it, and the only Azure permission is the role assignment on the storage account.",
+     "explanation": "Each link names the one before it, and the Azure permission that authorizes reads is the role assignment on the storage account.",
      "nodes": [
       {
        "id": "node-ac",
@@ -3028,7 +3118,7 @@
    "title": "What differs from AWS, and what transfers",
    "alt": "What differs from AWS, and what transfers. Each row puts the same question to both clouds and gets a different object back.",
    "caption": "The planes and the diagnostic order transfer; the objects that hold each boundary do not. AWS rows restate the course's AWS module. Synthetic teaching example.",
-   "textEquivalent": "What differs from AWS: Each row puts the same question to both clouds and gets a different object back. Columns: Question; On AWS; On Azure. Rows: What is the workspace? — Configuration naming Cinderline's VPC and bucket — An Azure resource with a locked managed resource group; Where does classic compute sit? — Customer-managed VPC: subnets, security group — Delegated host and container subnets; Databricks-managed NSG rules; What identity reads storage? — IAM role in the bucket's account — Access connector managed identity with an Azure data role; What was the legacy path? — Instance profile on the cluster's instances — Key, SAS or client secret in Spark configuration; What does private connectivity add? — PrivateLink endpoints for three connection types — A browser_authentication endpoint and Private DNS zone links; Where do customer-managed keys live? — AWS KMS key in the workspace's region — Azure Key Vault or Managed HSM; Which tier for serverless egress control? — Enterprise — Premium.\n\nWhat still transfers: The planes, the catalog-first order and the outward network walk carry across; only the objects change. Columns: Question; On AWS; On Azure. Rows: Where do the compute planes run? — Classic in the customer account, serverless in Databricks' — Classic in the subscription, serverless in Databricks'; What is the denied-request order? — Principal, privilege, credential role, bucket, key — Principal, privilege, credential role, network rules; What is the unreachable-request order? — DNS, route, security group, firewall — DNS, zone link, endpoint approval, route, NSG, firewall; What makes evidence usable? — Named object and its limit — Named object and its limit.",
+   "textEquivalent": "What differs from AWS: Each row puts the same question to both clouds and gets a different object back. Columns: Question; On AWS; On Azure. Rows: What is the workspace? — Configuration naming Cinderline's VPC and bucket — A classic workspace: an Azure resource with a locked managed resource group; Where does classic compute sit? — Customer-managed VPC: subnets, security group — Delegated host and container subnets; Databricks-managed NSG rules; What identity reads storage? — IAM role in the bucket's account — Access connector managed identity with an Azure data role; What was the legacy path? — Instance profile on the cluster's instances — Key, SAS or client secret in Spark configuration; What does private connectivity add? — PrivateLink endpoints for three connection types — A browser_authentication endpoint and Private DNS zone links; Where do customer-managed keys live? — AWS KMS key in the workspace's region — Azure Key Vault or Managed HSM; Which tier for serverless egress control? — Enterprise — Premium.\n\nWhat still transfers: The planes, the catalog-first order and the outward network walk carry across; only the objects change. Columns: Question; On AWS; On Azure. Rows: Where do the compute planes run? — Classic in the customer account, serverless in Databricks' — Classic in the subscription, serverless in Databricks'; What is the denied-request order? — Principal, privilege, credential role, bucket, key — Principal, privilege, credential role, network rules; What is the unreachable-request order? — DNS, route, security group, firewall — DNS, zone link, endpoint approval, route, NSG, firewall; What makes evidence usable? — Named object and its limit — Named object and its limit.",
    "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
    "claimIds": [
     "dbxfe-azure-claim-architecture",
@@ -3065,7 +3155,7 @@
        [
         "What is the workspace?",
         "Configuration naming Cinderline's VPC and bucket",
-        "An Azure resource with a locked managed resource group"
+        "A classic workspace: an Azure resource with a locked managed resource group"
        ],
        [
         "Where does classic compute sit?",
@@ -3612,10 +3702,10 @@
  "beats": [
   {
    "id": "dbxfe-azure-account",
-   "version": "1.0.0",
-   "title": "A workspace resource comes with a resource group you cannot edit",
+   "version": "1.1.0",
+   "title": "A classic workspace resource comes with a resource group you cannot edit",
    "outcome": "Place the tenant, subscription, workspace resource, managed resource group and workspace storage, and say which of them Cinderline can change.",
-   "explanation": "On Azure the workspace is a resource, Microsoft.Databricks/workspaces, in a resource group of Cinderline's subscription under its Entra tenant. Creating it provisions a second, [[dbxfe-azure-resources-concept|managed resource group]] holding the workspace storage account, networking components and, while clusters run, their virtual machines. Azure protects that group with a system deny assignment, so even a subscription Owner cannot edit what is inside. Notice in the second state that the tag edit fails in the managed group and succeeds on the workspace resource, while the control plane stays in the Databricks account throughout.",
+   "explanation": "On Azure, Cinderline's classic workspace is a resource, Microsoft.Databricks/workspaces, in a resource group of its subscription under its Entra tenant. Creating a classic workspace provisions a second, [[dbxfe-azure-resources-concept|managed resource group]] holding the workspace storage account, networking components and, while clusters run, their virtual machines. Azure protects that group with a system deny assignment, so even a subscription Owner cannot edit what is inside. Notice in the second state that the tag edit fails in the managed group and succeeds on the workspace resource, while the control plane stays in the Databricks account throughout.",
    "lessonId": "dbxfe-azure-l01",
    "sectionId": "dbxfe-azure-l01-resources",
    "conceptIds": [
@@ -3638,18 +3728,18 @@
     "dbxfe-azure-account-question"
    ],
    "handbook": {
-    "markdown": "The workspace resource, type `Microsoft.Databricks/workspaces`, lives in a resource group Cinderline chooses, in a subscription that trusts one Microsoft Entra tenant. Creating it through the portal, Azure CLI, PowerShell, Bicep or an ARM template also provisions a managed resource group holding the resources the workspace needs: virtual machines, storage accounts and networking components. The creating user becomes a workspace admin; creation takes minutes and occasionally hours.\n\nThe managed group is protected by a system deny assignment. Azure RBAC defines deny assignments as blocks on specific actions that apply even when a role assignment grants them, created and managed by Azure rather than by customers. Community answers on Microsoft Q&A describe the Databricks case: Owners cannot change tags or settings inside the managed group, the assignment disappears only when the workspace is deleted, and tags go on the workspace resource. Treat the group as read-only evidence.\n\n| Object | Where it lives | Who changes it |\n|---|---|---|\n| `dbw-cinderline-prod` | `rg-cinderline-data` | Cinderline |\n| Workspace storage account | managed group | Databricks, through the workspace |\n| Default VNet, NSG, NAT gateway | managed group | Databricks |\n| Control plane, web application | Databricks account | Databricks |\n\nThe workspace storage account holds workspace system data and the DBFS root; Cinderline's governed tables live in its own ADLS Gen2 account. To inspect without changing anything:\n\n```powershell\nGet-AzDenyAssignment -ResourceGroupName rg-dbw-prod-managed\n```\n\nor open the group's Access control (IAM) page and its Deny assignments tab. A refused edit there is expected behaviour, not a missing role, and no broader role overrides it. Nothing here creates a workspace.",
+    "markdown": "The workspace resource, type `Microsoft.Databricks/workspaces`, lives in a resource group Cinderline chooses, in a subscription that trusts one Microsoft Entra tenant. Creating a classic workspace through the portal, Azure CLI, PowerShell, Bicep or an ARM template also provisions a managed resource group holding the resources the workspace needs: virtual machines, storage accounts and networking components; the Microsoft.Databricks API's Serverless compute mode does not accept a managed resource group. The creating user becomes a workspace admin; creation takes minutes and occasionally hours.\n\nThe managed group is protected by a system deny assignment. Azure RBAC defines deny assignments as blocks on specific actions that apply even when a role assignment grants them, created and managed by Azure rather than by customers. Community answers on Microsoft Q&A describe the Databricks case: Owners cannot change tags or settings inside the managed group, the assignment disappears only when the workspace is deleted, and tags go on the workspace resource. Treat the group as read-only evidence.\n\n| Object | Where it lives | Who changes it |\n|---|---|---|\n| `dbw-cinderline-prod` | `rg-cinderline-data` | Cinderline |\n| Workspace storage account | managed group | Databricks, through the workspace |\n| Default VNet, NSG, NAT gateway | managed group | Databricks |\n| Control plane, web application | Databricks account | Databricks |\n\nThe workspace storage account holds workspace system data and the DBFS root; Cinderline's governed tables live in its own ADLS Gen2 account. To inspect without changing anything:\n\n```powershell\nGet-AzDenyAssignment -ResourceGroupName rg-dbw-prod-managed\n```\n\nor open the group's Access control (IAM) page and its Deny assignments tab. A refused edit there is expected behaviour, not a missing role, and no broader role overrides it. Nothing here creates a workspace.",
     "sourceSectionIds": [
      "dbxfe-azure-l01-resources"
     ]
    },
    "recap": "The workspace resource is Cinderline's to tag and configure; the managed resource group beside it is locked by a system deny assignment.",
-   "changeNote": "New academy beat.",
+   "changeNote": "The title, explanation and handbook now say the managed resource group comes with a classic workspace, not with every workspace. Source: the Microsoft.Databricks REST API specification (2026-01-01, pinned commit 2094b1c), where a Serverless-mode workspace takes no managed resource group.",
    "mediaIds": []
   },
   {
    "id": "dbxfe-azure-identity",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "Entra issues every identity, and two systems authorize them separately",
    "outcome": "Classify a user, group, service principal and managed identity by where each is created, how it reaches Databricks and which system grants it access.",
    "explanation": "Every Cinderline identity starts in the Microsoft Entra tenant: analysts are users in groups, the nightly job is an application [[dbxfe-azure-entra-concept|service principal]], and the access connector carries a [[dbxfe-azure-managedid-concept|managed identity]] whose service principal has no application object and no secret anyone holds. Databricks learns users, groups and service principals through provisioning. Then two systems grant separately: Unity Catalog privileges inside Databricks, Azure role assignments on Azure resources. Notice in the table's second state that automatic identity management brings the nested group and the service principal that SCIM left behind.",
@@ -3676,7 +3766,7 @@
     ]
    },
    "recap": "One tenant issues every identity, but a Unity Catalog grant and an Azure role assignment are separate permissions held in separate systems.",
-   "changeNote": "New academy beat.",
+   "changeNote": "The identity table no longer says a managed identity can never be a Databricks principal; it says the connector's identity is not provisioned in this design. Source: the Databricks Terraform provider documentation (docs/index.md, pinned commit b1d7b85), where a managed identity added to a workspace as a service principal works.",
    "mediaIds": []
   },
   {
@@ -3783,7 +3873,7 @@
   },
   {
    "id": "dbxfe-azure-routes",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "A route table decides where egress goes, and service tags name the destinations",
    "outcome": "Predict the next hop for a cluster's outbound connection from a subnet route table that uses service tags.",
    "explanation": "In an injected workspace, egress follows the route table on the two subnets, and Azure picks the longest matching prefix, so a specific route beats the default. Cinderline sends 0.0.0.0/0 to its firewall as a virtual appliance and adds [[dbxfe-azure-udr-concept|user-defined routes]] with service tags for what Databricks needs: AzureDatabricks for the control plane, relay and web application, Storage for artifact and log storage, EventHub for logging. Notice in the second state that deleting the AzureDatabricks route sends relay traffic to a firewall with no matching rule, and launches stop.",
@@ -3805,13 +3895,13 @@
    ],
    "hint": "Find the most specific prefix that contains the destination address.",
    "handbook": {
-    "markdown": "Every subnet has system routes; a route table associated with the subnet adds user-defined routes that override them. For each outbound packet Azure picks the route with the longest matching prefix, so a /22 VNet route beats a 0.0.0.0/0 default, and a service-tag route beats the default for addresses in that tag.\n\nCinderline's route table `rt-dbw-egress`, attached to both workspace subnets:\n\n```bash\naz network route-table route create \\\n  --resource-group rg-cinderline-net --route-table-name rt-dbw-egress \\\n  --name default-to-firewall --address-prefix 0.0.0.0/0 \\\n  --next-hop-type VirtualAppliance --next-hop-ip-address 10.10.0.4\n\naz network route-table route create \\\n  --resource-group rg-cinderline-net --route-table-name rt-dbw-egress \\\n  --name to-azuredatabricks --address-prefix AzureDatabricks \\\n  --next-hop-type Internet\n```\n\nThe Databricks page asks for a route for every type of outbound connection and recommends service tags over IP addresses: `AzureDatabricks` for the control plane, relay and web application, `Storage` for artifact and log storage, `EventHub` for logging. Internet-bound traffic to Azure services travels the Azure backbone. A route table holds a limited number of service-tag routes (25 at the time of writing), and an explicit prefix wins over a tag on an exact match.\n\nRouting everything through the firewall instead is legitimate, but then the firewall must allow each required destination, and that allowlist is Cinderline's to maintain as addresses change. The deletion in the visual shows the failure shape: relay traffic falls to the default route, the firewall has no rule, packets are dropped, and clusters stop launching with no refusal anywhere.\n\nVNets created with API versions released after 31 March 2026 get private subnets by default, so an injected workspace needs an explicit outbound method, a NAT gateway or a route to a firewall, from the first day. Where your permissions allow, inspect the effective routes of a node's network interface, not only the route table.",
+    "markdown": "Every subnet has system routes; a route table associated with the subnet adds user-defined routes that override them. For each outbound packet Azure picks the route with the longest matching prefix, so a /22 VNet route beats a 0.0.0.0/0 default, and a service-tag route beats the default for addresses in that tag.\n\nCinderline's route table `rt-dbw-egress`, attached to both workspace subnets:\n\n```bash\naz network route-table route create \\\n  --resource-group rg-cinderline-net --route-table-name rt-dbw-egress \\\n  --name default-to-firewall --address-prefix 0.0.0.0/0 \\\n  --next-hop-type VirtualAppliance --next-hop-ip-address 10.10.0.4\n\naz network route-table route create \\\n  --resource-group rg-cinderline-net --route-table-name rt-dbw-egress \\\n  --name to-azuredatabricks --address-prefix AzureDatabricks \\\n  --next-hop-type Internet\n```\n\nThe Databricks page asks for a route for every type of outbound connection and recommends service tags over IP addresses: `AzureDatabricks` for the control plane, relay and web application, `Storage` for artifact and log storage, `EventHub` for logging. Internet-bound traffic to Azure services travels the Azure backbone. A route table holds a limited number of service-tag routes (25 at the time of writing), and an explicit prefix wins over a tag on an exact match.\n\nRouting everything through the firewall instead is legitimate, but then the firewall must allow each required destination, and that allowlist is Cinderline's to maintain as addresses change. The deletion in the visual shows the failure shape: relay traffic falls to the default route, the firewall has no rule, packets are dropped, and clusters stop launching with no refusal anywhere.\n\nVNets created with API versions released after 31 March 2026 get private subnets by default, and in a private subnet a route with next hop Internet, such as the service-tag routes above, fails unless an explicit outbound method such as a NAT gateway is also configured: the route to the firewall does not carry that traffic. Azure's page also says private subnets do not apply to delegated subnets hosting PaaS services, whose outbound connectivity the service manages, so read each workspace subnet's setting rather than assuming, and plan an explicit outbound method such as a NAT gateway on both subnets from the first day. Where your permissions allow, inspect the effective routes of a node's network interface, not only the route table.",
     "sourceSectionIds": [
      "dbxfe-azure-l01-patterns"
     ]
    },
    "recap": "Longest prefix wins: service-tag routes keep Databricks' destinations reachable, and everything else follows the default route to the firewall.",
-   "changeNote": "New academy beat.",
+   "changeNote": "The default-outbound paragraph now says that in a private subnet the Internet-next-hop service-tag routes also need an explicit outbound method such as a NAT gateway, since the firewall route does not carry them, and notes Azure's exception for delegated subnets. Source: Microsoft's Default Outbound Access page source (azure-docs, pinned commit 194fd50).",
    "mediaIds": []
   },
   {
@@ -3851,7 +3941,7 @@
   },
   {
    "id": "dbxfe-azure-connector",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "Unity Catalog reaches ADLS through an access connector's managed identity",
    "outcome": "Assemble the chain from access connector to external table and name the Azure or Databricks object at each link.",
    "explanation": "Unity Catalog replaces the secret with an [[dbxfe-azure-connector-concept|access connector]]: an Azure resource, Microsoft.Databricks/accessConnectors, carrying a system-assigned managed identity. Cinderline grants that identity a data role such as Storage Blob Data Contributor on stcinderlinelake, registers the connector's resource ID as a storage credential, and binds an external location to [[dbxfe-azure-abfss-concept|abfss://quality@stcinderlinelake.dfs.core.windows.net/accepted]]. No secret exists to leak or rotate. Notice in the second state that removing the role assignment leaves every Unity Catalog object intact, yet reads fail at storage.",
@@ -3873,13 +3963,13 @@
     "dbxfe-azure-connector-self"
    ],
    "handbook": {
-    "markdown": "The Unity Catalog chain on Azure has five links, and only one of them is an Azure permission.\n\n1. **Access connector** `ac-cinderline-uc`, type `Microsoft.Databricks/accessConnectors`, in `rg-cinderline-data`, carrying a system-assigned managed identity; a user-assigned identity can be attached instead.\n2. **Role assignment**: the identity holds a data role, Storage Blob Data Contributor for read-write or Storage Blob Data Reader for read-only, scoped to the account or a container. Role changes can take up to ten minutes to apply.\n3. **Storage credential** `cinderline_lake_cred`, which names the connector's resource ID:\n\n```python\nfrom databricks.sdk import WorkspaceClient\nfrom databricks.sdk.service.catalog import AzureManagedIdentityRequest\n\nw = WorkspaceClient()\nw.storage_credentials.create(\n    name=\"cinderline_lake_cred\",\n    azure_managed_identity=AzureManagedIdentityRequest(\n        access_connector_id=(\n            \"/subscriptions/<subscription-id>/resourceGroups/rg-cinderline-data\"\n            \"/providers/Microsoft.Databricks/accessConnectors/ac-cinderline-uc\"\n        )\n    ),\n)\n```\n\n4. **External location**, which binds a path to the credential:\n\n```sql\nCREATE EXTERNAL LOCATION IF NOT EXISTS cinderline_quality\n  URL 'abfss://quality@stcinderlinelake.dfs.core.windows.net/accepted'\n  WITH (STORAGE CREDENTIAL cinderline_lake_cred);\n```\n\n5. **External table** `quality.accepted.inspections` under that path, with privileges granted to groups.\n\nCreating the credential needs metastore admin or the CREATE STORAGE CREDENTIAL privilege; creating the location needs CREATE EXTERNAL LOCATION on the metastore and the credential. A managed identity needs no secret rotation and, unlike a service principal, lets Unity Catalog reach storage protected by network rules. Unity Catalog checks the caller's access to the credential or location before it authenticates to Azure at all.\n\nThe failure in the visual is common after a cleanup: the role assignment disappears, every Unity Catalog object still looks correct, and reads fail with a 403 from storage. Read the identity's role assignments on the account before touching any grant.",
+    "markdown": "The Unity Catalog chain on Azure has five links, and the one that authorizes reads in Azure is a role assignment on the storage account. Databricks' Terraform guide also gives the connector's identity Storage Account Contributor, Storage Queue Data Contributor and EventGrid EventSubscription Contributor beside the data role, so read all of its role assignments.\n\n1. **Access connector** `ac-cinderline-uc`, type `Microsoft.Databricks/accessConnectors`, in `rg-cinderline-data`, carrying a system-assigned managed identity; a user-assigned identity can be attached instead.\n2. **Role assignment**: the identity holds a data role, Storage Blob Data Contributor for read-write or Storage Blob Data Reader for read-only, scoped to the account or a container. Role changes can take up to ten minutes to apply.\n3. **Storage credential** `cinderline_lake_cred`, which names the connector's resource ID:\n\n```python\nfrom databricks.sdk import WorkspaceClient\nfrom databricks.sdk.service.catalog import AzureManagedIdentityRequest\n\nw = WorkspaceClient()\nw.storage_credentials.create(\n    name=\"cinderline_lake_cred\",\n    azure_managed_identity=AzureManagedIdentityRequest(\n        access_connector_id=(\n            \"/subscriptions/<subscription-id>/resourceGroups/rg-cinderline-data\"\n            \"/providers/Microsoft.Databricks/accessConnectors/ac-cinderline-uc\"\n        )\n    ),\n)\n```\n\n4. **External location**, which binds a path to the credential:\n\n```sql\nCREATE EXTERNAL LOCATION IF NOT EXISTS cinderline_quality\n  URL 'abfss://quality@stcinderlinelake.dfs.core.windows.net/accepted'\n  WITH (STORAGE CREDENTIAL cinderline_lake_cred);\n```\n\n5. **External table** `quality.accepted.inspections` under that path, with privileges granted to groups.\n\nCreating the credential needs metastore admin or the CREATE STORAGE CREDENTIAL privilege; creating the location needs CREATE EXTERNAL LOCATION on the metastore and the credential. A managed identity needs no secret rotation and, unlike a service principal, lets Unity Catalog reach storage protected by network rules. Unity Catalog checks the caller's access to the credential or location before it authenticates to Azure at all.\n\nThe failure in the visual is common after a cleanup: the role assignment disappears, every Unity Catalog object still looks correct, and reads fail with a 403 from storage. Read the identity's role assignments on the account before touching any grant.",
     "sourceSectionIds": [
      "dbxfe-azure-l01-storage"
     ]
    },
-   "recap": "Connector, managed identity, Azure data role, storage credential, external location: the role assignment is the only Azure permission in the chain.",
-   "changeNote": "New academy beat.",
+   "recap": "Connector, managed identity, Azure data role, storage credential, external location: the data role assignment is the Azure permission that authorizes the reads.",
+   "changeNote": "The chain no longer calls the data role the connector identity's only Azure permission; it names it as the role that authorizes reads. Source: the Databricks Terraform provider guide for Unity Catalog on Azure (pinned commit b1d7b85), which assigns the identity four roles.",
    "mediaIds": []
   },
   {
@@ -4100,10 +4190,10 @@
   },
   {
    "id": "dbxfe-azure-aws",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "Azure is not AWS with new names: the boundaries sit in different objects",
    "outcome": "List what differs between Cinderline's Azure and AWS deployments and refuse the parity shortcuts that break a diagnosis.",
-   "explanation": "Translating AWS terms one for one hides where Azure's boundaries sit, so keep an explicit [[dbxfe-azure-awsdiff-concept|difference list]]. The workspace is itself an Azure resource with a locked managed group, not a configuration pointing at a customer account. Injected subnets are delegated to Databricks, which keeps the security rules it needs. Storage identity is an access connector's managed identity holding an Azure role, with no trust policy to write. Private Link adds a browser_authentication endpoint and Private DNS zone links. Notice in the table that tier names differ too: Premium on Azure where the AWS pages say Enterprise.",
+   "explanation": "Translating AWS terms one for one hides where Azure's boundaries sit, so keep an explicit [[dbxfe-azure-awsdiff-concept|difference list]]. A classic workspace is itself an Azure resource with a locked managed group, not a configuration pointing at a customer account. Injected subnets are delegated to Databricks, which keeps the security rules it needs. Storage identity is an access connector's managed identity holding an Azure role, with no trust policy to write. Private Link adds a browser_authentication endpoint and Private DNS zone links. Notice in the table that tier names differ too: Premium on Azure where the AWS pages say Enterprise.",
    "lessonId": "dbxfe-azure-l01",
    "sectionId": "dbxfe-azure-l01-differences",
    "conceptIds": [
@@ -4133,13 +4223,13 @@
     "dbxfe-azure-aws-self"
    ],
    "handbook": {
-    "markdown": "The questions transfer between clouds; the answers do not. Use this list to stop an AWS runbook being translated term for term.\n\n**What differs from AWS**\n- **The workspace.** On Azure it is a resource, `Microsoft.Databricks/workspaces`, with a managed resource group locked by a system deny assignment. The AWS module describes a workspace configuration naming Cinderline's VPC and bucket in its AWS account.\n- **Classic networking.** VNet injection uses two delegated subnets, host and container, and Databricks provisions the NSG rules it needs through the delegation; do not delete them. The AWS module uses a customer-managed VPC with at least two subnets and a security group.\n- **Storage identity.** A Unity Catalog storage credential on Azure names an access connector whose managed identity holds an Azure data role; no trust policy is written. On AWS the credential wraps an IAM role that lives in the bucket's account.\n- **Legacy access.** Azure's legacy path is a key, SAS or client secret in Spark configuration; AWS's is an instance profile on the cluster's instances.\n- **A network door on storage.** Azure storage network rules (virtual network, IP, resource instance, trusted service) refuse with a 403 independently of roles.\n- **Private connectivity.** Azure adds a `browser_authentication` endpoint for single sign-on and depends on Private DNS zone links per VNet.\n- **Keys and tiers.** Customer-managed keys on Azure come from Key Vault or Managed HSM and cover managed disks (classic compute only), managed services and the DBFS root. Back-end Private Link and serverless egress control need Premium on Azure; the AWS pages name Enterprise for egress control and for customer-managed keys.\n- **Identity.** Entra ID is the native directory: a Global Administrator seeds the first account admin, and the provisioning method decides whether service principals and nested groups arrive.\n\n**What transfers.** Two compute planes; four request paths; catalog before storage in the denied sequence; DNS before routes in the unreachable sequence; evidence rows that name the object and its limit.\n\nA three-cloud comparison keeps these as separate sourced answers per cloud and marks anything unverified as unknown rather than copying another cloud's answer.",
+    "markdown": "The questions transfer between clouds; the answers do not. Use this list to stop an AWS runbook being translated term for term.\n\n**What differs from AWS**\n- **The workspace.** On Azure a classic workspace is a resource, `Microsoft.Databricks/workspaces`, with a managed resource group locked by a system deny assignment. The AWS module describes a workspace configuration naming Cinderline's VPC and bucket in its AWS account.\n- **Classic networking.** VNet injection uses two delegated subnets, host and container, and Databricks provisions the NSG rules it needs through the delegation; do not delete them. The AWS module uses a customer-managed VPC with at least two subnets and a security group.\n- **Storage identity.** A Unity Catalog storage credential on Azure names an access connector whose managed identity holds an Azure data role; no trust policy is written. On AWS the credential wraps an IAM role that lives in the bucket's account.\n- **Legacy access.** Azure's legacy path is a key, SAS or client secret in Spark configuration; AWS's is an instance profile on the cluster's instances.\n- **A network door on storage.** Azure storage network rules (virtual network, IP, resource instance, trusted service) refuse with a 403 independently of roles.\n- **Private connectivity.** Azure adds a `browser_authentication` endpoint for single sign-on and depends on Private DNS zone links per VNet.\n- **Keys and tiers.** Customer-managed keys on Azure come from Key Vault or Managed HSM and cover managed disks (classic compute only), managed services and the DBFS root. Back-end Private Link and serverless egress control need Premium on Azure; the AWS pages name Enterprise for egress control and for customer-managed keys.\n- **Identity.** Entra ID is the native directory: a Global Administrator seeds the first account admin, and the provisioning method decides whether service principals and nested groups arrive.\n\n**What transfers.** Two compute planes; four request paths; catalog before storage in the denied sequence; DNS before routes in the unreachable sequence; evidence rows that name the object and its limit.\n\nA three-cloud comparison keeps these as separate sourced answers per cloud and marks anything unverified as unknown rather than copying another cloud's answer.",
     "sourceSectionIds": [
      "dbxfe-azure-l01-differences"
     ]
    },
    "recap": "Same planes and the same diagnostic order, but different owners, identities, network objects and tier names: never translate a runbook word for word.",
-   "changeNote": "New academy beat.",
+   "changeNote": "The explanation, handbook and comparison table now describe a classic workspace, not every workspace, as a resource with a locked managed resource group. Source: the Microsoft.Databricks REST API specification (2026-01-01, pinned commit 2094b1c), where a Serverless-mode workspace takes no managed resource group.",
    "mediaIds": []
   }
  ],
@@ -4204,9 +4294,9 @@
  "extensionCards": [
   {
    "id": "dbxfe-azure-extension-workspace-firewall",
-   "revision": "1",
+   "revision": "2",
    "prompt": "What changes for Databricks and other services when firewall support is enabled on a workspace storage account?",
-   "answer": "Public network access to the workspace storage account is blocked; Databricks reaches it through an access connector it creates, serverless through service or private endpoints, and outside services only through private endpoints.",
+   "answer": "Public network access to the workspace storage account is blocked; Databricks reaches it through an access connector associated with the workspace, serverless through service or private endpoints, and outside services only through private endpoints.",
    "explanation": "The workspace storage account sits in the managed resource group and holds workspace system data and the DBFS root, so Cinderline cannot put its own rules on it directly; this [[dbxfe-azure-extension-workspace-firewall-concept|documented option]] is the supported way. One setting deserves a second look: with trusted services allowed, any Azure Databricks access connector in the same tenant can reach the account, which is broader than one workspace. Enabling it is a change to plan with the network team, not a toggle to try in production.",
    "lessonId": "dbxfe-azure-l01",
    "sectionId": "dbxfe-azure-l01-resources",
@@ -4246,7 +4336,7 @@
    "revision": "1",
    "prompt": "Why might clusters in a newly created injected VNet fail to reach public endpoints though no route or firewall blocks them?",
    "answer": "Subnets in VNets created with API versions released after March 31, 2026 are private by default, so virtual machines need an explicit outbound method such as a NAT gateway.",
-   "explanation": "Azure retired implicit [[dbxfe-azure-extension-default-outbound-concept|default outbound access]] for new virtual networks: their subnets have defaultOutboundAccess set to false, and virtual machines in them cannot reach public endpoints without a NAT gateway, a route to a firewall or another explicit method. Existing VNets are unchanged, which is why two workspaces with identical route tables can behave differently. Databricks' recommendation of a NAT gateway on both injected subnets fits this change, but check each subnet's setting rather than assuming.",
+   "explanation": "Azure changed how new virtual networks get [[dbxfe-azure-extension-default-outbound-concept|default outbound access]]: with API versions released after March 31, 2026 their subnets have defaultOutboundAccess set to false unless configured otherwise, and virtual machines in them cannot reach public endpoints without a NAT gateway, a route to a firewall or another explicit method. Existing VNets are unchanged, which is why two workspaces with identical route tables can behave differently. Azure also says private subnets do not apply to delegated subnets hosting PaaS services, whose outbound connectivity the service manages, so check each subnet's setting rather than assuming; Databricks' recommendation of a NAT gateway on both injected subnets gives explicit outbound either way.",
    "lessonId": "dbxfe-azure-l01",
    "sectionId": "dbxfe-azure-l01-patterns",
    "conceptIds": [
@@ -4267,7 +4357,7 @@
    "revision": "1",
    "prompt": "How can linking privatelink.dfs.core.windows.net to Cinderline's VNet break access to a supplier's storage account?",
    "answer": "If the supplier's account has its own private endpoints, Cinderline's linked zone holds no record for it and answers NXDOMAIN, unless fallback to internet or another DNS configuration is added.",
-   "explanation": "Azure's documentation warns that a network using a Private DNS zone for a resource type resolves public resources of that type only when they have no private endpoint connections. Once Cinderline links the dfs zone, every dfs name is answered there, including the supplier's, whose CNAME points into the privatelink namespace. With no matching record the zone answers NXDOMAIN, so the read fails before any connection. [[dbxfe-azure-extension-dns-fallback-concept|Fallback to internet]] on the virtual network link, or a deliberate record, restores resolution.",
+   "explanation": "Azure's documentation warns that a network using a Private DNS zone for a resource type resolves public resources of that type only when they have no private endpoint connections. Once Cinderline links the dfs zone, every dfs name whose CNAME points into the privatelink namespace is answered there, including the supplier's, whose account has its own private endpoints. With no matching record the zone answers NXDOMAIN, so the read fails before any connection. [[dbxfe-azure-extension-dns-fallback-concept|Fallback to internet]] on the virtual network link, or a deliberate record, restores resolution.",
    "lessonId": "dbxfe-azure-l01",
    "sectionId": "dbxfe-azure-l01-private",
    "conceptIds": [

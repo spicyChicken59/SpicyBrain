@@ -283,6 +283,28 @@
    "context": "Open-source MLflow; the request handler behind the local inference server.",
    "caveat": "Source code, not a Databricks page; the managed endpoint's own parser is not claimed to be identical and is verified against the endpoint.",
    "reviewedEvidence": "Search-result title (the GitHub file page) confirmed 2026-09-23; the GitHub page body was not fetched in this build. The same module and its parser were read in the MLflow 3.16.1 package installed in the build's local environment on 2026-09-23: infer_and_parse_data requires exactly one of dataframe_split, dataframe_records, instances or inputs and passes the model's input schema to dataframe_from_parsed_json, whose docstring says it will attempt to cast data types according to the schema; invocations then calls predict, where schema enforcement runs."
+  },
+  {
+   "id": "dbxfe-serving-source-sdk-serving",
+   "title": "Databricks SDK for Python v0.141.0: service/serving.py (ServingEndpointsAPI.query)",
+   "url": "https://github.com/databricks/databricks-sdk-py/blob/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/serving.py",
+   "publisher": "Databricks (databricks-sdk-py, open-source SDK repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "API reference docstrings of the serving client: the query call, its four model-input fields for pandas DataFrame and tensor input, the invocations path it posts to, and the predictions field of the response.",
+   "caveat": "API reference docstring generated from the API specification; interface scope only. It does not say that exactly one input field is allowed per request, and does not state payload limits, how the managed endpoint parses and casts values, or availability by cloud or region.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/databricks-sdk-py/9df82c7d2256c16a8785b9deaf8483e7ba29341c/databricks/sdk/service/serving.py (tag v0.141.0): ':param dataframe_records: List[Any] (optional) Pandas Dataframe input in the records orientation. :param dataframe_split: :class:`DataframeSplitInput` (optional) Pandas Dataframe input in the split orientation. ... :param inputs: Any (optional) Tensor-based input in columnar format. :param instances: List[Any] (optional) Tensor-based input in row format.' ... 'f\"/serving-endpoints/{name}/invocations\",' ... 'predictions: Optional[List[Any]] = None \"\"\"The predictions returned by the serving endpoint.\"\"\"' Interface scope: the query call's four model-input fields, the path it posts to and the response field. The docstring does not say that exactly one input field is allowed per request, and does not state payload limits, how the managed endpoint parses and casts values, or availability by cloud or region."
+  },
+  {
+   "id": "dbxfe-serving-source-mlflow-scoring-server",
+   "title": "MLflow v3.16.1: mlflow/pyfunc/scoring_server/__init__.py (infer_and_parse_data)",
+   "url": "https://github.com/mlflow/mlflow/blob/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/pyfunc/scoring_server/__init__.py",
+   "publisher": "MLflow project (mlflow/mlflow, open-source repository)",
+   "reviewedAt": "2026-09-25",
+   "publishedAt": null,
+   "context": "Open-source MLflow's request handler behind the local inference server, pinned at the v3.16.1 tag: the four accepted input fields, the exactly-one rule and the hand-off of the model's input schema to the JSON parser.",
+   "caveat": "Open-source source code at a release tag, not Databricks documentation; open-source scope only. The managed endpoint's own parser is not claimed to be identical and is verified against the endpoint.",
+   "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/mlflow/mlflow/32792afe5b0183fce10532d3a023f5cfa8612d09/mlflow/pyfunc/scoring_server/__init__.py (tag v3.16.1): 'SUPPORTED_FORMATS = {DF_RECORDS, DF_SPLIT, INSTANCES, INPUTS} ... f\"The input must be a JSON dictionary with exactly one of the input fields {SUPPORTED_FORMATS}\" ... if len(format_keys) != 1: ... error_code=BAD_REQUEST, ... return dataframe_from_parsed_json( data[input_format], pandas_orient=pandas_orient, schema=schema' Open-source scope: MLflow's own scoring server accepts exactly one of the four input fields and hands the model's input schema to its JSON parser; this does not establish how the managed Databricks endpoint parses a request."
   }
  ],
  "claims": [
@@ -338,7 +360,9 @@
    "description": "Requests carry a JSON-serialized pandas DataFrame under dataframe_split or dataframe_records, or tensors under instances or inputs, and the response returns predictions.",
    "kind": "documented",
    "sourceIds": [
-    "dbxfe-serving-source-query"
+    "dbxfe-serving-source-query",
+    "dbxfe-serving-source-sdk-serving",
+    "dbxfe-serving-source-mlflow-scoring-server"
    ],
    "context": "Custom model endpoint request contract."
   },
@@ -437,7 +461,8 @@
    "kind": "documented",
    "sourceIds": [
     "dbxfe-serving-source-scoring-server",
-    "dbxfe-serving-source-signatures"
+    "dbxfe-serving-source-signatures",
+    "dbxfe-serving-source-mlflow-scoring-server"
    ],
    "context": "Open-source MLflow 3.x; the managed endpoint is verified separately."
   },
@@ -3467,7 +3492,7 @@
   },
   {
    "id": "dbxfe-serving-contract",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "title": "The request contract is the signature made external",
    "outcome": "Predict, for a given request body, whether the server accepts it, casts it or refuses it, and at which layer.",
    "explanation": "The body is a JSON-serialized pandas DataFrame under dataframe_split or dataframe_records, and two layers act on it. Parsing casts values to the signature's types, so 61 or \"61\" becomes 61.0, while \"61%\" cannot be cast and is refused. Then [[dbxfe-serving-signature-concept|enforcement]] matches columns by name, refuses a missing required column, ignores an undeclared one and allows only lossless conversions. Notice in the second state that a renamed column is a missing required column, and in the fourth why the [[dbxfe-serving-contract-concept|contract]] test sends JSON.",
@@ -3490,13 +3515,13 @@
    ],
    "hint": "Ask four questions of each column: is it declared, is it present, can the parser cast it, and is the result lossless.",
    "handbook": {
-    "markdown": "The MLflow signature guide states the enforcement rules. Enforcement runs when a model is loaded as a python function or served through deployment tools; it does not run for a model loaded in its native flavor, so a notebook that calls `mlflow.sklearn.load_model` may predict on a renamed frame the endpoint refuses. Inputs are matched by name and reordered to the signature's order; missing required inputs raise; extra inputs are disregarded; for column-based signatures only lossless conversions pass, int to double but not long to double.\n\nBefore enforcement, the server parses the body. Open-source MLflow's scoring server accepts exactly one of `dataframe_split`, `dataframe_records`, `instances` or `inputs`, and passes the signature to its JSON parser, which casts values to the signature's types; a value it cannot cast is refused as a bad request. The Databricks query page gives the same outer shape, posted to the endpoint's invocations URL with `predictions` in the response. Whether the managed endpoint's parser casts exactly as the open-source one does is a verification item, checked at stage 1 of a release by its 4xx rate, not assumed.\n\nTwo consequences follow. A test that builds a pandas frame from Python integers holds int64, MLflow's long, and is refused where the JSON path would accept the same number; test the body, not a frame. And a null in a declared column is not a missing column: it passes both layers and reaches the model as a missing value, which is why the scorecard counts nulls.\n\nThe lesson's contract test therefore rebuilds the version's signature around a constant stand-in model and sends JSON bodies through the open-source handler: the column list, a valid body, a missing column, a renamed column and a unit suffix. It is labelled not executed in this build, calls no endpoint, and proves the contract, not the model's predictions. A signature changes only with a new version, so a caller's schema change is a caller fix or a new release.",
+    "markdown": "The MLflow signature guide states the enforcement rules. Enforcement runs when a model is loaded as a python function or served through deployment tools; it does not run for a model loaded in its native flavor, so a notebook that calls `mlflow.sklearn.load_model` may predict on a renamed frame the endpoint refuses. Inputs are matched by name and reordered to the signature's order; missing required inputs raise; extra inputs are disregarded; for column-based signatures only lossless conversions pass, int to double but not long to double.\n\nBefore enforcement, the server parses the body. Open-source MLflow's scoring server accepts exactly one of `dataframe_split`, `dataframe_records`, `instances` or `inputs`, and passes the signature to its JSON parser, which casts values to the signature's types; a value it cannot cast is refused as a bad request. The Databricks SDK for Python's API reference for the query call lists the same four input fields, posted to the endpoint's `/serving-endpoints/{name}/invocations` path, with `predictions` in the response. Whether the managed endpoint's parser casts exactly as the open-source one does is a verification item, checked at stage 1 of a release by its 4xx rate, not assumed.\n\nTwo consequences follow. A test that builds a pandas frame from Python integers holds int64, MLflow's long, and is refused where the JSON path would accept the same number; test the body, not a frame. And a null in a declared column is not a missing column: it passes both layers and reaches the model as a missing value, which is why the scorecard counts nulls.\n\nThe lesson's contract test therefore rebuilds the version's signature around a constant stand-in model and sends JSON bodies through the open-source handler: the column list, a valid body, a missing column, a renamed column and a unit suffix. It is labelled not executed in this build, calls no endpoint, and proves the contract, not the model's predictions. A signature changes only with a new version, so a caller's schema change is a caller fix or a new release.",
     "sourceSectionIds": [
      "dbxfe-serving-l01-request"
     ]
    },
    "recap": "Parse casts to the signature's types, enforcement checks names and lossless types; test the JSON body, not a frame.",
-   "changeNote": "New academy beat.",
+   "changeNote": "The handbook now credits the request shape (four input fields, the invocations path, predictions in the response) to the Databricks SDK for Python v0.141.0 API reference, service/serving.py, read at its release tag on 2026-09-25, instead of the query documentation page. The facts taught are unchanged.",
    "mediaIds": []
   },
   {

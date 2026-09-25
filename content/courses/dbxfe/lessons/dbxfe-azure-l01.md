@@ -29,7 +29,7 @@ Two authorities then grant separately. Unity Catalog privileges decide what a Da
 
 An injected workspace takes two dedicated subnets, host and container, delegated to `Microsoft.Databricks/workspaces`. Each node takes one address in each; Azure reserves five per subnet, so a /26 pair caps the workspace at 59 nodes. With secure cluster connectivity nodes get no public IP and the VNet opens no inbound port.
 
-Egress is Cinderline's in the injected pattern: a NAT gateway for stable egress IPs, or a route table sending `0.0.0.0/0` to a firewall plus service-tag routes for `AzureDatabricks`, `Storage` and `EventHub`. Azure picks the longest matching prefix. Subnets of VNets created through API versions released after 31 March 2026 are private by default, so an explicit outbound method is required.
+Egress is Cinderline's in the injected pattern: a NAT gateway for stable egress IPs, or a route table sending `0.0.0.0/0` to a firewall plus service-tag routes for `AzureDatabricks`, `Storage` and `EventHub`. Azure picks the longest matching prefix. Subnets of VNets created through API versions released after 31 March 2026 are private by default, and in a private subnet a service-tag route whose next hop is Internet fails unless an explicit outbound method such as a NAT gateway is also configured. Azure also says private subnets do not apply to delegated subnets hosting PaaS services, so read each workspace subnet's setting.
 
 <!-- section:dbxfe-azure-l01-storage -->
 
@@ -88,7 +88,7 @@ Unknown until verified: endpoint support and limits in the region, networking ch
 
 Carry the questions across clouds, not the answers:
 
-- The workspace is an Azure resource with a locked managed resource group, not a configuration naming a customer account's VPC and bucket.
+- A classic workspace is an Azure resource with a locked managed resource group, not a configuration naming a customer account's VPC and bucket.
 - Classic networking uses two delegated subnets and Databricks-managed NSG rules, not a customer VPC with a security group.
 - Storage identity is an access connector's managed identity holding an Azure role; no trust policy is written.
 - The legacy path is a key, SAS or client secret in Spark configuration, not an instance profile.
@@ -101,7 +101,7 @@ Treating every 403 as a missing grant: a storage network rule refuses with a 403
 
 <!-- section:dbxfe-azure-l01-sources -->
 
-Azure Databricks pages on Microsoft Learn were confirmed by search-result title and snippet on 23 September 2026 by this module's earlier author in the same build session; their bodies were not fetched because the sandbox blocks the documentation host. Azure platform pages were read from their Markdown sources in Microsoft's public documentation repositories, and Databricks SDK docstrings from the PyPI package. Each source record says which. Documented mechanisms, original guidance and fictional Cinderline records are labelled separately.
+Azure Databricks pages on Microsoft Learn were confirmed by search-result title and snippet on 23 September 2026 by this module's earlier author in the same build session; their bodies were not fetched because the sandbox blocks the documentation host. Azure platform pages were read from their Markdown sources in Microsoft's public documentation repositories, and Databricks SDK docstrings from the PyPI package. Each source record says which. Four corrections made on 25 September 2026 rest on interface documentation read at pinned commits: the Microsoft.Databricks REST API specification and the Databricks and AzureRM Terraform provider documentation; these establish interfaces, not availability. Documented mechanisms, original guidance and fictional Cinderline records are labelled separately.
 
 <!-- section:dbxfe-azure-l01-links -->
 

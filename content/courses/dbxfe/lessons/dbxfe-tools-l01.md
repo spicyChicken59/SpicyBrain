@@ -52,7 +52,7 @@ status = gate._key_status((user, tool, key), digest(arguments))
 # 'conflict' refuses; 'resolve' re-sends with the same key
 ```
 
-C17 is the case to remember: the store wrote D3 on attempt 1, all three replies were late, and after 7500 ms the gate reported `timed_out` with outcome unknown. C18, the same key a minute later, returned D3 in 200 ms. A new key per retry would have written a fourth draft. General-purpose clients agree: urllib3 retries GET or PUT by default, not POST.
+C17 is the case to remember: the store wrote D3 on attempt 1, all three replies were late, and after 7500 ms the gate reported `timed_out` with outcome unknown. C18, the same key a minute later, returned D3 in 200 ms. A new key per retry would have written a fourth draft. General-purpose clients agree: urllib3 retries a late reply to a GET or PUT by default, not to a POST.
 
 <!-- section:dbxfe-tools-l01-mcp -->
 
@@ -64,7 +64,7 @@ The Model Context Protocol (MCP) lets a server expose tools, resources and promp
             "arguments": {"machine_id": "M7", "manual_section": "M7-4.2", "note": "Pressure drop 1.8 bar"}}}
 ```
 
-Each tool carries an `inputSchema` and optional annotations such as `readOnlyHint`, which are hints: clients should not decide anything from annotations sent by untrusted servers. For HTTP transports, the MCP Python SDK's authorization checks a bearer token's audience, expiry and the endpoint's scopes. That proves who connected, not whether this user may draft for machine C4; the handler and the target still decide. On Databricks, managed MCP servers expose Unity Catalog functions, vector search indexes and Genie spaces, and custom servers can run as apps with OAuth; verify availability and status first.
+Each tool carries an `inputSchema` and optional annotations such as `readOnlyHint`, which are hints: clients should not decide anything from annotations sent by untrusted servers. For HTTP transports, the MCP Python SDK's authorization checks a bearer token's expiry and the endpoint's scopes, and its audience only when audience validation is enabled, which the MCP specification requires servers to do. That proves who connected, not whether this user may draft for machine C4; the handler and the target still decide. On Databricks, managed MCP servers expose Unity Catalog functions, vector search indexes and Genie Agents (formerly Genie spaces), and custom servers can run as apps with OAuth; verify availability and status first.
 
 <!-- section:dbxfe-tools-l01-audit -->
 
@@ -107,7 +107,7 @@ Harbor Lane Clinic's supply assistant uses the same gate. `order_supplies(item_c
 
 <!-- section:dbxfe-tools-l01-sources -->
 
-Protocol facts come from the MCP Python SDK 2.2.0 and its schema package, downloaded from PyPI and read locally; the specification's tools page is cited by the URL the SDK uses, not re-read. Databricks facts come from the Databricks-authored databricks-mcp 0.9.2 and databricks-ai-bridge 0.22.0 packages and MLflow 3.16.1; the MCP on Databricks and agent authentication pages were not fetched here, so verify server types, preview status and regions there. OWASP wording is as reproduced in garak 0.17.0; retry defaults come from urllib3 2.6.3. Lab results are local executions, not platform behaviour.
+Protocol facts come from the MCP Python SDK 2.2.0 and its schema package, downloaded from PyPI and read locally; the specification's tools page was read in its source repository on 2026-09-25. The audience check was corrected on 2026-09-25 after reading the SDK's auth settings and token verifier at its v2.2.0 tag and the specification's authorization page in their source repositories. Databricks facts come from the Databricks-authored databricks-mcp 0.9.2 and databricks-ai-bridge 0.22.0 packages and MLflow 3.16.1; the MCP on Databricks and agent authentication pages were not fetched here, so verify server types, preview status and regions there; the name Genie Agents comes from Databricks' developer documentation source (databricks/devhub). OWASP wording is as reproduced in garak 0.17.0; retry defaults come from urllib3 2.6.3, whose retry code was re-read at its release tag on 2026-09-25. Lab results are local executions, not platform behaviour.
 
 <!-- section:dbxfe-tools-l01-related -->
 
