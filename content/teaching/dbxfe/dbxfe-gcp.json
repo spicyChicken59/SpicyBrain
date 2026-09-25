@@ -332,25 +332,25 @@
     },
     {
       "id": "dbxfe-gcp-source-sra-firewall",
-      "title": "Databricks Security Reference Architecture templates: Google Cloud workspace module firewall rules (vpc-firewall.tf, workspace.tf)",
+      "title": "Databricks Security Reference Architecture templates: Google Cloud workspace module firewall rules (vpc-firewall.tf, workspace.tf, variables.tf)",
       "url": "https://github.com/databricks/terraform-databricks-sra/blob/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/vpc-firewall.tf",
       "publisher": "Databricks (terraform-databricks-sra, open-source security reference architecture templates)",
       "reviewedAt": "2026-09-25",
       "publishedAt": null,
-      "context": "Terraform in Databricks' reference architecture that creates the VPC firewall rules for a classic Google Cloud workspace: the Databricks subnet's ingress rule before the workspace and, when the network is hardened, egress rules.",
-      "caveat": "Databricks-authored template code (companion material), not product documentation: its names, priorities and hardening choices are the template's and it is not a complete list of the rules Databricks requires. Relied on only for the subnet ingress rule the template pre-creates and the hardened egress rule to the region's control-plane IP addresses when PSC is not used.",
-      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/vpc-firewall.tf: '# Pre-create the intra-subnet ingress rule that Databricks would otherwise # auto-create on the workspace's VPC.' ... '# caller is responsible for all GCP-side networking, including the subnet # ingress rule Databricks requires.' ... 'count = (var.harden_network && !var.use_psc && !var.serverless_workspace_deployment) ? 1 : 0' ... 'destination_ranges = var.databricks_control_plane_ips'; from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/workspace.tf at the same commit: 'depends_on = [ google_compute_firewall.db_subnet_ingress, ]'; and from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/variables.tf: 'Databricks control-plane IPs for your region. Required when harden_network = true and use_psc = false.' Scope: a Databricks-authored reference template (open-source companion code); it shows what the template creates and what its comments say, not the product's documented requirements."
+      "context": "Terraform in Databricks' reference architecture that creates the VPC firewall rules for a classic Google Cloud workspace: the Databricks subnet's ingress rule before the workspace when the template builds the VPC and, when the network is hardened, egress rules. The url is the module's firewall file; workspace.tf and variables.tf are in the same directory at the same commit.",
+      "caveat": "Databricks-authored template code (companion material), not product documentation: its names, priorities and hardening choices are the template's and it is not a complete list of the rules Databricks requires. Relied on only for what the template says of the subnet ingress rule Databricks requires (pre-created in a VPC the template builds, left to the caller in a VPC the caller brings) and for the hardened egress rule to the region's control-plane IP addresses when PSC is not used.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/vpc-firewall.tf: '# Pre-create the intra-subnet ingress rule that Databricks would otherwise # auto-create on the workspace's VPC.' ... '# Skipped when use_existing_vpc = true — in bring-your-own-VPC mode the # caller is responsible for all GCP-side networking, including the subnet # ingress rule Databricks requires.' ... 'count = (var.use_existing_vpc || var.serverless_workspace_deployment) ? 0 : 1' ... 'count = (var.harden_network && !var.use_psc && !var.serverless_workspace_deployment) ? 1 : 0' ... 'destination_ranges = var.databricks_control_plane_ips'; from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/workspace.tf at the same commit: 'depends_on = [ google_compute_firewall.db_subnet_ingress, ]'; and from https://raw.githubusercontent.com/databricks/terraform-databricks-sra/a3403d9d78414cb81086fca46a442a81a483278a/gcp/modules/workspace_deployment/variables.tf: 'Databricks control-plane IPs for your region. Required when harden_network = true and use_psc = false.' Scope: a Databricks-authored reference template (open-source companion code); it shows what the template creates and what its comments say, not the product's documented requirements."
     },
     {
       "id": "dbxfe-gcp-source-kms",
-      "title": "Cloud Key Management Service API v1 discovery document (revision 20260917): crypto key IAM policy",
+      "title": "Cloud Key Management Service API v1 discovery document (revision 20260917): crypto key and key ring IAM policies",
       "url": "https://www.googleapis.com/discovery/v1/apis/cloudkms/v1/rest",
       "publisher": "Google",
       "reviewedAt": "2026-09-25",
       "publishedAt": null,
-      "context": "Google Cloud KMS access control: a crypto key's own IAM policy, read and replaced through getIamPolicy and setIamPolicy.",
-      "caveat": "API descriptions only, read live; they name no role for Databricks' key account and do not describe the grant Databricks makes through OAuth. Relied on only to show that a Cloud KMS key carries its own IAM policy of role bindings, where a grant on the key is recorded.",
-      "reviewedEvidence": "Read in this build on 2026-09-25 from https://www.googleapis.com/discovery/v1/apis/cloudkms/v1/rest (revision 20260917): the cryptoKeys resource pattern '^projects/[^/]+/locations/[^/]+/keyRings/[^/]+/cryptoKeys/[^/]+$'; setIamPolicy: 'Sets the access control policy on the specified resource. Replaces any existing policy.'; getIamPolicy: 'Gets the access control policy for a resource. Returns an empty policy if the resource exists and does not have a policy set.'; Policy: 'An Identity and Access Management (IAM) policy, which specifies access controls for Google Cloud resources. A `Policy` is a collection of `bindings`. A `binding` binds one or more `members`, or principals, to a single `role`.' Scope: Google's API reference for Cloud KMS access control (interface only)."
+      "context": "Google Cloud KMS access control: IAM policies on a crypto key and on its key ring, each read and replaced through getIamPolicy and setIamPolicy.",
+      "caveat": "API descriptions only, read live; they name no role for Databricks' key account, do not describe the grant Databricks makes through OAuth, and do not say on which resource a grant to use the key is recorded, nor whether a key ring's policy reaches the keys in it. Relied on only to show that Cloud KMS access control is an IAM policy of role bindings, which the API exposes on a key and on its key ring alike.",
+      "reviewedEvidence": "Read in this build on 2026-09-25 from https://www.googleapis.com/discovery/v1/apis/cloudkms/v1/rest (revision 20260917; the same endpoint also served revision 20260903 that day, which carries the same passages): the cryptoKeys resource pattern '^projects/[^/]+/locations/[^/]+/keyRings/[^/]+/cryptoKeys/[^/]+$' and the keyRings resource pattern '^projects/[^/]+/locations/[^/]+/keyRings/[^/]+$'; setIamPolicy at 'v1/projects/{projectsId}/locations/{locationsId}/keyRings/{keyRingsId}/cryptoKeys/{cryptoKeysId}:setIamPolicy' and at 'v1/projects/{projectsId}/locations/{locationsId}/keyRings/{keyRingsId}:setIamPolicy', each described as 'Sets the access control policy on the specified resource. Replaces any existing policy.'; getIamPolicy: 'Gets the access control policy for a resource. Returns an empty policy if the resource exists and does not have a policy set.'; KeyRing: 'A KeyRing is a toplevel logical grouping of CryptoKeys.'; Policy: 'An Identity and Access Management (IAM) policy, which specifies access controls for Google Cloud resources. A `Policy` is a collection of `bindings`. A `binding` binds one or more `members`, or principals, to a single `role`.' Scope: Google's API reference for Cloud KMS access control (interface only)."
     }
   ],
   "claims": [
@@ -1407,7 +1407,7 @@
       "title": "Service accounts and the projects that own them",
       "alt": "A table of the service accounts in Cinderline's deployment, the project that owns each and its purpose, then the grant each needs on Cinderline's side.",
       "caption": "Read each email's domain as its owning project; one row stays unknown until verified. Synthetic teaching example; the workspace ID is synthetic.",
-      "textEquivalent": "Who owns each service account: The email names the owning project, so three of these identities belong to Databricks and two to Cinderline. Table columns: Service account | Owning project | Purpose. Rows: dbx-provisioner@cl-admin-tools | cl-admin-tools (Cinderline) | Account admin that creates workspaces; db-8811223344556677@prod-gcp-us-east4 | prod-gcp-us-east4 (Databricks) | Created for the workspace; Storage credential account | Databricks-managed | Reads buckets after catalog checks; Customer-managed key account | Databricks control-plane project | Uses the Cloud KMS key; Cluster google_service_account | A Cinderline project | Cloud Storage and BigQuery for one cluster; Default classic VM account | Unknown until verified | Unknown until verified.\n\nWhat each needs from Cinderline: Every identity above needs a grant on something Cinderline owns; the evidence is always an IAM policy. Table columns: Service account | Grant on Cinderline's side | Evidence. Rows: Provisioner | Custom Workspace Creator role on the workspace project | Project IAM policy; Workspace account | Unknown until verified | Project IAM policy after creation; Storage credential account | Roles on gs://cl-quality-raw | Bucket IAM policy; Key account | Use of the Cloud KMS key | Key IAM policy; Cluster account | Roles on each bucket it reads | Bucket IAM policy.",
+      "textEquivalent": "Who owns each service account: The email names the owning project, so three of these identities belong to Databricks and two to Cinderline. Table columns: Service account | Owning project | Purpose. Rows: dbx-provisioner@cl-admin-tools | cl-admin-tools (Cinderline) | Account admin that creates workspaces; db-8811223344556677@prod-gcp-us-east4 | prod-gcp-us-east4 (Databricks) | Created for the workspace; Storage credential account | Databricks-managed | Reads buckets after catalog checks; Customer-managed key account | Databricks control-plane project | Uses the Cloud KMS key; Cluster google_service_account | A Cinderline project | Cloud Storage and BigQuery for one cluster; Default classic VM account | Unknown until verified | Unknown until verified.\n\nWhat each needs from Cinderline: Every identity above needs a grant on something Cinderline owns; the evidence is always an IAM policy. Table columns: Service account | Grant on Cinderline's side | Evidence. Rows: Provisioner | Custom Workspace Creator role on the workspace project | Project IAM policy; Workspace account | Unknown until verified | Project IAM policy after creation; Storage credential account | Roles on gs://cl-quality-raw | Bucket IAM policy; Key account | Use of the Cloud KMS key | IAM policy granting key use; Cluster account | Roles on each bucket it reads | Bucket IAM policy.",
       "provenance": "Original SpicyBrain authored visual; synthetic values; no copied product screenshot or executed cloud result.",
       "claimIds": [
         "dbxfe-gcp-claim-accounts",
@@ -1494,7 +1494,7 @@
               [
                 "Key account",
                 "Use of the Cloud KMS key",
-                "Key IAM policy"
+                "IAM policy granting key use"
               ],
               [
                 "Cluster account",
@@ -3353,7 +3353,7 @@
       "id": "dbxfe-gcp-vpc-self",
       "revision": "2",
       "prompt": "Cinderline's classic clusters stopped starting after the network team 'tidied up' unused routers in cl-net-host. A colleague proposes adding ingress firewall rules. Explain why that will not help and what you would check instead, in order.",
-      "modelAnswer": "The nodes open outbound connections to the relay, so no ingress rule from another source is consulted to reach it. The ingress rule for traffic within the Databricks subnet is a separate matter and stays in place: Databricks' reference template creates it before the workspace, noting that Databricks would otherwise create it. Check, in order: whether a Cloud Router with a NAT covering dbx-nodes-use4 still exists in us-east4 (the tidy-up is the recorded change); whether the relay hostname resolves from the subnet; whether any egress firewall rule with a lower priority number denies the connection; then retest one start in the same subnet and record the result. If back-end PSC is in use instead of NAT, check the endpoints and their DNS records in place of the NAT.",
+      "modelAnswer": "The nodes open outbound connections to the relay, so no ingress rule from another source is consulted to reach it. The ingress rule for traffic within the Databricks subnet is a separate matter and stays in place: Databricks' reference template calls it the subnet ingress rule Databricks requires. Check, in order: whether a Cloud Router with a NAT covering dbx-nodes-use4 still exists in us-east4 (the tidy-up is the recorded change); whether the relay hostname resolves from the subnet; whether any egress firewall rule with a lower priority number denies the connection; then retest one start in the same subnet and record the result. If back-end PSC is in use instead of NAT, check the endpoints and their DNS records in place of the NAT.",
       "reasoning": "The order follows the recorded change first and then the packet's path outward, and each check is read-only and cheap; starting from firewall logs is acceptable when the change record is missing.",
       "conceptIds": [
         "dbxfe-gcp-vpc-concept",
@@ -3569,7 +3569,7 @@
         ]
       },
       "recap": "Read a service account's owner off its email domain, then find the grant it needs on something Cinderline owns.",
-      "changeNote": "Two corrections to our teaching. The handbook's sentence on account-API sign-in was narrowed: the Databricks Terraform provider documentation (v1.133.0) requires a Google-issued OIDC token for creating or updating workspaces, network configurations and VPC endpoints, and documents service-principal sign-in at account level. The check's key-account rationale now says that Cinderline grants that account use of the key when the manual option is set, as the Databricks SDK for Python (v0.141.0) describes.",
+      "changeNote": "Three corrections to our teaching. Our sentence on account-API sign-in now matches the Databricks Terraform provider documentation (v1.133.0), which says that creating or updating workspaces, network configurations and VPC endpoints needs a Google-issued OIDC token, and documents service-principal sign-in at account level. The check's key-account rationale now says Cinderline grants that account use of the key when the manual option is set, as the Databricks SDK for Python (v0.141.0) describes. The key account's evidence row no longer names which IAM policy holds that grant, because the Cloud KMS API gives a key and its key ring an IAM policy each.",
       "mediaIds": []
     },
     {
@@ -3636,7 +3636,7 @@
         ]
       },
       "recap": "One regional subnet (/29 to /9) that nothing else shares, plus an outbound path; removing the NAT stalls starts without any refusal.",
-      "changeNote": "The self-check's model answer was narrowed: ingress rules from other sources do not help the nodes' outbound connection to the relay, but the ingress rule for traffic within the Databricks subnet stays in place. Source: Databricks' reference architecture template (vpc-firewall.tf), which creates that rule and notes that Databricks would otherwise create it.",
+      "changeNote": "We corrected the self-check's model answer. It still says extra ingress rules will not fix the nodes' outbound connection to the relay, and now adds that the ingress rule for traffic within the Databricks subnet stays in place. Source for that rule: Databricks' reference architecture template (vpc-firewall.tf), which calls it the subnet ingress rule Databricks requires.",
       "mediaIds": []
     },
     {
@@ -4043,7 +4043,7 @@
         "dbxfe-gcp-fiction"
       ],
       "beatId": "dbxfe-gcp-accounts",
-      "whyItMatters": "It adds a service account owned by a Databricks project, and its key grant becomes a separate evidence row in the key's own IAM policy."
+      "whyItMatters": "It adds a service account owned by a Databricks project, and its grant to use the key becomes a separate evidence row in an IAM policy."
     },
     {
       "id": "dbxfe-gcp-extension-vpcsc",

@@ -124,7 +124,7 @@ Routing batch traffic through the station's endpoint. Scale to zero under a late
 
 <!-- section:dbxfe-serving-l01-sources -->
 
-Databricks documentation on Model Serving, custom model endpoints and queries, serving multiple models, batch inference, inference tables, data profiling (formerly Lakehouse Monitoring), automatic feature lookup, training with feature tables, and endpoint health; MLflow's Model Signatures and Input Examples. Titles and URLs were confirmed by web search on 2026-09-23; page bodies were not fetched in this build. On 2026-09-25 two source files were read in their source repositories: the query call in the Databricks SDK for Python's API reference at its v0.141.0 tag, for the four input fields, the invocations path and the `predictions` response field; and open-source MLflow's scoring server at its v3.16.1 tag, for the input fields it accepts and how it parses them.
+Databricks documentation on Model Serving, custom model endpoints and queries, serving multiple models, batch inference, inference tables, data profiling (formerly Lakehouse Monitoring), automatic feature lookup, training with feature tables, and endpoint health; MLflow's Model Signatures and Input Examples. Titles and URLs were confirmed by web search on 2026-09-23; page bodies were not fetched in this build. On 2026-09-25 two source files were read in their source repositories: the query call in the Databricks SDK for Python's API reference at its v0.141.0 tag, for the four DataFrame and tensor input fields, the invocations path and the `predictions` response field; and open-source MLflow's scoring server at its v3.16.1 tag, for the input fields it accepts and how it parses them.
 
 <!-- section:dbxfe-serving-l01-related -->
 
