@@ -153,7 +153,7 @@ A green mocked suite proves your handler's contract against fakes. It cannot pro
 
 <!-- section:dbxfe-apps-l01-sources -->
 
-Four Apps pages (overview, authorization, resources, deployment) are cited as supplied in the build's source list and as previously read: the search budget was exhausted and the documentation host is blocked, so no title was re-confirmed and no page fetched. The Lakebase app-resource page was search-confirmed earlier in this build; two pages keep their original review dates. Header and environment details are marked for verification.
+Four Apps pages (overview, authorization, resources, deployment) are cited as supplied in the build's source list and from the author's recollection: the search budget was exhausted and the documentation host is blocked, so no title was re-confirmed and no page fetched. The Lakebase app-resource page was search-confirmed earlier in this build; two pages keep their original review dates. Header and environment details are marked for verification.
 
 <!-- section:dbxfe-apps-l01-links -->
 

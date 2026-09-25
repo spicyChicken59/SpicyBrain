@@ -102,7 +102,7 @@ Stock and history make 21 of 50 questions, above a one-in-five threshold, so pil
 - databricks-agents 1.12.0, read in this build: what `deploy()` configures.
 - MLflow 3.16.1, read in this build: `mlflow.genai.evaluate`, built-in scorers and `ResponsesAgent`.
 - [Build agents on Databricks](https://docs.databricks.com/aws/en/agents) and [Evaluate and improve](https://docs.databricks.com/aws/en/mlflow3/genai/eval-monitor/), the course's reviewed agent and evaluation sources.
-- Foundation Model APIs and AI Functions documentation: cited as previously read, neither fetched nor search-confirmed here, so their details are verification items.
+- Foundation Model APIs and AI Functions documentation: cited from the author's recollection, neither fetched nor search-confirmed here, so their details are verification items.
 <!-- section:dbxfe-ai-platform-l01-related -->
 
 [GenAI, retrieval and agents](#/module/dbxfe-genai) for the general retrieval and tool boundaries; [MLflow, experiments and reproducibility](#/module/dbxfe-mlflow) for the model versions an agent endpoint serves; [Unity Catalog, security and deployment](#/module/dbxfe-m06) for the grants behind every tool. The retrieval, evaluation, tools and applications modules go deeper.

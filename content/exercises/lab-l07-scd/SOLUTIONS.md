@@ -136,7 +136,7 @@ as the snapshot cadence.
 
 Nothing below was run: PySpark 4.0.4, this lab's engine, has no
 `pyspark.pipelines` module (the runner records that check), and no Databricks
-workspace was used. Argument names for Databricks are as previously read in
+workspace was used. Argument names for Databricks are as the author recalled them from
 its AUTO CDC documentation; confirm them against the current page first.
 
 On Databricks, the Type 2 table would be a streaming table filled by an AUTO CDC

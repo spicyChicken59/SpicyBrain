@@ -55,6 +55,7 @@ NEGATED = re.compile(
     r"(?:page body |body )?(?:was |were )?not (?:been )?(?:searched or |re-?)?(?:fetched|read|searched)(?: or (?:re-?)?(?:fetched|searched|read))?(?: again)?(?: in (?:this|the) build| in this (?:authoring )?session)?"
     r"|neither [^.]*? (?:was|were) (?:re-?checked|fetched|read)"
     r"|(?:were|was) not (?:reachable|read)(?: here)?"
+    r"|not a read in (?:this|the) build"
 )
 
 

@@ -24,7 +24,7 @@ Draw jobs, tables and reports as a graph and colour wave 1. Two edges cross its 
 
 <!-- section:dbxfe-warehouse-migration-l01-platforms -->
 
-Profile each source in its own vendor's current words before mapping it. In this build each vendor page's title and search snippet were confirmed, Microsoft's Fabric source and AWS's archived Redshift guides were read in full, and Snowflake and BigQuery detail beyond their snippets is marked as previously read.
+Profile each source in its own vendor's current words before mapping it. In this build each vendor page's title and search snippet were confirmed, Microsoft's Fabric source and AWS's archived Redshift guides were read in full, and Snowflake and BigQuery detail beyond their snippets is marked as the author's unverified recollection.
 
 | Question | Legacy appliance | Hadoop and Spark | Cloud warehouse |
 |---|---|---|---|
