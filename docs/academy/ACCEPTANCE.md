@@ -71,16 +71,22 @@ See [`CLOSEOUT.md`](CLOSEOUT.md) for recovery and the unresolved requirements.
   discarded before classification. A record that says its own page was not
   fetched can never count as read, and one that says it was not checked is
   unconfirmed.
-- **Coverage warnings** (listed in [`COVERAGE.md`](COVERAGE.md)) are all on
-  retained material:
-  - 31 retained canonical lessons keep their original seven-part format,
-    without the new solution, mistakes and sources sections;
-  - 10 retained scenarios predate stakeholder disclosures;
-  - three retained check prompts are short but complete.
+- **Coverage warnings.** [`COVERAGE.md`](COVERAGE.md) lists 109 warning
+  findings, all on retained material. They are 106 distinct items, because
+  the m03 scenario is reported twice and the m04 scenario three times (once
+  per lesson that uses it):
+  - 93 on 31 retained canonical lessons, each lacking the new solution,
+    mistakes and sources sections (three per lesson);
+  - 10 on retained scenarios without stakeholder disclosures;
+  - three on retained check prompts that are short but complete.
 
-  Changing any of them would move revisions that learners have already
-  answered against, for no change in meaning. The one warning on an
-  authoring note (the Delta module's editorial rationale) was fixed.
+  Each of the 106 items has its own decision and reason in
+  [`warning-dispositions.json`](warning-dispositions.json). All 106 are
+  kept: changing any of them would move revisions that learners have already
+  answered against, for no change in meaning.
+  `tests/py/test_warning_dispositions.py` fails if a warning has no decision
+  or a decision outlives its warning. The one warning on an authoring note
+  (the Delta module's editorial rationale) was fixed earlier.
 
 ## Not run, and why
 

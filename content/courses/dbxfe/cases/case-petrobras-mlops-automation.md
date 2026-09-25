@@ -2,7 +2,7 @@
 
 ### Who reports this and how
 
-The source is the Data + AI Summit 2025 session page "Petrobras MLOps Transformation With MLflow and Databricks". Two speaker pages surfaced by search, recorded as sources, name a presenter from Petrobras and a senior solutions architect from Databricks, so the reporter is joint: a customer story told with the vendor on stage. Search results date the recording's YouTube listing 7 July 2025 (also recorded); the session day itself is not stated. Only abstract-level snippets were available; the page itself and the video could not be opened when this analysis was written.
+The source is the Data + AI Summit 2025 session page "Petrobras MLOps Transformation With MLflow and Databricks". Search results for two speaker pages, recorded as sources but not opened, place one presenter at Petrobras and describe the other as a senior solutions architect at Databricks, so the reporter is treated as joint: a customer story told with the vendor on stage. Search results date the recording's YouTube listing 7 July 2025 (also recorded); the session day itself is not stated. Only abstract-level snippets were available; the page itself and the video could not be opened when this analysis was written.
 
 ### The problem
 
